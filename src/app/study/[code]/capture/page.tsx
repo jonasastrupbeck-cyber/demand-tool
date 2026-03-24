@@ -1,0 +1,325 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import { useLocale } from '@/lib/locale-context';
+
+interface HandlingType {
+  id: string;
+  label: string;
+}
+
+interface DemandType {
+  id: string;
+  category: 'value' | 'failure';
+  label: string;
+}
+
+interface ContactMethod {
+  id: string;
+  label: string;
+}
+
+interface WhatMattersType {
+  id: string;
+  label: string;
+}
+
+interface StudyData {
+  id: string;
+  name: string;
+  handlingTypes: HandlingType[];
+  demandTypes: DemandType[];
+  contactMethods: ContactMethod[];
+  whatMattersTypes: WhatMattersType[];
+}
+
+export default function CapturePage() {
+  const params = useParams();
+  const code = params.code as string;
+  const { t, tl } = useLocale();
+
+  const [study, setStudy] = useState<StudyData | null>(null);
+  const [todayCount, setTodayCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+  const [failureCauseSuggestions, setFailureCauseSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Form state
+  const [verbatim, setVerbatim] = useState('');
+  const [classification, setClassification] = useState<'value' | 'failure' | ''>('');
+  const [demandTypeId, setDemandTypeId] = useState('');
+  const [handlingTypeId, setHandlingTypeId] = useState('');
+  const [contactMethodId, setContactMethodId] = useState('');
+  const [whatMattersTypeId, setWhatMattersTypeId] = useState('');
+  const [failureCause, setFailureCause] = useState('');
+  const [whatMatters, setWhatMatters] = useState('');
+
+  const loadStudy = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setStudy(data);
+    }
+    setLoading(false);
+  }, [code]);
+
+  const loadTodayCount = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`);
+    if (res.ok) {
+      const data = await res.json();
+      setTodayCount(data.todayCount);
+    }
+  }, [code]);
+
+  const loadSuggestions = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/failure-causes`);
+    if (res.ok) {
+      const data = await res.json();
+      setFailureCauseSuggestions(data);
+    }
+  }, [code]);
+
+  useEffect(() => {
+    loadStudy();
+    loadTodayCount();
+    loadSuggestions();
+  }, [loadStudy, loadTodayCount, loadSuggestions]);
+
+  function resetForm() {
+    setVerbatim('');
+    setClassification('');
+    setDemandTypeId('');
+    setHandlingTypeId('');
+    setContactMethodId('');
+    setWhatMattersTypeId('');
+    setFailureCause('');
+    setWhatMatters('');
+    setError('');
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!verbatim.trim() || !classification) return;
+
+    setSubmitting(true);
+    setError('');
+
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        verbatim: verbatim.trim(),
+        classification,
+        demandTypeId: demandTypeId || undefined,
+        handlingTypeId: handlingTypeId || undefined,
+        contactMethodId: contactMethodId || undefined,
+        whatMattersTypeId: whatMattersTypeId || undefined,
+        failureCause: classification === 'failure' ? failureCause.trim() : undefined,
+        whatMatters: whatMatters.trim() || undefined,
+      }),
+    });
+
+    setSubmitting(false);
+
+    if (!res.ok) {
+      setError(t('capture.saveFailed'));
+      return;
+    }
+
+    setSuccess(true);
+    setTodayCount((c) => c + 1);
+    resetForm();
+    loadSuggestions();
+
+    setTimeout(() => setSuccess(false), 2000);
+  }
+
+  const filteredDemandTypes = study?.demandTypes.filter(
+    (dt) => dt.category === classification
+  ) || [];
+
+  const filteredSuggestions = failureCauseSuggestions.filter(
+    (s) => failureCause && s.toLowerCase().includes(failureCause.toLowerCase()) && s.toLowerCase() !== failureCause.toLowerCase()
+  );
+
+  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none';
+  const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <p className="text-gray-500">{t('capture.loading')}</p>
+      </div>
+    );
+  }
+
+  if (!study) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <p className="text-red-600">{t('capture.studyNotFound')}</p>
+      </div>
+    );
+  }
+
+  const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
+
+  return (
+    <div className="max-w-lg mx-auto p-4 pb-24">
+      {/* Header with today's count */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-gray-900">{study.name}</h1>
+        <span className="text-sm px-3 py-1 rounded-full font-medium bg-blue-50 text-blue-700">
+          {t('capture.today')}: {todayCount}
+        </span>
+      </div>
+
+      {/* Success flash */}
+      {success && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium animate-pulse">
+          {t('capture.saved')}
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Contact method — first field */}
+        <div>
+          <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
+          <select value={contactMethodId} onChange={(e) => setContactMethodId(e.target.value)} className={inputCls}>
+            <option value="">{t('capture.selectContactMethod')}</option>
+            {study.contactMethods.map((cm) => (
+              <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Verbatim demand */}
+        <div>
+          <label className={labelCls}>{t('capture.verbatimLabel')}</label>
+          <textarea value={verbatim} onChange={(e) => setVerbatim(e.target.value)} placeholder={t('capture.verbatimPlaceholder')} rows={3} className={inputCls} required />
+        </div>
+
+        {/* Value / Failure toggle */}
+        <div>
+          <label className={`${labelCls} mb-2`}>{t('capture.classification')}</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setClassification('value'); setDemandTypeId(''); setFailureCause(''); }}
+              className={`py-4 rounded-lg font-semibold text-lg transition-all ${
+                classification === 'value'
+                  ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
+                  : 'bg-green-50 text-green-700 border-2 border-green-200 hover:border-green-400'
+              }`}
+            >
+              {t('capture.value')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setClassification('failure'); setDemandTypeId(''); }}
+              className={`py-4 rounded-lg font-semibold text-lg transition-all ${
+                classification === 'failure'
+                  ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
+                  : 'bg-red-50 text-red-700 border-2 border-red-200 hover:border-red-400'
+              }`}
+            >
+              {t('capture.failure')}
+            </button>
+          </div>
+        </div>
+
+        {/* Demand type dropdown */}
+        {classification && (
+          <div>
+            <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
+            <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectType')}</option>
+              {filteredDemandTypes.map((dt) => (
+                <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Handling type dropdown */}
+        <div>
+          <label className={labelCls}>{t('capture.handlingLabel')}</label>
+          <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
+            <option value="">{t('capture.selectHandling')}</option>
+            {study.handlingTypes.map((ht) => (
+              <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Failure cause (only for failure demand) */}
+        {classification === 'failure' && (
+          <div className="relative">
+            <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
+            <textarea
+              value={failureCause}
+              onChange={(e) => { setFailureCause(e.target.value); setShowSuggestions(true); }}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder={t('capture.failureCausePlaceholder')}
+              rows={2}
+              className={inputCls}
+            />
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto bg-white border border-gray-200">
+                {filteredSuggestions.map((suggestion, i) => (
+                  <button key={i} type="button" className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                    onMouseDown={() => { setFailureCause(suggestion); setShowSuggestions(false); }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* What matters category dropdown */}
+        {study.whatMattersTypes.length > 0 && (
+          <div>
+            <label className={labelCls}>{t('capture.whatMattersTypeLabel')}</label>
+            <select value={whatMattersTypeId} onChange={(e) => setWhatMattersTypeId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectWhatMattersType')}</option>
+              {study.whatMattersTypes.map((wm) => (
+                <option key={wm.id} value={wm.id}>{tl(wm.label)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* What matters free text */}
+        <div>
+          <label className={labelCls}>{t('capture.whatMattersLabel')}</label>
+          <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
+        </div>
+
+        {/* Submit button - sticky at bottom */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
+          <div className="max-w-lg mx-auto">
+            <button
+              type="submit"
+              disabled={submitting || !verbatim.trim() || !classification}
+              className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
+            >
+              {submitting ? t('capture.saving') : t('capture.save')}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
