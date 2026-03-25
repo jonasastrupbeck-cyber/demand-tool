@@ -37,10 +37,10 @@ export async function exportDashboardToPptx(
   // ── Helper functions ──
 
   function addFooter(slide: PptxGenJS.Slide) {
-    // Small Vanguard logo watermark in footer
+    // Small Vanguard logo watermark in footer (aspect ratio 0.917)
     slide.addImage({
       data: VANGUARD_LOGO_BASE64,
-      x: 0.3, y: 6.85, w: 0.4, h: 0.32,
+      x: 0.3, y: 6.82, w: 0.3, h: 0.33,
     });
     slide.addText('Vanguard Demand Analysis', {
       x: 0.75, y: 7.0, w: 5, h: 0.3,
@@ -65,34 +65,34 @@ export async function exportDashboardToPptx(
 
   // ── Slide 1: Title Slide ──
   const titleSlide = pptx.addSlide();
-  titleSlide.background = { fill: '1a1a2e' };
+  titleSlide.background = { fill: 'ffffff' };
 
   // Burgundy accent bar at top
   titleSlide.addShape(pptx.ShapeType.rect, {
     x: 0, y: 0, w: 13.33, h: 0.08, fill: { color: 'ac2c2d' },
   });
 
-  // Vanguard logo on title slide
+  // Vanguard logo on title slide (1041×1136 original — aspect ratio ~0.917)
   titleSlide.addImage({
     data: VANGUARD_LOGO_BASE64,
-    x: 1, y: 0.8, w: 1.5, h: 1.2,
+    x: 1, y: 0.6, w: 1.1, h: 1.2,
   });
 
   titleSlide.addText(studyName, {
-    x: 1, y: 2.2, w: 11.33, h: 1.2,
-    fontSize: 40, fontFace: 'Arial', color: 'ffffff', bold: true,
+    x: 1, y: 2.0, w: 11.33, h: 1.2,
+    fontSize: 40, fontFace: 'Arial', color: '1f2937', bold: true,
   });
   titleSlide.addText(t('dashboard.title', locale), {
-    x: 1, y: 3.3, w: 11.33, h: 0.8,
+    x: 1, y: 3.1, w: 11.33, h: 0.8,
     fontSize: 24, fontFace: 'Arial', color: 'ac2c2d',
   });
   titleSlide.addText(`${dateRangeLabel}  •  ${data.totalEntries} ${t('dashboard.entries', locale)}`, {
-    x: 1, y: 4.3, w: 11.33, h: 0.5,
-    fontSize: 14, fontFace: 'Arial', color: '999999',
+    x: 1, y: 4.1, w: 11.33, h: 0.5,
+    fontSize: 14, fontFace: 'Arial', color: '6b7280',
   });
   titleSlide.addText(new Date().toLocaleDateString(), {
-    x: 1, y: 5.0, w: 11.33, h: 0.5,
-    fontSize: 12, fontFace: 'Arial', color: '666666',
+    x: 1, y: 4.8, w: 11.33, h: 0.5,
+    fontSize: 12, fontFace: 'Arial', color: '999999',
   });
 
   // ── Slide 2: Key Metrics ──
