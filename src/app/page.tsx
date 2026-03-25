@@ -164,11 +164,6 @@ export default function Home() {
           </div>
         )}
       </div>
-      <footer className="py-3 text-center">
-        <p className="text-[10px] text-gray-400">
-          Need help? Visit <a href="https://www.vanguardmetoden.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-500">www.vanguardmetoden.com</a> or write <a href="mailto:office@vanguard-consult.dk" className="underline hover:text-gray-500">office@vanguard-consult.dk</a>
-        </p>
-      </footer>
     </main>
   );
 }

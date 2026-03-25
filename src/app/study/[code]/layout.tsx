@@ -19,7 +19,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-white">
+    <div className="flex flex-col min-h-full bg-white">
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
@@ -61,10 +61,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
       </nav>
-      <div className="flex-1 w-full">{children}</div>
-      <p className="block w-full py-4 text-center text-[10px] text-gray-400">
-        Need help? Visit <a href="https://www.vanguardmetoden.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-500">www.vanguardmetoden.com</a> or write <a href="mailto:office@vanguard-consult.dk" className="underline hover:text-gray-500">office@vanguard-consult.dk</a>
-      </p>
+      <div className="flex-1">{children}</div>
     </div>
   );
 }
