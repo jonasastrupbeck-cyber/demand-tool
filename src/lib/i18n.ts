@@ -575,6 +575,12 @@ const translations = {
     sv: 'Vad \u00e4r viktigt f\u00f6r kunden',
     de: 'Was dem Kunden wichtig ist',
   },
+  'dashboard.whatMattersNotes': {
+    en: 'What Matters — Customer Notes',
+    da: 'Hvad betyder noget — Kundenoter',
+    sv: 'Vad är viktigt — Kundanteckningar',
+    de: 'Was wichtig ist — Kundennotizen',
+  },
   'dashboard.valueConcentration': {
     en: 'Value Demand Concentration',
     da: 'Koncentration af v\u00e6rdiskabende eftersp\u00f8rgsel',

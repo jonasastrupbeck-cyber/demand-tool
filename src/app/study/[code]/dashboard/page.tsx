@@ -244,7 +244,7 @@ export default function DashboardPage() {
           <Card label={t('dashboard.totalEntries')} value={data.totalEntries} />
           <Card label={t('dashboard.valueDemand')} value={`${valuePercent}%`} sub={`${data.valueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
           <Card label={t('dashboard.failureDemand')} value={`${failurePercent}%`} sub={`${data.failureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
-          <Card label={t('dashboard.perfect')} value={`${data.perfectPercentage}%`} sub={t('dashboard.perfectSub')} color="#3b82f6" />
+          <Card label={t('dashboard.perfect')} value={`${data.perfectPercentage}%`} sub={t('dashboard.perfectSub')} color="#22c55e" />
         </div>
 
         {data.totalEntries === 0 ? (
@@ -376,6 +376,20 @@ export default function DashboardPage() {
                     <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded bg-red-50">
                       <span className="text-sm truncate mr-2 text-gray-700">{fc.cause}</span>
                       <span className="text-sm font-medium shrink-0 text-red-700">{fc.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </ChartCard>
+            )}
+
+            {/* What matters - free text notes */}
+            {data.whatMattersNotes && data.whatMattersNotes.length > 0 && (
+              <ChartCard title={t('dashboard.whatMattersNotes')}>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {data.whatMattersNotes.map((note, i) => (
+                    <div key={i} className="py-2 px-3 rounded bg-gray-50 border border-gray-100">
+                      <p className="text-sm text-gray-700">{note.text}</p>
+                      <p className="text-xs text-gray-400 mt-1">{note.date}</p>
                     </div>
                   ))}
                 </div>

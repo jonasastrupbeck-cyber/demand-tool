@@ -2,6 +2,7 @@ import PptxGenJS from 'pptxgenjs';
 import type { DashboardData } from '@/types';
 import type { Locale, TranslationKey } from '@/lib/i18n';
 import { t as translate } from '@/lib/i18n';
+import { VANGUARD_LOGO_BASE64 } from '@/lib/logo-data';
 
 const BRAND = {
   burgundy: '#ac2c2d',
@@ -36,8 +37,13 @@ export async function exportDashboardToPptx(
   // ── Helper functions ──
 
   function addFooter(slide: PptxGenJS.Slide) {
+    // Small Vanguard logo watermark in footer
+    slide.addImage({
+      data: VANGUARD_LOGO_BASE64,
+      x: 0.3, y: 6.85, w: 0.4, h: 0.32,
+    });
     slide.addText('Vanguard Demand Analysis', {
-      x: 0.5, y: 7.0, w: 5, h: 0.3,
+      x: 0.75, y: 7.0, w: 5, h: 0.3,
       fontSize: 8, color: '999999', fontFace: 'Arial',
     });
     slide.addText(new Date().toLocaleDateString(), {
@@ -64,6 +70,12 @@ export async function exportDashboardToPptx(
   // Burgundy accent bar at top
   titleSlide.addShape(pptx.ShapeType.rect, {
     x: 0, y: 0, w: 13.33, h: 0.08, fill: { color: 'ac2c2d' },
+  });
+
+  // Vanguard logo on title slide
+  titleSlide.addImage({
+    data: VANGUARD_LOGO_BASE64,
+    x: 1, y: 0.8, w: 1.5, h: 1.2,
   });
 
   titleSlide.addText(studyName, {
@@ -96,7 +108,7 @@ export async function exportDashboardToPptx(
     { label: t('dashboard.totalEntries', locale), value: `${data.totalEntries}`, sub: t('dashboard.entries', locale), color: '1f2937', bgColor: 'f8f9fa' },
     { label: t('dashboard.valueDemand', locale), value: `${valuePercent}%`, sub: `${data.valueCount} ${t('dashboard.entries', locale)}`, color: '22c55e', bgColor: 'f0fdf4' },
     { label: t('dashboard.failureDemand', locale), value: `${failurePercent}%`, sub: `${data.failureCount} ${t('dashboard.entries', locale)}`, color: 'ef4444', bgColor: 'fef2f2' },
-    { label: t('dashboard.perfect', locale), value: `${data.perfectPercentage}%`, sub: t('dashboard.perfectSub', locale), color: '3b82f6', bgColor: 'eff6ff' },
+    { label: t('dashboard.perfect', locale), value: `${data.perfectPercentage}%`, sub: t('dashboard.perfectSub', locale), color: '22c55e', bgColor: 'f0fdf4' },
   ];
 
   metrics.forEach((m, i) => {
@@ -123,45 +135,36 @@ export async function exportDashboardToPptx(
     });
   });
 
-  // Value vs Failure donut visual below metrics
+  // Value vs Failure pie chart below metrics
   if (data.totalEntries > 0) {
-    // Simple visual bar representing value/failure split
-    const barY = 4.2;
-    const barW = 11.93;
-    const valueFrac = data.valueCount / data.totalEntries;
-
     metricsSlide.addText(t('dashboard.valueVsFailure', locale), {
       x: 0.5, y: 3.8, w: 12, h: 0.4,
       fontSize: 13, fontFace: 'Arial', color: '1f2937', bold: true,
     });
 
-    // Value portion
-    if (valueFrac > 0) {
-      metricsSlide.addShape(pptx.ShapeType.roundRect, {
-        x: 0.7, y: barY, w: barW * valueFrac, h: 0.6,
-        fill: { color: '22c55e' }, rectRadius: 0.05,
-      });
-      if (valueFrac > 0.08) {
-        metricsSlide.addText(`${t('capture.value', locale)} ${valuePercent}%`, {
-          x: 0.7, y: barY, w: barW * valueFrac, h: 0.6,
-          fontSize: 11, fontFace: 'Arial', color: 'ffffff', align: 'center', bold: true,
-        });
-      }
-    }
-    // Failure portion
-    const failFrac = 1 - valueFrac;
-    if (failFrac > 0) {
-      metricsSlide.addShape(pptx.ShapeType.roundRect, {
-        x: 0.7 + barW * valueFrac, y: barY, w: barW * failFrac, h: 0.6,
-        fill: { color: 'ef4444' }, rectRadius: 0.05,
-      });
-      if (failFrac > 0.08) {
-        metricsSlide.addText(`${t('capture.failure', locale)} ${failurePercent}%`, {
-          x: 0.7 + barW * valueFrac, y: barY, w: barW * failFrac, h: 0.6,
-          fontSize: 11, fontFace: 'Arial', color: 'ffffff', align: 'center', bold: true,
-        });
-      }
-    }
+    const pieData = [
+      {
+        name: t('capture.value', locale),
+        labels: [t('capture.value', locale), t('capture.failure', locale)],
+        values: [data.valueCount, data.failureCount],
+      },
+    ];
+
+    metricsSlide.addChart('pie', pieData, {
+      x: 3.5, y: 4.0, w: 6, h: 3.2,
+      showLegend: true,
+      legendPos: 'b',
+      legendFontSize: 10,
+      legendColor: '1f2937',
+      showPercent: true,
+      showValue: false,
+      showTitle: false,
+      dataLabelPosition: 'outEnd',
+      dataLabelFontSize: 11,
+      dataLabelColor: '1f2937',
+      dataLabelFontBold: true,
+      chartColors: ['22c55e', 'ef4444'],
+    });
   }
 
   // ── Slide 3: Top Demand Types ──

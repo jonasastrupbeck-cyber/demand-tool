@@ -63,6 +63,7 @@ export interface DashboardData {
   handlingByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   demandOverTime: Array<{ date: string; valueCount: number; failureCount: number }>;
   failureCauses: Array<{ cause: string; count: number }>;
+  whatMattersNotes: Array<{ text: string; date: string }>;
 }
 
 export interface CreateEntryInput {

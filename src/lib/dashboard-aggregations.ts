@@ -152,6 +152,18 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .orderBy(desc(sql`count(*)`))
     .limit(15);
 
+  // What matters free-text notes
+  const whatMattersNotes = await db.select({
+    text: demandEntries.whatMatters,
+    date: sql<string>`${demandEntries.createdAt}::date`,
+  })
+    .from(demandEntries)
+    .where(and(
+      ...conditions,
+      sql`${demandEntries.whatMatters} IS NOT NULL AND ${demandEntries.whatMatters} != ''`
+    ))
+    .orderBy(desc(demandEntries.createdAt));
+
   return {
     totalEntries,
     valueCount,
@@ -164,5 +176,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     handlingByClassification,
     demandOverTime: demandOverTimeResult,
     failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
+    whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date })),
   };
 }
