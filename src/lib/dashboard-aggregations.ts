@@ -16,7 +16,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   // Total counts by classification
   const classificationCounts = await db.select({
     classification: demandEntries.classification,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(whereClause)
@@ -30,7 +30,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   let perfectPercentage = 0;
   if (oneStopId && totalEntries > 0) {
     const perfectCount = await db.select({
-      count: sql<number>`count(*)`,
+      count: sql<number>`count(*)::int`,
     })
       .from(demandEntries)
       .where(and(
@@ -45,7 +45,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const demandTypeCounts = await db.select({
     label: demandTypes.label,
     category: demandTypes.category,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
@@ -57,7 +57,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   // Handling type counts
   const handlingTypeCounts = await db.select({
     label: handlingTypes.label,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
@@ -68,7 +68,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   // Contact method counts
   const contactMethodCounts = await db.select({
     label: contactMethods.label,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(contactMethods, eq(demandEntries.contactMethodId, contactMethods.id))
@@ -79,7 +79,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   // What matters type counts
   const whatMattersCounts = await db.select({
     label: whatMattersTypes.label,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(whatMattersTypes, eq(demandEntries.whatMattersTypeId, whatMattersTypes.id))
@@ -91,7 +91,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const handlingByClass = await db.select({
     label: handlingTypes.label,
     classification: demandEntries.classification,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
@@ -114,14 +114,14 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
 
   // Demand over time
   const demandOverTime = await db.select({
-    date: sql<string>`date(${demandEntries.createdAt}, 'unixepoch')`,
+    date: sql<string>`${demandEntries.createdAt}::date`,
     classification: demandEntries.classification,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(whereClause)
-    .groupBy(sql`date(${demandEntries.createdAt}, 'unixepoch')`, demandEntries.classification)
-    .orderBy(sql`date(${demandEntries.createdAt}, 'unixepoch')`);
+    .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
+    .orderBy(sql`${demandEntries.createdAt}::date`);
 
   const timeMap = new Map<string, { valueCount: number; failureCount: number }>();
   for (const row of demandOverTime) {
@@ -140,7 +140,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   // Failure causes
   const failureCauses = await db.select({
     cause: demandEntries.failureCause,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(and(

@@ -2,11 +2,7 @@ import { db } from './db';
 import { studies, handlingTypes, demandTypes, contactMethods, whatMattersTypes, demandEntries } from './schema';
 import { eq, and, desc, asc, sql, gte, lte } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
-import { initializeDatabase } from './init-db';
 import type { Locale } from './i18n';
-
-// Ensure tables exist
-initializeDatabase();
 
 const DEFAULT_HANDLING_TYPES: Record<Locale, string[]> = {
   en: [
@@ -276,7 +272,7 @@ export async function getEntries(studyId: string, from?: Date, to?: Date) {
 export async function getFailureCauseSuggestions(studyId: string) {
   const results = await db.select({
     cause: demandEntries.failureCause,
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(and(
@@ -296,7 +292,7 @@ export async function getEntryCountToday(studyId: string) {
   today.setHours(0, 0, 0, 0);
 
   const result = await db.select({
-    count: sql<number>`count(*)`,
+    count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(and(
