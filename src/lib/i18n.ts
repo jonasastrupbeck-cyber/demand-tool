@@ -63,6 +63,48 @@ const translations = {
     sv: 'Skapa en studie',
     de: 'Studie erstellen',
   },
+  'landing.contactMethodQuestion': {
+    en: 'Which contact method are you studying?',
+    da: 'Hvilken kontaktmetode studerer du?',
+    sv: 'Vilken kontaktmetod studerar du?',
+    de: 'Welche Kontaktmethode untersuchen Sie?',
+  },
+  'landing.contactPhone': {
+    en: 'Phone',
+    da: 'Telefon',
+    sv: 'Telefon',
+    de: 'Telefon',
+  },
+  'landing.contactMail': {
+    en: 'Mail',
+    da: 'Mail',
+    sv: 'Mail',
+    de: 'Mail',
+  },
+  'landing.contactFaceToFace': {
+    en: 'Face2face',
+    da: 'Personligt',
+    sv: 'Personligt',
+    de: 'Persönlich',
+  },
+  'landing.contactOther': {
+    en: 'Other',
+    da: 'Andet',
+    sv: 'Annat',
+    de: 'Andere',
+  },
+  'landing.contactOtherPlaceholder': {
+    en: 'Enter contact method...',
+    da: 'Indtast kontaktmetode...',
+    sv: 'Ange kontaktmetod...',
+    de: 'Kontaktmethode eingeben...',
+  },
+  'landing.contactNone': {
+    en: 'All (no default)',
+    da: 'Alle (ingen standard)',
+    sv: 'Alla (ingen standard)',
+    de: 'Alle (kein Standard)',
+  },
   'landing.studyName': {
     en: 'Study Name',
     da: 'Studienavn',

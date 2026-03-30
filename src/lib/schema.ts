@@ -6,6 +6,7 @@ export const studies = pgTable('studies', {
   name: text('name').notNull(),
   description: text('description').default(''),
   oneStopHandlingType: text('one_stop_handling_type'),
+  primaryContactMethodId: text('primary_contact_method_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
 });

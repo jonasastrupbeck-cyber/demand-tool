@@ -11,6 +11,8 @@ export default function Home() {
   const [accessCode, setAccessCode] = useState('');
   const [studyName, setStudyName] = useState('');
   const [studyDesc, setStudyDesc] = useState('');
+  const [contactMethodChoice, setContactMethodChoice] = useState('');
+  const [customContactMethod, setCustomContactMethod] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,10 +39,17 @@ export default function Home() {
     setLoading(true);
     setError('');
 
+    // Resolve primary contact method label
+    let primaryContactMethod: string | undefined;
+    if (contactMethodChoice === 'phone') primaryContactMethod = t('landing.contactPhone');
+    else if (contactMethodChoice === 'mail') primaryContactMethod = t('landing.contactMail');
+    else if (contactMethodChoice === 'face2face') primaryContactMethod = t('landing.contactFaceToFace');
+    else if (contactMethodChoice === 'other' && customContactMethod.trim()) primaryContactMethod = customContactMethod.trim();
+
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale }),
+      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod }),
     });
 
     if (!res.ok) {
@@ -142,6 +151,44 @@ export default function Home() {
                     rows={3}
                     className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('landing.contactMethodQuestion')}
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['none', 'phone', 'mail', 'face2face', 'other'] as const).map((choice) => {
+                      const labelKey = choice === 'none' ? 'landing.contactNone'
+                        : choice === 'phone' ? 'landing.contactPhone'
+                        : choice === 'mail' ? 'landing.contactMail'
+                        : choice === 'face2face' ? 'landing.contactFaceToFace'
+                        : 'landing.contactOther';
+                      const isSelected = contactMethodChoice === choice;
+                      return (
+                        <button
+                          key={choice}
+                          type="button"
+                          onClick={() => setContactMethodChoice(choice === contactMethodChoice ? '' : choice)}
+                          className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                            isSelected
+                              ? 'bg-[#ac2c2d] text-white ring-2 ring-[#ac2c2d] ring-offset-1'
+                              : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
+                          } ${choice === 'other' ? 'col-span-2' : ''}`}
+                        >
+                          {t(labelKey as Parameters<typeof t>[0])}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {contactMethodChoice === 'other' && (
+                    <input
+                      type="text"
+                      value={customContactMethod}
+                      onChange={(e) => setCustomContactMethod(e.target.value)}
+                      placeholder={t('landing.contactOtherPlaceholder')}
+                      className="w-full mt-2 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                    />
+                  )}
                 </div>
               </div>
               <button

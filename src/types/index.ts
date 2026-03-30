@@ -4,6 +4,7 @@ export interface Study {
   name: string;
   description: string;
   oneStopHandlingType: string | null;
+  primaryContactMethodId: string | null;
   createdAt: Date;
   isActive: boolean;
 }

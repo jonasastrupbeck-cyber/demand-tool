@@ -64,7 +64,7 @@ const DEFAULT_CONTACT_METHODS: Record<Locale, string[]> = {
   de: ['Telefon', 'Mail', 'Persönlich'],
 };
 
-export async function createStudy(name: string, description: string = '', locale: Locale = 'en') {
+export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string) {
   const id = generateId();
   let accessCode = generateAccessCode();
 
@@ -125,13 +125,37 @@ export async function createStudy(name: string, description: string = '', locale
 
   // Create default contact methods in the chosen language
   const localizedContactMethods = DEFAULT_CONTACT_METHODS[locale];
+  const contactMethodIds: { id: string; label: string }[] = [];
   for (let i = 0; i < localizedContactMethods.length; i++) {
+    const cmId = generateId();
+    contactMethodIds.push({ id: cmId, label: localizedContactMethods[i] });
     await db.insert(contactMethods).values({
-      id: generateId(),
+      id: cmId,
       studyId: id,
       label: localizedContactMethods[i],
       sortOrder: i,
     });
+  }
+
+  // Handle primary contact method
+  let primaryCmId: string | null = null;
+  if (primaryContactMethod) {
+    // Check if it matches one of the defaults
+    const match = contactMethodIds.find(cm => cm.label.toLowerCase() === primaryContactMethod.toLowerCase());
+    if (match) {
+      primaryCmId = match.id;
+    } else {
+      // Custom contact method ("Andet"/Other) — add it as an extra method
+      const customId = generateId();
+      await db.insert(contactMethods).values({
+        id: customId,
+        studyId: id,
+        label: primaryContactMethod,
+        sortOrder: contactMethodIds.length,
+      });
+      primaryCmId = customId;
+    }
+    await db.update(studies).set({ primaryContactMethodId: primaryCmId }).where(eq(studies.id, id));
   }
 
   return { id, accessCode };

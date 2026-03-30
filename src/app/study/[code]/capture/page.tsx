@@ -28,6 +28,7 @@ interface WhatMattersType {
 interface StudyData {
   id: string;
   name: string;
+  primaryContactMethodId: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -63,6 +64,10 @@ export default function CapturePage() {
     if (res.ok) {
       const data = await res.json();
       setStudy(data);
+      // Prefill contact method with study's primary choice
+      if (data.primaryContactMethodId) {
+        setContactMethodId(data.primaryContactMethodId);
+      }
     }
     setLoading(false);
   }, [code]);
@@ -94,7 +99,8 @@ export default function CapturePage() {
     setClassification('');
     setDemandTypeId('');
     setHandlingTypeId('');
-    setContactMethodId('');
+    // Keep primary contact method prefilled after submit
+    setContactMethodId(study?.primaryContactMethodId || '');
     setWhatMattersTypeId('');
     setFailureCause('');
     setWhatMatters('');
