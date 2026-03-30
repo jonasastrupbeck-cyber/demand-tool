@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "Demand Analysis Tool",
   description: "Vanguard Method demand gathering and analysis",
   verification: {
-    google: "ew5JFMGnoS1vhlMMIRI1rR3FP_tnORX0dbhZWpJoMdI",
+    google: "8ey5bDguCyf7dhmwzkqsONJ1Rklirnh96Dk_fqPZi8o",
   },
 };
 
