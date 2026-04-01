@@ -623,6 +623,12 @@ const translations = {
     sv: 'Icke-värdeskapande efterfrågan per ursprunglig värdeskapande efterfrågan',
     de: 'Fehlernachfrage nach ursprünglicher Wertnachfrage',
   },
+  'dashboard.failureByValueTitle': {
+    en: 'What type of value demand causes us most failure demand?',
+    da: 'Hvilken type værdiskabende efterspørgsel forårsager mest ikke-værdiskabende efterspørgsel?',
+    sv: 'Vilken typ av värdeskapande efterfrågan orsakar mest icke-värdeskapande efterfrågan?',
+    de: 'Welche Art von Wertnachfrage verursacht die meiste Fehlernachfrage?',
+  },
   'dashboard.failureCauses': {
     en: 'Failure Causes (System Conditions)',
     da: '\u00c5rsager til ikke-v\u00e6rdiskabende eftersp\u00f8rgsel (systemforhold)',

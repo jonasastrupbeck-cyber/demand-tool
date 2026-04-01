@@ -370,7 +370,7 @@ export async function exportDashboardToPptx(
   if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
     const fovSlide = pptx.addSlide();
     fovSlide.background = { fill: 'ffffff' };
-    addSlideTitle(fovSlide, t('dashboard.failuresByOriginalValue', locale));
+    addSlideTitle(fovSlide, t('dashboard.failureByValueTitle', locale));
     addFooter(fovSlide);
 
     const totalFOV = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
