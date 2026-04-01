@@ -20,6 +20,11 @@ interface ContactMethod {
   label: string;
 }
 
+interface PointOfTransaction {
+  id: string;
+  label: string;
+}
+
 interface StudyData {
   id: string;
   name: string;
@@ -29,6 +34,7 @@ interface StudyData {
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
+  pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: { id: string; label: string }[];
 }
 
@@ -47,6 +53,7 @@ export default function SettingsPage() {
   const [newFailureType, setNewFailureType] = useState('');
   const [newContactMethod, setNewContactMethod] = useState('');
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
+  const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -139,6 +146,23 @@ export default function SettingsPage() {
     loadStudy();
   }
 
+  async function addPointOfTransactionHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPointOfTransaction.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newPointOfTransaction.trim() }),
+    });
+    setNewPointOfTransaction('');
+    loadStudy();
+  }
+
+  async function removePointOfTransaction(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
   function copyCode() {
     navigator.clipboard.writeText(code);
     setCopied(true);
@@ -217,6 +241,24 @@ export default function SettingsPage() {
           <form onSubmit={addContactMethodHandler} className="flex gap-2">
             <input type="text" value={newContactMethod} onChange={(e) => setNewContactMethod(e.target.value)} placeholder={t('settings.addContactMethod')} className={inputCls} />
             <button type="submit" disabled={!newContactMethod.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+          </form>
+        </div>
+
+        {/* Points of transaction */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.pointsOfTransaction')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.pointsOfTransactionDesc')}</p>
+          <ul className="space-y-2 mb-4">
+            {(study.pointsOfTransaction || []).map((pot) => (
+              <li key={pot.id} className={itemCls}>
+                <span className="text-sm text-gray-800">{tl(pot.label)}</span>
+                <button onClick={() => removePointOfTransaction(pot.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+              </li>
+            ))}
+          </ul>
+          <form onSubmit={addPointOfTransactionHandler} className="flex gap-2">
+            <input type="text" value={newPointOfTransaction} onChange={(e) => setNewPointOfTransaction(e.target.value)} placeholder={t('settings.addPointOfTransaction')} className={inputCls} />
+            <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
           </form>
         </div>
 

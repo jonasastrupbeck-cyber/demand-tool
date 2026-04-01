@@ -196,6 +196,17 @@ export default function DashboardPage() {
     pct: totalWmCount > 0 ? `${Math.round((d.count / totalWmCount) * 100)}%` : '0%',
   }));
 
+  const translatedPotByClassification = (data.pointOfTransactionByClassification || []).map(d => {
+    const total = d.valueCount + d.failureCount;
+    return {
+      ...d, label: tl(d.label),
+      valuePct: total > 0 ? `${Math.round((d.valueCount / total) * 100)}%` : '',
+      failurePct: total > 0 ? `${Math.round((d.failureCount / total) * 100)}%` : '',
+      total,
+      totalPct: data.totalEntries > 0 ? `${Math.round((total / data.totalEntries) * 100)}%` : '0%',
+    };
+  });
+
   const tickStyle = { fontSize: 11, fill: THEME.textSecondary };
 
   return (
@@ -380,6 +391,31 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
             </div>
+
+            {/* Point of transaction by classification */}
+            {translatedPotByClassification.length > 0 && (
+              <ChartCard title={t('dashboard.pointOfTransaction')}>
+                <ResponsiveContainer width="100%" height={Math.max(200, translatedPotByClassification.length * 50 + 40)}>
+                  <BarChart data={translatedPotByClassification} layout="vertical" margin={{ left: 10, right: 80 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                    <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                    <YAxis type="category" dataKey="label" width={120} tick={{ fontSize: 11, fill: THEME.text }} interval={0} />
+                    <Tooltip {...tooltipStyle} />
+                    <Legend wrapperStyle={{ color: THEME.textSecondary, fontSize: 12 }} />
+                    <Bar dataKey="valueCount" name={t('capture.value')} fill={COLORS.value} stackId="a" radius={[0, 0, 0, 0]}>
+                      <LabelList dataKey="valuePct" position="center" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }} />
+                    </Bar>
+                    <Bar dataKey="failureCount" name={t('capture.failure')} fill={COLORS.failure} stackId="a" radius={[0, 4, 4, 0]}
+                      label={(props) => {
+                        const item = translatedPotByClassification[props.index as number];
+                        if (!item) return '';
+                        return `${item.total} (${item.totalPct})`;
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
 
             {/* Demand over time */}
             {data.demandOverTime.length > 1 && (

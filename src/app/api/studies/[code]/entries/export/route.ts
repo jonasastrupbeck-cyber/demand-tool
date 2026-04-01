@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStudyByCode, getEntries, getHandlingTypes, getDemandTypes, getContactMethods, getWhatMattersTypes } from '@/lib/queries';
+import { getStudyByCode, getEntries, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes } from '@/lib/queries';
 import { getDashboardData } from '@/lib/dashboard-aggregations';
 import * as XLSX from 'xlsx';
 
@@ -19,11 +19,12 @@ export async function GET(
   const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
 
-  const [entries, hTypes, dTypes, cMethods, wmTypes, dashboard] = await Promise.all([
+  const [entries, hTypes, dTypes, cMethods, potTypes, wmTypes, dashboard] = await Promise.all([
     getEntries(study.id, from, to),
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
+    getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
     getDashboardData(study.id, from, to),
   ]);
@@ -31,6 +32,7 @@ export async function GET(
   const hTypeMap = new Map(hTypes.map(h => [h.id, h.label]));
   const dTypeMap = new Map(dTypes.map(d => [d.id, d.label]));
   const cMethodMap = new Map(cMethods.map(c => [c.id, c.label]));
+  const potMap = new Map(potTypes.map(p => [p.id, p.label]));
   const wmTypeMap = new Map(wmTypes.map(w => [w.id, w.label]));
 
   // Sheet 1: Raw entries
@@ -41,6 +43,7 @@ export async function GET(
     'Demand Type': e.demandTypeId ? dTypeMap.get(e.demandTypeId) || '' : '',
     'Handling': e.handlingTypeId ? hTypeMap.get(e.handlingTypeId) || '' : '',
     'Contact Method': e.contactMethodId ? cMethodMap.get(e.contactMethodId) || '' : '',
+    'Point of Transaction': e.pointOfTransactionId ? potMap.get(e.pointOfTransactionId) || '' : '',
     'What Matters Category': e.whatMattersTypeId ? wmTypeMap.get(e.whatMattersTypeId) || '' : '',
     'Original Value Demand': e.originalValueDemandTypeId ? dTypeMap.get(e.originalValueDemandTypeId) || '' : '',
     'Failure Cause (System Condition)': e.failureCause || '',

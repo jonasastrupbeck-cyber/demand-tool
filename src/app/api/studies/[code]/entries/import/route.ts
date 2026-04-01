@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getHandlingTypes, getDemandTypes, getContactMethods, getWhatMattersTypes, createEntry } from '@/lib/queries';
+import { getStudyByCode, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, createEntry } from '@/lib/queries';
 import * as XLSX from 'xlsx';
 
 // Map of accepted classification values → internal value
@@ -51,16 +51,18 @@ export async function POST(
   }
 
   // Build lookup maps for types (label → id, case-insensitive)
-  const [hTypes, dTypes, cMethods, wmTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
+    getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
   ]);
 
   const handlingMap = new Map(hTypes.map(h => [h.label.toLowerCase(), h.id]));
   const demandTypeMap = new Map(dTypes.map(d => [d.label.toLowerCase(), d.id]));
   const contactMethodMap = new Map(cMethods.map(c => [c.label.toLowerCase(), c.id]));
+  const potMap = new Map(potTypes.map(p => [p.label.toLowerCase(), p.id]));
   const whatMattersTypeMap = new Map(wmTypes.map(w => [w.label.toLowerCase(), w.id]));
 
   const errors: Array<{ row: number; message: string }> = [];
@@ -96,11 +98,13 @@ export async function POST(
     const demandTypeLabel = String(row['Demand Type'] || '').trim().toLowerCase();
     const handlingLabel = String(row['Handling'] || '').trim().toLowerCase();
     const contactMethodLabel = String(row['Contact Method'] || '').trim().toLowerCase();
+    const potLabel = String(row['Point of Transaction'] || '').trim().toLowerCase();
     const whatMattersTypeLabel = String(row['What Matters Category'] || '').trim().toLowerCase();
 
     const demandTypeId = demandTypeLabel ? demandTypeMap.get(demandTypeLabel) : undefined;
     const handlingTypeId = handlingLabel ? handlingMap.get(handlingLabel) : undefined;
     const contactMethodId = contactMethodLabel ? contactMethodMap.get(contactMethodLabel) : undefined;
+    const pointOfTransactionId = potLabel ? potMap.get(potLabel) : undefined;
     const whatMattersTypeId = whatMattersTypeLabel ? whatMattersTypeMap.get(whatMattersTypeLabel) : undefined;
 
     const originalValueDemandLabel = String(row['Original Value Demand'] || '').trim().toLowerCase();
@@ -119,6 +123,7 @@ export async function POST(
       demandTypeId: demandTypeId || undefined,
       handlingTypeId: handlingTypeId || undefined,
       contactMethodId: contactMethodId || undefined,
+      pointOfTransactionId: pointOfTransactionId || undefined,
       whatMattersTypeId: whatMattersTypeId || undefined,
       originalValueDemandTypeId: originalValueDemandTypeId || undefined,
       failureCause,

@@ -20,6 +20,11 @@ interface ContactMethod {
   label: string;
 }
 
+interface PointOfTransaction {
+  id: string;
+  label: string;
+}
+
 interface WhatMattersType {
   id: string;
   label: string;
@@ -29,9 +34,11 @@ interface StudyData {
   id: string;
   name: string;
   primaryContactMethodId: string | null;
+  primaryPointOfTransactionId: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
+  pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: WhatMattersType[];
 }
 
@@ -55,6 +62,7 @@ export default function CapturePage() {
   const [demandTypeId, setDemandTypeId] = useState('');
   const [handlingTypeId, setHandlingTypeId] = useState('');
   const [contactMethodId, setContactMethodId] = useState('');
+  const [pointOfTransactionId, setPointOfTransactionId] = useState('');
   const [whatMattersTypeId, setWhatMattersTypeId] = useState('');
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
@@ -68,6 +76,10 @@ export default function CapturePage() {
       // Prefill contact method with study's primary choice
       if (data.primaryContactMethodId) {
         setContactMethodId(data.primaryContactMethodId);
+      }
+      // Prefill point of transaction with study's primary choice
+      if (data.primaryPointOfTransactionId) {
+        setPointOfTransactionId(data.primaryPointOfTransactionId);
       }
     }
     setLoading(false);
@@ -100,8 +112,9 @@ export default function CapturePage() {
     setClassification('');
     setDemandTypeId('');
     setHandlingTypeId('');
-    // Keep primary contact method prefilled after submit
+    // Keep primary contact method and POT prefilled after submit
     setContactMethodId(study?.primaryContactMethodId || '');
+    setPointOfTransactionId(study?.primaryPointOfTransactionId || '');
     setWhatMattersTypeId('');
     setOriginalValueDemandTypeId('');
     setFailureCause('');
@@ -125,6 +138,7 @@ export default function CapturePage() {
         demandTypeId: demandTypeId || undefined,
         handlingTypeId: handlingTypeId || undefined,
         contactMethodId: contactMethodId || undefined,
+        pointOfTransactionId: pointOfTransactionId || undefined,
         whatMattersTypeId: whatMattersTypeId || undefined,
         originalValueDemandTypeId: classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined,
         failureCause: classification === 'failure' ? failureCause.trim() : undefined,
@@ -200,7 +214,20 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Contact method — first field */}
+        {/* Point of transaction — first field */}
+        {study.pointsOfTransaction.length > 0 && (
+          <div>
+            <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
+            <select value={pointOfTransactionId} onChange={(e) => setPointOfTransactionId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectPointOfTransaction')}</option>
+              {study.pointsOfTransaction.map((pot) => (
+                <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Contact method */}
         <div>
           <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
           <select value={contactMethodId} onChange={(e) => setContactMethodId(e.target.value)} className={inputCls}>

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, whatMattersTypes, demandEntries } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, demandEntries } from './schema';
 import { eq, and, desc, asc, sql, gte, lte } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -64,7 +64,7 @@ const DEFAULT_CONTACT_METHODS: Record<Locale, string[]> = {
   de: ['Telefon', 'Mail', 'Persönlich'],
 };
 
-export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string) {
+export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string) {
   const id = generateId();
   let accessCode = generateAccessCode();
 
@@ -156,6 +156,18 @@ export async function createStudy(name: string, description: string = '', locale
       primaryCmId = customId;
     }
     await db.update(studies).set({ primaryContactMethodId: primaryCmId }).where(eq(studies.id, id));
+  }
+
+  // Handle point of transaction
+  if (pointOfTransaction) {
+    const potId = generateId();
+    await db.insert(pointsOfTransaction).values({
+      id: potId,
+      studyId: id,
+      label: pointOfTransaction,
+      sortOrder: 0,
+    });
+    await db.update(studies).set({ primaryPointOfTransactionId: potId }).where(eq(studies.id, id));
   }
 
   return { id, accessCode };
@@ -256,12 +268,33 @@ export async function deleteWhatMattersType(id: string) {
   await db.delete(whatMattersTypes).where(eq(whatMattersTypes.id, id));
 }
 
+export async function getPointsOfTransaction(studyId: string) {
+  return db.select().from(pointsOfTransaction).where(eq(pointsOfTransaction.studyId, studyId)).orderBy(asc(pointsOfTransaction.sortOrder));
+}
+
+export async function addPointOfTransaction(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getPointsOfTransaction(studyId);
+  await db.insert(pointsOfTransaction).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function deletePointOfTransaction(id: string) {
+  await db.delete(pointsOfTransaction).where(eq(pointsOfTransaction.id, id));
+}
+
 export async function createEntry(studyId: string, data: {
   verbatim: string;
   classification: 'value' | 'failure';
   handlingTypeId?: string;
   demandTypeId?: string;
   contactMethodId?: string;
+  pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   originalValueDemandTypeId?: string;
   failureCause?: string;
@@ -277,6 +310,7 @@ export async function createEntry(studyId: string, data: {
     handlingTypeId: data.handlingTypeId || null,
     demandTypeId: data.demandTypeId || null,
     contactMethodId: data.contactMethodId || null,
+    pointOfTransactionId: data.pointOfTransactionId || null,
     whatMattersTypeId: data.whatMattersTypeId || null,
     originalValueDemandTypeId: data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     failureCause: data.classification === 'failure' ? (data.failureCause || null) : null,

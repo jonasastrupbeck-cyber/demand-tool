@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, whatMattersTypes, studies } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, studies } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import type { DashboardData } from '@/types';
 
@@ -166,6 +166,31 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .groupBy(demandTypes.label)
     .orderBy(desc(sql`count(*)`));
 
+  // Point of transaction by classification
+  const potByClass = await db.select({
+    label: pointsOfTransaction.label,
+    classification: demandEntries.classification,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(pointsOfTransaction, eq(demandEntries.pointOfTransactionId, pointsOfTransaction.id))
+    .where(whereClause)
+    .groupBy(pointsOfTransaction.label, demandEntries.classification);
+
+  const potMap = new Map<string, { valueCount: number; failureCount: number }>();
+  for (const row of potByClass) {
+    if (!potMap.has(row.label)) {
+      potMap.set(row.label, { valueCount: 0, failureCount: 0 });
+    }
+    const entry = potMap.get(row.label)!;
+    if (row.classification === 'value') entry.valueCount = row.count;
+    else entry.failureCount = row.count;
+  }
+  const pointOfTransactionByClassification = Array.from(potMap.entries()).map(([label, counts]) => ({
+    label,
+    ...counts,
+  }));
+
   // What matters free-text notes
   const whatMattersNotes = await db.select({
     text: demandEntries.whatMatters,
@@ -188,6 +213,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     contactMethodCounts,
     whatMattersCounts,
     handlingByClassification,
+    pointOfTransactionByClassification,
     demandOverTime: demandOverTimeResult,
     failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
     failuresByOriginalValueDemand,

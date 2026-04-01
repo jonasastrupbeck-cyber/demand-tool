@@ -7,6 +7,7 @@ export const studies = pgTable('studies', {
   description: text('description').default(''),
   oneStopHandlingType: text('one_stop_handling_type'),
   primaryContactMethodId: text('primary_contact_method_id'),
+  primaryPointOfTransactionId: text('primary_point_of_transaction_id'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
 });
@@ -33,6 +34,13 @@ export const contactMethods = pgTable('contact_methods', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+export const pointsOfTransaction = pgTable('points_of_transaction', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const whatMattersTypes = pgTable('what_matters_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -49,6 +57,7 @@ export const demandEntries = pgTable('demand_entries', {
   handlingTypeId: text('handling_type_id').references(() => handlingTypes.id),
   demandTypeId: text('demand_type_id').references(() => demandTypes.id),
   contactMethodId: text('contact_method_id').references(() => contactMethods.id),
+  pointOfTransactionId: text('point_of_transaction_id').references(() => pointsOfTransaction.id),
   whatMattersTypeId: text('what_matters_type_id').references(() => whatMattersTypes.id),
   originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),
   failureCause: text('failure_cause'),

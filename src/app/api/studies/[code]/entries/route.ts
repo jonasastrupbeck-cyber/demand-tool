@@ -50,6 +50,7 @@ export async function POST(
     handlingTypeId: body.handlingTypeId || undefined,
     demandTypeId: body.demandTypeId || undefined,
     contactMethodId: body.contactMethodId || undefined,
+    pointOfTransactionId: body.pointOfTransactionId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     failureCause: body.failureCause?.trim() || undefined,

@@ -695,6 +695,54 @@ const translations = {
     sv: 'Laddar upp...',
     de: 'Hochladen...',
   },
+  'dashboard.pointOfTransaction': {
+    en: 'Demand by Point of Transaction',
+    da: 'Efterspørgsel fordelt på transaktionspunkt',
+    sv: 'Efterfrågan per transaktionspunkt',
+    de: 'Nachfrage nach Transaktionspunkt',
+  },
+  'landing.pointOfTransactionQuestion': {
+    en: 'What is the point of transaction?',
+    da: 'Hvad er transaktionspunktet?',
+    sv: 'Vad är transaktionspunkten?',
+    de: 'Was ist der Transaktionspunkt?',
+  },
+  'landing.pointOfTransactionPlaceholder': {
+    en: 'e.g. Customer service, 2nd line support...',
+    da: 'f.eks. Kundeservice, 2. linje support...',
+    sv: 't.ex. Kundtjänst, 2:a linjens support...',
+    de: 'z.B. Kundenservice, 2nd-Level-Support...',
+  },
+  'capture.pointOfTransactionLabel': {
+    en: 'Point of transaction',
+    da: 'Transaktionspunkt',
+    sv: 'Transaktionspunkt',
+    de: 'Transaktionspunkt',
+  },
+  'capture.selectPointOfTransaction': {
+    en: 'Select point of transaction...',
+    da: 'Vælg transaktionspunkt...',
+    sv: 'Välj transaktionspunkt...',
+    de: 'Transaktionspunkt auswählen...',
+  },
+  'settings.pointsOfTransaction': {
+    en: 'Points of Transaction',
+    da: 'Transaktionspunkter',
+    sv: 'Transaktionspunkter',
+    de: 'Transaktionspunkte',
+  },
+  'settings.pointsOfTransactionDesc': {
+    en: 'Where demand is received in the organisation.',
+    da: 'Hvor efterspørgslen modtages i organisationen.',
+    sv: 'Var efterfrågan tas emot i organisationen.',
+    de: 'Wo die Nachfrage in der Organisation empfangen wird.',
+  },
+  'settings.addPointOfTransaction': {
+    en: 'Add point of transaction...',
+    da: 'Tilføj transaktionspunkt...',
+    sv: 'Lägg till transaktionspunkt...',
+    de: 'Transaktionspunkt hinzufügen...',
+  },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

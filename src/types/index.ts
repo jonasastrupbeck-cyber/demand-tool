@@ -5,6 +5,7 @@ export interface Study {
   description: string;
   oneStopHandlingType: string | null;
   primaryContactMethodId: string | null;
+  primaryPointOfTransactionId: string | null;
   createdAt: Date;
   isActive: boolean;
 }
@@ -31,6 +32,13 @@ export interface ContactMethod {
   sortOrder: number;
 }
 
+export interface PointOfTransaction {
+  id: string;
+  studyId: string;
+  label: string;
+  sortOrder: number;
+}
+
 export interface WhatMattersType {
   id: string;
   studyId: string;
@@ -47,6 +55,7 @@ export interface DemandEntry {
   handlingTypeId: string | null;
   demandTypeId: string | null;
   contactMethodId: string | null;
+  pointOfTransactionId: string | null;
   whatMattersTypeId: string | null;
   originalValueDemandTypeId: string | null;
   failureCause: string | null;
@@ -61,6 +70,7 @@ export interface DashboardData {
   demandTypeCounts: Array<{ label: string; category: string; count: number }>;
   handlingTypeCounts: Array<{ label: string; count: number }>;
   contactMethodCounts: Array<{ label: string; count: number }>;
+  pointOfTransactionByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   whatMattersCounts: Array<{ label: string; count: number }>;
   handlingByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   demandOverTime: Array<{ date: string; valueCount: number; failureCount: number }>;
@@ -75,6 +85,7 @@ export interface CreateEntryInput {
   handlingTypeId?: string;
   demandTypeId?: string;
   contactMethodId?: string;
+  pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   originalValueDemandTypeId?: string;
   failureCause?: string;

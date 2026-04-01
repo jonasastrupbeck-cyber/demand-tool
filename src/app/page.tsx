@@ -13,6 +13,7 @@ export default function Home() {
   const [studyDesc, setStudyDesc] = useState('');
   const [contactMethodChoice, setContactMethodChoice] = useState('');
   const [customContactMethod, setCustomContactMethod] = useState('');
+  const [pointOfTransaction, setPointOfTransaction] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,7 @@ export default function Home() {
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod }),
+      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined }),
     });
 
     if (!res.ok) {
@@ -189,6 +190,18 @@ export default function Home() {
                       className="w-full mt-2 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
                     />
                   )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('landing.pointOfTransactionQuestion')}
+                  </label>
+                  <input
+                    type="text"
+                    value={pointOfTransaction}
+                    onChange={(e) => setPointOfTransaction(e.target.value)}
+                    placeholder={t('landing.pointOfTransactionPlaceholder')}
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                  />
                 </div>
               </div>
               <button

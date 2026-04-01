@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getWhatMattersTypes } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,10 +12,11 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, wmTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
+    getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
   ]);
 
@@ -24,6 +25,7 @@ export async function GET(
     handlingTypes: hTypes,
     demandTypes: dTypes,
     contactMethods: cMethods,
+    pointsOfTransaction: potTypes,
     whatMattersTypes: wmTypes,
   });
 }

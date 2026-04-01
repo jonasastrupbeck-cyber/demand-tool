@@ -337,6 +337,43 @@ export async function exportDashboardToPptx(
     });
   }
 
+  // ── Slide: Point of Transaction ──
+  if (data.pointOfTransactionByClassification && data.pointOfTransactionByClassification.length > 0) {
+    const potSlide = pptx.addSlide();
+    potSlide.background = { fill: 'ffffff' };
+    addSlideTitle(potSlide, t('dashboard.pointOfTransaction', locale));
+    addFooter(potSlide);
+
+    const tableRows: PptxGenJS.TableRow[] = [
+      [
+        { text: t('capture.pointOfTransactionLabel', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '1f2937' } },
+        { text: t('capture.value', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '22c55e', align: 'center' } },
+        { text: t('capture.failure', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: 'ef4444', align: 'center' } },
+        { text: 'Total', options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '1f2937', align: 'center' } },
+        { text: '%', options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '1f2937', align: 'center' } },
+      ],
+    ];
+
+    data.pointOfTransactionByClassification.forEach((pot) => {
+      const total = pot.valueCount + pot.failureCount;
+      const pct = data.totalEntries > 0 ? Math.round((total / data.totalEntries) * 100) : 0;
+      tableRows.push([
+        { text: tl(pot.label), options: { fontSize: 9, color: '1f2937' } },
+        { text: `${pot.valueCount}`, options: { fontSize: 9, color: '22c55e', align: 'center' } },
+        { text: `${pot.failureCount}`, options: { fontSize: 9, color: 'ef4444', align: 'center' } },
+        { text: `${total}`, options: { fontSize: 9, color: '1f2937', align: 'center', bold: true } },
+        { text: `${pct}%`, options: { fontSize: 9, color: '6b7280', align: 'center' } },
+      ]);
+    });
+
+    potSlide.addTable(tableRows, {
+      x: 0.5, y: 1.3, w: 10,
+      border: { type: 'solid', pt: 0.5, color: 'e5e7eb' },
+      colW: [4, 1.5, 1.5, 1.5, 1.5],
+      fontFace: 'Arial',
+    });
+  }
+
   // ── Slide 7: Failure Causes ──
   if (data.failureCauses.length > 0) {
     const fcSlide = pptx.addSlide();
