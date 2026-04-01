@@ -55,6 +55,7 @@ export async function POST(
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     failureCause: body.failureCause?.trim() || undefined,
     whatMatters: body.whatMatters?.trim() || undefined,
+    collectorName: body.collectorName?.trim() || undefined,
   });
 
   return NextResponse.json({ id }, { status: 201 });

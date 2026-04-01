@@ -132,6 +132,7 @@ export async function POST(
       ? String(row['Failure Cause (System Condition)'] || '').trim() || undefined
       : undefined;
     const whatMatters = String(row['What Matters (Notes)'] || row['What Matters to Customer'] || '').trim() || undefined;
+    const collectorName = String(row['Collector'] || '').trim() || undefined;
 
     await createEntry(study.id, {
       verbatim,
@@ -144,6 +145,7 @@ export async function POST(
       originalValueDemandTypeId: originalValueDemandTypeId || undefined,
       failureCause,
       whatMatters,
+      collectorName,
     }, createdAt);
     imported++;
   }

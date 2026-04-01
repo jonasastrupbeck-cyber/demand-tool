@@ -463,6 +463,23 @@ export default function DashboardPage() {
                 </div>
               </ChartCard>
             )}
+
+            {/* Team activity */}
+            {data.collectorCounts && data.collectorCounts.length > 0 && (
+              <ChartCard title={t('dashboard.collectors')}>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {data.collectorCounts.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 px-3 rounded bg-blue-50">
+                      <div>
+                        <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                        <span className="text-xs text-gray-400 ml-2">{t('dashboard.lastActive')}: {c.lastActive}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-blue-700">{c.count} {t('dashboard.collectorEntries')}</span>
+                    </div>
+                  ))}
+                </div>
+              </ChartCard>
+            )}
           </>
         )}
       </div>

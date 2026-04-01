@@ -743,6 +743,48 @@ const translations = {
     sv: 'Lägg till transaktionspunkt...',
     de: 'Transaktionspunkt hinzufügen...',
   },
+  'capture.whoAreYou': {
+    en: 'Who are you?',
+    da: 'Hvem er du?',
+    sv: 'Vem är du?',
+    de: 'Wer sind Sie?',
+  },
+  'capture.enterName': {
+    en: 'Enter your name...',
+    da: 'Indtast dit navn...',
+    sv: 'Ange ditt namn...',
+    de: 'Geben Sie Ihren Namen ein...',
+  },
+  'capture.continue': {
+    en: 'Continue',
+    da: 'Fortsæt',
+    sv: 'Fortsätt',
+    de: 'Weiter',
+  },
+  'capture.notYou': {
+    en: 'Not you?',
+    da: 'Ikke dig?',
+    sv: 'Inte du?',
+    de: 'Nicht Sie?',
+  },
+  'dashboard.collectors': {
+    en: 'Team Activity',
+    da: 'Teamaktivitet',
+    sv: 'Teamaktivitet',
+    de: 'Teamaktivität',
+  },
+  'dashboard.collectorEntries': {
+    en: 'entries',
+    da: 'registreringer',
+    sv: 'poster',
+    de: 'Einträge',
+  },
+  'dashboard.lastActive': {
+    en: 'Last active',
+    da: 'Sidst aktiv',
+    sv: 'Senast aktiv',
+    de: 'Zuletzt aktiv',
+  },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

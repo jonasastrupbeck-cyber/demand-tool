@@ -48,6 +48,7 @@ export async function GET(
     'Original Value Demand': e.originalValueDemandTypeId ? dTypeMap.get(e.originalValueDemandTypeId) || '' : '',
     'Failure Cause (System Condition)': e.failureCause || '',
     'What Matters (Notes)': e.whatMatters || '',
+    'Collector': e.collectorName || '',
   }));
 
   // Sheet 2: Summary

@@ -55,6 +55,8 @@ export default function CapturePage() {
   const [error, setError] = useState('');
   const [failureCauseSuggestions, setFailureCauseSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [collectorName, setCollectorName] = useState('');
+  const [nameConfirmed, setNameConfirmed] = useState(false);
 
   // Form state
   const [verbatim, setVerbatim] = useState('');
@@ -105,7 +107,13 @@ export default function CapturePage() {
     loadStudy();
     loadTodayCount();
     loadSuggestions();
-  }, [loadStudy, loadTodayCount, loadSuggestions]);
+    // Restore collector name from localStorage
+    const saved = localStorage.getItem(`collector_${code}`);
+    if (saved) {
+      setCollectorName(saved);
+      setNameConfirmed(true);
+    }
+  }, [loadStudy, loadTodayCount, loadSuggestions, code]);
 
   function resetForm() {
     setVerbatim('');
@@ -143,6 +151,7 @@ export default function CapturePage() {
         originalValueDemandTypeId: classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined,
         failureCause: classification === 'failure' ? failureCause.trim() : undefined,
         whatMatters: whatMatters.trim() || undefined,
+        collectorName: collectorName.trim() || undefined,
       }),
     });
 
@@ -188,13 +197,60 @@ export default function CapturePage() {
     );
   }
 
+  if (!nameConfirmed) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          <div className="rounded-xl shadow-sm p-6 bg-white border border-gray-200">
+            <h2 className="text-lg font-semibold mb-1 text-gray-900">{study.name}</h2>
+            <p className="text-sm text-gray-500 mb-4">{t('capture.whoAreYou')}</p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!collectorName.trim()) return;
+              localStorage.setItem(`collector_${code}`, collectorName.trim());
+              setNameConfirmed(true);
+            }}>
+              <input
+                type="text"
+                value={collectorName}
+                onChange={(e) => setCollectorName(e.target.value)}
+                placeholder={t('capture.enterName')}
+                className={inputCls}
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={!collectorName.trim()}
+                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+              >
+                {t('capture.continue')}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      {/* Header with today's count */}
+      {/* Header with collector name and today's count */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">{study.name}</h1>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">{study.name}</h1>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-sm text-gray-500">{collectorName}</span>
+            <button
+              type="button"
+              onClick={() => { localStorage.removeItem(`collector_${code}`); setCollectorName(''); setNameConfirmed(false); }}
+              className="text-xs text-[#ac2c2d] hover:text-[#8a2324]"
+            >
+              {t('capture.notYou')}
+            </button>
+          </div>
+        </div>
         <span className="text-sm px-3 py-1 rounded-full font-medium bg-blue-50 text-blue-700">
           {t('capture.today')}: {todayCount}
         </span>

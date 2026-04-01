@@ -299,6 +299,7 @@ export async function createEntry(studyId: string, data: {
   originalValueDemandTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
+  collectorName?: string;
 }, createdAt?: Date) {
   const id = generateId();
   await db.insert(demandEntries).values({
@@ -315,6 +316,7 @@ export async function createEntry(studyId: string, data: {
     originalValueDemandTypeId: data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     failureCause: data.classification === 'failure' ? (data.failureCause || null) : null,
     whatMatters: data.whatMatters || null,
+    collectorName: data.collectorName || null,
   });
   return id;
 }

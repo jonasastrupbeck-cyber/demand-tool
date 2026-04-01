@@ -60,6 +60,7 @@ export interface DemandEntry {
   originalValueDemandTypeId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
+  collectorName: string | null;
 }
 
 export interface DashboardData {
@@ -77,6 +78,7 @@ export interface DashboardData {
   failureCauses: Array<{ cause: string; count: number }>;
   failuresByOriginalValueDemand: Array<{ label: string; count: number }>;
   whatMattersNotes: Array<{ text: string; date: string }>;
+  collectorCounts: Array<{ name: string; count: number; lastActive: string }>;
 }
 
 export interface CreateEntryInput {
@@ -90,4 +92,5 @@ export interface CreateEntryInput {
   originalValueDemandTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
+  collectorName?: string;
 }

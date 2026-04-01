@@ -203,6 +203,22 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     ))
     .orderBy(desc(demandEntries.createdAt));
 
+  // Collector stats
+  const collectorStats = await db.select({
+    name: demandEntries.collectorName,
+    count: sql<number>`count(*)::int`,
+    lastActive: sql<string>`max(${demandEntries.createdAt})::date`,
+  })
+    .from(demandEntries)
+    .where(and(
+      ...conditions,
+      sql`${demandEntries.collectorName} IS NOT NULL AND ${demandEntries.collectorName} != ''`
+    ))
+    .groupBy(demandEntries.collectorName)
+    .orderBy(desc(sql`count(*)`));
+
+  const collectorCounts = collectorStats.map(r => ({ name: r.name!, count: r.count, lastActive: r.lastActive }));
+
   return {
     totalEntries,
     valueCount,
@@ -218,5 +234,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
     failuresByOriginalValueDemand,
     whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date })),
+    collectorCounts,
   };
 }
