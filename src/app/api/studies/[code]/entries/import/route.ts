@@ -10,6 +10,10 @@ const CLASSIFICATION_MAP: Record<string, 'value' | 'failure'> = {
   // Danish
   'værdiskabende': 'value',
   'ikke-værdiskabende': 'failure',
+  // Danish abbreviations
+  'vs': 'value',
+  'ivs': 'failure',
+  'spild': 'failure',
   // Swedish
   'värdeskapande': 'value',
   'icke-värdeskapande': 'failure',
@@ -17,6 +21,13 @@ const CLASSIFICATION_MAP: Record<string, 'value' | 'failure'> = {
   'wert': 'value',
   'fehler': 'failure',
 };
+
+// Convert Excel serial date number to JS Date
+function excelDateToJS(serial: number): Date {
+  // Excel epoch is 1900-01-01, but has a leap year bug (day 60 = Feb 29, 1900 which didn't exist)
+  const utcDays = Math.floor(serial) - 25569; // 25569 = days between 1900-01-01 and 1970-01-01
+  return new Date(utcDays * 86400000);
+}
 
 export async function POST(
   request: Request,
@@ -85,13 +96,18 @@ export async function POST(
       continue;
     }
 
-    // Parse optional date
+    // Parse optional date (supports Excel serial numbers and date strings)
     let createdAt: Date | undefined;
     const rawDate = row['Date'];
     if (rawDate) {
-      const parsed = new Date(String(rawDate));
-      if (!isNaN(parsed.getTime())) {
-        createdAt = parsed;
+      if (typeof rawDate === 'number' && rawDate > 1000 && rawDate < 100000) {
+        // Excel serial date number
+        createdAt = excelDateToJS(rawDate);
+      } else {
+        const parsed = new Date(String(rawDate));
+        if (!isNaN(parsed.getTime())) {
+          createdAt = parsed;
+        }
       }
     }
 
