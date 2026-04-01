@@ -20,7 +20,8 @@ const THEME = {
 const COLORS = {
   value: '#22c55e',
   failure: '#ef4444',
-  handling: ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#ef4444', '#14b8a6'],
+  // Blue-to-grey shades for non-classification data
+  neutral: ['#3b82f6', '#60a5fa', '#93c5fd', '#6b7280', '#9ca3af', '#475569', '#94a3b8', '#64748b'],
 };
 
 const tooltipStyle = {
@@ -285,40 +286,39 @@ export default function DashboardPage() {
           </div>
         ) : (
           <>
-            {/* Row 1: Value/Failure pie + Top demand types */}
-            <div className="grid md:grid-cols-2 gap-4">
-              <ChartCard title={t('dashboard.valueVsFailure')}>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie data={pieData} cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
-                      label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
-                      labelLine={{ strokeWidth: 1 }}
-                    >
-                      {pieData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
-                    </Pie>
-                    <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartCard>
+            {/* Value/Failure pie */}
+            <ChartCard title={t('dashboard.valueVsFailure')}>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
+                    label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                    labelLine={{ strokeWidth: 1 }}
+                  >
+                    {pieData.map((entry, i) => (<Cell key={i} fill={entry.color} />))}
+                  </Pie>
+                  <Tooltip {...tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
-              <ChartCard title={t('dashboard.top10')}>
-                <ResponsiveContainer width="100%" height={Math.max(250, translatedDemandTypeCounts.length * 32 + 40)}>
-                  <BarChart data={translatedDemandTypeCounts} layout="vertical" margin={{ left: 10, right: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
-                    <XAxis type="number" allowDecimals={false} tick={tickStyle} />
-                    <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} />
-                    <Tooltip {...tooltipStyle} />
-                    <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]}>
-                      {translatedDemandTypeCounts.map((d, i) => (
-                        <Cell key={i} fill={d.category === 'failure' ? COLORS.failure : '#3b82f6'} />
-                      ))}
-                      <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 10 }} />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartCard>
-            </div>
+            {/* Top 10 Demand Types — full width for long labels */}
+            <ChartCard title={t('dashboard.top10')}>
+              <ResponsiveContainer width="100%" height={Math.max(300, translatedDemandTypeCounts.length * 40 + 40)}>
+                <BarChart data={translatedDemandTypeCounts} layout="vertical" margin={{ left: 20, right: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                  <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                  <YAxis type="category" dataKey="label" width={260} tick={{ fontSize: 11, fill: THEME.textSecondary }} interval={0} />
+                  <Tooltip {...tooltipStyle} />
+                  <Bar dataKey="count" fill={COLORS.value} radius={[0, 4, 4, 0]}>
+                    {translatedDemandTypeCounts.map((d, i) => (
+                      <Cell key={i} fill={d.category === 'failure' ? COLORS.failure : COLORS.value} />
+                    ))}
+                    <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
 
             {/* Row 2: Handling pie + Handling by classification */}
             <div className="grid md:grid-cols-2 gap-4">
@@ -329,7 +329,7 @@ export default function DashboardPage() {
                       label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
                       labelLine={{ strokeWidth: 1 }}
                     >
-                      {translatedHandlingTypeCounts.map((_, i) => (<Cell key={i} fill={COLORS.handling[i % COLORS.handling.length]} />))}
+                      {translatedHandlingTypeCounts.map((_, i) => (<Cell key={i} fill={COLORS.neutral[i % COLORS.neutral.length]} />))}
                     </Pie>
                     <Tooltip {...tooltipStyle} />
                     <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
@@ -366,7 +366,7 @@ export default function DashboardPage() {
                         label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
                         labelLine={{ strokeWidth: 1 }}
                       >
-                        {translatedContactMethodCounts.map((_, i) => (<Cell key={i} fill={COLORS.handling[i % COLORS.handling.length]} />))}
+                        {translatedContactMethodCounts.map((_, i) => (<Cell key={i} fill={COLORS.neutral[i % COLORS.neutral.length]} />))}
                       </Pie>
                       <Tooltip {...tooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
@@ -383,7 +383,7 @@ export default function DashboardPage() {
                       <XAxis type="number" allowDecimals={false} tick={tickStyle} />
                       <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} />
                       <Tooltip {...tooltipStyle} />
-                      <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]}>
+                      <Bar dataKey="count" fill="#60a5fa" radius={[0, 4, 4, 0]}>
                         <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 10 }} />
                       </Bar>
                     </BarChart>

@@ -15,7 +15,8 @@ const BRAND = {
   lightGray: '#f3f4f6',
 };
 
-const HANDLING_COLORS = ['3b82f6', '8b5cf6', 'ec4899', 'f59e0b', '10b981', '6366f1', 'ef4444', '14b8a6'];
+// Blue-to-grey shades for non-classification data
+const NEUTRAL_COLORS = ['3b82f6', '60a5fa', '93c5fd', '6b7280', '9ca3af', '475569', '94a3b8', '64748b'];
 
 function t(key: TranslationKey, locale: Locale, params?: Record<string, string>): string {
   return translate(key, locale, params);
@@ -181,7 +182,7 @@ export async function exportDashboardToPptx(
     data.demandTypeCounts.slice(0, 10).forEach((dt, i) => {
       const y = 1.3 + i * 0.5;
       const pct = totalDT > 0 ? Math.round((dt.count / totalDT) * 100) : 0;
-      const barColor = dt.category === 'failure' ? 'ef4444' : '3b82f6';
+      const barColor = dt.category === 'failure' ? 'ef4444' : '22c55e';
       const bw = maxCount > 0 ? (dt.count / maxCount) * barMaxW : 0;
 
       dtSlide.addText(tl(dt.label), {
@@ -216,7 +217,7 @@ export async function exportDashboardToPptx(
       const y = 1.3 + i * 0.6;
       const pct = totalH > 0 ? Math.round((ht.count / totalH) * 100) : 0;
       const bw = maxH > 0 ? (ht.count / maxH) * barMaxW : 0;
-      const barColor = HANDLING_COLORS[i % HANDLING_COLORS.length];
+      const barColor = NEUTRAL_COLORS[i % NEUTRAL_COLORS.length];
 
       hSlide.addText(tl(ht.label), {
         x: 0.5, y, w: 3.5, h: 0.45,
@@ -285,7 +286,7 @@ export async function exportDashboardToPptx(
       const y = 1.3 + i * 0.6;
       const pct = totalCM > 0 ? Math.round((cm.count / totalCM) * 100) : 0;
       const bw = maxCM > 0 ? (cm.count / maxCM) * barMaxW : 0;
-      const barColor = HANDLING_COLORS[i % HANDLING_COLORS.length];
+      const barColor = NEUTRAL_COLORS[i % NEUTRAL_COLORS.length];
 
       cmSlide.addText(tl(cm.label), {
         x: 0.5, y, w: 3.5, h: 0.45,
@@ -327,7 +328,7 @@ export async function exportDashboardToPptx(
       if (bw > 0.05) {
         wmSlide.addShape(pptx.ShapeType.roundRect, {
           x: 4.2, y: y + 0.05, w: bw, h: 0.3,
-          fill: { color: '8b5cf6' }, rectRadius: 0.04,
+          fill: { color: '60a5fa' }, rectRadius: 0.04,
         });
       }
       wmSlide.addText(`${wm.count} (${pct}%)`, {
