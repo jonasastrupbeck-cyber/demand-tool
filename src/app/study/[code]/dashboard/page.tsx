@@ -411,7 +411,9 @@ export default function DashboardPage() {
                         if (!item) return '';
                         return `${item.total} (${item.totalPct})`;
                       }}
-                    />
+                    >
+                      <LabelList dataKey="failurePct" position="center" style={{ fill: '#fff', fontSize: 10, fontWeight: 600 }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
