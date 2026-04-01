@@ -391,6 +391,27 @@ export default function DashboardPage() {
               </ChartCard>
             )}
 
+            {/* Failures by original value demand */}
+            {data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0 && (
+              <ChartCard title={t('dashboard.failuresByOriginalValue')}>
+                <ResponsiveContainer width="100%" height={Math.max(200, data.failuresByOriginalValueDemand.length * 45)}>
+                  <BarChart data={data.failuresByOriginalValueDemand} layout="vertical" margin={{ left: 10, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
+                    <YAxis type="category" dataKey="label" width={140} tick={{ fill: '#374151', fontSize: 12 }} tickFormatter={(v: string) => tl(v)} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill={COLORS.failure} radius={[0, 4, 4, 0]}
+                      label={(props) => {
+                        const total = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
+                        const pct = total > 0 ? Math.round(((props.value as number) / total) * 100) : 0;
+                        return `${props.value} (${pct}%)`;
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
             {/* What matters - free text notes */}
             {data.whatMattersNotes && data.whatMattersNotes.length > 0 && (
               <ChartCard title={t('dashboard.whatMattersNotes')}>

@@ -42,6 +42,7 @@ export async function GET(
     'Handling': e.handlingTypeId ? hTypeMap.get(e.handlingTypeId) || '' : '',
     'Contact Method': e.contactMethodId ? cMethodMap.get(e.contactMethodId) || '' : '',
     'What Matters Category': e.whatMattersTypeId ? wmTypeMap.get(e.whatMattersTypeId) || '' : '',
+    'Original Value Demand': e.originalValueDemandTypeId ? dTypeMap.get(e.originalValueDemandTypeId) || '' : '',
     'Failure Cause (System Condition)': e.failureCause || '',
     'What Matters (Notes)': e.whatMatters || '',
   }));

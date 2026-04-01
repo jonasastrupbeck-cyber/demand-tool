@@ -366,7 +366,40 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 8: Demand Over Time ──
+  // ── Slide 8: Failures by Original Value Demand ──
+  if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
+    const fovSlide = pptx.addSlide();
+    fovSlide.background = { fill: 'ffffff' };
+    addSlideTitle(fovSlide, t('dashboard.failuresByOriginalValue', locale));
+    addFooter(fovSlide);
+
+    const totalFOV = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
+    const maxFOV = Math.max(...data.failuresByOriginalValueDemand.map(d => d.count));
+    const barMaxW = 7.0;
+
+    data.failuresByOriginalValueDemand.forEach((item, i) => {
+      const y = 1.3 + i * 0.5;
+      const pct = totalFOV > 0 ? Math.round((item.count / totalFOV) * 100) : 0;
+      const bw = maxFOV > 0 ? (item.count / maxFOV) * barMaxW : 0;
+
+      fovSlide.addText(tl(item.label), {
+        x: 0.5, y, w: 3.5, h: 0.4,
+        fontSize: 10, fontFace: 'Arial', color: '1f2937', align: 'right',
+      });
+      if (bw > 0.05) {
+        fovSlide.addShape(pptx.ShapeType.roundRect, {
+          x: 4.2, y: y + 0.05, w: bw, h: 0.3,
+          fill: { color: 'ef4444' }, rectRadius: 0.04,
+        });
+      }
+      fovSlide.addText(`${item.count} (${pct}%)`, {
+        x: 4.2 + bw + 0.1, y, w: 2, h: 0.4,
+        fontSize: 9, fontFace: 'Arial', color: '6b7280',
+      });
+    });
+  }
+
+  // ── Slide 9: Demand Over Time ──
   if (data.demandOverTime.length > 1) {
     const dotSlide = pptx.addSlide();
     dotSlide.background = { fill: 'ffffff' };

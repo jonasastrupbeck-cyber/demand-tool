@@ -32,6 +32,7 @@ export async function GET(
       'Handling': hTypes[0]?.label || '',
       'Contact Method': cMethods[0]?.label || '',
       'What Matters Category': wmTypes[0]?.label || '',
+      'Original Value Demand': valueTypes[0]?.label || '',
       'Failure Cause (System Condition)': '',
       'What Matters (Notes)': 'Quick answer',
     },
@@ -54,7 +55,7 @@ export async function GET(
   const wsReference = XLSX.utils.json_to_sheet(referenceData);
 
   wsTemplate['!cols'] = [
-    { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 18 }, { wch: 22 }, { wch: 35 }, { wch: 30 },
+    { wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 18 }, { wch: 22 }, { wch: 25 }, { wch: 35 }, { wch: 30 },
   ];
   wsReference['!cols'] = [
     { wch: 25 }, { wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 25 },

@@ -235,6 +235,18 @@ const translations = {
     sv: 'V\u00e4lj hantering...',
     de: 'Bearbeitung ausw\u00e4hlen...',
   },
+  'capture.originalValueDemandLabel': {
+    en: 'What was the original value demand?',
+    da: 'Hvad var den oprindelige værdiskabende efterspørgsel?',
+    sv: 'Vad var den ursprungliga värdeskapande efterfrågan?',
+    de: 'Was war die ursprüngliche Wertnachfrage?',
+  },
+  'capture.selectOriginalValueDemand': {
+    en: 'Select original value demand...',
+    da: 'Vælg oprindelig værdiskabende efterspørgsel...',
+    sv: 'Välj ursprunglig värdeskapande efterfrågan...',
+    de: 'Ursprüngliche Wertnachfrage auswählen...',
+  },
   'capture.failureCauseLabel': {
     en: 'Cause of failure demand (system condition)',
     da: '\u00c5rsag til ikke-v\u00e6rdiskabende eftersp\u00f8rgsel (systemforhold)',
@@ -604,6 +616,12 @@ const translations = {
     da: 'Eftersp\u00f8rgsel over tid',
     sv: 'Efterfr\u00e5gan \u00f6ver tid',
     de: 'Nachfrage im Zeitverlauf',
+  },
+  'dashboard.failuresByOriginalValue': {
+    en: 'Failure Demand by Original Value Demand',
+    da: 'Ikke-værdiskabende efterspørgsel fordelt på oprindelig værdiskabende efterspørgsel',
+    sv: 'Icke-värdeskapande efterfrågan per ursprunglig värdeskapande efterfrågan',
+    de: 'Fehlernachfrage nach ursprünglicher Wertnachfrage',
   },
   'dashboard.failureCauses': {
     en: 'Failure Causes (System Conditions)',

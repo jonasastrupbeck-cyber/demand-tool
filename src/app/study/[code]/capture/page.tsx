@@ -56,6 +56,7 @@ export default function CapturePage() {
   const [handlingTypeId, setHandlingTypeId] = useState('');
   const [contactMethodId, setContactMethodId] = useState('');
   const [whatMattersTypeId, setWhatMattersTypeId] = useState('');
+  const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
   const [whatMatters, setWhatMatters] = useState('');
 
@@ -102,6 +103,7 @@ export default function CapturePage() {
     // Keep primary contact method prefilled after submit
     setContactMethodId(study?.primaryContactMethodId || '');
     setWhatMattersTypeId('');
+    setOriginalValueDemandTypeId('');
     setFailureCause('');
     setWhatMatters('');
     setError('');
@@ -124,6 +126,7 @@ export default function CapturePage() {
         handlingTypeId: handlingTypeId || undefined,
         contactMethodId: contactMethodId || undefined,
         whatMattersTypeId: whatMattersTypeId || undefined,
+        originalValueDemandTypeId: classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined,
         failureCause: classification === 'failure' ? failureCause.trim() : undefined,
         whatMatters: whatMatters.trim() || undefined,
       }),
@@ -220,7 +223,7 @@ export default function CapturePage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => { setClassification('value'); setDemandTypeId(''); setFailureCause(''); }}
+              onClick={() => { setClassification('value'); setDemandTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
               className={`py-4 rounded-lg font-semibold text-lg transition-all ${
                 classification === 'value'
                   ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
@@ -291,6 +294,19 @@ export default function CapturePage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Original value demand (only for failure demand) */}
+        {classification === 'failure' && (
+          <div>
+            <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
+            <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectOriginalValueDemand')}</option>
+              {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
+                <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+              ))}
+            </select>
           </div>
         )}
 

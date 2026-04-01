@@ -50,6 +50,7 @@ export const demandEntries = pgTable('demand_entries', {
   demandTypeId: text('demand_type_id').references(() => demandTypes.id),
   contactMethodId: text('contact_method_id').references(() => contactMethods.id),
   whatMattersTypeId: text('what_matters_type_id').references(() => whatMattersTypes.id),
+  originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),
   failureCause: text('failure_cause'),
   whatMatters: text('what_matters'),
 });

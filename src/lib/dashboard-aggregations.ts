@@ -152,6 +152,20 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .orderBy(desc(sql`count(*)`))
     .limit(15);
 
+  // Failures by original value demand type
+  const failuresByOriginalValueDemand = await db.select({
+    label: demandTypes.label,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(demandTypes, eq(demandEntries.originalValueDemandTypeId, demandTypes.id))
+    .where(and(
+      ...conditions,
+      eq(demandEntries.classification, 'failure'),
+    ))
+    .groupBy(demandTypes.label)
+    .orderBy(desc(sql`count(*)`));
+
   // What matters free-text notes
   const whatMattersNotes = await db.select({
     text: demandEntries.whatMatters,
@@ -176,6 +190,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     handlingByClassification,
     demandOverTime: demandOverTimeResult,
     failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
+    failuresByOriginalValueDemand,
     whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date })),
   };
 }

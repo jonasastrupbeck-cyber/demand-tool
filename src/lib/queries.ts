@@ -263,6 +263,7 @@ export async function createEntry(studyId: string, data: {
   demandTypeId?: string;
   contactMethodId?: string;
   whatMattersTypeId?: string;
+  originalValueDemandTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
 }, createdAt?: Date) {
@@ -277,6 +278,7 @@ export async function createEntry(studyId: string, data: {
     demandTypeId: data.demandTypeId || null,
     contactMethodId: data.contactMethodId || null,
     whatMattersTypeId: data.whatMattersTypeId || null,
+    originalValueDemandTypeId: data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     failureCause: data.classification === 'failure' ? (data.failureCause || null) : null,
     whatMatters: data.whatMatters || null,
   });

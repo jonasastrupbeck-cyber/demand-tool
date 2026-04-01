@@ -103,6 +103,11 @@ export async function POST(
     const contactMethodId = contactMethodLabel ? contactMethodMap.get(contactMethodLabel) : undefined;
     const whatMattersTypeId = whatMattersTypeLabel ? whatMattersTypeMap.get(whatMattersTypeLabel) : undefined;
 
+    const originalValueDemandLabel = String(row['Original Value Demand'] || '').trim().toLowerCase();
+    const originalValueDemandTypeId = (classification === 'failure' && originalValueDemandLabel)
+      ? demandTypeMap.get(originalValueDemandLabel)
+      : undefined;
+
     const failureCause = classification === 'failure'
       ? String(row['Failure Cause (System Condition)'] || '').trim() || undefined
       : undefined;
@@ -115,6 +120,7 @@ export async function POST(
       handlingTypeId: handlingTypeId || undefined,
       contactMethodId: contactMethodId || undefined,
       whatMattersTypeId: whatMattersTypeId || undefined,
+      originalValueDemandTypeId: originalValueDemandTypeId || undefined,
       failureCause,
       whatMatters,
     }, createdAt);

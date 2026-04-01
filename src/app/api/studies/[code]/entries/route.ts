@@ -51,6 +51,7 @@ export async function POST(
     demandTypeId: body.demandTypeId || undefined,
     contactMethodId: body.contactMethodId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
+    originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     failureCause: body.failureCause?.trim() || undefined,
     whatMatters: body.whatMatters?.trim() || undefined,
   });

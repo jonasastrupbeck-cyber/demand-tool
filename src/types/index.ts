@@ -48,6 +48,7 @@ export interface DemandEntry {
   demandTypeId: string | null;
   contactMethodId: string | null;
   whatMattersTypeId: string | null;
+  originalValueDemandTypeId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
 }
@@ -64,6 +65,7 @@ export interface DashboardData {
   handlingByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   demandOverTime: Array<{ date: string; valueCount: number; failureCount: number }>;
   failureCauses: Array<{ cause: string; count: number }>;
+  failuresByOriginalValueDemand: Array<{ label: string; count: number }>;
   whatMattersNotes: Array<{ text: string; date: string }>;
 }
 
@@ -74,6 +76,7 @@ export interface CreateEntryInput {
   demandTypeId?: string;
   contactMethodId?: string;
   whatMattersTypeId?: string;
+  originalValueDemandTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
 }
