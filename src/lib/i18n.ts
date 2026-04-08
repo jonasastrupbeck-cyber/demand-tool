@@ -785,6 +785,182 @@ const translations = {
     sv: 'Senast aktiv',
     de: 'Zuletzt aktiv',
   },
+
+  // Work tracking
+  'capture.demand': {
+    en: 'Demand',
+    da: 'Efterspørgsel',
+    sv: 'Efterfrågan',
+    de: 'Nachfrage',
+  },
+  'capture.work': {
+    en: 'Work',
+    da: 'Arbejde',
+    sv: 'Arbete',
+    de: 'Arbeit',
+  },
+  'capture.unknown': {
+    en: '?',
+    da: '?',
+    sv: '?',
+    de: '?',
+  },
+  'capture.demandHelp': {
+    en: 'Demand comes from customers — requests, questions, or complaints directed at your organisation',
+    da: 'Efterspørgsel kommer fra kunder — henvendelser, spørgsmål eller klager rettet mod din organisation',
+    sv: 'Efterfrågan kommer från kunder — förfrågningar, frågor eller klagomål riktade till din organisation',
+    de: 'Nachfrage kommt von Kunden — Anfragen, Fragen oder Beschwerden an Ihre Organisation',
+  },
+  'capture.workHelp': {
+    en: 'Work comes from within the system — internal requests, information questions between colleagues, management reporting',
+    da: 'Arbejde kommer indefra systemet — interne henvendelser, informationsspørgsmål mellem kolleger, ledelsesrapportering',
+    sv: 'Arbete kommer inifrån systemet — interna förfrågningar, informationsfrågor mellan kollegor, ledningsrapportering',
+    de: 'Arbeit kommt aus dem System — interne Anfragen, Informationsfragen zwischen Kollegen, Management-Berichterstattung',
+  },
+  'capture.workClassificationHelp': {
+    en: 'Consequence of something not done right? → Failure. Otherwise, is it value work? If unsure → ?',
+    da: 'Konsekvens af noget der ikke er gjort rigtigt? → Ikke-værdiskabende. Ellers, er det værdiskabende arbejde? Hvis usikker → ?',
+    sv: 'Konsekvens av något som inte gjorts rätt? → Icke-värdeskapande. Annars, är det värdeskapande arbete? Om osäker → ?',
+    de: 'Folge von etwas, das nicht richtig gemacht wurde? → Fehler. Ansonsten, ist es Wertarbeit? Wenn unsicher → ?',
+  },
+  'capture.workTypeLabel': {
+    en: 'Work type',
+    da: 'Arbejdstype',
+    sv: 'Arbetstyp',
+    de: 'Arbeitsart',
+  },
+  'capture.selectWorkType': {
+    en: 'Select work type...',
+    da: 'Vælg arbejdstype...',
+    sv: 'Välj arbetstyp...',
+    de: 'Arbeitsart auswählen...',
+  },
+  'capture.workVerbatimLabel': {
+    en: 'What was the internal request or question?',
+    da: 'Hvad var den interne henvendelse eller spørgsmål?',
+    sv: 'Vad var den interna förfrågan eller frågan?',
+    de: 'Was war die interne Anfrage oder Frage?',
+  },
+  'capture.workVerbatimPlaceholder': {
+    en: 'Describe the internal request or question...',
+    da: 'Beskriv den interne henvendelse eller spørgsmål...',
+    sv: 'Beskriv den interna förfrågan eller frågan...',
+    de: 'Beschreiben Sie die interne Anfrage oder Frage...',
+  },
+  'capture.saveWork': {
+    en: 'Save Work Entry',
+    da: 'Gem arbejdsregistrering',
+    sv: 'Spara arbetspost',
+    de: 'Arbeitseintrag speichern',
+  },
+  'dashboard.demandVsWork': {
+    en: 'Demand vs Work',
+    da: 'Efterspørgsel vs. arbejde',
+    sv: 'Efterfrågan vs. arbete',
+    de: 'Nachfrage vs. Arbeit',
+  },
+  'dashboard.overview': {
+    en: 'Overview',
+    da: 'Overblik',
+    sv: 'Översikt',
+    de: 'Übersicht',
+  },
+  'dashboard.workTab': {
+    en: 'Work',
+    da: 'Arbejde',
+    sv: 'Arbete',
+    de: 'Arbeit',
+  },
+  'dashboard.demandTab': {
+    en: 'Demand',
+    da: 'Efterspørgsel',
+    sv: 'Efterfrågan',
+    de: 'Nachfrage',
+  },
+  'dashboard.workAnalysis': {
+    en: 'Work Analysis',
+    da: 'Arbejdsanalyse',
+    sv: 'Arbetsanalys',
+    de: 'Arbeitsanalyse',
+  },
+  'dashboard.unknownEntries': {
+    en: 'Uncertain (?)',
+    da: 'Usikker (?)',
+    sv: 'Osäker (?)',
+    de: 'Unsicher (?)',
+  },
+  'dashboard.workEntries': {
+    en: 'Work Entries',
+    da: 'Arbejdsregistreringer',
+    sv: 'Arbetsposter',
+    de: 'Arbeitseinträge',
+  },
+  'dashboard.workTypes': {
+    en: 'Work Types',
+    da: 'Arbejdstyper',
+    sv: 'Arbetstyper',
+    de: 'Arbeitsarten',
+  },
+  'dashboard.valueWork': {
+    en: 'Value Work',
+    da: 'Værdiskabende arbejde',
+    sv: 'Värdeskapande arbete',
+    de: 'Wertarbeit',
+  },
+  'dashboard.failureWork': {
+    en: 'Failure Work',
+    da: 'Ikke-værdiskabende arbejde',
+    sv: 'Icke-värdeskapande arbete',
+    de: 'Fehlerarbeit',
+  },
+  'dashboard.workOverTime': {
+    en: 'Work Over Time',
+    da: 'Arbejde over tid',
+    sv: 'Arbete över tid',
+    de: 'Arbeit im Zeitverlauf',
+  },
+  'dashboard.totalCapacity': {
+    en: 'Total Capacity',
+    da: 'Total kapacitet',
+    sv: 'Total kapacitet',
+    de: 'Gesamtkapazität',
+  },
+  'settings.workTracking': {
+    en: 'Work Tracking',
+    da: 'Arbejdssporing',
+    sv: 'Arbetsspårning',
+    de: 'Arbeitsverfolgung',
+  },
+  'settings.workTrackingDesc': {
+    en: 'Track internal work alongside customer demand. Work comes from within the system — internal requests, information questions between colleagues.',
+    da: 'Spor internt arbejde ved siden af kundeefterspørgsel. Arbejde kommer indefra systemet — interne henvendelser, informationsspørgsmål mellem kolleger.',
+    sv: 'Spåra internt arbete vid sidan av kundefterfrågan. Arbete kommer inifrån systemet — interna förfrågningar, informationsfrågor mellan kollegor.',
+    de: 'Verfolgen Sie interne Arbeit neben der Kundennachfrage. Arbeit kommt aus dem System — interne Anfragen, Informationsfragen zwischen Kollegen.',
+  },
+  'settings.enableWorkTracking': {
+    en: 'Enable work tracking',
+    da: 'Aktiver arbejdssporing',
+    sv: 'Aktivera arbetsspårning',
+    de: 'Arbeitsverfolgung aktivieren',
+  },
+  'settings.workTypes': {
+    en: 'Work Types',
+    da: 'Arbejdstyper',
+    sv: 'Arbetstyper',
+    de: 'Arbeitsarten',
+  },
+  'settings.workTypesDesc': {
+    en: 'Categories for classifying internal work.',
+    da: 'Kategorier til klassificering af internt arbejde.',
+    sv: 'Kategorier för klassificering av internt arbete.',
+    de: 'Kategorien zur Klassifizierung interner Arbeit.',
+  },
+  'settings.addWorkType': {
+    en: 'Add work type...',
+    da: 'Tilføj arbejdstype...',
+    sv: 'Lägg till arbetstyp...',
+    de: 'Arbeitsart hinzufügen...',
+  },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
@@ -826,6 +1002,10 @@ const DEFAULT_LABEL_GROUPS: string[][] = [
   ['Complaint', 'Klage', 'Klagomål', 'Beschwerde'],
   ['Error/mistake correction', 'Fejlrettelse', 'Felkorrigering', 'Fehlerkorrektur'],
   ['Repeat contact', 'Gentagen henvendelse', 'Upprepat kontakt', 'Wiederholter Kontakt'],
+  // Work types
+  ['Information request (internal)', 'Informationsforespørgsel (intern)', 'Informationsförfrågan (intern)', 'Informationsanfrage (intern)'],
+  ['Management reporting', 'Ledelsesrapportering', 'Ledningsrapportering', 'Management-Berichterstattung'],
+  ['Internal process query', 'Intern procesforespørgsel', 'Intern processförfrågan', 'Interne Prozessanfrage'],
 ];
 
 const LOCALE_INDEX: Record<Locale, number> = { en: 0, da: 1, sv: 2, de: 3 };

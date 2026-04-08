@@ -202,7 +202,40 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 4: Handling Breakdown ──
+  // ── Slide 4: Failures by Original Value Demand ──
+  if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
+    const fovSlide = pptx.addSlide();
+    fovSlide.background = { fill: 'ffffff' };
+    addSlideTitle(fovSlide, t('dashboard.failureByValueTitle', locale));
+    addFooter(fovSlide);
+
+    const totalFOV = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
+    const maxFOV = Math.max(...data.failuresByOriginalValueDemand.map(d => d.count));
+    const barMaxW = 7.0;
+
+    data.failuresByOriginalValueDemand.forEach((item, i) => {
+      const y = 1.3 + i * 0.5;
+      const pct = totalFOV > 0 ? Math.round((item.count / totalFOV) * 100) : 0;
+      const bw = maxFOV > 0 ? (item.count / maxFOV) * barMaxW : 0;
+
+      fovSlide.addText(tl(item.label), {
+        x: 0.5, y, w: 3.5, h: 0.4,
+        fontSize: 10, fontFace: 'Arial', color: '1f2937', align: 'right',
+      });
+      if (bw > 0.05) {
+        fovSlide.addShape(pptx.ShapeType.roundRect, {
+          x: 4.2, y: y + 0.05, w: bw, h: 0.3,
+          fill: { color: 'ef4444' }, rectRadius: 0.04,
+        });
+      }
+      fovSlide.addText(`${item.count} (${pct}%)`, {
+        x: 4.2 + bw + 0.1, y, w: 2, h: 0.4,
+        fontSize: 9, fontFace: 'Arial', color: '6b7280',
+      });
+    });
+  }
+
+  // ── Slide 5: Handling Breakdown ──
   if (data.handlingTypeCounts.length > 0) {
     const hSlide = pptx.addSlide();
     hSlide.background = { fill: 'ffffff' };
@@ -404,39 +437,6 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 8: Failures by Original Value Demand ──
-  if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
-    const fovSlide = pptx.addSlide();
-    fovSlide.background = { fill: 'ffffff' };
-    addSlideTitle(fovSlide, t('dashboard.failureByValueTitle', locale));
-    addFooter(fovSlide);
-
-    const totalFOV = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
-    const maxFOV = Math.max(...data.failuresByOriginalValueDemand.map(d => d.count));
-    const barMaxW = 7.0;
-
-    data.failuresByOriginalValueDemand.forEach((item, i) => {
-      const y = 1.3 + i * 0.5;
-      const pct = totalFOV > 0 ? Math.round((item.count / totalFOV) * 100) : 0;
-      const bw = maxFOV > 0 ? (item.count / maxFOV) * barMaxW : 0;
-
-      fovSlide.addText(tl(item.label), {
-        x: 0.5, y, w: 3.5, h: 0.4,
-        fontSize: 10, fontFace: 'Arial', color: '1f2937', align: 'right',
-      });
-      if (bw > 0.05) {
-        fovSlide.addShape(pptx.ShapeType.roundRect, {
-          x: 4.2, y: y + 0.05, w: bw, h: 0.3,
-          fill: { color: 'ef4444' }, rectRadius: 0.04,
-        });
-      }
-      fovSlide.addText(`${item.count} (${pct}%)`, {
-        x: 4.2 + bw + 0.1, y, w: 2, h: 0.4,
-        fontSize: 9, fontFace: 'Arial', color: '6b7280',
-      });
-    });
-  }
-
   // ── Slide 9: Demand Over Time ──
   if (data.demandOverTime.length > 1) {
     const dotSlide = pptx.addSlide();
@@ -469,6 +469,90 @@ export async function exportDashboardToPptx(
       colW: [4, 2.5, 2.5, 2.5],
       fontFace: 'Arial',
       autoPage: true,
+    });
+  }
+
+  // ── Slide: Demand vs Work ──
+  if (data.workCount > 0) {
+    const dvwSlide = pptx.addSlide();
+    dvwSlide.background = { fill: 'ffffff' };
+    addSlideTitle(dvwSlide, t('dashboard.demandVsWork', locale));
+    addFooter(dvwSlide);
+
+    const totalCapacity = data.totalEntries + data.workCount;
+    const demandPct = totalCapacity > 0 ? Math.round((data.totalEntries / totalCapacity) * 100) : 0;
+    const workPct = totalCapacity > 0 ? Math.round((data.workCount / totalCapacity) * 100) : 0;
+
+    const dvwData = [
+      {
+        name: 'split',
+        labels: [t('dashboard.demandTab', locale), t('dashboard.workTab', locale)],
+        values: [data.totalEntries, data.workCount],
+      },
+    ];
+
+    dvwSlide.addChart('pie', dvwData, {
+      x: 3.5, y: 1.3, w: 6, h: 4,
+      showLegend: true,
+      legendPos: 'b',
+      legendFontSize: 11,
+      legendColor: '1f2937',
+      showPercent: true,
+      showValue: false,
+      showTitle: false,
+      dataLabelPosition: 'outEnd',
+      dataLabelFontSize: 12,
+      dataLabelColor: '1f2937',
+      dataLabelFontBold: true,
+      chartColors: ['3b82f6', 'f59e0b'],
+    });
+
+    // Summary text
+    dvwSlide.addText(`${t('dashboard.demandTab', locale)}: ${data.totalEntries} (${demandPct}%)  |  ${t('dashboard.workTab', locale)}: ${data.workCount} (${workPct}%)  |  ${t('dashboard.totalCapacity', locale)}: ${totalCapacity}`, {
+      x: 0.5, y: 5.5, w: 12, h: 0.5,
+      fontSize: 11, fontFace: 'Arial', color: '6b7280', align: 'center',
+    });
+  }
+
+  // ── Slide: Work Analysis ──
+  if (data.workCount > 0 && data.workTypeCounts.length > 0) {
+    const waSlide = pptx.addSlide();
+    waSlide.background = { fill: 'ffffff' };
+    addSlideTitle(waSlide, t('dashboard.workAnalysis', locale));
+    addFooter(waSlide);
+
+    // Work value/failure/? summary
+    const workValPct = data.workCount > 0 ? Math.round((data.workValueCount / data.workCount) * 100) : 0;
+    const workFailPct = data.workCount > 0 ? Math.round((data.workFailureCount / data.workCount) * 100) : 0;
+
+    waSlide.addText(`${t('capture.value', locale)}: ${data.workValueCount} (${workValPct}%)  |  ${t('capture.failure', locale)}: ${data.workFailureCount} (${workFailPct}%)${data.workUnknownCount > 0 ? `  |  ?: ${data.workUnknownCount}` : ''}`, {
+      x: 0.5, y: 1.2, w: 12, h: 0.4,
+      fontSize: 11, fontFace: 'Arial', color: '6b7280', align: 'center',
+    });
+
+    // Work type bars
+    const maxWT = Math.max(...data.workTypeCounts.map(d => d.count));
+    const barMaxW = 7.0;
+
+    data.workTypeCounts.forEach((item, i) => {
+      const y = 2.0 + i * 0.5;
+      const pct = data.workCount > 0 ? Math.round((item.count / data.workCount) * 100) : 0;
+      const bw = maxWT > 0 ? (item.count / maxWT) * barMaxW : 0;
+
+      waSlide.addText(tl(item.label), {
+        x: 0.5, y, w: 3.5, h: 0.4,
+        fontSize: 10, fontFace: 'Arial', color: '1f2937', align: 'right',
+      });
+      if (bw > 0.05) {
+        waSlide.addShape(pptx.ShapeType.roundRect, {
+          x: 4.2, y: y + 0.05, w: bw, h: 0.3,
+          fill: { color: 'f59e0b' }, rectRadius: 0.04,
+        });
+      }
+      waSlide.addText(`${item.count} (${pct}%)`, {
+        x: 4.2 + bw + 0.1, y, w: 2, h: 0.4,
+        fontSize: 9, fontFace: 'Arial', color: '6b7280',
+      });
     });
   }
 

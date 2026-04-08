@@ -6,6 +6,7 @@ export interface Study {
   oneStopHandlingType: string | null;
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
+  workTrackingEnabled: boolean;
   createdAt: Date;
   isActive: boolean;
 }
@@ -46,18 +47,27 @@ export interface WhatMattersType {
   sortOrder: number;
 }
 
+export interface WorkType {
+  id: string;
+  studyId: string;
+  label: string;
+  sortOrder: number;
+}
+
 export interface DemandEntry {
   id: string;
   studyId: string;
   createdAt: Date;
   verbatim: string;
-  classification: 'value' | 'failure';
+  classification: 'value' | 'failure' | 'unknown';
+  entryType: 'demand' | 'work';
   handlingTypeId: string | null;
   demandTypeId: string | null;
   contactMethodId: string | null;
   pointOfTransactionId: string | null;
   whatMattersTypeId: string | null;
   originalValueDemandTypeId: string | null;
+  workTypeId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
   collectorName: string | null;
@@ -67,6 +77,7 @@ export interface DashboardData {
   totalEntries: number;
   valueCount: number;
   failureCount: number;
+  unknownCount: number;
   perfectPercentage: number;
   demandTypeCounts: Array<{ label: string; category: string; count: number }>;
   handlingTypeCounts: Array<{ label: string; count: number }>;
@@ -79,17 +90,26 @@ export interface DashboardData {
   failuresByOriginalValueDemand: Array<{ label: string; count: number }>;
   whatMattersNotes: Array<{ text: string; date: string }>;
   collectorCounts: Array<{ name: string; count: number; lastActive: string }>;
+  // Work tracking
+  workCount: number;
+  workValueCount: number;
+  workFailureCount: number;
+  workUnknownCount: number;
+  workTypeCounts: Array<{ label: string; count: number }>;
+  workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }>;
 }
 
 export interface CreateEntryInput {
   verbatim: string;
-  classification: 'value' | 'failure';
+  classification: 'value' | 'failure' | 'unknown';
+  entryType?: 'demand' | 'work';
   handlingTypeId?: string;
   demandTypeId?: string;
   contactMethodId?: string;
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   originalValueDemandTypeId?: string;
+  workTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;

@@ -1,30 +1,41 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, studies } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import type { DashboardData } from '@/types';
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date): Promise<DashboardData> {
-  const conditions = [eq(demandEntries.studyId, studyId)];
-  if (from) conditions.push(gte(demandEntries.createdAt, from));
-  if (to) conditions.push(lte(demandEntries.createdAt, to));
-  const whereClause = and(...conditions);
+  const baseConditions = [eq(demandEntries.studyId, studyId)];
+  if (from) baseConditions.push(gte(demandEntries.createdAt, from));
+  if (to) baseConditions.push(lte(demandEntries.createdAt, to));
 
-  // Get study for one-stop handling type
+  // Demand-only conditions (filter out work entries from all existing queries)
+  const demandConditions = [...baseConditions, eq(demandEntries.entryType, 'demand')];
+  const demandWhere = and(...demandConditions);
+
+  // Work-only conditions
+  const workConditions = [...baseConditions, eq(demandEntries.entryType, 'work')];
+  const workWhere = and(...workConditions);
+
+  // Get study for one-stop handling type and work tracking flag
   const study = await db.select().from(studies).where(eq(studies.id, studyId));
   const oneStopId = study[0]?.oneStopHandlingType;
+  const workTrackingEnabled = study[0]?.workTrackingEnabled ?? false;
 
-  // Total counts by classification
+  // ── DEMAND AGGREGATIONS ──
+
+  // Total counts by classification (demand only)
   const classificationCounts = await db.select({
     classification: demandEntries.classification,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(demandEntries.classification);
 
   const valueCount = classificationCounts.find(c => c.classification === 'value')?.count || 0;
   const failureCount = classificationCounts.find(c => c.classification === 'failure')?.count || 0;
-  const totalEntries = valueCount + failureCount;
+  const unknownCount = classificationCounts.find(c => c.classification === 'unknown')?.count || 0;
+  const totalEntries = valueCount + failureCount + unknownCount;
 
   // Perfect percentage: value demand with one-stop handling as % of total demand
   let perfectPercentage = 0;
@@ -34,7 +45,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     })
       .from(demandEntries)
       .where(and(
-        ...conditions,
+        ...demandConditions,
         eq(demandEntries.classification, 'value'),
         eq(demandEntries.handlingTypeId, oneStopId)
       ));
@@ -49,45 +60,45 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   })
     .from(demandEntries)
     .innerJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(demandTypes.label, demandTypes.category)
     .orderBy(desc(sql`count(*)`))
     .limit(10);
 
-  // Handling type counts
+  // Handling type counts (demand only)
   const handlingTypeCounts = await db.select({
     label: handlingTypes.label,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(handlingTypes.label)
     .orderBy(desc(sql`count(*)`));
 
-  // Contact method counts
+  // Contact method counts (demand only)
   const contactMethodCounts = await db.select({
     label: contactMethods.label,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(contactMethods, eq(demandEntries.contactMethodId, contactMethods.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(contactMethods.label)
     .orderBy(desc(sql`count(*)`));
 
-  // What matters type counts
+  // What matters type counts (demand only)
   const whatMattersCounts = await db.select({
     label: whatMattersTypes.label,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .innerJoin(whatMattersTypes, eq(demandEntries.whatMattersTypeId, whatMattersTypes.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(whatMattersTypes.label)
     .orderBy(desc(sql`count(*)`));
 
-  // Handling by classification
+  // Handling by classification (demand only)
   const handlingByClass = await db.select({
     label: handlingTypes.label,
     classification: demandEntries.classification,
@@ -95,7 +106,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   })
     .from(demandEntries)
     .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(handlingTypes.label, demandEntries.classification);
 
   const handlingMap = new Map<string, { valueCount: number; failureCount: number }>();
@@ -105,21 +116,21 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     }
     const entry = handlingMap.get(row.label)!;
     if (row.classification === 'value') entry.valueCount = row.count;
-    else entry.failureCount = row.count;
+    else if (row.classification === 'failure') entry.failureCount = row.count;
   }
   const handlingByClassification = Array.from(handlingMap.entries()).map(([label, counts]) => ({
     label,
     ...counts,
   }));
 
-  // Demand over time
+  // Demand over time (demand only)
   const demandOverTime = await db.select({
     date: sql<string>`${demandEntries.createdAt}::date`,
     classification: demandEntries.classification,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
     .orderBy(sql`${demandEntries.createdAt}::date`);
 
@@ -130,21 +141,21 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     }
     const entry = timeMap.get(row.date)!;
     if (row.classification === 'value') entry.valueCount = row.count;
-    else entry.failureCount = row.count;
+    else if (row.classification === 'failure') entry.failureCount = row.count;
   }
   const demandOverTimeResult = Array.from(timeMap.entries()).map(([date, counts]) => ({
     date,
     ...counts,
   }));
 
-  // Failure causes
+  // Failure causes (demand only)
   const failureCauses = await db.select({
     cause: demandEntries.failureCause,
     count: sql<number>`count(*)::int`,
   })
     .from(demandEntries)
     .where(and(
-      ...conditions,
+      ...demandConditions,
       eq(demandEntries.classification, 'failure'),
       sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
     ))
@@ -152,7 +163,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .orderBy(desc(sql`count(*)`))
     .limit(15);
 
-  // Failures by original value demand type
+  // Failures by original value demand type (demand only)
   const failuresByOriginalValueDemand = await db.select({
     label: demandTypes.label,
     count: sql<number>`count(*)::int`,
@@ -160,13 +171,13 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .from(demandEntries)
     .innerJoin(demandTypes, eq(demandEntries.originalValueDemandTypeId, demandTypes.id))
     .where(and(
-      ...conditions,
+      ...demandConditions,
       eq(demandEntries.classification, 'failure'),
     ))
     .groupBy(demandTypes.label)
     .orderBy(desc(sql`count(*)`));
 
-  // Point of transaction by classification
+  // Point of transaction by classification (demand only)
   const potByClass = await db.select({
     label: pointsOfTransaction.label,
     classification: demandEntries.classification,
@@ -174,7 +185,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   })
     .from(demandEntries)
     .innerJoin(pointsOfTransaction, eq(demandEntries.pointOfTransactionId, pointsOfTransaction.id))
-    .where(whereClause)
+    .where(demandWhere)
     .groupBy(pointsOfTransaction.label, demandEntries.classification);
 
   const potMap = new Map<string, { valueCount: number; failureCount: number }>();
@@ -184,26 +195,27 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     }
     const entry = potMap.get(row.label)!;
     if (row.classification === 'value') entry.valueCount = row.count;
-    else entry.failureCount = row.count;
+    else if (row.classification === 'failure') entry.failureCount = row.count;
   }
   const pointOfTransactionByClassification = Array.from(potMap.entries()).map(([label, counts]) => ({
     label,
     ...counts,
   }));
 
-  // What matters free-text notes
+  // What matters free-text notes (demand only)
   const whatMattersNotes = await db.select({
     text: demandEntries.whatMatters,
     date: sql<string>`${demandEntries.createdAt}::date`,
   })
     .from(demandEntries)
     .where(and(
-      ...conditions,
+      ...demandConditions,
       sql`${demandEntries.whatMatters} IS NOT NULL AND ${demandEntries.whatMatters} != ''`
     ))
     .orderBy(desc(demandEntries.createdAt));
 
-  // Collector stats
+  // Collector stats (all entries — demand + work)
+  const allWhere = and(...baseConditions);
   const collectorStats = await db.select({
     name: demandEntries.collectorName,
     count: sql<number>`count(*)::int`,
@@ -211,7 +223,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   })
     .from(demandEntries)
     .where(and(
-      ...conditions,
+      allWhere,
       sql`${demandEntries.collectorName} IS NOT NULL AND ${demandEntries.collectorName} != ''`
     ))
     .groupBy(demandEntries.collectorName)
@@ -219,10 +231,72 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
 
   const collectorCounts = collectorStats.map(r => ({ name: r.name!, count: r.count, lastActive: r.lastActive }));
 
+  // ── WORK AGGREGATIONS ──
+
+  let workCount = 0;
+  let workValueCount = 0;
+  let workFailureCount = 0;
+  let workUnknownCount = 0;
+  let workTypeCounts: Array<{ label: string; count: number }> = [];
+  let workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }> = [];
+
+  if (workTrackingEnabled) {
+    const workClassCounts = await db.select({
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .where(workWhere)
+      .groupBy(demandEntries.classification);
+
+    workValueCount = workClassCounts.find(c => c.classification === 'value')?.count || 0;
+    workFailureCount = workClassCounts.find(c => c.classification === 'failure')?.count || 0;
+    workUnknownCount = workClassCounts.find(c => c.classification === 'unknown')?.count || 0;
+    workCount = workValueCount + workFailureCount + workUnknownCount;
+
+    // Work type counts
+    workTypeCounts = await db.select({
+      label: workTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+      .where(workWhere)
+      .groupBy(workTypes.label)
+      .orderBy(desc(sql`count(*)`));
+
+    // Work over time
+    const workOT = await db.select({
+      date: sql<string>`${demandEntries.createdAt}::date`,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .where(workWhere)
+      .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
+      .orderBy(sql`${demandEntries.createdAt}::date`);
+
+    const workTimeMap = new Map<string, { valueCount: number; failureCount: number; unknownCount: number }>();
+    for (const row of workOT) {
+      if (!workTimeMap.has(row.date)) {
+        workTimeMap.set(row.date, { valueCount: 0, failureCount: 0, unknownCount: 0 });
+      }
+      const entry = workTimeMap.get(row.date)!;
+      if (row.classification === 'value') entry.valueCount = row.count;
+      else if (row.classification === 'failure') entry.failureCount = row.count;
+      else entry.unknownCount = row.count;
+    }
+    workOverTime = Array.from(workTimeMap.entries()).map(([date, counts]) => ({
+      date,
+      ...counts,
+    }));
+  }
+
   return {
     totalEntries,
     valueCount,
     failureCount,
+    unknownCount,
     perfectPercentage,
     demandTypeCounts,
     handlingTypeCounts,
@@ -235,5 +309,11 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     failuresByOriginalValueDemand,
     whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date })),
     collectorCounts,
+    workCount,
+    workValueCount,
+    workFailureCount,
+    workUnknownCount,
+    workTypeCounts,
+    workOverTime,
   };
 }

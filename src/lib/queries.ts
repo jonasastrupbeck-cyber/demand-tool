@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, demandEntries } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries } from './schema';
 import { eq, and, desc, asc, sql, gte, lte } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -64,7 +64,14 @@ const DEFAULT_CONTACT_METHODS: Record<Locale, string[]> = {
   de: ['Telefon', 'Mail', 'Persönlich'],
 };
 
-export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string) {
+const DEFAULT_WORK_TYPES: Record<Locale, string[]> = {
+  en: ['Information request (internal)', 'Management reporting', 'Internal process query'],
+  da: ['Informationsforespørgsel (intern)', 'Ledelsesrapportering', 'Intern procesforespørgsel'],
+  sv: ['Informationsförfrågan (intern)', 'Ledningsrapportering', 'Intern processförfrågan'],
+  de: ['Informationsanfrage (intern)', 'Management-Berichterstattung', 'Interne Prozessanfrage'],
+};
+
+export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false) {
   const id = generateId();
   let accessCode = generateAccessCode();
 
@@ -79,6 +86,7 @@ export async function createStudy(name: string, description: string = '', locale
     accessCode,
     name,
     description,
+    workTrackingEnabled,
     createdAt: new Date(),
     isActive: true,
   });
@@ -170,6 +178,19 @@ export async function createStudy(name: string, description: string = '', locale
     await db.update(studies).set({ primaryPointOfTransactionId: potId }).where(eq(studies.id, id));
   }
 
+  // Create default work types if work tracking is enabled
+  if (workTrackingEnabled) {
+    const localizedWorkTypes = DEFAULT_WORK_TYPES[locale];
+    for (let i = 0; i < localizedWorkTypes.length; i++) {
+      await db.insert(workTypes).values({
+        id: generateId(),
+        studyId: id,
+        label: localizedWorkTypes[i],
+        sortOrder: i,
+      });
+    }
+  }
+
   return { id, accessCode };
 }
 
@@ -178,7 +199,7 @@ export async function getStudyByCode(code: string) {
   return result[0] || null;
 }
 
-export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null }) {
+export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean }) {
   await db.update(studies).set(data).where(eq(studies.id, id));
 }
 
@@ -288,34 +309,74 @@ export async function deletePointOfTransaction(id: string) {
   await db.delete(pointsOfTransaction).where(eq(pointsOfTransaction.id, id));
 }
 
+export async function getWorkTypes(studyId: string) {
+  return db.select().from(workTypes).where(eq(workTypes.studyId, studyId)).orderBy(asc(workTypes.sortOrder));
+}
+
+export async function addWorkType(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getWorkTypes(studyId);
+  await db.insert(workTypes).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function deleteWorkType(id: string) {
+  await db.delete(workTypes).where(eq(workTypes.id, id));
+}
+
+export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en') {
+  const existing = await getWorkTypes(studyId);
+  if (existing.length > 0) return;
+  const localizedWorkTypes = DEFAULT_WORK_TYPES[locale];
+  for (let i = 0; i < localizedWorkTypes.length; i++) {
+    await db.insert(workTypes).values({
+      id: generateId(),
+      studyId,
+      label: localizedWorkTypes[i],
+      sortOrder: i,
+    });
+  }
+}
+
 export async function createEntry(studyId: string, data: {
   verbatim: string;
-  classification: 'value' | 'failure';
+  classification: 'value' | 'failure' | 'unknown';
+  entryType?: 'demand' | 'work';
   handlingTypeId?: string;
   demandTypeId?: string;
   contactMethodId?: string;
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   originalValueDemandTypeId?: string;
+  workTypeId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;
 }, createdAt?: Date) {
   const id = generateId();
+  const entryType = data.entryType || 'demand';
+  const isDemand = entryType === 'demand';
   await db.insert(demandEntries).values({
     id,
     studyId,
     createdAt: createdAt || new Date(),
     verbatim: data.verbatim,
     classification: data.classification,
+    entryType,
     handlingTypeId: data.handlingTypeId || null,
-    demandTypeId: data.demandTypeId || null,
+    demandTypeId: isDemand ? (data.demandTypeId || null) : null,
     contactMethodId: data.contactMethodId || null,
     pointOfTransactionId: data.pointOfTransactionId || null,
-    whatMattersTypeId: data.whatMattersTypeId || null,
-    originalValueDemandTypeId: data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
-    failureCause: data.classification === 'failure' ? (data.failureCause || null) : null,
-    whatMatters: data.whatMatters || null,
+    whatMattersTypeId: isDemand ? (data.whatMattersTypeId || null) : null,
+    originalValueDemandTypeId: isDemand && data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
+    workTypeId: !isDemand ? (data.workTypeId || null) : null,
+    failureCause: isDemand && data.classification === 'failure' ? (data.failureCause || null) : null,
+    whatMatters: isDemand ? (data.whatMatters || null) : null,
     collectorName: data.collectorName || null,
   });
   return id;

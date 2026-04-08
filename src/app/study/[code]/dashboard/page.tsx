@@ -32,6 +32,8 @@ const tooltipStyle = {
 
 type DateRange = 'all' | 'today' | '7d' | '30d';
 
+type DashboardView = 'demand' | 'work' | 'overview';
+
 export default function DashboardPage() {
   const params = useParams();
   const code = params.code as string;
@@ -39,8 +41,10 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [studyName, setStudyName] = useState('');
+  const [workTrackingEnabled, setWorkTrackingEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('all');
+  const [dashboardView, setDashboardView] = useState<DashboardView>('demand');
   const [uploading, setUploading] = useState(false);
   const [exportingPptx, setExportingPptx] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -80,7 +84,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch(`/api/studies/${encodeURIComponent(code)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(s => { if (s) setStudyName(s.name); });
+      .then(s => { if (s) { setStudyName(s.name); setWorkTrackingEnabled(s.workTrackingEnabled); } });
   }, [code]);
 
   function handleExport() {
@@ -251,16 +255,38 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Dashboard view tabs (only when work tracking enabled and has work data) */}
+        {workTrackingEnabled && data.workCount > 0 && (
+          <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200">
+            {(['demand', 'work', 'overview'] as DashboardView[]).map((view) => (
+              <button
+                key={view}
+                onClick={() => setDashboardView(view)}
+                className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
+                  dashboardView === view ? 'bg-[#ac2c2d] text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {view === 'demand' ? t('dashboard.demandTab') : view === 'work' ? t('dashboard.workTab') : t('dashboard.overview')}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Summary cards */}
+        {dashboardView === 'demand' && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card label={t('dashboard.totalEntries')} value={data.totalEntries} />
           <Card label={t('dashboard.valueDemand')} value={`${valuePercent}%`} sub={`${data.valueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
           <Card label={t('dashboard.failureDemand')} value={`${failurePercent}%`} sub={`${data.failureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
           <Card label={t('dashboard.perfect')} value={`${data.perfectPercentage}%`} sub={t('dashboard.perfectSub')} color="#22c55e" />
+          {data.unknownCount > 0 && (
+            <Card label={t('dashboard.unknownEntries')} value={data.unknownCount} color="#f59e0b" />
+          )}
         </div>
+        )}
 
-        {/* Top metric: failure by original value demand */}
-        {data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0 && (
+        {/* ── DEMAND VIEW ── */}
+        {dashboardView === 'demand' && data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0 && (
           <ChartCard title={t('dashboard.failureByValueTitle')}>
             <ResponsiveContainer width="100%" height={Math.max(200, data.failuresByOriginalValueDemand.length * 45)}>
               <BarChart data={data.failuresByOriginalValueDemand} layout="vertical" margin={{ left: 10, right: 60 }}>
@@ -280,7 +306,7 @@ export default function DashboardPage() {
           </ChartCard>
         )}
 
-        {data.totalEntries === 0 ? (
+        {dashboardView === 'demand' && data.totalEntries === 0 ? (
           <div className="rounded-xl p-8 text-center bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
             {t('dashboard.noEntries')}
           </div>
@@ -464,23 +490,139 @@ export default function DashboardPage() {
               </ChartCard>
             )}
 
-            {/* Team activity */}
-            {data.collectorCounts && data.collectorCounts.length > 0 && (
-              <ChartCard title={t('dashboard.collectors')}>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {data.collectorCounts.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between py-2 px-3 rounded bg-blue-50">
-                      <div>
-                        <span className="text-sm font-medium text-gray-800">{c.name}</span>
-                        <span className="text-xs text-gray-400 ml-2">{t('dashboard.lastActive')}: {c.lastActive}</span>
-                      </div>
-                      <span className="text-sm font-semibold text-blue-700">{c.count} {t('dashboard.collectorEntries')}</span>
-                    </div>
-                  ))}
-                </div>
-              </ChartCard>
+          </>
+        )}
+
+        {/* ── WORK VIEW ── */}
+        {dashboardView === 'work' && (
+          <>
+            {/* Work summary cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card label={t('dashboard.workEntries')} value={data.workCount} />
+              <Card label={t('dashboard.valueWork')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
+              <Card label={t('dashboard.failureWork')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
+              {data.workUnknownCount > 0 && (
+                <Card label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
+              )}
+            </div>
+
+            {data.workCount === 0 ? (
+              <div className="rounded-xl p-8 text-center bg-white border border-gray-200 text-gray-600">
+                {t('dashboard.noEntries')}
+              </div>
+            ) : (
+              <>
+                {/* Work value/failure pie */}
+                <ChartCard title={t('dashboard.workAnalysis')}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: t('capture.value'), value: data.workValueCount, color: COLORS.value },
+                          { name: t('capture.failure'), value: data.workFailureCount, color: COLORS.failure },
+                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount, color: '#f59e0b' }] : []),
+                        ]}
+                        cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
+                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={{ strokeWidth: 1 }}
+                      >
+                        {[COLORS.value, COLORS.failure, '#f59e0b'].slice(0, data.workUnknownCount > 0 ? 3 : 2).map((color, i) => (
+                          <Cell key={i} fill={color} />
+                        ))}
+                      </Pie>
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Work types bar chart */}
+                {data.workTypeCounts.length > 0 && (
+                  <ChartCard title={t('dashboard.workTypes')}>
+                    <ResponsiveContainer width="100%" height={Math.max(200, data.workTypeCounts.length * 40 + 40)}>
+                      <BarChart data={data.workTypeCounts.map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                        <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                        <YAxis type="category" dataKey="label" width={200} tick={{ fontSize: 11, fill: THEME.textSecondary }} interval={0} />
+                        <Tooltip {...tooltipStyle} />
+                        <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="count" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                )}
+
+                {/* Work over time */}
+                {data.workOverTime.length > 1 && (
+                  <ChartCard title={t('dashboard.workOverTime')}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={data.workOverTime}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                        <XAxis dataKey="date" tick={tickStyle} />
+                        <YAxis allowDecimals={false} tick={tickStyle} />
+                        <Tooltip {...tooltipStyle} />
+                        <Legend wrapperStyle={{ color: THEME.textSecondary }} />
+                        <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                )}
+              </>
             )}
           </>
+        )}
+
+        {/* ── OVERVIEW VIEW ── */}
+        {dashboardView === 'overview' && (
+          <>
+            {/* Total capacity cards */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <Card label={t('dashboard.totalCapacity')} value={data.totalEntries + data.workCount} />
+              <Card label={t('dashboard.demandTab')} value={data.totalEntries} sub={`${data.totalEntries + data.workCount > 0 ? Math.round((data.totalEntries / (data.totalEntries + data.workCount)) * 100) : 0}%`} color="#3b82f6" />
+              <Card label={t('dashboard.workTab')} value={data.workCount} sub={`${data.totalEntries + data.workCount > 0 ? Math.round((data.workCount / (data.totalEntries + data.workCount)) * 100) : 0}%`} color="#f59e0b" />
+            </div>
+
+            {/* Demand vs Work pie */}
+            <ChartCard title={t('dashboard.demandVsWork')}>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: t('dashboard.demandTab'), value: data.totalEntries },
+                      { name: t('dashboard.workTab'), value: data.workCount },
+                    ]}
+                    cx="50%" cy="50%" outerRadius={85} innerRadius={35} dataKey="value"
+                    label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                    labelLine={{ strokeWidth: 1 }}
+                  >
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#f59e0b" />
+                  </Pie>
+                  <Tooltip {...tooltipStyle} />
+                  <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </>
+        )}
+
+        {/* Team activity (shown on all views) */}
+        {data.collectorCounts && data.collectorCounts.length > 0 && dashboardView === 'demand' && (
+          <ChartCard title={t('dashboard.collectors')}>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {data.collectorCounts.map((c, i) => (
+                <div key={i} className="flex items-center justify-between py-2 px-3 rounded bg-blue-50">
+                  <div>
+                    <span className="text-sm font-medium text-gray-800">{c.name}</span>
+                    <span className="text-xs text-gray-400 ml-2">{t('dashboard.lastActive')}: {c.lastActive}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-blue-700">{c.count} {t('dashboard.collectorEntries')}</span>
+                </div>
+              ))}
+            </div>
+          </ChartCard>
         )}
       </div>
     </div>

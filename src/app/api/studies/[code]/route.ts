@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, seedDefaultWorkTypes } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,12 +12,13 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
     getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
+    getWorkTypes(study.id),
   ]);
 
   return NextResponse.json({
@@ -27,6 +28,7 @@ export async function GET(
     contactMethods: cMethods,
     pointsOfTransaction: potTypes,
     whatMattersTypes: wmTypes,
+    workTypes: wTypes,
   });
 }
 
@@ -46,7 +48,14 @@ export async function PUT(
   if (body.name !== undefined) updates.name = body.name;
   if (body.description !== undefined) updates.description = body.description;
   if (body.oneStopHandlingType !== undefined) updates.oneStopHandlingType = body.oneStopHandlingType;
+  if (body.workTrackingEnabled !== undefined) updates.workTrackingEnabled = body.workTrackingEnabled;
 
   await updateStudy(study.id, updates);
+
+  // Seed default work types when enabling work tracking for the first time
+  if (body.workTrackingEnabled === true) {
+    await seedDefaultWorkTypes(study.id, body.locale || 'en');
+  }
+
   return NextResponse.json({ success: true });
 }

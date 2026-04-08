@@ -8,6 +8,7 @@ export const studies = pgTable('studies', {
   oneStopHandlingType: text('one_stop_handling_type'),
   primaryContactMethodId: text('primary_contact_method_id'),
   primaryPointOfTransactionId: text('primary_point_of_transaction_id'),
+  workTrackingEnabled: boolean('work_tracking_enabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
 });
@@ -48,18 +49,27 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+export const workTypes = pgTable('work_types', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const demandEntries = pgTable('demand_entries', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   verbatim: text('verbatim').notNull(),
-  classification: text('classification').$type<'value' | 'failure'>().notNull(),
+  classification: text('classification').$type<'value' | 'failure' | 'unknown'>().notNull(),
+  entryType: text('entry_type').$type<'demand' | 'work'>().notNull().default('demand'),
   handlingTypeId: text('handling_type_id').references(() => handlingTypes.id),
   demandTypeId: text('demand_type_id').references(() => demandTypes.id),
   contactMethodId: text('contact_method_id').references(() => contactMethods.id),
   pointOfTransactionId: text('point_of_transaction_id').references(() => pointsOfTransaction.id),
   whatMattersTypeId: text('what_matters_type_id').references(() => whatMattersTypes.id),
   originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),
+  workTypeId: text('work_type_id').references(() => workTypes.id),
   failureCause: text('failure_cause'),
   whatMatters: text('what_matters'),
   collectorName: text('collector_name'),

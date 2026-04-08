@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, createEntry } from '@/lib/queries';
+import { getStudyByCode, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, createEntry } from '@/lib/queries';
 import * as XLSX from 'xlsx';
 
 // Map of accepted classification values → internal value
-const CLASSIFICATION_MAP: Record<string, 'value' | 'failure'> = {
+const CLASSIFICATION_MAP: Record<string, 'value' | 'failure' | 'unknown'> = {
   // English
   'value': 'value',
   'failure': 'failure',
+  '?': 'unknown',
+  'unknown': 'unknown',
   // Danish
   'værdiskabende': 'value',
   'ikke-værdiskabende': 'failure',
@@ -20,6 +22,20 @@ const CLASSIFICATION_MAP: Record<string, 'value' | 'failure'> = {
   // German
   'wert': 'value',
   'fehler': 'failure',
+};
+
+const ENTRY_TYPE_MAP: Record<string, 'demand' | 'work'> = {
+  'demand': 'demand',
+  'work': 'work',
+  // Danish
+  'efterspørgsel': 'demand',
+  'arbejde': 'work',
+  // Swedish
+  'efterfrågan': 'demand',
+  'arbete': 'work',
+  // German
+  'nachfrage': 'demand',
+  'arbeit': 'work',
 };
 
 // Convert Excel serial date number to JS Date
@@ -62,12 +78,13 @@ export async function POST(
   }
 
   // Build lookup maps for types (label → id, case-insensitive)
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
     getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
+    getWorkTypes(study.id),
   ]);
 
   const handlingMap = new Map(hTypes.map(h => [h.label.toLowerCase(), h.id]));
@@ -75,6 +92,7 @@ export async function POST(
   const contactMethodMap = new Map(cMethods.map(c => [c.label.toLowerCase(), c.id]));
   const potMap = new Map(potTypes.map(p => [p.label.toLowerCase(), p.id]));
   const whatMattersTypeMap = new Map(wmTypes.map(w => [w.label.toLowerCase(), w.id]));
+  const workTypeMap = new Map(wTypes.map(w => [w.label.toLowerCase(), w.id]));
 
   const errors: Array<{ row: number; message: string }> = [];
   let imported = 0;
@@ -111,13 +129,19 @@ export async function POST(
       }
     }
 
+    // Determine entry type
+    const rawEntryType = String(row['Entry Type'] || '').trim().toLowerCase();
+    const entryType = ENTRY_TYPE_MAP[rawEntryType] || 'demand';
+
     const demandTypeLabel = String(row['Demand Type'] || '').trim().toLowerCase();
+    const workTypeLabel = String(row['Work Type'] || '').trim().toLowerCase();
     const handlingLabel = String(row['Handling'] || '').trim().toLowerCase();
     const contactMethodLabel = String(row['Contact Method'] || '').trim().toLowerCase();
     const potLabel = String(row['Point of Transaction'] || '').trim().toLowerCase();
     const whatMattersTypeLabel = String(row['What Matters Category'] || '').trim().toLowerCase();
 
     const demandTypeId = demandTypeLabel ? demandTypeMap.get(demandTypeLabel) : undefined;
+    const workTypeId = workTypeLabel ? workTypeMap.get(workTypeLabel) : undefined;
     const handlingTypeId = handlingLabel ? handlingMap.get(handlingLabel) : undefined;
     const contactMethodId = contactMethodLabel ? contactMethodMap.get(contactMethodLabel) : undefined;
     const pointOfTransactionId = potLabel ? potMap.get(potLabel) : undefined;
@@ -137,7 +161,9 @@ export async function POST(
     await createEntry(study.id, {
       verbatim,
       classification,
+      entryType,
       demandTypeId: demandTypeId || undefined,
+      workTypeId: workTypeId || undefined,
       handlingTypeId: handlingTypeId || undefined,
       contactMethodId: contactMethodId || undefined,
       pointOfTransactionId: pointOfTransactionId || undefined,

@@ -40,19 +40,23 @@ export async function POST(
     return NextResponse.json({ error: 'Demand verbatim is required' }, { status: 400 });
   }
 
-  if (!body.classification || !['value', 'failure'].includes(body.classification)) {
-    return NextResponse.json({ error: 'Classification must be "value" or "failure"' }, { status: 400 });
+  if (!body.classification || !['value', 'failure', 'unknown'].includes(body.classification)) {
+    return NextResponse.json({ error: 'Classification must be "value", "failure", or "unknown"' }, { status: 400 });
   }
+
+  const entryType = body.entryType === 'work' ? 'work' : 'demand';
 
   const id = await createEntry(study.id, {
     verbatim: body.verbatim.trim(),
     classification: body.classification,
+    entryType,
     handlingTypeId: body.handlingTypeId || undefined,
     demandTypeId: body.demandTypeId || undefined,
     contactMethodId: body.contactMethodId || undefined,
     pointOfTransactionId: body.pointOfTransactionId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
+    workTypeId: body.workTypeId || undefined,
     failureCause: body.failureCause?.trim() || undefined,
     whatMatters: body.whatMatters?.trim() || undefined,
     collectorName: body.collectorName?.trim() || undefined,

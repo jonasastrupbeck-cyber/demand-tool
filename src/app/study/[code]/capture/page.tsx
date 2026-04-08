@@ -30,16 +30,23 @@ interface WhatMattersType {
   label: string;
 }
 
+interface WorkType {
+  id: string;
+  label: string;
+}
+
 interface StudyData {
   id: string;
   name: string;
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
+  workTrackingEnabled: boolean;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: WhatMattersType[];
+  workTypes: WorkType[];
 }
 
 export default function CapturePage() {
@@ -58,9 +65,12 @@ export default function CapturePage() {
   const [collectorName, setCollectorName] = useState('');
   const [nameConfirmed, setNameConfirmed] = useState(false);
 
+  // Entry type (demand vs work)
+  const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
+
   // Form state
   const [verbatim, setVerbatim] = useState('');
-  const [classification, setClassification] = useState<'value' | 'failure' | ''>('');
+  const [classification, setClassification] = useState<'value' | 'failure' | 'unknown' | ''>('');
   const [demandTypeId, setDemandTypeId] = useState('');
   const [handlingTypeId, setHandlingTypeId] = useState('');
   const [contactMethodId, setContactMethodId] = useState('');
@@ -69,17 +79,16 @@ export default function CapturePage() {
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
   const [whatMatters, setWhatMatters] = useState('');
+  const [workTypeId, setWorkTypeId] = useState('');
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
     if (res.ok) {
       const data = await res.json();
       setStudy(data);
-      // Prefill contact method with study's primary choice
       if (data.primaryContactMethodId) {
         setContactMethodId(data.primaryContactMethodId);
       }
-      // Prefill point of transaction with study's primary choice
       if (data.primaryPointOfTransactionId) {
         setPointOfTransactionId(data.primaryPointOfTransactionId);
       }
@@ -107,7 +116,6 @@ export default function CapturePage() {
     loadStudy();
     loadTodayCount();
     loadSuggestions();
-    // Restore collector name from localStorage
     const saved = localStorage.getItem(`collector_${code}`);
     if (saved) {
       setCollectorName(saved);
@@ -120,14 +128,15 @@ export default function CapturePage() {
     setClassification('');
     setDemandTypeId('');
     setHandlingTypeId('');
-    // Keep primary contact method and POT prefilled after submit
     setContactMethodId(study?.primaryContactMethodId || '');
     setPointOfTransactionId(study?.primaryPointOfTransactionId || '');
     setWhatMattersTypeId('');
     setOriginalValueDemandTypeId('');
     setFailureCause('');
     setWhatMatters('');
+    setWorkTypeId('');
     setError('');
+    // Keep entryType sticky for batch entry
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -137,22 +146,30 @@ export default function CapturePage() {
     setSubmitting(true);
     setError('');
 
+    const body: Record<string, unknown> = {
+      verbatim: verbatim.trim(),
+      classification,
+      entryType,
+      handlingTypeId: handlingTypeId || undefined,
+      contactMethodId: contactMethodId || undefined,
+      pointOfTransactionId: pointOfTransactionId || undefined,
+      collectorName: collectorName.trim() || undefined,
+    };
+
+    if (entryType === 'demand') {
+      body.demandTypeId = demandTypeId || undefined;
+      body.whatMattersTypeId = whatMattersTypeId || undefined;
+      body.originalValueDemandTypeId = classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
+      body.failureCause = classification === 'failure' ? failureCause.trim() : undefined;
+      body.whatMatters = whatMatters.trim() || undefined;
+    } else {
+      body.workTypeId = workTypeId || undefined;
+    }
+
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        verbatim: verbatim.trim(),
-        classification,
-        demandTypeId: demandTypeId || undefined,
-        handlingTypeId: handlingTypeId || undefined,
-        contactMethodId: contactMethodId || undefined,
-        pointOfTransactionId: pointOfTransactionId || undefined,
-        whatMattersTypeId: whatMattersTypeId || undefined,
-        originalValueDemandTypeId: classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined,
-        failureCause: classification === 'failure' ? failureCause.trim() : undefined,
-        whatMatters: whatMatters.trim() || undefined,
-        collectorName: collectorName.trim() || undefined,
-      }),
+      body: JSON.stringify(body),
     });
 
     setSubmitting(false);
@@ -232,6 +249,7 @@ export default function CapturePage() {
     );
   }
 
+  const isDemand = entryType === 'demand';
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
 
   return (
@@ -255,6 +273,39 @@ export default function CapturePage() {
           {t('capture.today')}: {todayCount}
         </span>
       </div>
+
+      {/* Demand / Work tabs (only when work tracking is enabled) */}
+      {study.workTrackingEnabled && (
+        <div className="mb-4">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+            <button
+              type="button"
+              onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+              className={`py-2.5 rounded-md font-medium text-sm transition-all ${
+                isDemand
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t('capture.demand')}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+              className={`py-2.5 rounded-md font-medium text-sm transition-all ${
+                !isDemand
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t('capture.work')}
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500 italic">
+            {isDemand ? t('capture.demandHelp') : t('capture.workHelp')}
+          </p>
+        </div>
+      )}
 
       {/* Success flash */}
       {success && (
@@ -294,20 +345,35 @@ export default function CapturePage() {
           </select>
         </div>
 
-        {/* Verbatim demand */}
+        {/* Verbatim */}
         <div>
-          <label className={labelCls}>{t('capture.verbatimLabel')}</label>
-          <textarea value={verbatim} onChange={(e) => setVerbatim(e.target.value)} placeholder={t('capture.verbatimPlaceholder')} rows={3} className={inputCls} required />
+          <label className={labelCls}>
+            {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}
+          </label>
+          <textarea
+            value={verbatim}
+            onChange={(e) => setVerbatim(e.target.value)}
+            placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
+            rows={3}
+            className={inputCls}
+            required
+          />
         </div>
 
-        {/* Value / Failure toggle */}
+        {/* Value / Failure / ? toggle */}
         <div>
           <label className={`${labelCls} mb-2`}>{t('capture.classification')}</label>
-          <div className="grid grid-cols-2 gap-3">
+          {/* Work classification helper */}
+          {!isDemand && (
+            <p className="mb-2 text-xs text-gray-500 italic">
+              {t('capture.workClassificationHelp')}
+            </p>
+          )}
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => { setClassification('value'); setDemandTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
-              className={`py-4 rounded-lg font-semibold text-lg transition-all ${
+              onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
                 classification === 'value'
                   ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
                   : 'bg-green-50 text-green-700 border-2 border-green-200 hover:border-green-400'
@@ -317,8 +383,8 @@ export default function CapturePage() {
             </button>
             <button
               type="button"
-              onClick={() => { setClassification('failure'); setDemandTypeId(''); }}
-              className={`py-4 rounded-lg font-semibold text-lg transition-all ${
+              onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
+              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
                 classification === 'failure'
                   ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
                   : 'bg-red-50 text-red-700 border-2 border-red-200 hover:border-red-400'
@@ -326,11 +392,22 @@ export default function CapturePage() {
             >
               {t('capture.failure')}
             </button>
+            <button
+              type="button"
+              onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
+                classification === 'unknown'
+                  ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500 ring-offset-2'
+                  : 'bg-amber-50 text-amber-700 border-2 border-amber-200 hover:border-amber-400'
+              }`}
+            >
+              {t('capture.unknown')}
+            </button>
           </div>
         </div>
 
-        {/* Demand type dropdown */}
-        {classification && (
+        {/* Demand type dropdown (demand mode only) */}
+        {isDemand && classification && classification !== 'unknown' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
@@ -342,7 +419,20 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Handling type dropdown */}
+        {/* Work type dropdown (work mode only) */}
+        {!isDemand && classification && (
+          <div>
+            <label className={labelCls}>{t('capture.workTypeLabel')}</label>
+            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectWorkType')}</option>
+              {study.workTypes.map((wt) => (
+                <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Handling type dropdown (both modes) */}
         <div>
           <label className={labelCls}>{t('capture.handlingLabel')}</label>
           <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
@@ -353,8 +443,8 @@ export default function CapturePage() {
           </select>
         </div>
 
-        {/* Failure cause (only for failure demand) */}
-        {classification === 'failure' && (
+        {/* Failure cause (demand + failure only) */}
+        {isDemand && classification === 'failure' && (
           <div className="relative">
             <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
             <textarea
@@ -380,8 +470,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Original value demand (only for failure demand) */}
-        {classification === 'failure' && (
+        {/* Original value demand (demand + failure only) */}
+        {isDemand && classification === 'failure' && (
           <div>
             <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
             <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
@@ -393,8 +483,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters category dropdown */}
-        {study.whatMattersTypes.length > 0 && (
+        {/* What matters category dropdown (demand only) */}
+        {isDemand && study.whatMattersTypes.length > 0 && (
           <div>
             <label className={labelCls}>{t('capture.whatMattersTypeLabel')}</label>
             <select value={whatMattersTypeId} onChange={(e) => setWhatMattersTypeId(e.target.value)} className={inputCls}>
@@ -406,11 +496,13 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters free text */}
-        <div>
-          <label className={labelCls}>{t('capture.whatMattersLabel')}</label>
-          <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
-        </div>
+        {/* What matters free text (demand only) */}
+        {isDemand && (
+          <div>
+            <label className={labelCls}>{t('capture.whatMattersLabel')}</label>
+            <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
+          </div>
+        )}
 
         {/* Submit button - sticky at bottom */}
         <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
@@ -420,7 +512,7 @@ export default function CapturePage() {
               disabled={submitting || !verbatim.trim() || !classification}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
-              {submitting ? t('capture.saving') : t('capture.save')}
+              {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
             </button>
           </div>
         </div>
