@@ -287,6 +287,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   let workFailureCount = 0;
   let workUnknownCount = 0;
   let workTypeCounts: Array<{ label: string; count: number }> = [];
+  let workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number }> = [];
   let workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }> = [];
 
   if (workTrackingEnabled) {
@@ -313,6 +314,31 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
       .where(workWhere)
       .groupBy(workTypes.label)
       .orderBy(desc(sql`count(*)`));
+
+    // Work types by classification
+    const workTypeByClass = await db.select({
+      label: workTypes.label,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+      .where(workWhere)
+      .groupBy(workTypes.label, demandEntries.classification);
+
+    const wtClassMap = new Map<string, { valueCount: number; failureCount: number }>();
+    for (const row of workTypeByClass) {
+      if (!wtClassMap.has(row.label)) {
+        wtClassMap.set(row.label, { valueCount: 0, failureCount: 0 });
+      }
+      const entry = wtClassMap.get(row.label)!;
+      if (row.classification === 'value') entry.valueCount = row.count;
+      else if (row.classification === 'failure') entry.failureCount = row.count;
+    }
+    workTypesByClassification = Array.from(wtClassMap.entries()).map(([label, counts]) => ({
+      label,
+      ...counts,
+    }));
 
     // Work over time
     const workOT = await db.select({
@@ -365,6 +391,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     workFailureCount,
     workUnknownCount,
     workTypeCounts,
+    workTypesByClassification,
     workOverTime,
   };
 }

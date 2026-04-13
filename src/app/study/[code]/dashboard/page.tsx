@@ -763,8 +763,8 @@ export default function DashboardPage() {
             {/* Work summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Card label={t('dashboard.workEntries')} value={data.workCount} />
-              <Card label={t('dashboard.valueWork')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
-              <Card label={t('dashboard.failureWork')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
+              <Card label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
+              <Card label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
               {data.workUnknownCount > 0 && (
                 <Card label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
               )}
@@ -782,9 +782,9 @@ export default function DashboardPage() {
                     <PieChart>
                       <Pie
                         data={[
-                          { name: t('capture.value'), value: data.workValueCount, color: COLORS.value },
-                          { name: t('capture.failure'), value: data.workFailureCount, color: COLORS.failure },
-                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount, color: '#f59e0b' }] : []),
+                          { name: t('capture.value'), value: data.workValueCount },
+                          { name: t('capture.failure'), value: data.workFailureCount },
+                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount }] : []),
                         ]}
                         cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
                         label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
@@ -800,17 +800,51 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
 
-                {/* Work types bar chart */}
+                {/* Work types by classification — stacked bar */}
+                {data.workTypesByClassification && data.workTypesByClassification.length > 0 && (() => {
+                  const translated = data.workTypesByClassification.map(d => ({
+                    label: tl(d.label),
+                    [t('capture.value')]: d.valueCount,
+                    [t('capture.failure')]: d.failureCount,
+                    total: d.valueCount + d.failureCount,
+                  }));
+                  return (
+                    <ChartCard title={t('dashboard.workTypesByClass')}>
+                      <ResponsiveContainer width="100%" height={Math.max(220, translated.length * 45 + 40)}>
+                        <BarChart data={translated} layout="vertical" margin={{ left: 10, right: 60 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                          <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                          <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                          <Tooltip {...tooltipStyle} />
+                          <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                          <Bar dataKey={t('capture.value')} stackId="a" fill={COLORS.value} radius={[0, 0, 0, 0]} />
+                          <Bar dataKey={t('capture.failure')} stackId="a" fill={COLORS.failure} radius={[0, 4, 4, 0]}>
+                            <LabelList dataKey="total" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  );
+                })()}
+
+                {/* Work types total bar chart */}
                 {data.workTypeCounts.length > 0 && (
                   <ChartCard title={t('dashboard.workTypes')}>
                     <ResponsiveContainer width="100%" height={Math.max(200, data.workTypeCounts.length * 40 + 40)}>
-                      <BarChart data={data.workTypeCounts.map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 60 }}>
+                      <BarChart data={(() => {
+                        const totalWork = data.workTypeCounts.reduce((s, d) => s + d.count, 0);
+                        return data.workTypeCounts.map(d => ({
+                          ...d,
+                          label: tl(d.label),
+                          pct: totalWork > 0 ? `${Math.round((d.count / totalWork) * 100)}%` : '0%',
+                        }));
+                      })()} layout="vertical" margin={{ left: 10, right: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
                         <XAxis type="number" allowDecimals={false} tick={tickStyle} />
-                        <YAxis type="category" dataKey="label" width={130} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 18) + '…' : v} />
+                        <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
                         <Tooltip {...tooltipStyle} />
                         <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="count" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                          <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -839,38 +873,96 @@ export default function DashboardPage() {
         )}
 
         {/* ── OVERVIEW VIEW ── */}
-        {dashboardView === 'overview' && (
-          <>
-            {/* Total capacity cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <Card label={t('dashboard.totalCapacity')} value={data.totalEntries + data.workCount} />
-              <Card label={t('dashboard.demandTab')} value={data.totalEntries} sub={`${data.totalEntries + data.workCount > 0 ? Math.round((data.totalEntries / (data.totalEntries + data.workCount)) * 100) : 0}%`} color="#3b82f6" />
-              <Card label={t('dashboard.workTab')} value={data.workCount} sub={`${data.totalEntries + data.workCount > 0 ? Math.round((data.workCount / (data.totalEntries + data.workCount)) * 100) : 0}%`} color="#f59e0b" />
-            </div>
+        {dashboardView === 'overview' && (() => {
+          const totalCapacity = data.totalEntries + data.workCount;
+          const failDemandPct = data.totalEntries > 0 ? Math.round((data.failureCount / data.totalEntries) * 100) : 0;
+          const failWorkPct = data.workCount > 0 ? Math.round((data.workFailureCount / data.workCount) * 100) : 0;
+          const demandRatio = totalCapacity > 0 ? Math.round((data.totalEntries / totalCapacity) * 100) : 0;
+          const workRatio = totalCapacity > 0 ? Math.round((data.workCount / totalCapacity) * 100) : 0;
 
-            {/* Demand vs Work pie */}
-            <ChartCard title={t('dashboard.demandVsWork')}>
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: t('dashboard.demandTab'), value: data.totalEntries },
-                      { name: t('dashboard.workTab'), value: data.workCount },
-                    ]}
-                    cx="50%" cy="50%" outerRadius={85} innerRadius={35} dataKey="value"
-                    label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
-                    labelLine={{ strokeWidth: 1 }}
-                  >
-                    <Cell fill="#3b82f6" />
-                    <Cell fill="#f59e0b" />
-                  </Pie>
-                  <Tooltip {...tooltipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </>
-        )}
+          return (
+            <>
+              {/* Key metrics cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                <Card label={t('dashboard.totalCapacity')} value={totalCapacity} sub={`${data.totalEntries} ${t('dashboard.demandTab').toLowerCase()} + ${data.workCount} ${t('dashboard.workTab').toLowerCase()}`} />
+                <Card label={t('dashboard.failureDemandPct')} value={`${failDemandPct}%`} sub={`${data.failureCount} / ${data.totalEntries}`} color={COLORS.failure} />
+                {data.perfectPercentage > 0 && (
+                  <Card label={t('dashboard.perfect')} value={`${data.perfectPercentage}%`} sub={t('dashboard.perfectSub')} color={COLORS.value} />
+                )}
+                <Card label={t('dashboard.failureWorkPct')} value={`${failWorkPct}%`} sub={`${data.workFailureCount} / ${data.workCount}`} color={COLORS.failure} />
+                <Card label={t('dashboard.demandWorkRatio')} value={`${demandRatio}% : ${workRatio}%`} />
+              </div>
+
+              {/* Side-by-side demand vs work split */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Demand split mini pie */}
+                <ChartCard title={t('dashboard.demandSplit')}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: t('capture.value'), value: data.valueCount },
+                          { name: t('capture.failure'), value: data.failureCount },
+                          ...(data.unknownCount > 0 ? [{ name: '?', value: data.unknownCount }] : []),
+                        ]}
+                        cx="50%" cy="50%" outerRadius={60} innerRadius={25} dataKey="value"
+                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={{ strokeWidth: 1 }}
+                      >
+                        <Cell fill={COLORS.value} />
+                        <Cell fill={COLORS.failure} />
+                        {data.unknownCount > 0 && <Cell fill="#f59e0b" />}
+                      </Pie>
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 11, color: THEME.textSecondary }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {/* Work split mini pie */}
+                <ChartCard title={t('dashboard.workSplit')}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: t('capture.value'), value: data.workValueCount },
+                          { name: t('capture.failure'), value: data.workFailureCount },
+                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount }] : []),
+                        ]}
+                        cx="50%" cy="50%" outerRadius={60} innerRadius={25} dataKey="value"
+                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={{ strokeWidth: 1 }}
+                      >
+                        <Cell fill={COLORS.value} />
+                        <Cell fill={COLORS.failure} />
+                        {data.workUnknownCount > 0 && <Cell fill="#f59e0b" />}
+                      </Pie>
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 11, color: THEME.textSecondary }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+
+              {/* Top 3 system conditions */}
+              {data.failureCauses.length > 0 && (
+                <ChartCard title={t('dashboard.topFailureCauses')}>
+                  <div className="space-y-2">
+                    {data.failureCauses.slice(0, 3).map((fc, i) => (
+                      <div key={i} className="flex items-center justify-between bg-red-50 rounded-lg px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold text-red-300">#{i + 1}</span>
+                          <span className="text-sm text-gray-800">{fc.cause}</span>
+                        </div>
+                        <span className="text-sm font-semibold text-red-600 ml-3 shrink-0">{fc.count}×</span>
+                      </div>
+                    ))}
+                  </div>
+                </ChartCard>
+              )}
+            </>
+          );
+        })()}
 
         {/* Data collection coverage (shown on all views) */}
         {data.collectorCounts && data.collectorCounts.length > 0 && (

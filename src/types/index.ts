@@ -105,6 +105,7 @@ export interface DashboardData {
   workFailureCount: number;
   workUnknownCount: number;
   workTypeCounts: Array<{ label: string; count: number }>;
+  workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }>;
 }
 
