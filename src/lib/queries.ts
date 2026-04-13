@@ -1,6 +1,6 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries } from './schema';
-import { eq, and, desc, asc, sql, gte, lte } from 'drizzle-orm';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters } from './schema';
+import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
 
@@ -71,7 +71,7 @@ const DEFAULT_WORK_TYPES: Record<Locale, string[]> = {
   de: ['Informationsanfrage (intern)', 'Management-Berichterstattung', 'Interne Prozessanfrage'],
 };
 
-export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false) {
+export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false, consultantPin?: string) {
   const id = generateId();
   let accessCode = generateAccessCode();
 
@@ -87,6 +87,8 @@ export async function createStudy(name: string, description: string = '', locale
     name,
     description,
     workTrackingEnabled,
+    activeLayer: 1,
+    consultantPin: consultantPin || null,
     createdAt: new Date(),
     isActive: true,
   });
@@ -199,7 +201,7 @@ export async function getStudyByCode(code: string) {
   return result[0] || null;
 }
 
-export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean }) {
+export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean; consultantPin?: string }) {
   await db.update(studies).set(data).where(eq(studies.id, id));
 }
 
@@ -217,6 +219,10 @@ export async function addHandlingType(studyId: string, label: string) {
     sortOrder: existing.length,
   });
   return id;
+}
+
+export async function updateHandlingType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(handlingTypes).set(data).where(eq(handlingTypes.id, id));
 }
 
 export async function deleteHandlingType(id: string) {
@@ -243,6 +249,10 @@ export async function addDemandType(studyId: string, category: 'value' | 'failur
     sortOrder: existing.length,
   });
   return id;
+}
+
+export async function updateDemandType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(demandTypes).set(data).where(eq(demandTypes.id, id));
 }
 
 export async function deleteDemandType(id: string) {
@@ -283,6 +293,10 @@ export async function addWhatMattersType(studyId: string, label: string) {
     sortOrder: existing.length,
   });
   return id;
+}
+
+export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(whatMattersTypes).set(data).where(eq(whatMattersTypes.id, id));
 }
 
 export async function deleteWhatMattersType(id: string) {
@@ -352,8 +366,10 @@ export async function createEntry(studyId: string, data: {
   contactMethodId?: string;
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
+  whatMattersTypeIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
+  linkedValueDemandEntryId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;
@@ -375,10 +391,24 @@ export async function createEntry(studyId: string, data: {
     whatMattersTypeId: isDemand ? (data.whatMattersTypeId || null) : null,
     originalValueDemandTypeId: isDemand && data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     workTypeId: !isDemand ? (data.workTypeId || null) : null,
+    linkedValueDemandEntryId: isDemand && data.classification === 'failure' ? (data.linkedValueDemandEntryId || null) : null,
     failureCause: isDemand && data.classification === 'failure' ? (data.failureCause || null) : null,
     whatMatters: isDemand ? (data.whatMatters || null) : null,
     collectorName: data.collectorName || null,
   });
+
+  // Insert what matters junction records
+  const whatMattersIds = data.whatMattersTypeIds || (data.whatMattersTypeId ? [data.whatMattersTypeId] : []);
+  if (isDemand && whatMattersIds.length > 0) {
+    for (const wmtId of whatMattersIds) {
+      await db.insert(demandEntryWhatMatters).values({
+        id: generateId(),
+        demandEntryId: id,
+        whatMattersTypeId: wmtId,
+      });
+    }
+  }
+
   return id;
 }
 
@@ -424,4 +454,92 @@ export async function getEntryCountToday(studyId: string) {
     ));
 
   return result[0]?.count || 0;
+}
+
+// --- Layer system ---
+
+export async function activateLayer(studyId: string, targetLayer: number) {
+  const study = await db.select().from(studies).where(eq(studies.id, studyId));
+  if (!study[0]) throw new Error('Study not found');
+  if (targetLayer !== study[0].activeLayer + 1) throw new Error('Can only activate the next layer');
+  if (targetLayer > 5) throw new Error('Maximum layer is 5');
+  await db.update(studies).set({ activeLayer: targetLayer }).where(eq(studies.id, studyId));
+}
+
+export async function updateEntry(entryId: string, data: {
+  classification?: 'value' | 'failure' | 'unknown';
+  demandTypeId?: string | null;
+  handlingTypeId?: string | null;
+  linkedValueDemandEntryId?: string | null;
+  originalValueDemandTypeId?: string | null;
+  failureCause?: string | null;
+  whatMattersTypeIds?: string[];
+}) {
+  const { whatMattersTypeIds, ...entryData } = data;
+
+  // Update the entry fields
+  const updateFields: Record<string, unknown> = {};
+  if (data.classification !== undefined) updateFields.classification = data.classification;
+  if (data.demandTypeId !== undefined) updateFields.demandTypeId = data.demandTypeId;
+  if (data.handlingTypeId !== undefined) updateFields.handlingTypeId = data.handlingTypeId;
+  if (data.linkedValueDemandEntryId !== undefined) updateFields.linkedValueDemandEntryId = data.linkedValueDemandEntryId;
+  if (data.originalValueDemandTypeId !== undefined) updateFields.originalValueDemandTypeId = data.originalValueDemandTypeId;
+  if (data.failureCause !== undefined) updateFields.failureCause = data.failureCause;
+
+  if (Object.keys(updateFields).length > 0) {
+    await db.update(demandEntries).set(updateFields).where(eq(demandEntries.id, entryId));
+  }
+
+  // Update what matters junction records if provided
+  if (whatMattersTypeIds !== undefined) {
+    await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+    for (const wmtId of whatMattersTypeIds) {
+      await db.insert(demandEntryWhatMatters).values({
+        id: generateId(),
+        demandEntryId: entryId,
+        whatMattersTypeId: wmtId,
+      });
+    }
+  }
+}
+
+export async function deleteEntry(entryId: string) {
+  await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+  await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
+}
+
+export async function getEntriesForReclassification(studyId: string, layer: number) {
+  const conditions = [
+    eq(demandEntries.studyId, studyId),
+    eq(demandEntries.entryType, 'demand'),
+  ];
+
+  if (layer === 2) {
+    conditions.push(eq(demandEntries.classification, 'unknown'));
+  } else if (layer === 3) {
+    conditions.push(isNull(demandEntries.handlingTypeId));
+  } else if (layer === 4) {
+    conditions.push(eq(demandEntries.classification, 'failure'));
+    conditions.push(isNull(demandEntries.linkedValueDemandEntryId));
+  }
+
+  return db.select().from(demandEntries)
+    .where(and(...conditions))
+    .orderBy(asc(demandEntries.createdAt));
+}
+
+export async function getReclassificationCount(studyId: string, layer: number): Promise<number> {
+  const entries = await getEntriesForReclassification(studyId, layer);
+  return entries.length;
+}
+
+export async function getWhatMattersForEntries(entryIds: string[]) {
+  if (entryIds.length === 0) return [];
+  return db.select().from(demandEntryWhatMatters)
+    .where(inArray(demandEntryWhatMatters.demandEntryId, entryIds));
+}
+
+export async function getWhatMattersForEntry(entryId: string) {
+  return db.select().from(demandEntryWhatMatters)
+    .where(eq(demandEntryWhatMatters.demandEntryId, entryId));
 }

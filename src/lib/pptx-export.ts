@@ -28,6 +28,7 @@ export async function exportDashboardToPptx(
   locale: Locale,
   dateRangeLabel: string,
   tl: (label: string) => string,
+  activeLayer: number = 5,
 ) {
   const pptx = new PptxGenJS();
 
@@ -96,7 +97,67 @@ export async function exportDashboardToPptx(
     fontSize: 12, fontFace: 'Arial', color: '999999',
   });
 
-  // ── Slide 2: Key Metrics ──
+  // ── Slide 2: Executive Summary ──
+  const summarySlide = pptx.addSlide();
+  summarySlide.background = { fill: 'ffffff' };
+  addSlideTitle(summarySlide, t('dashboard.executiveSummary', locale));
+  addFooter(summarySlide);
+
+  const findings: string[] = [];
+
+  // Total entries
+  findings.push(`${data.totalEntries} ${t('dashboard.entries', locale)}`);
+
+  // Value/Failure split
+  if (activeLayer >= 2 && data.totalEntries > 0) {
+    const vPct = Math.round((data.valueCount / data.totalEntries) * 100);
+    const fPct = Math.round((data.failureCount / data.totalEntries) * 100);
+    findings.push(`${t('dashboard.valueDemand', locale)}: ${vPct}% — ${t('dashboard.failureDemand', locale)}: ${fPct}%`);
+  }
+
+  // Top demand type
+  if (activeLayer >= 2 && data.demandTypeCounts.length > 0) {
+    const top = data.demandTypeCounts[0];
+    const topPct = data.totalEntries > 0 ? Math.round((top.count / data.totalEntries) * 100) : 0;
+    findings.push(`${t('dashboard.topDemandType', locale)}: ${tl(top.label)} (${topPct}%)`);
+  }
+
+  // Perfect handling
+  if (activeLayer >= 3 && data.perfectPercentage !== undefined) {
+    findings.push(`${t('dashboard.perfect', locale)}: ${data.perfectPercentage}%`);
+  }
+
+  // Failure flows
+  if (activeLayer >= 2 && data.failureFlowLinks && data.failureFlowLinks.length > 0) {
+    const topFlow = data.failureFlowLinks.reduce((a, b) => a.count > b.count ? a : b);
+    findings.push(`${t('dashboard.topFailureFlow', locale)}: ${tl(topFlow.sourceLabel)} → ${tl(topFlow.targetLabel)} (${topFlow.count})`);
+  }
+
+  // Top failure cause
+  if (activeLayer >= 2 && data.failureCauses.length > 0) {
+    findings.push(`${t('dashboard.topFailureCause', locale)}: ${data.failureCauses[0].cause} (${data.failureCauses[0].count})`);
+  }
+
+  // Demand vs Work
+  if (data.workCount > 0) {
+    const totalCapacity = data.totalEntries + data.workCount;
+    const demandPct = Math.round((data.totalEntries / totalCapacity) * 100);
+    findings.push(`${t('dashboard.demandTab', locale)}: ${demandPct}% — ${t('dashboard.workTab', locale)}: ${100 - demandPct}%`);
+  }
+
+  findings.forEach((f, i) => {
+    const y = 1.4 + i * 0.65;
+    // Bullet point
+    summarySlide.addShape(pptx.ShapeType.ellipse, {
+      x: 0.9, y: y + 0.12, w: 0.12, h: 0.12, fill: { color: 'ac2c2d' },
+    });
+    summarySlide.addText(f, {
+      x: 1.2, y, w: 11, h: 0.5,
+      fontSize: 14, fontFace: 'Arial', color: '1f2937',
+    });
+  });
+
+  // ── Slide 3: Key Metrics ──
   const metricsSlide = pptx.addSlide();
   metricsSlide.background = { fill: 'ffffff' };
   addSlideTitle(metricsSlide, t('dashboard.title', locale));
@@ -105,12 +166,20 @@ export async function exportDashboardToPptx(
   const valuePercent = data.totalEntries > 0 ? Math.round((data.valueCount / data.totalEntries) * 100) : 0;
   const failurePercent = data.totalEntries > 0 ? Math.round((data.failureCount / data.totalEntries) * 100) : 0;
 
-  const metrics = [
+  const metrics: Array<{ label: string; value: string; sub: string; color: string; bgColor: string }> = [
     { label: t('dashboard.totalEntries', locale), value: `${data.totalEntries}`, sub: t('dashboard.entries', locale), color: '1f2937', bgColor: 'f8f9fa' },
-    { label: t('dashboard.valueDemand', locale), value: `${valuePercent}%`, sub: `${data.valueCount} ${t('dashboard.entries', locale)}`, color: '22c55e', bgColor: 'f0fdf4' },
-    { label: t('dashboard.failureDemand', locale), value: `${failurePercent}%`, sub: `${data.failureCount} ${t('dashboard.entries', locale)}`, color: 'ef4444', bgColor: 'fef2f2' },
-    { label: t('dashboard.perfect', locale), value: `${data.perfectPercentage}%`, sub: t('dashboard.perfectSub', locale), color: '22c55e', bgColor: 'f0fdf4' },
   ];
+  if (activeLayer >= 2) {
+    metrics.push(
+      { label: t('dashboard.valueDemand', locale), value: `${valuePercent}%`, sub: `${data.valueCount} ${t('dashboard.entries', locale)}`, color: '22c55e', bgColor: 'f0fdf4' },
+      { label: t('dashboard.failureDemand', locale), value: `${failurePercent}%`, sub: `${data.failureCount} ${t('dashboard.entries', locale)}`, color: 'ef4444', bgColor: 'fef2f2' },
+    );
+  }
+  if (activeLayer >= 3) {
+    metrics.push(
+      { label: t('dashboard.perfect', locale), value: `${data.perfectPercentage}%`, sub: t('dashboard.perfectSub', locale), color: '22c55e', bgColor: 'f0fdf4' },
+    );
+  }
 
   metrics.forEach((m, i) => {
     const x = 0.5 + i * 3.1;
@@ -136,8 +205,8 @@ export async function exportDashboardToPptx(
     });
   });
 
-  // Value vs Failure pie chart below metrics
-  if (data.totalEntries > 0) {
+  // Value vs Failure pie chart below metrics (layer 2+)
+  if (activeLayer >= 2 && data.totalEntries > 0) {
     metricsSlide.addText(t('dashboard.valueVsFailure', locale), {
       x: 0.5, y: 3.8, w: 12, h: 0.4,
       fontSize: 13, fontFace: 'Arial', color: '1f2937', bold: true,
@@ -168,8 +237,8 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 3: Top Demand Types ──
-  if (data.demandTypeCounts.length > 0) {
+  // ── Slide 3: Top Demand Types (Layer 2+) ──
+  if (activeLayer >= 2 && data.demandTypeCounts.length > 0) {
     const dtSlide = pptx.addSlide();
     dtSlide.background = { fill: 'ffffff' };
     addSlideTitle(dtSlide, t('dashboard.top10', locale));
@@ -202,8 +271,8 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 4: Failures by Original Value Demand ──
-  if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
+  // ── Slide 4: Failures by Original Value Demand (Layer 2+) ──
+  if (activeLayer >= 2 && data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
     const fovSlide = pptx.addSlide();
     fovSlide.background = { fill: 'ffffff' };
     addSlideTitle(fovSlide, t('dashboard.failureByValueTitle', locale));
@@ -235,8 +304,85 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 5: Handling Breakdown ──
-  if (data.handlingTypeCounts.length > 0) {
+  // ── Slide: Failure Flow Cross-tabulation (Layer 2+) ──
+  if (activeLayer >= 2 && data.failureFlowLinks && data.failureFlowLinks.length > 0) {
+    const ffSlide = pptx.addSlide();
+    ffSlide.background = { fill: 'ffffff' };
+    addSlideTitle(ffSlide, t('dashboard.failureFlow', locale));
+    addFooter(ffSlide);
+
+    // Build cross-tab: rows = source (value demand types), cols = target (failure demand types)
+    const sourceLabels = [...new Set(data.failureFlowLinks.map(l => l.sourceLabel))];
+    const targetLabels = [...new Set(data.failureFlowLinks.map(l => l.targetLabel))];
+    const countMap = new Map<string, number>();
+    for (const link of data.failureFlowLinks) {
+      countMap.set(`${link.sourceLabel}||${link.targetLabel}`, link.count);
+    }
+
+    // Header row: empty cell + failure demand type columns + total
+    const headerRow: PptxGenJS.TableRow = [
+      { text: '', options: { bold: true, fontSize: 8, fill: { color: 'f3f4f6' }, color: '1f2937' } },
+      ...targetLabels.map(label => ({
+        text: tl(label), options: { bold: true, fontSize: 8, fill: { color: 'fef2f2' }, color: 'ef4444', align: 'center' as const },
+      })),
+      { text: 'Total', options: { bold: true, fontSize: 8, fill: { color: 'f3f4f6' }, color: '1f2937', align: 'center' as const } },
+    ];
+
+    const tableRows: PptxGenJS.TableRow[] = [headerRow];
+
+    sourceLabels.forEach(source => {
+      let rowTotal = 0;
+      const cells: PptxGenJS.TableRow = [
+        { text: tl(source), options: { fontSize: 8, color: '22c55e', bold: true } },
+      ];
+      targetLabels.forEach(target => {
+        const count = countMap.get(`${source}||${target}`) || 0;
+        rowTotal += count;
+        cells.push({
+          text: count > 0 ? `${count}` : '', options: { fontSize: 8, color: '1f2937', align: 'center' as const },
+        });
+      });
+      cells.push({
+        text: `${rowTotal}`, options: { fontSize: 8, color: '1f2937', align: 'center' as const, bold: true },
+      });
+      tableRows.push(cells);
+    });
+
+    // Totals row
+    const totalsRow: PptxGenJS.TableRow = [
+      { text: 'Total', options: { bold: true, fontSize: 8, color: '1f2937', fill: { color: 'f3f4f6' } } },
+    ];
+    let grandTotal = 0;
+    targetLabels.forEach(target => {
+      const colTotal = sourceLabels.reduce((sum, source) => sum + (countMap.get(`${source}||${target}`) || 0), 0);
+      grandTotal += colTotal;
+      totalsRow.push({
+        text: `${colTotal}`, options: { bold: true, fontSize: 8, color: '1f2937', align: 'center' as const, fill: { color: 'f3f4f6' } },
+      });
+    });
+    totalsRow.push({
+      text: `${grandTotal}`, options: { bold: true, fontSize: 8, color: '1f2937', align: 'center' as const, fill: { color: 'f3f4f6' } },
+    });
+    tableRows.push(totalsRow);
+
+    // Column widths: first col wider, rest evenly distributed
+    const totalCols = targetLabels.length + 2; // source label + targets + total
+    const firstColW = 3;
+    const remainingW = 9.5;
+    const otherColW = remainingW / (totalCols - 1);
+    const colW = [firstColW, ...Array(totalCols - 1).fill(otherColW)];
+
+    ffSlide.addTable(tableRows, {
+      x: 0.3, y: 1.3, w: 12.5,
+      border: { type: 'solid', pt: 0.5, color: 'e5e7eb' },
+      colW,
+      fontFace: 'Arial',
+      autoPage: true,
+    });
+  }
+
+  // ── Slide 5: Handling Breakdown (Layer 3+) ──
+  if (activeLayer >= 3 && data.handlingTypeCounts.length > 0) {
     const hSlide = pptx.addSlide();
     hSlide.background = { fill: 'ffffff' };
     addSlideTitle(hSlide, t('dashboard.handlingTitle', locale));
@@ -338,8 +484,8 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 6: What Matters ──
-  if (data.whatMattersCounts.length > 0) {
+  // ── Slide 6: What Matters (Layer 5+) ──
+  if (activeLayer >= 5 && data.whatMattersCounts.length > 0) {
     const wmSlide = pptx.addSlide();
     wmSlide.background = { fill: 'ffffff' };
     addSlideTitle(wmSlide, t('dashboard.whatMatters', locale));
@@ -368,6 +514,40 @@ export async function exportDashboardToPptx(
         x: 4.2 + bw + 0.1, y, w: 2, h: 0.4,
         fontSize: 9, fontFace: 'Arial', color: '6b7280',
       });
+    });
+  }
+
+  // ── Slide: What Matters by Classification (Layer 5+) ──
+  if (activeLayer >= 5 && data.whatMattersByClassification && data.whatMattersByClassification.length > 0) {
+    const wmcSlide = pptx.addSlide();
+    wmcSlide.background = { fill: 'ffffff' };
+    addSlideTitle(wmcSlide, t('dashboard.whatMattersByClass', locale));
+    addFooter(wmcSlide);
+
+    const tableRows: PptxGenJS.TableRow[] = [
+      [
+        { text: t('dashboard.whatMatters', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '1f2937' } },
+        { text: t('capture.value', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '22c55e', align: 'center' } },
+        { text: t('capture.failure', locale), options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: 'ef4444', align: 'center' } },
+        { text: 'Total', options: { bold: true, fontSize: 9, fill: { color: 'f3f4f6' }, color: '1f2937', align: 'center' } },
+      ],
+    ];
+
+    data.whatMattersByClassification.forEach((wmc) => {
+      const total = wmc.valueCount + wmc.failureCount;
+      tableRows.push([
+        { text: tl(wmc.label), options: { fontSize: 9, color: '1f2937' } },
+        { text: `${wmc.valueCount}`, options: { fontSize: 9, color: '22c55e', align: 'center' } },
+        { text: `${wmc.failureCount}`, options: { fontSize: 9, color: 'ef4444', align: 'center' } },
+        { text: `${total}`, options: { fontSize: 9, color: '1f2937', align: 'center', bold: true } },
+      ]);
+    });
+
+    wmcSlide.addTable(tableRows, {
+      x: 0.5, y: 1.3, w: 8,
+      border: { type: 'solid', pt: 0.5, color: 'e5e7eb' },
+      colW: [3, 1.5, 1.5, 1.5],
+      fontFace: 'Arial',
     });
   }
 
@@ -408,8 +588,8 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 7: Failure Causes ──
-  if (data.failureCauses.length > 0) {
+  // ── Slide 7: Failure Causes (Layer 2+) ──
+  if (activeLayer >= 2 && data.failureCauses.length > 0) {
     const fcSlide = pptx.addSlide();
     fcSlide.background = { fill: 'ffffff' };
     addSlideTitle(fcSlide, t('dashboard.failureCauses', locale));

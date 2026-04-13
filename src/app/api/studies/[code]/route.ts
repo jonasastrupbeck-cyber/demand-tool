@@ -47,8 +47,10 @@ export async function PUT(
   const updates: Record<string, unknown> = {};
   if (body.name !== undefined) updates.name = body.name;
   if (body.description !== undefined) updates.description = body.description;
+  if (body.purpose !== undefined) updates.purpose = body.purpose;
   if (body.oneStopHandlingType !== undefined) updates.oneStopHandlingType = body.oneStopHandlingType;
   if (body.workTrackingEnabled !== undefined) updates.workTrackingEnabled = body.workTrackingEnabled;
+  if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);
 

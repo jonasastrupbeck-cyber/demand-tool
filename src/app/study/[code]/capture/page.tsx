@@ -7,12 +7,14 @@ import { useLocale } from '@/lib/locale-context';
 interface HandlingType {
   id: string;
   label: string;
+  operationalDefinition: string | null;
 }
 
 interface DemandType {
   id: string;
   category: 'value' | 'failure';
   label: string;
+  operationalDefinition: string | null;
 }
 
 interface ContactMethod {
@@ -28,6 +30,7 @@ interface PointOfTransaction {
 interface WhatMattersType {
   id: string;
   label: string;
+  operationalDefinition: string | null;
 }
 
 interface WorkType {
@@ -41,6 +44,7 @@ interface StudyData {
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
+  activeLayer: number;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -64,6 +68,7 @@ export default function CapturePage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [collectorName, setCollectorName] = useState('');
   const [nameConfirmed, setNameConfirmed] = useState(false);
+  const [lastEntry, setLastEntry] = useState<{ id: string; verbatim: string } | null>(null);
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
@@ -75,7 +80,7 @@ export default function CapturePage() {
   const [handlingTypeId, setHandlingTypeId] = useState('');
   const [contactMethodId, setContactMethodId] = useState('');
   const [pointOfTransactionId, setPointOfTransactionId] = useState('');
-  const [whatMattersTypeId, setWhatMattersTypeId] = useState('');
+  const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
   const [whatMatters, setWhatMatters] = useState('');
@@ -130,7 +135,7 @@ export default function CapturePage() {
     setHandlingTypeId('');
     setContactMethodId(study?.primaryContactMethodId || '');
     setPointOfTransactionId(study?.primaryPointOfTransactionId || '');
-    setWhatMattersTypeId('');
+    setWhatMattersTypeIds([]);
     setOriginalValueDemandTypeId('');
     setFailureCause('');
     setWhatMatters('');
@@ -141,26 +146,36 @@ export default function CapturePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!verbatim.trim() || !classification) return;
+    const activeLayer = study?.activeLayer || 1;
+    // At Layer 1, classification is auto-set to 'unknown'
+    const effectiveClassification = activeLayer < 2 ? 'unknown' : classification;
+    if (!verbatim.trim() || !effectiveClassification) return;
 
     setSubmitting(true);
     setError('');
 
     const body: Record<string, unknown> = {
       verbatim: verbatim.trim(),
-      classification,
+      classification: effectiveClassification,
       entryType,
-      handlingTypeId: handlingTypeId || undefined,
       contactMethodId: contactMethodId || undefined,
       pointOfTransactionId: pointOfTransactionId || undefined,
       collectorName: collectorName.trim() || undefined,
     };
 
+    // Layer 3+: include handling
+    if (activeLayer >= 3) {
+      body.handlingTypeId = handlingTypeId || undefined;
+    }
+
     if (entryType === 'demand') {
-      body.demandTypeId = demandTypeId || undefined;
-      body.whatMattersTypeId = whatMattersTypeId || undefined;
-      body.originalValueDemandTypeId = classification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
-      body.failureCause = classification === 'failure' ? failureCause.trim() : undefined;
+      // Layer 2+: include demand type
+      if (activeLayer >= 2) {
+        body.demandTypeId = demandTypeId || undefined;
+        body.originalValueDemandTypeId = effectiveClassification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
+        body.failureCause = effectiveClassification === 'failure' ? failureCause.trim() : undefined;
+      }
+      body.whatMattersTypeIds = whatMattersTypeIds.length > 0 ? whatMattersTypeIds : undefined;
       body.whatMatters = whatMatters.trim() || undefined;
     } else {
       body.workTypeId = workTypeId || undefined;
@@ -179,12 +194,14 @@ export default function CapturePage() {
       return;
     }
 
+    const saved = await res.json();
+    setLastEntry({ id: saved.id, verbatim: verbatim.trim() });
     setSuccess(true);
     setTodayCount((c) => c + 1);
     resetForm();
     loadSuggestions();
 
-    setTimeout(() => setSuccess(false), 2000);
+    setTimeout(() => setSuccess(false), 4000);
   }
 
   const filteredDemandTypes = study?.demandTypes.filter(
@@ -197,6 +214,7 @@ export default function CapturePage() {
 
   const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none';
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
+  const req = <span className="text-red-500 ml-0.5">*</span>;
 
   if (loading) {
     return (
@@ -307,9 +325,30 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* Last entry undo card */}
+      {lastEntry && (
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-gray-400">{t('capture.lastEntry')}</p>
+            <p className="text-sm text-gray-700 truncate">&ldquo;{lastEntry.verbatim}&rdquo;</p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${lastEntry.id}`, { method: 'DELETE' });
+              setLastEntry(null);
+              setTodayCount((c) => Math.max(0, c - 1));
+            }}
+            className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+          >
+            {t('capture.undo')}
+          </button>
+        </div>
+      )}
+
       {/* Success flash */}
       {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium animate-pulse">
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium">
           {t('capture.saved')}
         </div>
       )}
@@ -321,18 +360,21 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Point of transaction — first field */}
-        {study.pointsOfTransaction.length > 0 && (
-          <div>
-            <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
-            <select value={pointOfTransactionId} onChange={(e) => setPointOfTransactionId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectPointOfTransaction')}</option>
-              {study.pointsOfTransaction.map((pot) => (
-                <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Verbatim — always first, the customer's words are most important */}
+        <div>
+          <label className={labelCls}>
+            {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}{req}
+          </label>
+          <textarea
+            value={verbatim}
+            onChange={(e) => setVerbatim(e.target.value)}
+            placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
+            rows={3}
+            className={inputCls}
+            autoFocus
+            required
+          />
+        </div>
 
         {/* Contact method */}
         <div>
@@ -345,69 +387,68 @@ export default function CapturePage() {
           </select>
         </div>
 
-        {/* Verbatim */}
-        <div>
-          <label className={labelCls}>
-            {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}
-          </label>
-          <textarea
-            value={verbatim}
-            onChange={(e) => setVerbatim(e.target.value)}
-            placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
-            rows={3}
-            className={inputCls}
-            required
-          />
-        </div>
-
-        {/* Value / Failure / ? toggle */}
-        <div>
-          <label className={`${labelCls} mb-2`}>{t('capture.classification')}</label>
-          {/* Work classification helper */}
-          {!isDemand && (
-            <p className="mb-2 text-xs text-gray-500 italic">
-              {t('capture.workClassificationHelp')}
-            </p>
-          )}
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
-              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
-                classification === 'value'
-                  ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
-                  : 'bg-green-50 text-green-700 border-2 border-green-200 hover:border-green-400'
-              }`}
-            >
-              {t('capture.value')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
-              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
-                classification === 'failure'
-                  ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
-                  : 'bg-red-50 text-red-700 border-2 border-red-200 hover:border-red-400'
-              }`}
-            >
-              {t('capture.failure')}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
-              className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
-                classification === 'unknown'
-                  ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500 ring-offset-2'
-                  : 'bg-amber-50 text-amber-700 border-2 border-amber-200 hover:border-amber-400'
-              }`}
-            >
-              {t('capture.unknown')}
-            </button>
+        {/* Point of transaction */}
+        {study.pointsOfTransaction.length > 0 && (
+          <div>
+            <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
+            <select value={pointOfTransactionId} onChange={(e) => setPointOfTransactionId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectPointOfTransaction')}</option>
+              {study.pointsOfTransaction.map((pot) => (
+                <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+              ))}
+            </select>
           </div>
-        </div>
+        )}
 
-        {/* Demand type dropdown (demand mode only) */}
-        {isDemand && classification && classification !== 'unknown' && (
+        {/* Value / Failure / ? toggle (Layer 2+) */}
+        {(study.activeLayer >= 2) && (
+          <div>
+            <label className={`${labelCls} mb-2`}>{t('capture.classification')}{req}</label>
+            {!isDemand && (
+              <p className="mb-2 text-xs text-gray-500 italic">
+                {t('capture.workClassificationHelp')}
+              </p>
+            )}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
+                  classification === 'value'
+                    ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
+                    : 'bg-green-50 text-green-700 border-2 border-green-200 hover:border-green-400'
+                }`}
+              >
+                {t('capture.value')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
+                className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
+                  classification === 'failure'
+                    ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
+                    : 'bg-red-50 text-red-700 border-2 border-red-200 hover:border-red-400'
+                }`}
+              >
+                {t('capture.failure')}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
+                  classification === 'unknown'
+                    ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500 ring-offset-2'
+                    : 'bg-amber-50 text-amber-700 border-2 border-amber-200 hover:border-amber-400'
+                }`}
+              >
+                {t('capture.unknown')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Demand type dropdown (Layer 2+, demand mode only) */}
+        {study.activeLayer >= 2 && isDemand && classification && classification !== 'unknown' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
@@ -416,6 +457,9 @@ export default function CapturePage() {
                 <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
               ))}
             </select>
+            {demandTypeId && filteredDemandTypes.find(d => d.id === demandTypeId)?.operationalDefinition && (
+              <p className="mt-1 text-xs text-gray-400 italic">{filteredDemandTypes.find(d => d.id === demandTypeId)!.operationalDefinition}</p>
+            )}
           </div>
         )}
 
@@ -432,19 +476,24 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Handling type dropdown (both modes) */}
-        <div>
-          <label className={labelCls}>{t('capture.handlingLabel')}</label>
-          <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
-            <option value="">{t('capture.selectHandling')}</option>
-            {study.handlingTypes.map((ht) => (
-              <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
-            ))}
-          </select>
-        </div>
+        {/* Handling type dropdown (Layer 3+) */}
+        {study.activeLayer >= 3 && (
+          <div>
+            <label className={labelCls}>{t('capture.handlingLabel')}</label>
+            <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectHandling')}</option>
+              {study.handlingTypes.map((ht) => (
+                <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
+              ))}
+            </select>
+            {handlingTypeId && study.handlingTypes.find(h => h.id === handlingTypeId)?.operationalDefinition && (
+              <p className="mt-1 text-xs text-gray-400 italic">{study.handlingTypes.find(h => h.id === handlingTypeId)!.operationalDefinition}</p>
+            )}
+          </div>
+        )}
 
-        {/* Failure cause (demand + failure only) */}
-        {isDemand && classification === 'failure' && (
+        {/* Failure cause (Layer 2+, demand + failure only) */}
+        {study.activeLayer >= 2 && isDemand && classification === 'failure' && (
           <div className="relative">
             <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
             <textarea
@@ -470,8 +519,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Original value demand (demand + failure only) */}
-        {isDemand && classification === 'failure' && (
+        {/* Original value demand (Layer 2+, demand + failure only) */}
+        {study.activeLayer >= 2 && isDemand && classification === 'failure' && (
           <div>
             <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
             <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
@@ -483,16 +532,34 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters category dropdown (demand only) */}
+        {/* What matters multi-select (demand only) */}
         {isDemand && study.whatMattersTypes.length > 0 && (
           <div>
-            <label className={labelCls}>{t('capture.whatMattersTypeLabel')}</label>
-            <select value={whatMattersTypeId} onChange={(e) => setWhatMattersTypeId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectWhatMattersType')}</option>
-              {study.whatMattersTypes.map((wm) => (
-                <option key={wm.id} value={wm.id}>{tl(wm.label)}</option>
-              ))}
-            </select>
+            <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
+            <div className="flex flex-wrap gap-2">
+              {study.whatMattersTypes.map((wm) => {
+                const isSelected = whatMattersTypeIds.includes(wm.id);
+                return (
+                  <button
+                    key={wm.id}
+                    type="button"
+                    title={wm.operationalDefinition || undefined}
+                    onClick={() => {
+                      setWhatMattersTypeIds(prev =>
+                        isSelected ? prev.filter(id => id !== wm.id) : [...prev, wm.id]
+                      );
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      isSelected
+                        ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-1'
+                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-400'
+                    }`}
+                  >
+                    {tl(wm.label)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -509,7 +576,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || !verbatim.trim() || !classification}
+              disabled={submitting || !verbatim.trim() || ((study?.activeLayer || 1) >= 2 && !classification)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}

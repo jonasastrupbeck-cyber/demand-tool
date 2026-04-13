@@ -34,7 +34,13 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   function setLocale(newLocale: Locale) {
     setLocaleState(newLocale);
     localStorage.setItem('demand-tool-locale', newLocale);
+    document.documentElement.lang = newLocale;
   }
+
+  // Sync lang attribute on mount
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   function t(key: TranslationKey, params?: Record<string, string>) {
     return translate(key, locale, params);

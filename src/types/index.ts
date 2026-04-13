@@ -7,6 +7,8 @@ export interface Study {
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
+  activeLayer: number;
+  consultantPin: string | null;
   createdAt: Date;
   isActive: boolean;
 }
@@ -15,6 +17,7 @@ export interface HandlingType {
   id: string;
   studyId: string;
   label: string;
+  operationalDefinition: string | null;
   sortOrder: number;
 }
 
@@ -23,6 +26,7 @@ export interface DemandType {
   studyId: string;
   category: 'value' | 'failure';
   label: string;
+  operationalDefinition: string | null;
   sortOrder: number;
 }
 
@@ -44,6 +48,7 @@ export interface WhatMattersType {
   id: string;
   studyId: string;
   label: string;
+  operationalDefinition: string | null;
   sortOrder: number;
 }
 
@@ -66,8 +71,10 @@ export interface DemandEntry {
   contactMethodId: string | null;
   pointOfTransactionId: string | null;
   whatMattersTypeId: string | null;
+  whatMattersTypeIds: string[];
   originalValueDemandTypeId: string | null;
   workTypeId: string | null;
+  linkedValueDemandEntryId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
   collectorName: string | null;
@@ -84,11 +91,13 @@ export interface DashboardData {
   contactMethodCounts: Array<{ label: string; count: number }>;
   pointOfTransactionByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   whatMattersCounts: Array<{ label: string; count: number }>;
+  whatMattersByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   handlingByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   demandOverTime: Array<{ date: string; valueCount: number; failureCount: number }>;
   failureCauses: Array<{ cause: string; count: number }>;
   failuresByOriginalValueDemand: Array<{ label: string; count: number }>;
-  whatMattersNotes: Array<{ text: string; date: string }>;
+  failureFlowLinks: Array<{ sourceLabel: string; targetLabel: string; count: number }>;
+  whatMattersNotes: Array<{ text: string; date: string; demandTypeLabel: string | null; classification: string | null }>;
   collectorCounts: Array<{ name: string; count: number; lastActive: string }>;
   // Work tracking
   workCount: number;
@@ -108,9 +117,17 @@ export interface CreateEntryInput {
   contactMethodId?: string;
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
+  whatMattersTypeIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
+  linkedValueDemandEntryId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;
+}
+
+export interface DemandEntryWhatMatters {
+  id: string;
+  demandEntryId: string;
+  whatMattersTypeId: string;
 }

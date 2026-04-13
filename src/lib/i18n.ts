@@ -51,6 +51,12 @@ const translations = {
     sv: 'Skapa en ny studie',
     de: 'Neue Studie erstellen',
   },
+  'landing.methodContext': {
+    en: 'Understand what customers really need by studying demand from their perspective. Separate value demand from failure demand to redesign the system.',
+    da: 'Forstå hvad kunderne virkelig har brug for ved at studere efterspørgslen fra deres perspektiv. Adskil værdiskabende fra ikke-værdiskabende efterspørgsel for at redesigne systemet.',
+    sv: 'Förstå vad kunderna verkligen behöver genom att studera efterfrågan från deras perspektiv. Separera värdeskapande från icke-värdeskapande efterfrågan för att designa om systemet.',
+    de: 'Verstehen Sie was Kunden wirklich brauchen, indem Sie die Nachfrage aus deren Perspektive untersuchen. Trennen Sie Wert-Nachfrage von Fehler-Nachfrage, um das System neu zu gestalten.',
+  },
   'landing.joinExisting': {
     en: 'Join an existing study',
     da: 'Deltag i et eksisterende studie',
@@ -313,6 +319,18 @@ const translations = {
     sv: 'Post sparad',
     de: 'Eintrag gespeichert',
   },
+  'capture.lastEntry': {
+    en: 'Last entry',
+    da: 'Seneste registrering',
+    sv: 'Senaste post',
+    de: 'Letzter Eintrag',
+  },
+  'capture.undo': {
+    en: 'Undo',
+    da: 'Fortryd',
+    sv: 'Ångra',
+    de: 'Rückgängig',
+  },
   'capture.saveFailed': {
     en: 'Failed to save entry. Please try again.',
     da: 'Kunne ikke gemme registrering. Pr\u00f8v igen.',
@@ -339,16 +357,46 @@ const translations = {
     sv: 'Studieinst\u00e4llningar',
     de: 'Studieneinstellungen',
   },
+  'settings.purpose': {
+    en: 'Purpose',
+    da: 'Formål',
+    sv: 'Syfte',
+    de: 'Zweck',
+  },
+  'settings.purposeDesc': {
+    en: 'What is the purpose of this system from the customer\'s point of view?',
+    da: 'Hvad er formålet med dette system set fra kundens synspunkt?',
+    sv: 'Vad är syftet med detta system ur kundens synvinkel?',
+    de: 'Was ist der Zweck dieses Systems aus Sicht des Kunden?',
+  },
+  'settings.purposePlaceholder': {
+    en: 'e.g. "To help customers resolve their issue in one contact"',
+    da: 'f.eks. "At hjælpe kunder med at løse deres problem i én kontakt"',
+    sv: 't.ex. "Att hjälpa kunder lösa sitt ärende vid en kontakt"',
+    de: 'z.B. "Kunden helfen, ihr Anliegen in einem Kontakt zu lösen"',
+  },
   'settings.accessCode': {
     en: 'Access Code',
     da: 'Adgangskode',
-    sv: '\u00c5tkomstkod',
+    sv: 'Åtkomstkod',
     de: 'Zugangscode',
+  },
+  'settings.formPreview': {
+    en: 'Capture form preview',
+    da: 'Registreringsformular forhåndsvisning',
+    sv: 'Förhandsgranskning av registreringsformulär',
+    de: 'Vorschau des Erfassungsformulars',
+  },
+  'settings.formPreviewDesc': {
+    en: 'This is what practitioners will see when capturing demand.',
+    da: 'Sådan ser det ud for medarbejderne, når de registrerer efterspørgsel.',
+    sv: 'Så här ser det ut för medarbetarna när de registrerar efterfrågan.',
+    de: 'So sieht es für die Mitarbeiter aus, wenn sie Nachfrage erfassen.',
   },
   'settings.shareCode': {
     en: 'Share this code with your team to join the study.',
     da: 'Del denne kode med dit team for at deltage i studiet.',
-    sv: 'Dela denna kod med ditt team f\u00f6r att g\u00e5 med i studien.',
+    sv: 'Dela denna kod med ditt team för att gå med i studien.',
     de: 'Teilen Sie diesen Code mit Ihrem Team, um an der Studie teilzunehmen.',
   },
   'settings.copy': {
@@ -395,9 +443,21 @@ const translations = {
   },
   'settings.add': {
     en: 'Add',
-    da: 'Tilf\u00f8j',
-    sv: 'L\u00e4gg till',
-    de: 'Hinzuf\u00fcgen',
+    da: 'Tilføj',
+    sv: 'Lägg till',
+    de: 'Hinzufügen',
+  },
+  'settings.save': {
+    en: 'Save',
+    da: 'Gem',
+    sv: 'Spara',
+    de: 'Speichern',
+  },
+  'settings.saved': {
+    en: 'Saved',
+    da: 'Gemt',
+    sv: 'Sparat',
+    de: 'Gespeichert',
   },
   'settings.addHandling': {
     en: 'Add handling type...',
@@ -503,6 +563,12 @@ const translations = {
     sv: 'Kunde inte ladda dashboard',
     de: 'Dashboard konnte nicht geladen werden',
   },
+  'dashboard.purpose': {
+    en: 'Purpose',
+    da: 'Formål',
+    sv: 'Syfte',
+    de: 'Zweck',
+  },
   'dashboard.allTime': {
     en: 'All time',
     da: 'Altid',
@@ -526,6 +592,12 @@ const translations = {
     da: '30 dage',
     sv: '30 dagar',
     de: '30 Tage',
+  },
+  'dashboard.custom': {
+    en: 'Custom',
+    da: 'Vælg',
+    sv: 'Välj',
+    de: 'Wählen',
   },
   'dashboard.export': {
     en: 'Export XLSX',
@@ -576,10 +648,58 @@ const translations = {
     de: 'Eintr\u00e4ge',
   },
   'dashboard.noEntries': {
-    en: 'No entries yet. Start capturing demand to see analytics.',
-    da: 'Ingen registreringer endnu. Begynd at indsamle eftersp\u00f8rgsel for at se analyser.',
-    sv: 'Inga poster \u00e4nnu. B\u00f6rja samla in efterfr\u00e5gan f\u00f6r att se analyser.',
-    de: 'Noch keine Eintr\u00e4ge. Beginnen Sie mit der Nachfrageerfassung, um Analysen zu sehen.',
+    en: 'No entries yet',
+    da: 'Ingen registreringer endnu',
+    sv: 'Inga poster ännu',
+    de: 'Noch keine Einträge',
+  },
+  'dashboard.executiveSummary': {
+    en: 'Executive Summary',
+    da: 'Sammenfatning',
+    sv: 'Sammanfattning',
+    de: 'Zusammenfassung',
+  },
+  'dashboard.topDemandType': {
+    en: 'Top demand type',
+    da: 'Hyppigste efterspørgselstype',
+    sv: 'Vanligaste efterfrågetyp',
+    de: 'Häufigste Nachfrageart',
+  },
+  'dashboard.topFailureFlow': {
+    en: 'Top failure flow',
+    da: 'Hyppigste fejl-flow',
+    sv: 'Vanligaste felflöde',
+    de: 'Häufigster Fehlerfluss',
+  },
+  'dashboard.topFailureCause': {
+    en: 'Top system condition',
+    da: 'Hyppigste systemforhold',
+    sv: 'Vanligaste systemförhållande',
+    de: 'Häufigste Systembedingung',
+  },
+  'dashboard.demandTabHelp': {
+    en: 'What customers are asking for — types, patterns, and value vs failure split',
+    da: 'Hvad kunderne efterspørger — typer, mønstre og værdi vs. fejl-fordeling',
+    sv: 'Vad kunderna efterfrågar — typer, mönster och värde vs. felsplit',
+    de: 'Was Kunden nachfragen — Typen, Muster und Wert- vs. Fehler-Aufteilung',
+  },
+  'dashboard.workTabHelp': {
+    en: 'How work flows through the system — handling, capability, and flow analysis',
+    da: 'Hvordan arbejdet flyder gennem systemet — håndtering, kapabilitet og flowanalyse',
+    sv: 'Hur arbetet flödar genom systemet — hantering, kapabilitet och flödesanalys',
+    de: 'Wie Arbeit durch das System fließt — Bearbeitung, Fähigkeit und Flussanalyse',
+  },
+  'dashboard.overviewTabHelp': {
+    en: 'The full picture — all demand data, system conditions, and what matters to customers',
+    da: 'Det fulde billede — alle efterspørgselsdata, systemforhold og det der betyder noget for kunderne',
+    sv: 'Hela bilden — all efterfrågedata, systemförhållanden och det som betyder något för kunderna',
+    de: 'Das Gesamtbild — alle Nachfragedaten, Systembedingungen und was den Kunden wichtig ist',
+  },
+  'dashboard.noEntriesHint': {
+    en: 'Share the access code with your team and start capturing demand on the Capture tab, or upload existing data via XLSX.',
+    da: 'Del adgangskoden med dit team og begynd at registrere efterspørgsel via Registrér-fanen, eller upload eksisterende data via XLSX.',
+    sv: 'Dela åtkomstkoden med ditt team och börja registrera efterfrågan via Registrera-fliken, eller ladda upp befintlig data via XLSX.',
+    de: 'Teilen Sie den Zugangscode mit Ihrem Team und beginnen Sie mit der Erfassung über den Erfassungs-Tab, oder laden Sie bestehende Daten per XLSX hoch.',
   },
   'dashboard.valueVsFailure': {
     en: 'Value vs Failure Demand',
@@ -629,6 +749,42 @@ const translations = {
     sv: 'Vilken typ av värdeskapande efterfrågan orsakar mest icke-värdeskapande efterfrågan?',
     de: 'Welche Art von Wertnachfrage verursacht die meiste Fehlernachfrage?',
   },
+  'dashboard.failureFlow': {
+    en: 'Where does failure demand come from?',
+    da: 'Hvor kommer fejlefterspørgslen fra?',
+    sv: 'Var kommer icke-värdeskapande efterfrågan ifrån?',
+    de: 'Woher kommt die Fehlernachfrage?',
+  },
+  'dashboard.flowClickHint': {
+    en: 'Click a flow to see system conditions',
+    da: 'Klik på et flow for at se systemforhold',
+    sv: 'Klicka på ett flöde för att se systemförhållanden',
+    de: 'Klicken Sie auf einen Fluss, um Systembedingungen zu sehen',
+  },
+  'dashboard.flowCauses': {
+    en: 'System conditions',
+    da: 'Systemforhold',
+    sv: 'Systemförhållanden',
+    de: 'Systembedingungen',
+  },
+  'dashboard.flowCausesEmpty': {
+    en: 'No system conditions recorded for this flow',
+    da: 'Ingen systemforhold registreret for dette flow',
+    sv: 'Inga systemförhållanden registrerade för detta flöde',
+    de: 'Keine Systembedingungen für diesen Fluss erfasst',
+  },
+  'dashboard.allTypes': {
+    en: 'All',
+    da: 'Alle',
+    sv: 'Alla',
+    de: 'Alle',
+  },
+  'dashboard.whatMattersThemes': {
+    en: 'Common themes in what matters',
+    da: 'Hyppige temaer i det der betyder noget',
+    sv: 'Vanliga teman i det som betyder något',
+    de: 'Häufige Themen bei dem was wichtig ist',
+  },
   'dashboard.failureCauses': {
     en: 'Failure Causes (System Conditions)',
     da: '\u00c5rsager til ikke-v\u00e6rdiskabende eftersp\u00f8rgsel (systemforhold)',
@@ -641,15 +797,39 @@ const translations = {
     sv: 'Vad \u00e4r viktigt f\u00f6r kunden',
     de: 'Was dem Kunden wichtig ist',
   },
+  'dashboard.whatMattersByClass': {
+    en: 'What Matters: Value vs Failure',
+    da: 'Hvad betyder noget: V\u00e6rdi vs Fejl',
+    sv: 'Vad \u00e4r viktigt: V\u00e4rde vs Fel',
+    de: 'Was wichtig ist: Wert vs Fehler',
+  },
   'dashboard.whatMattersNotes': {
     en: 'What Matters — Customer Notes',
     da: 'Hvad betyder noget — Kundenoter',
     sv: 'Vad är viktigt — Kundanteckningar',
     de: 'Was wichtig ist — Kundennotizen',
   },
+  'dashboard.groupByDate': {
+    en: 'By date',
+    da: 'Efter dato',
+    sv: 'Efter datum',
+    de: 'Nach Datum',
+  },
+  'dashboard.groupByType': {
+    en: 'By demand type',
+    da: 'Efter type',
+    sv: 'Efter typ',
+    de: 'Nach Typ',
+  },
+  'dashboard.unclassified': {
+    en: 'Unclassified',
+    da: 'Ikke klassificeret',
+    sv: 'Oklassificerad',
+    de: 'Nicht klassifiziert',
+  },
   'dashboard.valueConcentration': {
     en: 'Value Demand Concentration',
-    da: 'Koncentration af v\u00e6rdiskabende eftersp\u00f8rgsel',
+    da: 'Koncentration af værdiskabende efterspørgsel',
     sv: 'Koncentration av v\u00e4rdeskapande efterfr\u00e5gan',
     de: 'Wert-Nachfragekonzentration',
   },
@@ -767,17 +947,29 @@ const translations = {
     sv: 'Inte du?',
     de: 'Nicht Sie?',
   },
-  'dashboard.collectors': {
-    en: 'Team Activity',
-    da: 'Teamaktivitet',
-    sv: 'Teamaktivitet',
-    de: 'Teamaktivität',
+  'dashboard.collectionCoverage': {
+    en: 'Data Collection Coverage',
+    da: 'Dækningsgrad for dataindsamling',
+    sv: 'Datainsamlingstäckning',
+    de: 'Datenerfassungsabdeckung',
   },
-  'dashboard.collectorEntries': {
-    en: 'entries',
-    da: 'registreringer',
-    sv: 'poster',
-    de: 'Einträge',
+  'dashboard.collectors': {
+    en: 'Collectors',
+    da: 'Indsamlere',
+    sv: 'Insamlare',
+    de: 'Erfasser',
+  },
+  'dashboard.totalCaptures': {
+    en: 'Total captures',
+    da: 'Registreringer i alt',
+    sv: 'Totalt insamlade',
+    de: 'Erfassungen gesamt',
+  },
+  'dashboard.lastCapture': {
+    en: 'Last capture',
+    da: 'Seneste registrering',
+    sv: 'Senaste insamling',
+    de: 'Letzte Erfassung',
   },
   'dashboard.lastActive': {
     en: 'Last active',
@@ -960,6 +1152,304 @@ const translations = {
     da: 'Tilføj arbejdstype...',
     sv: 'Lägg till arbetstyp...',
     de: 'Arbeitsart hinzufügen...',
+  },
+
+  // Consultant PIN
+  'landing.consultantPin': {
+    en: 'Consultant PIN',
+    da: 'Konsulent-PIN',
+    sv: 'Konsult-PIN',
+    de: 'Berater-PIN',
+  },
+  'landing.consultantPinPlaceholder': {
+    en: 'Set a 4-6 digit PIN for settings access',
+    da: 'Angiv en 4-6 cifret PIN til adgang til indstillinger',
+    sv: 'Ange en 4-6 siffrig PIN för åtkomst till inställningar',
+    de: 'Legen Sie eine 4-6-stellige PIN für den Zugang zu Einstellungen fest',
+  },
+  'consultant.enterPin': {
+    en: 'Enter consultant PIN',
+    da: 'Indtast konsulent-PIN',
+    sv: 'Ange konsult-PIN',
+    de: 'Berater-PIN eingeben',
+  },
+  'consultant.wrongPin': {
+    en: 'Incorrect PIN',
+    da: 'Forkert PIN',
+    sv: 'Felaktig PIN',
+    de: 'Falsche PIN',
+  },
+  'consultant.unlock': {
+    en: 'Unlock',
+    da: 'Lås op',
+    sv: 'Lås upp',
+    de: 'Entsperren',
+  },
+  'consultant.setPin': {
+    en: 'Set consultant PIN',
+    da: 'Angiv konsulent-PIN',
+    sv: 'Ange konsult-PIN',
+    de: 'Berater-PIN festlegen',
+  },
+  'consultant.setPinDesc': {
+    en: 'A PIN is required to access settings and manage layers. Set one now.',
+    da: 'En PIN er påkrævet for at få adgang til indstillinger og administrere lag. Angiv en nu.',
+    sv: 'En PIN krävs för åtkomst till inställningar och lagerhantering. Ange en nu.',
+    de: 'Zum Zugriff auf Einstellungen und Schichten wird eine PIN benötigt. Jetzt festlegen.',
+  },
+
+  // Layer system
+  'layers.title': {
+    en: 'Analysis Layers',
+    da: 'Analyselag',
+    sv: 'Analyslager',
+    de: 'Analyseschichten',
+  },
+  'layers.current': {
+    en: 'Current layer',
+    da: 'Nuværende lag',
+    sv: 'Nuvarande lager',
+    de: 'Aktuelle Schicht',
+  },
+  'layers.activate': {
+    en: 'Activate Layer {layer}',
+    da: 'Aktivér lag {layer}',
+    sv: 'Aktivera lager {layer}',
+    de: 'Schicht {layer} aktivieren',
+  },
+  'layers.activateConfirm': {
+    en: 'This will add new fields to the capture form and require reclassification of existing demands. Continue?',
+    da: 'Dette tilføjer nye felter til indsamlingsformularen og kræver omklassificering af eksisterende efterspørgsler. Fortsæt?',
+    sv: 'Detta lägger till nya fält i insamlingsformuläret och kräver omklassificering av befintliga efterfrågningar. Fortsätt?',
+    de: 'Dadurch werden neue Felder zum Erfassungsformular hinzugefügt und eine Neuklassifizierung bestehender Nachfragen erforderlich. Fortfahren?',
+  },
+  'layers.allActive': {
+    en: 'All layers active',
+    da: 'Alle lag er aktive',
+    sv: 'Alla lager aktiva',
+    de: 'Alle Schichten aktiv',
+  },
+  'layers.prereq2': {
+    en: 'Before activating: define at least one value and one failure demand type below',
+    da: 'Før aktivering: definer mindst én værdiskabende og én ikke-værdiskabende efterspørgselstype nedenfor',
+    sv: 'Före aktivering: definiera minst en värdeskapande och en icke-värdeskapande efterfrågetyp nedan',
+    de: 'Vor Aktivierung: definieren Sie mindestens eine Wert- und eine Fehler-Nachfrageart unten',
+  },
+  'layers.prereq3': {
+    en: 'Before activating: define at least one handling type below',
+    da: 'Før aktivering: definer mindst én håndteringstype nedenfor',
+    sv: 'Före aktivering: definiera minst en hanteringstyp nedan',
+    de: 'Vor Aktivierung: definieren Sie mindestens eine Bearbeitungsart unten',
+  },
+  'layers.prereq4': {
+    en: 'Before activating: ensure failure demand types are configured with original value demand links',
+    da: 'Før aktivering: sørg for at ikke-værdiskabende efterspørgselstyper er konfigureret med links til oprindelig værdiskabende efterspørgsel',
+    sv: 'Före aktivering: se till att icke-värdeskapande efterfrågetyper är konfigurerade med länkar till ursprunglig värdeefterfrågan',
+    de: 'Vor Aktivierung: stellen Sie sicher, dass Fehler-Nachfragearten mit Links zur ursprünglichen Wert-Nachfrage konfiguriert sind',
+  },
+  'layers.prereq5': {
+    en: 'Before activating: define at least one "what matters" category below',
+    da: 'Før aktivering: definer mindst én "det der betyder noget"-kategori nedenfor',
+    sv: 'Före aktivering: definiera minst en "det som betyder något"-kategori nedan',
+    de: 'Vor Aktivierung: definieren Sie mindestens eine "was wichtig ist"-Kategorie unten',
+  },
+  'layers.guidanceTitle': {
+    en: 'What changes when you activate Layer {layer}',
+    da: 'Hvad ændrer sig når du aktiverer lag {layer}',
+    sv: 'Vad ändras när du aktiverar lager {layer}',
+    de: 'Was ändert sich wenn Sie Schicht {layer} aktivieren',
+  },
+  'layers.guidance2': {
+    en: 'Practitioners will classify each demand as Value or Failure, and select a demand type. Existing entries will need reclassification.',
+    da: 'Medarbejdere skal klassificere hver efterspørgsel som Værdi eller Fejl, og vælge en efterspørgselstype. Eksisterende registreringer skal omklassificeres.',
+    sv: 'Medarbetare klassificerar varje efterfrågan som Värde eller Icke-värde, och väljer en efterfrågetyp. Befintliga poster behöver omklassificeras.',
+    de: 'Mitarbeiter klassifizieren jede Nachfrage als Wert oder Fehler und wählen einen Nachfragetyp. Bestehende Einträge müssen neu klassifiziert werden.',
+  },
+  'layers.guidance3': {
+    en: 'Practitioners will record how each demand was handled (e.g. one-stop, pass-on). This reveals how the system responds to demand.',
+    da: 'Medarbejdere registrerer hvordan hver efterspørgsel blev håndteret (f.eks. one-stop, sendt videre). Dette afslører hvordan systemet reagerer på efterspørgsel.',
+    sv: 'Medarbetare registrerar hur varje efterfrågan hanterades (t.ex. one-stop, vidarebefordrad). Detta avslöjar hur systemet svarar på efterfrågan.',
+    de: 'Mitarbeiter erfassen wie jede Nachfrage bearbeitet wurde (z.B. One-Stop, Weiterleitung). Dies zeigt wie das System auf Nachfrage reagiert.',
+  },
+  'layers.guidance4': {
+    en: 'Failure demands will be linked back to the original value demand they stem from. This reveals which value demands generate the most failure.',
+    da: 'Fejlefterspørgsler kobles tilbage til den oprindelige værdiefterspørgsel de stammer fra. Dette afslører hvilke værdiefterspørgsler der genererer mest fejl.',
+    sv: 'Icke-värdeskapande efterfrågan kopplas tillbaka till den ursprungliga värdeefterfrågan. Detta avslöjar vilka värdeefterfrågor som genererar mest icke-värde.',
+    de: 'Fehlernachfragen werden mit der ursprünglichen Wertnachfrage verknüpft. Dies zeigt welche Wertnachfragen die meisten Fehler erzeugen.',
+  },
+  'layers.guidance5': {
+    en: 'Full analysis with all fields active. Practitioners can now capture what matters to the customer for each demand.',
+    da: 'Fuld analyse med alle felter aktive. Medarbejdere kan nu registrere hvad der betyder noget for kunden ved hver efterspørgsel.',
+    sv: 'Full analys med alla fält aktiva. Medarbetare kan nu registrera vad som betyder något för kunden vid varje efterfrågan.',
+    de: 'Vollständige Analyse mit allen Feldern aktiv. Mitarbeiter können nun erfassen was dem Kunden bei jeder Nachfrage wichtig ist.',
+  },
+  'layers.description1': {
+    en: 'Raw demand + what matters',
+    da: 'Rå efterspørgsel + hvad der betyder noget',
+    sv: 'Rå efterfrågan + vad som är viktigt',
+    de: 'Rohe Nachfrage + was wichtig ist',
+  },
+  'layers.description2': {
+    en: 'Value / failure classification',
+    da: 'Værdi-/fejlklassificering',
+    sv: 'Värde-/felklassificering',
+    de: 'Wert-/Fehlerklassifizierung',
+  },
+  'layers.description3': {
+    en: 'Handling (how demand is dealt with)',
+    da: 'Håndtering (hvordan efterspørgsel behandles)',
+    sv: 'Hantering (hur efterfrågan hanteras)',
+    de: 'Bearbeitung (wie Nachfrage behandelt wird)',
+  },
+  'layers.description4': {
+    en: 'Linked demands (failure to value)',
+    da: 'Sammenkædede efterspørgsler (fejl til værdi)',
+    sv: 'Länkade efterfrågningar (fel till värde)',
+    de: 'Verknüpfte Nachfragen (Fehler zu Wert)',
+  },
+  'layers.description5': {
+    en: 'Split what matters by demand type',
+    da: 'Opdel hvad der betyder noget efter efterspørgselstype',
+    sv: 'Dela upp vad som är viktigt per efterfrågetyp',
+    de: 'Was wichtig ist nach Nachfragetyp aufteilen',
+  },
+
+  // Navigation
+  'nav.reclassify': {
+    en: 'Reclassify',
+    da: 'Omklassificér',
+    sv: 'Omklassificera',
+    de: 'Neuklassifizieren',
+  },
+
+  // Reclassification
+  'reclassify.title': {
+    en: 'Reclassify Demands',
+    da: 'Omklassificér efterspørgsler',
+    sv: 'Omklassificera efterfrågningar',
+    de: 'Nachfragen neuklassifizieren',
+  },
+  'reclassify.remaining': {
+    en: '{current} of {total} remaining',
+    da: '{current} af {total} tilbage',
+    sv: '{current} av {total} kvar',
+    de: '{current} von {total} übrig',
+  },
+  'reclassify.saveNext': {
+    en: 'Save & Next',
+    da: 'Gem & næste',
+    sv: 'Spara & nästa',
+    de: 'Speichern & weiter',
+  },
+  'reclassify.skip': {
+    en: 'Skip',
+    da: 'Spring over',
+    sv: 'Hoppa över',
+    de: 'Überspringen',
+  },
+  'reclassify.complete': {
+    en: 'All caught up — no demands need reclassifying right now.',
+    da: 'Alt er opdateret — ingen efterspørgsler skal omklassificeres lige nu.',
+    sv: 'Allt är uppdaterat — inga efterfrågningar behöver omklassificeras just nu.',
+    de: 'Alles erledigt — keine Nachfragen müssen gerade neuklassifiziert werden.',
+  },
+  'reclassify.layerLabel': {
+    en: 'Layer {layer}',
+    da: 'Lag {layer}',
+    sv: 'Lager {layer}',
+    de: 'Schicht {layer}',
+  },
+  'reclassify.layerGuide2': {
+    en: 'Classify each demand as value or failure. Value demand is what customers actually want. Failure demand is caused by a failure to do something or do something right for the customer.',
+    da: 'Klassificér hver efterspørgsel som værdi eller fejl. Værdiefterspørgsel er det kunden faktisk ønsker. Fejlefterspørgsel er forårsaget af en fejl i at gøre noget eller gøre noget rigtigt for kunden.',
+    sv: 'Klassificera varje efterfrågan som värde eller fel. Värdeefterfrågan är det kunden faktiskt vill ha. Felefterfrågan orsakas av ett misslyckande att göra något eller göra något rätt för kunden.',
+    de: 'Klassifizieren Sie jede Nachfrage als Wert oder Fehler. Wertnachfrage ist das, was Kunden tatsächlich wollen. Fehlernachfrage wird durch ein Versagen verursacht, etwas zu tun oder richtig zu tun.',
+  },
+  'reclassify.layerGuide3': {
+    en: 'Select how each demand was handled. This helps understand the system\'s response to customer demand.',
+    da: 'Vælg hvordan hver efterspørgsel blev håndteret. Dette hjælper med at forstå systemets reaktion på kundeefterspørgsel.',
+    sv: 'Välj hur varje efterfrågan hanterades. Detta hjälper till att förstå systemets svar på kundefterfrågan.',
+    de: 'Wählen Sie, wie jede Nachfrage bearbeitet wurde. Dies hilft, die Reaktion des Systems auf Kundennachfrage zu verstehen.',
+  },
+  'reclassify.layerGuide4': {
+    en: 'Link each failure demand to the original value demand it relates to. This reveals which value demands are generating the most failure.',
+    da: 'Forbind hver fejlefterspørgsel med den oprindelige værdiefterspørgsel den relaterer til. Dette afslører hvilke værdiefterspørgsler der genererer mest fejl.',
+    sv: 'Koppla varje felefterfrågan till den ursprungliga värdeefterfrågan den relaterar till. Detta avslöjar vilka värdeefterfrågor som genererar mest fel.',
+    de: 'Verknüpfen Sie jede Fehlernachfrage mit der ursprünglichen Wertnachfrage. Dies zeigt, welche Wertnachfragen die meisten Fehler verursachen.',
+  },
+  'reclassify.layerNotActive': {
+    en: 'Classification is not yet active for this study. Activate Layer 2 in Settings to begin.',
+    da: 'Klassificering er endnu ikke aktiveret for dette studie. Aktivér Lag 2 i Indstillinger for at begynde.',
+    sv: 'Klassificering är ännu inte aktiverad för denna studie. Aktivera Lager 2 i Inställningar för att börja.',
+    de: 'Die Klassifizierung ist für diese Studie noch nicht aktiviert. Aktivieren Sie Schicht 2 in den Einstellungen, um zu beginnen.',
+  },
+  'reclassify.classifyAs': {
+    en: 'Classify this demand as value or failure:',
+    da: 'Klassificér denne efterspørgsel som værdi eller fejl:',
+    sv: 'Klassificera denna efterfrågan som värde eller fel:',
+    de: 'Klassifizieren Sie diese Nachfrage als Wert oder Fehler:',
+  },
+  'reclassify.selectHandling': {
+    en: 'How was this demand handled?',
+    da: 'Hvordan blev denne efterspørgsel håndteret?',
+    sv: 'Hur hanterades denna efterfrågan?',
+    de: 'Wie wurde diese Nachfrage bearbeitet?',
+  },
+  'reclassify.linkToValue': {
+    en: 'Which value demand did this failure originate from?',
+    da: 'Hvilken værdiefterspørgsel opstod denne fejl fra?',
+    sv: 'Vilken värdeefterfrågan härstammade detta fel från?',
+    de: 'Von welcher Wertnachfrage stammt dieser Fehler?',
+  },
+
+  // Capture form - what matters multi-select
+  'capture.whatMattersSelect': {
+    en: 'What matters (select all that apply)',
+    da: 'Hvad betyder noget (vælg alle der gælder)',
+    sv: 'Vad är viktigt (välj alla som gäller)',
+    de: 'Was wichtig ist (alle zutreffenden auswählen)',
+  },
+
+  // Capture form - linked demand
+  'capture.linkedValueDemand': {
+    en: 'Link to originating value demand',
+    da: 'Kobl til den oprindelige værdiefterspørgsel',
+    sv: 'Länka till ursprunglig värdeefterfrågan',
+    de: 'Mit ursprünglicher Wertnachfrage verknüpfen',
+  },
+  'capture.searchValueDemands': {
+    en: 'Search value demands...',
+    da: 'Søg værdiefterspørgsler...',
+    sv: 'Sök värdeefterfrågor...',
+    de: 'Wertnachfragen suchen...',
+  },
+
+  // Reclassification warning
+  'layers.reclassifyWarning': {
+    en: '{count} entries still need reclassification for the current layer. Activate anyway?',
+    da: '{count} registreringer mangler stadig omklassificering for det nuv\u00e6rende lag. Aktiver alligevel?',
+    sv: '{count} poster beh\u00f6ver fortfarande omklassificering f\u00f6r nuvarande lager. Aktivera \u00e4nd\u00e5?',
+    de: '{count} Eintr\u00e4ge m\u00fcssen noch f\u00fcr die aktuelle Ebene neu klassifiziert werden. Trotzdem aktivieren?',
+  },
+  'layers.noReclassifyNeeded': {
+    en: 'All entries are up to date. Activate Layer {layer}?',
+    da: 'Alle registreringer er opdaterede. Aktiver lag {layer}?',
+    sv: 'Alla poster \u00e4r uppdaterade. Aktivera lager {layer}?',
+    de: 'Alle Eintr\u00e4ge sind aktuell. Ebene {layer} aktivieren?',
+  },
+
+  // Operational definitions
+  'settings.operationalDefinition': {
+    en: 'Operational definition',
+    da: 'Operationel definition',
+    sv: 'Operationell definition',
+    de: 'Operationale Definition',
+  },
+  'settings.operationalDefinitionPlaceholder': {
+    en: 'Define what this means in practice...',
+    da: 'Definér hvad dette betyder i praksis...',
+    sv: 'Definiera vad detta innebär i praktiken...',
+    de: 'Definieren Sie, was das in der Praxis bedeutet...',
   },
 } as const;
 

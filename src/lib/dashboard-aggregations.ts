@@ -1,6 +1,7 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData } from '@/types';
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date): Promise<DashboardData> {
@@ -87,16 +88,43 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .groupBy(contactMethods.label)
     .orderBy(desc(sql`count(*)`));
 
-  // What matters type counts (demand only)
+  // What matters type counts (demand only, via junction table)
   const whatMattersCounts = await db.select({
     label: whatMattersTypes.label,
     count: sql<number>`count(*)::int`,
   })
-    .from(demandEntries)
-    .innerJoin(whatMattersTypes, eq(demandEntries.whatMattersTypeId, whatMattersTypes.id))
+    .from(demandEntryWhatMatters)
+    .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
+    .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
     .where(demandWhere)
     .groupBy(whatMattersTypes.label)
     .orderBy(desc(sql`count(*)`));
+
+  // What matters by classification (demand only, for Layer 5)
+  const wmByClass = await db.select({
+    label: whatMattersTypes.label,
+    classification: demandEntries.classification,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntryWhatMatters)
+    .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
+    .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
+    .where(demandWhere)
+    .groupBy(whatMattersTypes.label, demandEntries.classification);
+
+  const wmClassMap = new Map<string, { valueCount: number; failureCount: number }>();
+  for (const row of wmByClass) {
+    if (!wmClassMap.has(row.label)) {
+      wmClassMap.set(row.label, { valueCount: 0, failureCount: 0 });
+    }
+    const entry = wmClassMap.get(row.label)!;
+    if (row.classification === 'value') entry.valueCount = row.count;
+    else if (row.classification === 'failure') entry.failureCount = row.count;
+  }
+  const whatMattersByClassification = Array.from(wmClassMap.entries()).map(([label, counts]) => ({
+    label,
+    ...counts,
+  }));
 
   // Handling by classification (demand only)
   const handlingByClass = await db.select({
@@ -177,6 +205,24 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .groupBy(demandTypes.label)
     .orderBy(desc(sql`count(*)`));
 
+  // Failure flow: value demand type → failure demand type cross-tabulation
+  const originalDemandType = alias(demandTypes, 'originalDemandType');
+  const failureDemandType = alias(demandTypes, 'failureDemandType');
+  const failureFlowLinks = await db.select({
+    sourceLabel: originalDemandType.label,
+    targetLabel: failureDemandType.label,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(originalDemandType, eq(demandEntries.originalValueDemandTypeId, originalDemandType.id))
+    .innerJoin(failureDemandType, eq(demandEntries.demandTypeId, failureDemandType.id))
+    .where(and(
+      ...demandConditions,
+      eq(demandEntries.classification, 'failure'),
+    ))
+    .groupBy(originalDemandType.label, failureDemandType.label)
+    .orderBy(desc(sql`count(*)`));
+
   // Point of transaction by classification (demand only)
   const potByClass = await db.select({
     label: pointsOfTransaction.label,
@@ -206,8 +252,11 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const whatMattersNotes = await db.select({
     text: demandEntries.whatMatters,
     date: sql<string>`${demandEntries.createdAt}::date`,
+    demandTypeLabel: demandTypes.label,
+    classification: demandEntries.classification,
   })
     .from(demandEntries)
+    .leftJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
     .where(and(
       ...demandConditions,
       sql`${demandEntries.whatMatters} IS NOT NULL AND ${demandEntries.whatMatters} != ''`
@@ -302,12 +351,14 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     handlingTypeCounts,
     contactMethodCounts,
     whatMattersCounts,
+    whatMattersByClassification,
     handlingByClassification,
     pointOfTransactionByClassification,
     demandOverTime: demandOverTimeResult,
     failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
     failuresByOriginalValueDemand,
-    whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date })),
+    failureFlowLinks,
+    whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date, demandTypeLabel: r.demandTypeLabel || null, classification: r.classification })),
     collectorCounts,
     workCount,
     workValueCount,
@@ -316,4 +367,41 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     workTypeCounts,
     workOverTime,
   };
+}
+
+export async function getFailureCausesForFlow(
+  studyId: string,
+  sourceLabel: string,
+  targetLabel: string,
+  from?: Date,
+  to?: Date,
+): Promise<Array<{ cause: string; count: number }>> {
+  const conditions = [
+    eq(demandEntries.studyId, studyId),
+    eq(demandEntries.entryType, 'demand'),
+    eq(demandEntries.classification, 'failure'),
+    sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`,
+  ];
+  if (from) conditions.push(gte(demandEntries.createdAt, from));
+  if (to) conditions.push(lte(demandEntries.createdAt, to));
+
+  const originalDT = alias(demandTypes, 'originalDT');
+  const failureDT = alias(demandTypes, 'failureDT');
+
+  const results = await db.select({
+    cause: demandEntries.failureCause,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(originalDT, eq(demandEntries.originalValueDemandTypeId, originalDT.id))
+    .innerJoin(failureDT, eq(demandEntries.demandTypeId, failureDT.id))
+    .where(and(
+      ...conditions,
+      eq(originalDT.label, sourceLabel),
+      eq(failureDT.label, targetLabel),
+    ))
+    .groupBy(demandEntries.failureCause)
+    .orderBy(desc(sql`count(*)`));
+
+  return results.map(r => ({ cause: r.cause!, count: r.count }));
 }

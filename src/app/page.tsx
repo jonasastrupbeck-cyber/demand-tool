@@ -14,6 +14,7 @@ export default function Home() {
   const [contactMethodChoice, setContactMethodChoice] = useState('');
   const [customContactMethod, setCustomContactMethod] = useState('');
   const [pointOfTransaction, setPointOfTransaction] = useState('');
+  const [consultantPin, setConsultantPin] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,7 +51,7 @@ export default function Home() {
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined }),
+      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined }),
     });
 
     if (!res.ok) {
@@ -82,7 +83,8 @@ export default function Home() {
         <div className="text-center mb-8">
           <img src="/vanguard-logo.png" alt="Vanguard" style={{ width: '140px', height: 'auto', margin: '0 auto 16px' }} />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')}</h1>
-          <p className="text-gray-600">{t('app.subtitle')}</p>
+          <p className="text-gray-600 mb-3">{t('app.subtitle')}</p>
+          <p className="text-sm text-gray-400 max-w-sm mx-auto">{t('landing.methodContext')}</p>
         </div>
 
         {error && (
@@ -200,6 +202,21 @@ export default function Home() {
                     value={pointOfTransaction}
                     onChange={(e) => setPointOfTransaction(e.target.value)}
                     placeholder={t('landing.pointOfTransactionPlaceholder')}
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('landing.consultantPin')}
+                  </label>
+                  <input
+                    type="password"
+                    value={consultantPin}
+                    onChange={(e) => setConsultantPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder={t('landing.consultantPinPlaceholder')}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
                     className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
                   />
                 </div>
