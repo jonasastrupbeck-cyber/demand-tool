@@ -1,3 +1,4 @@
+/* Dashboard – demand / work / overview tabs */
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
