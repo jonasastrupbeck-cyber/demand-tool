@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData } from '@/types';
@@ -21,6 +21,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const study = await db.select().from(studies).where(eq(studies.id, studyId));
   const oneStopId = study[0]?.oneStopHandlingType;
   const workTrackingEnabled = study[0]?.workTrackingEnabled ?? false;
+  const systemConditionsEnabled = study[0]?.systemConditionsEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
 
@@ -176,20 +177,40 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     ...counts,
   }));
 
-  // Failure causes (demand only)
-  const failureCauses = await db.select({
-    cause: demandEntries.failureCause,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .where(and(
-      ...demandConditions,
-      eq(demandEntries.classification, 'failure'),
-      sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
-    ))
-    .groupBy(demandEntries.failureCause)
-    .orderBy(desc(sql`count(*)`))
-    .limit(15);
+  // Failure causes / system conditions (demand only)
+  let failureCausesRaw: Array<{ cause: string | null; count: number }>;
+  if (systemConditionsEnabled) {
+    // Use junction table when managed system conditions are enabled
+    failureCausesRaw = await db.select({
+      cause: systemConditions.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntrySystemConditions)
+      .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
+      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+      .where(and(
+        ...demandConditions,
+        eq(demandEntries.classification, 'failure'),
+      ))
+      .groupBy(systemConditions.label)
+      .orderBy(desc(sql`count(*)`))
+      .limit(15);
+  } else {
+    // Fall back to free-text grouping
+    failureCausesRaw = await db.select({
+      cause: demandEntries.failureCause,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .where(and(
+        ...demandConditions,
+        eq(demandEntries.classification, 'failure'),
+        sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
+      ))
+      .groupBy(demandEntries.failureCause)
+      .orderBy(desc(sql`count(*)`))
+      .limit(15);
+  }
 
   // Failures by original value demand type (demand only)
   const failuresByOriginalValueDemand = await db.select({
@@ -381,7 +402,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     handlingByClassification,
     pointOfTransactionByClassification,
     demandOverTime: demandOverTimeResult,
-    failureCauses: failureCauses.map(r => ({ cause: r.cause!, count: r.count })),
+    failureCauses: failureCausesRaw.map(r => ({ cause: r.cause!, count: r.count })),
     failuresByOriginalValueDemand,
     failureFlowLinks,
     whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date, demandTypeLabel: r.demandTypeLabel || null, classification: r.classification })),
@@ -403,32 +424,61 @@ export async function getFailureCausesForFlow(
   from?: Date,
   to?: Date,
 ): Promise<Array<{ cause: string; count: number }>> {
-  const conditions = [
+  // Check if study uses managed system conditions
+  const study = await db.select().from(studies).where(eq(studies.id, studyId));
+  const scEnabled = study[0]?.systemConditionsEnabled ?? false;
+
+  const baseConditions = [
     eq(demandEntries.studyId, studyId),
     eq(demandEntries.entryType, 'demand'),
     eq(demandEntries.classification, 'failure'),
-    sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`,
   ];
-  if (from) conditions.push(gte(demandEntries.createdAt, from));
-  if (to) conditions.push(lte(demandEntries.createdAt, to));
+  if (from) baseConditions.push(gte(demandEntries.createdAt, from));
+  if (to) baseConditions.push(lte(demandEntries.createdAt, to));
 
   const originalDT = alias(demandTypes, 'originalDT');
   const failureDT = alias(demandTypes, 'failureDT');
 
-  const results = await db.select({
-    cause: demandEntries.failureCause,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(originalDT, eq(demandEntries.originalValueDemandTypeId, originalDT.id))
-    .innerJoin(failureDT, eq(demandEntries.demandTypeId, failureDT.id))
-    .where(and(
-      ...conditions,
-      eq(originalDT.label, sourceLabel),
-      eq(failureDT.label, targetLabel),
-    ))
-    .groupBy(demandEntries.failureCause)
-    .orderBy(desc(sql`count(*)`));
+  if (scEnabled) {
+    const results = await db.select({
+      cause: systemConditions.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntrySystemConditions)
+      .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
+      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+      .innerJoin(originalDT, eq(demandEntries.originalValueDemandTypeId, originalDT.id))
+      .innerJoin(failureDT, eq(demandEntries.demandTypeId, failureDT.id))
+      .where(and(
+        ...baseConditions,
+        eq(originalDT.label, sourceLabel),
+        eq(failureDT.label, targetLabel),
+      ))
+      .groupBy(systemConditions.label)
+      .orderBy(desc(sql`count(*)`));
 
-  return results.map(r => ({ cause: r.cause!, count: r.count }));
+    return results.map(r => ({ cause: r.cause!, count: r.count }));
+  } else {
+    const conditions = [
+      ...baseConditions,
+      sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`,
+    ];
+
+    const results = await db.select({
+      cause: demandEntries.failureCause,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(originalDT, eq(demandEntries.originalValueDemandTypeId, originalDT.id))
+      .innerJoin(failureDT, eq(demandEntries.demandTypeId, failureDT.id))
+      .where(and(
+        ...conditions,
+        eq(originalDT.label, sourceLabel),
+        eq(failureDT.label, targetLabel),
+      ))
+      .groupBy(demandEntries.failureCause)
+      .orderBy(desc(sql`count(*)`));
+
+    return results.map(r => ({ cause: r.cause!, count: r.count }));
+  }
 }

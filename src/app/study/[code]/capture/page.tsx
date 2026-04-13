@@ -44,6 +44,7 @@ interface StudyData {
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
+  systemConditionsEnabled: boolean;
   activeLayer: number;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -51,6 +52,7 @@ interface StudyData {
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: WhatMattersType[];
   workTypes: WorkType[];
+  systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
 }
 
 export default function CapturePage() {
@@ -83,6 +85,7 @@ export default function CapturePage() {
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
+  const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
   const [whatMatters, setWhatMatters] = useState('');
   const [workTypeId, setWorkTypeId] = useState('');
 
@@ -138,6 +141,7 @@ export default function CapturePage() {
     setWhatMattersTypeIds([]);
     setOriginalValueDemandTypeId('');
     setFailureCause('');
+    setSystemConditionIds([]);
     setWhatMatters('');
     setWorkTypeId('');
     setError('');
@@ -179,6 +183,11 @@ export default function CapturePage() {
       body.whatMatters = whatMatters.trim() || undefined;
     } else {
       body.workTypeId = workTypeId || undefined;
+    }
+
+    // System conditions (both demand and work, when failure + enabled)
+    if (study?.systemConditionsEnabled && effectiveClassification === 'failure' && systemConditionIds.length > 0) {
+      body.systemConditionIds = systemConditionIds;
     }
 
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
@@ -492,31 +501,61 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Failure cause (Layer 2+, demand + failure only) */}
-        {study.activeLayer >= 2 && isDemand && classification === 'failure' && (
-          <div className="relative">
-            <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
-            <textarea
-              value={failureCause}
-              onChange={(e) => { setFailureCause(e.target.value); setShowSuggestions(true); }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              onFocus={() => setShowSuggestions(true)}
-              placeholder={t('capture.failureCausePlaceholder')}
-              rows={2}
-              className={inputCls}
-            />
-            {showSuggestions && filteredSuggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto bg-white border border-gray-200">
-                {filteredSuggestions.map((suggestion, i) => (
-                  <button key={i} type="button" className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-                    onMouseDown={() => { setFailureCause(suggestion); setShowSuggestions(false); }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+        {/* System conditions / failure cause (Layer 2+, failure only — both demand and work) */}
+        {study.activeLayer >= 2 && classification === 'failure' && (
+          study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
+            <div>
+              <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
+              <div className="flex flex-wrap gap-2">
+                {(study.systemConditions || []).map((sc) => {
+                  const isSelected = systemConditionIds.includes(sc.id);
+                  return (
+                    <button
+                      key={sc.id}
+                      type="button"
+                      title={sc.operationalDefinition || undefined}
+                      onClick={() => {
+                        setSystemConditionIds(prev =>
+                          isSelected ? prev.filter(id => id !== sc.id) : [...prev, sc.id]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                        isSelected
+                          ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
+                          : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
+                      }`}
+                    >
+                      {tl(sc.label)}
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </div>
+            </div>
+          ) : isDemand ? (
+            <div className="relative">
+              <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
+              <textarea
+                value={failureCause}
+                onChange={(e) => { setFailureCause(e.target.value); setShowSuggestions(true); }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder={t('capture.failureCausePlaceholder')}
+                rows={2}
+                className={inputCls}
+              />
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto bg-white border border-gray-200">
+                  {filteredSuggestions.map((suggestion, i) => (
+                    <button key={i} type="button" className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                      onMouseDown={() => { setFailureCause(suggestion); setShowSuggestions(false); }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null
         )}
 
         {/* Original value demand (Layer 2+, demand + failure only) */}

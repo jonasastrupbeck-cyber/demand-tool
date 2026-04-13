@@ -259,6 +259,12 @@ const translations = {
     sv: 'Orsak till icke-v\u00e4rdeskapande efterfr\u00e5gan (systemf\u00f6rh\u00e5llande)',
     de: 'Ursache der Fehlernachfrage (Systembedingung)',
   },
+  'capture.systemConditionsLabel': {
+    en: 'System conditions (what caused this failure?)',
+    da: 'Systemforhold (hvad forårsagede denne fejl?)',
+    sv: 'Systemförhållanden (vad orsakade detta fel?)',
+    de: 'Systembedingungen (was hat diesen Fehler verursacht?)',
+  },
   'capture.failureCausePlaceholder': {
     en: 'What system condition caused this failure demand?',
     da: 'Hvilket systemforhold for\u00e5rsagede denne ikke-v\u00e6rdiskabende eftersp\u00f8rgsel?',
@@ -1206,6 +1212,30 @@ const translations = {
     da: 'Tilføj arbejdstype...',
     sv: 'Lägg till arbetstyp...',
     de: 'Arbeitsart hinzufügen...',
+  },
+  'settings.systemConditions': {
+    en: 'System Conditions',
+    da: 'Systemforhold',
+    sv: 'Systemförhållanden',
+    de: 'Systembedingungen',
+  },
+  'settings.systemConditionsDesc': {
+    en: 'Pre-defined system conditions that explain why failure demand occurs. When enabled, collectors select from this list instead of typing free text.',
+    da: 'Foruddefinerede systemforhold der forklarer hvorfor fejlefterspørgsel opstår. Når aktiveret vælger indsamlere fra denne liste i stedet for at skrive fritekst.',
+    sv: 'Fördefinierade systemförhållanden som förklarar varför felefterfrågan uppstår. När aktiverat väljer insamlare från denna lista istället för att skriva fritext.',
+    de: 'Vordefinierte Systembedingungen, die erklären, warum Fehlnachfrage entsteht. Wenn aktiviert, wählen Erfasser aus dieser Liste statt Freitext einzugeben.',
+  },
+  'settings.enableSystemConditions': {
+    en: 'Enable managed system conditions',
+    da: 'Aktiver styrede systemforhold',
+    sv: 'Aktivera hanterade systemförhållanden',
+    de: 'Verwaltete Systembedingungen aktivieren',
+  },
+  'settings.addSystemCondition': {
+    en: 'Add system condition...',
+    da: 'Tilføj systemforhold...',
+    sv: 'Lägg till systemförhållande...',
+    de: 'Systembedingung hinzufügen...',
   },
 
   // Consultant PIN

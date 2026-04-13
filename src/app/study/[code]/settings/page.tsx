@@ -33,6 +33,12 @@ interface WorkType {
   label: string;
 }
 
+interface SystemConditionType {
+  id: string;
+  label: string;
+  operationalDefinition: string | null;
+}
+
 interface StudyData {
   id: string;
   name: string;
@@ -41,6 +47,7 @@ interface StudyData {
   accessCode: string;
   oneStopHandlingType: string | null;
   workTrackingEnabled: boolean;
+  systemConditionsEnabled: boolean;
   activeLayer: number;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
@@ -49,6 +56,7 @@ interface StudyData {
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
+  systemConditions: SystemConditionType[];
 }
 
 export default function SettingsPage() {
@@ -84,11 +92,12 @@ export default function SettingsPage() {
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
+  const [newSystemCondition, setNewSystemCondition] = useState('');
 
   // Operational definition editing
   const [editingDefId, setEditingDefId] = useState<string | null>(null);
   const [editingDefValue, setEditingDefValue] = useState('');
-  const [editingDefType, setEditingDefType] = useState<'handling' | 'demand' | 'whatMatters'>('handling');
+  const [editingDefType, setEditingDefType] = useState<'handling' | 'demand' | 'whatMatters' | 'systemCondition'>('handling');
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -300,7 +309,34 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  function startEditDef(id: string, currentDef: string | null, type: 'handling' | 'demand' | 'whatMatters') {
+  async function toggleSystemConditions() {
+    const newValue = !study?.systemConditionsEnabled;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemConditionsEnabled: newValue }),
+    });
+    loadStudy();
+  }
+
+  async function addSystemConditionHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSystemCondition.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newSystemCondition.trim() }),
+    });
+    setNewSystemCondition('');
+    loadStudy();
+  }
+
+  async function removeSystemCondition(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  function startEditDef(id: string, currentDef: string | null, type: 'handling' | 'demand' | 'whatMatters' | 'systemCondition') {
     setEditingDefId(id);
     setEditingDefValue(currentDef || '');
     setEditingDefType(type);
@@ -308,7 +344,7 @@ export default function SettingsPage() {
 
   async function saveOperationalDefinition() {
     if (!editingDefId) return;
-    const typePathMap = { handling: 'handling-types', demand: 'demand-types', whatMatters: 'what-matters-types' };
+    const typePathMap = { handling: 'handling-types', demand: 'demand-types', whatMatters: 'what-matters-types', systemCondition: 'system-conditions' };
     await fetch(`/api/studies/${encodeURIComponent(code)}/${typePathMap[editingDefType]}/${editingDefId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -690,6 +726,65 @@ export default function SettingsPage() {
             <button type="submit" disabled={!newFailureType.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
           </form>
         </div>}
+
+        {/* System Conditions */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.systemConditions')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.systemConditionsDesc')}</p>
+          <label className="flex items-center gap-3 cursor-pointer mb-4">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={study.systemConditionsEnabled}
+                onChange={toggleSystemConditions}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-red-600 transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+            </div>
+            <span className="text-sm text-gray-700 font-medium">{t('settings.enableSystemConditions')}</span>
+          </label>
+          {study.systemConditionsEnabled && (
+            <>
+              <ul className="space-y-2 mb-4">
+                {(study.systemConditions || []).map((sc) => (
+                  <li key={sc.id} className="py-2 px-3 rounded-lg bg-red-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-red-700">{tl(sc.label)}</span>
+                      <button onClick={() => removeSystemCondition(sc.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    </div>
+                    {editingDefId === sc.id ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={editingDefValue}
+                          onChange={(e) => setEditingDefValue(e.target.value)}
+                          placeholder={t('settings.operationalDefinitionPlaceholder')}
+                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
+                        />
+                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditDef(sc.id, sc.operationalDefinition, 'systemCondition')}
+                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
+                      >
+                        {sc.operationalDefinition || t('settings.operationalDefinition') + '...'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <form onSubmit={addSystemConditionHandler} className="flex gap-2">
+                <input type="text" value={newSystemCondition} onChange={(e) => setNewSystemCondition(e.target.value)} placeholder={t('settings.addSystemCondition')} className={inputCls} />
+                <button type="submit" disabled={!newSystemCondition.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
+              </form>
+            </>
+          )}
+        </div>
 
         {/* What Matters Types */}
         <div className={cardCls}>

@@ -7,6 +7,7 @@ export interface Study {
   primaryContactMethodId: string | null;
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
+  systemConditionsEnabled: boolean;
   activeLayer: number;
   consultantPin: string | null;
   createdAt: Date;
@@ -72,6 +73,7 @@ export interface DemandEntry {
   pointOfTransactionId: string | null;
   whatMattersTypeId: string | null;
   whatMattersTypeIds: string[];
+  systemConditionIds: string[];
   originalValueDemandTypeId: string | null;
   workTypeId: string | null;
   linkedValueDemandEntryId: string | null;
@@ -119,6 +121,7 @@ export interface CreateEntryInput {
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
+  systemConditionIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -131,4 +134,18 @@ export interface DemandEntryWhatMatters {
   id: string;
   demandEntryId: string;
   whatMattersTypeId: string;
+}
+
+export interface SystemCondition {
+  id: string;
+  studyId: string;
+  label: string;
+  operationalDefinition: string | null;
+  sortOrder: number;
+}
+
+export interface DemandEntrySystemCondition {
+  id: string;
+  demandEntryId: string;
+  systemConditionId: string;
 }

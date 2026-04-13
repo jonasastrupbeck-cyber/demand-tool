@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, seedDefaultWorkTypes } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, seedDefaultWorkTypes } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,13 +12,14 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
     getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
+    getSystemConditions(study.id),
   ]);
 
   return NextResponse.json({
@@ -29,6 +30,7 @@ export async function GET(
     pointsOfTransaction: potTypes,
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
+    systemConditions: scTypes,
   });
 }
 
@@ -50,6 +52,7 @@ export async function PUT(
   if (body.purpose !== undefined) updates.purpose = body.purpose;
   if (body.oneStopHandlingType !== undefined) updates.oneStopHandlingType = body.oneStopHandlingType;
   if (body.workTrackingEnabled !== undefined) updates.workTrackingEnabled = body.workTrackingEnabled;
+  if (body.systemConditionsEnabled !== undefined) updates.systemConditionsEnabled = body.systemConditionsEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);

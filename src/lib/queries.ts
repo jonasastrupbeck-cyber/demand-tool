@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -201,7 +201,7 @@ export async function getStudyByCode(code: string) {
   return result[0] || null;
 }
 
-export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean; consultantPin?: string }) {
+export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean; systemConditionsEnabled?: boolean; consultantPin?: string }) {
   await db.update(studies).set(data).where(eq(studies.id, id));
 }
 
@@ -303,6 +303,43 @@ export async function deleteWhatMattersType(id: string) {
   await db.delete(whatMattersTypes).where(eq(whatMattersTypes.id, id));
 }
 
+// --- System Conditions ---
+
+export async function getSystemConditions(studyId: string) {
+  return db.select().from(systemConditions).where(eq(systemConditions.studyId, studyId)).orderBy(asc(systemConditions.sortOrder));
+}
+
+export async function addSystemCondition(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getSystemConditions(studyId);
+  await db.insert(systemConditions).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function updateSystemCondition(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(systemConditions).set(data).where(eq(systemConditions.id, id));
+}
+
+export async function deleteSystemCondition(id: string) {
+  await db.delete(systemConditions).where(eq(systemConditions.id, id));
+}
+
+export async function getSystemConditionsForEntries(entryIds: string[]) {
+  if (entryIds.length === 0) return [];
+  return db.select().from(demandEntrySystemConditions)
+    .where(inArray(demandEntrySystemConditions.demandEntryId, entryIds));
+}
+
+export async function getSystemConditionsForEntry(entryId: string) {
+  return db.select().from(demandEntrySystemConditions)
+    .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+}
+
 export async function getPointsOfTransaction(studyId: string) {
   return db.select().from(pointsOfTransaction).where(eq(pointsOfTransaction.studyId, studyId)).orderBy(asc(pointsOfTransaction.sortOrder));
 }
@@ -367,6 +404,7 @@ export async function createEntry(studyId: string, data: {
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
+  systemConditionIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -405,6 +443,18 @@ export async function createEntry(studyId: string, data: {
         id: generateId(),
         demandEntryId: id,
         whatMattersTypeId: wmtId,
+      });
+    }
+  }
+
+  // Insert system condition junction records
+  const scIds = data.systemConditionIds || [];
+  if (data.classification === 'failure' && scIds.length > 0) {
+    for (const scId of scIds) {
+      await db.insert(demandEntrySystemConditions).values({
+        id: generateId(),
+        demandEntryId: id,
+        systemConditionId: scId,
       });
     }
   }
@@ -474,8 +524,9 @@ export async function updateEntry(entryId: string, data: {
   originalValueDemandTypeId?: string | null;
   failureCause?: string | null;
   whatMattersTypeIds?: string[];
+  systemConditionIds?: string[];
 }) {
-  const { whatMattersTypeIds, ...entryData } = data;
+  const { whatMattersTypeIds, systemConditionIds, ...entryData } = data;
 
   // Update the entry fields
   const updateFields: Record<string, unknown> = {};
@@ -501,10 +552,23 @@ export async function updateEntry(entryId: string, data: {
       });
     }
   }
+
+  // Update system condition junction records if provided
+  if (systemConditionIds !== undefined) {
+    await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+    for (const scId of systemConditionIds) {
+      await db.insert(demandEntrySystemConditions).values({
+        id: generateId(),
+        demandEntryId: entryId,
+        systemConditionId: scId,
+      });
+    }
+  }
 }
 
 export async function deleteEntry(entryId: string) {
   await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+  await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
   await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
 }
 

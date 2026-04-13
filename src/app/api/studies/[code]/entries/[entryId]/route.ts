@@ -22,6 +22,7 @@ export async function PATCH(
   if (body.originalValueDemandTypeId !== undefined) updates.originalValueDemandTypeId = body.originalValueDemandTypeId;
   if (body.failureCause !== undefined) updates.failureCause = body.failureCause;
   if (body.whatMattersTypeIds !== undefined) updates.whatMattersTypeIds = body.whatMattersTypeIds;
+  if (body.systemConditionIds !== undefined) updates.systemConditionIds = body.systemConditionIds;
 
   await updateEntry(entryId, updates);
 

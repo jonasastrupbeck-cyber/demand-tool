@@ -10,6 +10,7 @@ export const studies = pgTable('studies', {
   primaryContactMethodId: text('primary_contact_method_id'),
   primaryPointOfTransactionId: text('primary_point_of_transaction_id'),
   workTrackingEnabled: boolean('work_tracking_enabled').notNull().default(false),
+  systemConditionsEnabled: boolean('system_conditions_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -86,4 +87,18 @@ export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
+});
+
+export const systemConditions = pgTable('system_conditions', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  operationalDefinition: text('operational_definition'),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+export const demandEntrySystemConditions = pgTable('demand_entry_system_conditions', {
+  id: text('id').primaryKey(),
+  demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
+  systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
 });

@@ -56,6 +56,7 @@ export async function POST(
     pointOfTransactionId: body.pointOfTransactionId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     whatMattersTypeIds: Array.isArray(body.whatMattersTypeIds) ? body.whatMattersTypeIds : undefined,
+    systemConditionIds: Array.isArray(body.systemConditionIds) ? body.systemConditionIds : undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     workTypeId: body.workTypeId || undefined,
     linkedValueDemandEntryId: body.linkedValueDemandEntryId || undefined,
