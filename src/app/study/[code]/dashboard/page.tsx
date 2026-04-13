@@ -397,12 +397,13 @@ export default function DashboardPage() {
         )}
 
         {/* ── DEMAND VIEW ── */}
-        {dashboardView === 'demand' && data.totalEntries === 0 ? (
+        {dashboardView === 'demand' && data.totalEntries === 0 && (
           <div className="rounded-xl p-8 text-center bg-white border border-gray-200">
             <p className="text-lg font-semibold text-gray-700 mb-2">{t('dashboard.noEntries')}</p>
             <p className="text-sm text-gray-500">{t('dashboard.noEntriesHint')}</p>
           </div>
-        ) : (
+        )}
+        {dashboardView === 'demand' && data.totalEntries > 0 && (
           <>
             {/* Value/Failure pie (Layer 2+) */}
             {activeLayer >= 2 && <ChartCard title={t('dashboard.valueVsFailure')}>
