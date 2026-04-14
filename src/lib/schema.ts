@@ -13,6 +13,7 @@ export const studies = pgTable('studies', {
   systemConditionsEnabled: boolean('system_conditions_enabled').notNull().default(false),
   demandTypesEnabled: boolean('demand_types_enabled').notNull().default(false),
   workTypesEnabled: boolean('work_types_enabled').notNull().default(false),
+  volumeMode: boolean('volume_mode').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

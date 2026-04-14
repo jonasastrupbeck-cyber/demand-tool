@@ -47,6 +47,7 @@ interface StudyData {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  volumeMode: boolean;
   activeLayer: number;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -155,13 +156,15 @@ export default function CapturePage() {
     const activeLayer = study?.activeLayer || 1;
     // At Layer 1, classification is auto-set to 'unknown'
     const effectiveClassification = activeLayer < 2 ? 'unknown' : classification;
-    if (!verbatim.trim() || !effectiveClassification) return;
+    const isVolumeMode = study?.volumeMode ?? false;
+    if (!isVolumeMode && !verbatim.trim()) return;
+    if (!effectiveClassification) return;
 
     setSubmitting(true);
     setError('');
 
     const body: Record<string, unknown> = {
-      verbatim: verbatim.trim(),
+      verbatim: verbatim.trim() || '',
       classification: effectiveClassification,
       entryType,
       contactMethodId: contactMethodId || undefined,
@@ -341,7 +344,7 @@ export default function CapturePage() {
         <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-gray-400">{t('capture.lastEntry')}</p>
-            <p className="text-sm text-gray-700 truncate">&ldquo;{lastEntry.verbatim}&rdquo;</p>
+            <p className="text-sm text-gray-700 truncate">{lastEntry.verbatim ? <>&ldquo;{lastEntry.verbatim}&rdquo;</> : t('capture.saved')}</p>
           </div>
           <button
             type="button"
@@ -371,21 +374,23 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Verbatim — always first, the customer's words are most important */}
-        <div>
-          <label className={labelCls}>
-            {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}{req}
-          </label>
-          <textarea
-            value={verbatim}
-            onChange={(e) => setVerbatim(e.target.value)}
-            placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
-            rows={3}
-            className={inputCls}
-            autoFocus
-            required
-          />
-        </div>
+        {/* Verbatim — the customer's words (hidden in volume mode) */}
+        {!study.volumeMode && (
+          <div>
+            <label className={labelCls}>
+              {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}{req}
+            </label>
+            <textarea
+              value={verbatim}
+              onChange={(e) => setVerbatim(e.target.value)}
+              placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
+              rows={3}
+              className={inputCls}
+              autoFocus
+              required
+            />
+          </div>
+        )}
 
         {/* Contact method */}
         <div>
@@ -617,7 +622,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || !verbatim.trim() || ((study?.activeLayer || 1) >= 2 && !classification)}
+              disabled={submitting || (!study.volumeMode && !verbatim.trim()) || ((study?.activeLayer || 1) >= 2 && !classification)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}

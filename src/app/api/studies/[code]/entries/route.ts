@@ -36,7 +36,7 @@ export async function POST(
 
   const body = await request.json();
 
-  if (!body.verbatim || typeof body.verbatim !== 'string') {
+  if (!study.volumeMode && (!body.verbatim || typeof body.verbatim !== 'string')) {
     return NextResponse.json({ error: 'Demand verbatim is required' }, { status: 400 });
   }
 
@@ -47,7 +47,7 @@ export async function POST(
   const entryType = body.entryType === 'work' ? 'work' : 'demand';
 
   const id = await createEntry(study.id, {
-    verbatim: body.verbatim.trim(),
+    verbatim: (body.verbatim || '').trim(),
     classification: body.classification,
     entryType,
     handlingTypeId: body.handlingTypeId || undefined,

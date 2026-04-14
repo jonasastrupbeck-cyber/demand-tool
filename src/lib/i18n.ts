@@ -1261,6 +1261,24 @@ const translations = {
     sv: 'Aktivera arbetstypklassificering',
     de: 'Arbeitstyp-Klassifizierung aktivieren',
   },
+  'settings.volumeMode': {
+    en: 'Volume Mode',
+    da: 'Volumetilstand',
+    sv: 'Volymläge',
+    de: 'Volumenmodus',
+  },
+  'settings.volumeModeDesc': {
+    en: 'When the study is well-built and it\'s time to gather volume, enable this to hide the verbatim text field. The team will only select types and classifications.',
+    da: 'Når studiet er velopbygget og det er tid til at indsamle volumen, aktiver dette for at skjule fritekstfeltet. Teamet vælger kun typer og klassificeringer.',
+    sv: 'När studien är väluppbyggd och det är dags att samla volym, aktivera detta för att dölja fritextfältet. Teamet väljer bara typer och klassificeringar.',
+    de: 'Wenn die Studie gut aufgebaut ist und es Zeit ist Volumen zu sammeln, aktivieren Sie dies um das Freitextfeld auszublenden. Das Team wählt nur Typen und Klassifizierungen.',
+  },
+  'settings.enableVolumeMode': {
+    en: 'Enable volume mode (hide verbatim)',
+    da: 'Aktiver volumetilstand (skjul fritekst)',
+    sv: 'Aktivera volymläge (dölj fritext)',
+    de: 'Volumenmodus aktivieren (Freitext ausblenden)',
+  },
 
   // Consultant PIN
   'landing.consultantPin': {

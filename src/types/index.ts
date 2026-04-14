@@ -10,6 +10,7 @@ export interface Study {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  volumeMode: boolean;
   activeLayer: number;
   consultantPin: string | null;
   createdAt: Date;

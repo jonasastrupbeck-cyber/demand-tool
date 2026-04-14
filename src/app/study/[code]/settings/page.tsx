@@ -50,6 +50,7 @@ interface StudyData {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  volumeMode: boolean;
   activeLayer: number;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
@@ -317,6 +318,16 @@ export default function SettingsPage() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ demandTypesEnabled: newValue }),
+    });
+    loadStudy();
+  }
+
+  async function toggleVolumeMode() {
+    const newValue = !study?.volumeMode;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ volumeMode: newValue }),
     });
     loadStudy();
   }
@@ -923,6 +934,25 @@ export default function SettingsPage() {
             )}
           </div>
         )}
+        {/* Volume Mode */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.volumeMode')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.volumeModeDesc')}</p>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={study.volumeMode}
+                onChange={toggleVolumeMode}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+            </div>
+            <span className="text-sm text-gray-700 font-medium">{t('settings.enableVolumeMode')}</span>
+          </label>
+        </div>
+
         {/* Capture form preview */}
         <div className={cardCls}>
           <button

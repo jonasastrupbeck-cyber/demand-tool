@@ -55,6 +55,7 @@ export async function PUT(
   if (body.systemConditionsEnabled !== undefined) updates.systemConditionsEnabled = body.systemConditionsEnabled;
   if (body.demandTypesEnabled !== undefined) updates.demandTypesEnabled = body.demandTypesEnabled;
   if (body.workTypesEnabled !== undefined) updates.workTypesEnabled = body.workTypesEnabled;
+  if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);
