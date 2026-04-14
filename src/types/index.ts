@@ -112,6 +112,10 @@ export interface DashboardData {
   workTypeCounts: Array<{ label: string; count: number }>;
   workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }>;
+  // Lifecycle
+  lifecycleEnabled: boolean;
+  lifecycleByStageAndDemandType: Array<{ stageLabel: string; stageSortOrder: number; demandTypeLabel: string; demandTypeCategory: 'value' | 'failure'; count: number }>;
+  lifecycleFailureByStage: Array<{ stageLabel: string; stageSortOrder: number; count: number }>;
 }
 
 export interface CreateEntryInput {

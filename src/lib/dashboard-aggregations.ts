@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData } from '@/types';
@@ -22,6 +22,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const oneStopId = study[0]?.oneStopHandlingType;
   const workTrackingEnabled = study[0]?.workTrackingEnabled ?? false;
   const systemConditionsEnabled = study[0]?.systemConditionsEnabled ?? false;
+  const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
 
@@ -388,6 +389,76 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     }));
   }
 
+  // ── LIFECYCLE AGGREGATIONS ──
+  // Effective stage = entry.lifecycleStageId ?? type.lifecycleStageId
+  const lifecycleByStageAndDemandType: Array<{ stageLabel: string; stageSortOrder: number; demandTypeLabel: string; demandTypeCategory: 'value' | 'failure'; count: number }> = [];
+  let lifecycleFailureByStage: Array<{ stageLabel: string; stageSortOrder: number; count: number }> = [];
+
+  if (lifecycleEnabled) {
+    // Demand lifecycle grouped by stage + demand type (with category)
+    const effectiveStage = sql<string>`COALESCE(${demandEntries.lifecycleStageId}, ${demandTypes.lifecycleStageId})`;
+    const rows = await db.select({
+      stageId: effectiveStage,
+      demandTypeLabel: demandTypes.label,
+      demandTypeCategory: demandTypes.category,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
+      .where(demandWhere)
+      .groupBy(effectiveStage, demandTypes.label, demandTypes.category, demandEntries.classification);
+
+    // Fetch all stages for this study for label/order lookup
+    const stageRows = await db.select().from(lifecycleStages).where(eq(lifecycleStages.studyId, studyId));
+    const stageMap = new Map(stageRows.map(s => [s.id, { label: s.label, sortOrder: s.sortOrder }]));
+
+    // Build stage→type aggregation (collapse classification into counts)
+    const byStageType = new Map<string, { stageLabel: string; stageSortOrder: number; demandTypeLabel: string; demandTypeCategory: 'value' | 'failure'; count: number }>();
+    for (const row of rows) {
+      const info = row.stageId ? stageMap.get(row.stageId) : null;
+      const stageLabel = info?.label ?? 'Unassigned';
+      const stageSortOrder = info?.sortOrder ?? 999;
+      const key = `${stageLabel}||${row.demandTypeLabel}`;
+      const existing = byStageType.get(key);
+      if (existing) {
+        existing.count += row.count;
+      } else {
+        byStageType.set(key, {
+          stageLabel,
+          stageSortOrder,
+          demandTypeLabel: row.demandTypeLabel,
+          demandTypeCategory: row.demandTypeCategory as 'value' | 'failure',
+          count: row.count,
+        });
+      }
+    }
+    lifecycleByStageAndDemandType.push(...Array.from(byStageType.values()).sort((a, b) => a.stageSortOrder - b.stageSortOrder));
+
+    // Failure-by-stage — include entries without a demand type (leftJoin), for the bar chart
+    const failureStageEffective = sql<string>`COALESCE(${demandEntries.lifecycleStageId}, ${demandTypes.lifecycleStageId})`;
+    const failureRows = await db.select({
+      stageId: failureStageEffective,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .leftJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
+      .where(and(...demandConditions, eq(demandEntries.classification, 'failure')))
+      .groupBy(failureStageEffective);
+
+    const failMap = new Map<string, { stageSortOrder: number; count: number }>();
+    for (const row of failureRows) {
+      const info = row.stageId ? stageMap.get(row.stageId) : null;
+      const stageLabel = info?.label ?? 'Unassigned';
+      const stageSortOrder = info?.sortOrder ?? 999;
+      const existing = failMap.get(stageLabel);
+      failMap.set(stageLabel, { stageSortOrder, count: (existing?.count ?? 0) + row.count });
+    }
+    lifecycleFailureByStage = Array.from(failMap.entries())
+      .map(([stageLabel, v]) => ({ stageLabel, stageSortOrder: v.stageSortOrder, count: v.count }))
+      .sort((a, b) => a.stageSortOrder - b.stageSortOrder);
+  }
+
   return {
     totalEntries,
     valueCount,
@@ -414,6 +485,9 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     workTypeCounts,
     workTypesByClassification,
     workOverTime,
+    lifecycleEnabled,
+    lifecycleByStageAndDemandType,
+    lifecycleFailureByStage,
   };
 }
 

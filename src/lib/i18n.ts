@@ -1627,6 +1627,79 @@ const translations = {
     sv: 'Definiera vad detta innebär i praktiken...',
     de: 'Definieren Sie, was das in der Praxis bedeutet...',
   },
+  // --- Lifecycle (Customer Lifecycle / tVM) ---
+  'settings.lifecycle': {
+    en: 'Customer Lifecycle (optional)',
+    da: 'Kundens livscyklus (valgfrit)',
+    sv: 'Kundens livscykel (valfritt)',
+    de: 'Kundenlebenszyklus (optional)',
+  },
+  'settings.lifecycleDesc': {
+    en: 'Optional Vanguard Method lens. AI auto-tags each demand/work type with a lifecycle stage. Only type labels are sent to the AI — never customer verbatims.',
+    da: 'Valgfri linse fra Vanguard Metoden. AI mærker automatisk hver efterspørgselstype og arbejdstype med en livscyklusfase. Kun typebetegnelser sendes til AI — aldrig kundernes egne ord.',
+    sv: 'Valfri lins från Vanguard-metoden. AI taggar automatiskt varje efterfråge- och arbetstyp med en livscykelfas. Endast typetiketter skickas till AI — aldrig kundernas egna ord.',
+    de: 'Optionales Linsen-Werkzeug der Vanguard-Methode. KI markiert automatisch jeden Nachfrage-/Arbeitstyp mit einer Lebenszyklusphase. Es werden nur Typbezeichnungen an die KI gesendet — niemals Kundenaussagen.',
+  },
+  'settings.enableLifecycle': {
+    en: 'Enable customer lifecycle',
+    da: 'Aktiver kundens livscyklus',
+    sv: 'Aktivera kundens livscykel',
+    de: 'Kundenlebenszyklus aktivieren',
+  },
+  'settings.lifecycleStages': {
+    en: 'Lifecycle stages',
+    da: 'Livscyklusfaser',
+    sv: 'Livscykelfaser',
+    de: 'Lebenszyklusphasen',
+  },
+  'settings.addLifecycleStage': {
+    en: 'Add stage...',
+    da: 'Tilføj fase...',
+    sv: 'Lägg till fas...',
+    de: 'Phase hinzufügen...',
+  },
+  'settings.classifyAllTypes': {
+    en: 'Re-classify all types with AI',
+    da: 'Klassificér alle typer på ny med AI',
+    sv: 'Klassificera om alla typer med AI',
+    de: 'Alle Typen mit KI neu klassifizieren',
+  },
+  'settings.classifying': {
+    en: 'Classifying...',
+    da: 'Klassificerer...',
+    sv: 'Klassificerar...',
+    de: 'Klassifiziere...',
+  },
+  'settings.lifecycleNoStage': {
+    en: 'No stage',
+    da: 'Ingen fase',
+    sv: 'Ingen fas',
+    de: 'Keine Phase',
+  },
+  'dashboard.lifecycleSankey': {
+    en: 'Lifecycle stage → classification',
+    da: 'Livscyklusfase → klassificering',
+    sv: 'Livscykelfas → klassificering',
+    de: 'Lebenszyklusphase → Klassifizierung',
+  },
+  'dashboard.lifecycleByStage': {
+    en: 'Failure demand by lifecycle stage',
+    da: 'Fejlefterspørgsel efter livscyklusfase',
+    sv: 'Felefterfrågan efter livscykelfas',
+    de: 'Fehlnachfrage nach Lebenszyklusphase',
+  },
+  'dashboard.lifecycleFilter': {
+    en: 'Lifecycle',
+    da: 'Livscyklus',
+    sv: 'Livscykel',
+    de: 'Lebenszyklus',
+  },
+  'dashboard.lifecycleFilterAll': {
+    en: 'All stages',
+    da: 'Alle faser',
+    sv: 'Alla faser',
+    de: 'Alle Phasen',
+  },
 } as const;
 
 export type TranslationKey = keyof typeof translations;

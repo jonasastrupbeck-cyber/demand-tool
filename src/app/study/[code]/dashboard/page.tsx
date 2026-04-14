@@ -546,6 +546,90 @@ export default function DashboardPage() {
               );
             })()}
 
+            {/* Lifecycle Sankey + failure-by-stage */}
+            {data.lifecycleEnabled && (data.lifecycleByStageAndDemandType?.length ?? 0) > 0 && (() => {
+              const rows = data.lifecycleByStageAndDemandType;
+              const stageOrder: string[] = [];
+              const stageSeen = new Set<string>();
+              for (const r of rows) {
+                if (!stageSeen.has(r.stageLabel)) { stageSeen.add(r.stageLabel); stageOrder.push(r.stageLabel); }
+              }
+              // Type nodes ordered value-first, then failure, stable within each
+              const typeOrder: Array<{ label: string; category: 'value' | 'failure' }> = [];
+              const typeSeen = new Set<string>();
+              for (const cat of ['value', 'failure'] as const) {
+                for (const r of rows) {
+                  if (r.demandTypeCategory === cat && !typeSeen.has(r.demandTypeLabel)) {
+                    typeSeen.add(r.demandTypeLabel);
+                    typeOrder.push({ label: r.demandTypeLabel, category: cat });
+                  }
+                }
+              }
+              const nodes = [
+                ...stageOrder.map(s => ({ name: s })),
+                ...typeOrder.map(tObj => ({ name: tl(tObj.label) })),
+              ];
+              const stageIdx = new Map(stageOrder.map((s, i) => [s, i]));
+              const typeIdx = new Map(typeOrder.map((tObj, i) => [tObj.label, i + stageOrder.length]));
+              const links = rows.map(r => ({
+                source: stageIdx.get(r.stageLabel)!,
+                target: typeIdx.get(r.demandTypeLabel)!,
+                value: r.count,
+              }));
+              const linkCategory = rows.map(r => r.demandTypeCategory);
+              // Node category map: stages default to 'stage' (green), types use their category
+              const nodeCategory: Array<'stage' | 'value' | 'failure'> = [
+                ...stageOrder.map(() => 'stage' as const),
+                ...typeOrder.map(tObj => tObj.category),
+              ];
+              return (
+                <ChartCard title={t('dashboard.lifecycleSankey')}>
+                  <div className="flex items-center gap-4 text-xs text-gray-600 mb-2 -mt-1">
+                    <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.value }} />{tl('Value demand')}</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: COLORS.failure }} />{tl('Failure demand')}</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={Math.max(280, nodes.length * 32)}>
+                    <Sankey
+                      data={{ nodes, links }}
+                      nodePadding={24}
+                      nodeWidth={10}
+                      linkCurvature={0.5}
+                      margin={{ top: 10, right: 180, bottom: 10, left: 160 }}
+                      node={(props: NodeProps) => {
+                        const cat = nodeCategory[props.index];
+                        const fill = cat === 'stage' ? '#6366f1' : cat === 'value' ? COLORS.value : COLORS.failure;
+                        return <SankeyNode {...props} sourceCount={stageOrder.length} fillOverride={fill} />;
+                      }}
+                      link={(props: LinkProps) => {
+                        const { onClick: _omit, ...rest } = props;
+                        void _omit;
+                        const stroke = linkCategory[props.index] === 'value' ? COLORS.value : COLORS.failure;
+                        return <SankeyLink {...rest} stroke={stroke} />;
+                      }}
+                    >
+                      <Tooltip />
+                    </Sankey>
+                  </ResponsiveContainer>
+                </ChartCard>
+              );
+            })()}
+
+            {data.lifecycleEnabled && (data.lifecycleFailureByStage?.length ?? 0) > 0 && (
+              <ChartCard title={t('dashboard.lifecycleByStage')}>
+                <ResponsiveContainer width="100%" height={Math.max(220, data.lifecycleFailureByStage.length * 38 + 40)}>
+                  <BarChart data={data.lifecycleFailureByStage} layout="vertical" margin={{ left: 10, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                    <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                    <YAxis type="category" dataKey="stageLabel" width={120} tick={{ fontSize: 11, fill: THEME.textSecondary }} interval={0} />
+                    <Tooltip {...tooltipStyle} />
+                    <Bar dataKey="count" fill={COLORS.failure} radius={[0, 4, 4, 0]}>
+                      <LabelList dataKey="count" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
             {/* Contact methods + What Matters */}
             <div className="grid md:grid-cols-2 gap-4">
               {data.contactMethodCounts.length > 0 && (
@@ -1143,9 +1227,9 @@ function buildSankeyData(
   return { nodes, links: sankeyLinks, sourceCount: sourceLabels.length, linkMeta };
 }
 
-function SankeyNode({ x, y, width, height, index, payload, sourceCount }: NodeProps & { sourceCount: number }) {
+function SankeyNode({ x, y, width, height, index, payload, sourceCount, fillOverride }: NodeProps & { sourceCount: number; fillOverride?: string }) {
   const isSource = index < sourceCount;
-  const fill = isSource ? '#22c55e' : '#ef4444';
+  const fill = fillOverride ?? (isSource ? '#22c55e' : '#ef4444');
   return (
     <g>
       <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} />
@@ -1164,18 +1248,19 @@ function SankeyNode({ x, y, width, height, index, payload, sourceCount }: NodePr
   );
 }
 
-function SankeyLink({ sourceX, targetX, sourceY, targetY, sourceControlX, targetControlX, linkWidth, onClick }: LinkProps & { onClick?: () => void }) {
+function SankeyLink({ sourceX, targetX, sourceY, targetY, sourceControlX, targetControlX, linkWidth, onClick, stroke }: LinkProps & { onClick?: () => void; stroke?: string }) {
+  const color = stroke ?? '#ef4444';
   return (
     <path
       d={`M${sourceX},${sourceY} C${sourceControlX},${sourceY} ${targetControlX},${targetY} ${targetX},${targetY}`}
       fill="none"
-      stroke="#ef4444"
+      stroke={color}
       strokeWidth={linkWidth}
-      strokeOpacity={onClick ? 0.3 : 0.15}
+      strokeOpacity={onClick ? 0.3 : 0.2}
       style={{ cursor: onClick ? 'pointer' : 'default', transition: 'stroke-opacity 0.15s' }}
       onClick={onClick}
       onMouseEnter={(e) => { if (onClick) { const el = e.target as SVGPathElement; el.style.strokeOpacity = '0.6'; el.style.strokeWidth = String(Math.max(linkWidth + 2, linkWidth * 1.3)); } }}
-      onMouseLeave={(e) => { const el = e.target as SVGPathElement; el.style.strokeOpacity = onClick ? '0.3' : '0.15'; el.style.strokeWidth = String(linkWidth); }}
+      onMouseLeave={(e) => { const el = e.target as SVGPathElement; el.style.strokeOpacity = onClick ? '0.3' : '0.2'; el.style.strokeWidth = String(linkWidth); }}
     />
   );
 }

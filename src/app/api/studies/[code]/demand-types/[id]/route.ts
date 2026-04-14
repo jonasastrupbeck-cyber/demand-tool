@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { demandTypes } from '@/lib/schema';
+import { eq } from 'drizzle-orm';
 import { getStudyByCode, deleteDemandType, updateDemandType } from '@/lib/queries';
 
 export async function PATCH(
@@ -13,7 +16,15 @@ export async function PATCH(
   const updates: { operationalDefinition?: string | null } = {};
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
 
-  await updateDemandType(id, updates);
+  if (Object.keys(updates).length > 0) {
+    await updateDemandType(id, updates);
+  }
+
+  // Manual lifecycle override (separate path because it's not part of updateDemandType's signature)
+  if (body.lifecycleStageId !== undefined) {
+    await db.update(demandTypes).set({ lifecycleStageId: body.lifecycleStageId }).where(eq(demandTypes.id, id));
+  }
+
   return NextResponse.json({ success: true });
 }
 

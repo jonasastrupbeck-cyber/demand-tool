@@ -14,6 +14,7 @@ export const studies = pgTable('studies', {
   demandTypesEnabled: boolean('demand_types_enabled').notNull().default(false),
   workTypesEnabled: boolean('work_types_enabled').notNull().default(false),
   volumeMode: boolean('volume_mode').notNull().default(false),
+  lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
@@ -28,6 +29,14 @@ export const handlingTypes = pgTable('handling_types', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+export const lifecycleStages = pgTable('lifecycle_stages', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  code: text('code').notNull(), // 'attract', 'acquire', 'live_with', 'look_after', 'grow_keep', 'help_me_leave', 'custom'
+  label: text('label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const demandTypes = pgTable('demand_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -35,6 +44,9 @@ export const demandTypes = pgTable('demand_types', {
   label: text('label').notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
+  lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
+  lifecycleAiSuggestion: text('lifecycle_ai_suggestion'),
+  lifecycleClassifiedAt: timestamp('lifecycle_classified_at', { withTimezone: true }),
 });
 
 export const contactMethods = pgTable('contact_methods', {
@@ -64,6 +76,9 @@ export const workTypes = pgTable('work_types', {
   studyId: text('study_id').notNull().references(() => studies.id),
   label: text('label').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
+  lifecycleAiSuggestion: text('lifecycle_ai_suggestion'),
+  lifecycleClassifiedAt: timestamp('lifecycle_classified_at', { withTimezone: true }),
 });
 
 export const demandEntries = pgTable('demand_entries', {
@@ -84,6 +99,7 @@ export const demandEntries = pgTable('demand_entries', {
   failureCause: text('failure_cause'),
   whatMatters: text('what_matters'),
   collectorName: text('collector_name'),
+  lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
 });
 
 export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {

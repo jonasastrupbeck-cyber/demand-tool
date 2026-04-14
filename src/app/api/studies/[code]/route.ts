@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, seedDefaultWorkTypes } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, lcStages] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -20,6 +20,7 @@ export async function GET(
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
     getSystemConditions(study.id),
+    getLifecycleStages(study.id),
   ]);
 
   return NextResponse.json({
@@ -31,6 +32,7 @@ export async function GET(
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
     systemConditions: scTypes,
+    lifecycleStages: lcStages,
   });
 }
 
@@ -56,6 +58,7 @@ export async function PUT(
   if (body.demandTypesEnabled !== undefined) updates.demandTypesEnabled = body.demandTypesEnabled;
   if (body.workTypesEnabled !== undefined) updates.workTypesEnabled = body.workTypesEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
+  if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);
@@ -63,6 +66,11 @@ export async function PUT(
   // Seed default work types when enabling work tracking for the first time
   if (body.workTrackingEnabled === true) {
     await seedDefaultWorkTypes(study.id, body.locale || 'en');
+  }
+
+  // Seed default lifecycle stages when enabling lifecycle for the first time
+  if (body.lifecycleEnabled === true) {
+    await seedDefaultLifecycleStages(study.id, body.locale || 'en');
   }
 
   return NextResponse.json({ success: true });

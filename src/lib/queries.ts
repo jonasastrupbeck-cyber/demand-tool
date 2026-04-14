@@ -1,8 +1,9 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
+import { STANDARD_LIFECYCLE_STAGES } from './ai/classify-lifecycle';
 
 const DEFAULT_HANDLING_TYPES: Record<Locale, string[]> = {
   en: [
@@ -201,7 +202,7 @@ export async function getStudyByCode(code: string) {
   return result[0] || null;
 }
 
-export async function updateStudy(id: string, data: { name?: string; description?: string; oneStopHandlingType?: string | null; workTrackingEnabled?: boolean; systemConditionsEnabled?: boolean; consultantPin?: string }) {
+export async function updateStudy(id: string, data: Record<string, unknown>) {
   await db.update(studies).set(data).where(eq(studies.id, id));
 }
 
@@ -606,6 +607,132 @@ export async function getWhatMattersForEntries(entryIds: string[]) {
 export async function getWhatMattersForEntry(entryId: string) {
   return db.select().from(demandEntryWhatMatters)
     .where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+}
+
+// --- Lifecycle stages ---
+
+const DEFAULT_LIFECYCLE_LABELS: Record<Locale, Record<string, string>> = {
+  en: {
+    attract: 'Attract',
+    acquire: 'Acquire',
+    live_with: 'Live With',
+    look_after: 'Look After',
+    grow_keep: 'Grow / Keep',
+    help_me_leave: 'Help Me Leave',
+  },
+  da: {
+    attract: 'Tiltrække',
+    acquire: 'Erhverve',
+    live_with: 'Leve med',
+    look_after: 'Tage sig af',
+    grow_keep: 'Vokse / Beholde',
+    help_me_leave: 'Hjælpe mig ud',
+  },
+  sv: {
+    attract: 'Attrahera',
+    acquire: 'Förvärva',
+    live_with: 'Leva med',
+    look_after: 'Ta hand om',
+    grow_keep: 'Växa / Behålla',
+    help_me_leave: 'Hjälp mig att lämna',
+  },
+  de: {
+    attract: 'Anziehen',
+    acquire: 'Gewinnen',
+    live_with: 'Leben mit',
+    look_after: 'Betreuen',
+    grow_keep: 'Wachsen / Halten',
+    help_me_leave: 'Hilf mir zu gehen',
+  },
+};
+
+export async function getLifecycleStages(studyId: string) {
+  return db.select().from(lifecycleStages).where(eq(lifecycleStages.studyId, studyId)).orderBy(asc(lifecycleStages.sortOrder));
+}
+
+export async function addLifecycleStage(studyId: string, label: string, code: string = 'custom') {
+  const id = generateId();
+  const existing = await getLifecycleStages(studyId);
+  await db.insert(lifecycleStages).values({
+    id,
+    studyId,
+    code,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function updateLifecycleStage(id: string, data: { label?: string; sortOrder?: number }) {
+  await db.update(lifecycleStages).set(data).where(eq(lifecycleStages.id, id));
+}
+
+export async function deleteLifecycleStage(id: string) {
+  // Null out FK references first
+  await db.update(demandTypes).set({ lifecycleStageId: null }).where(eq(demandTypes.lifecycleStageId, id));
+  await db.update(workTypes).set({ lifecycleStageId: null }).where(eq(workTypes.lifecycleStageId, id));
+  await db.update(demandEntries).set({ lifecycleStageId: null }).where(eq(demandEntries.lifecycleStageId, id));
+  await db.delete(lifecycleStages).where(eq(lifecycleStages.id, id));
+}
+
+/** Idempotent: only seeds when no stages exist for this study. */
+export async function seedDefaultLifecycleStages(studyId: string, locale: Locale = 'en') {
+  const existing = await getLifecycleStages(studyId);
+  if (existing.length > 0) return;
+  const labels = DEFAULT_LIFECYCLE_LABELS[locale];
+  for (let i = 0; i < STANDARD_LIFECYCLE_STAGES.length; i++) {
+    const stage = STANDARD_LIFECYCLE_STAGES[i];
+    await db.insert(lifecycleStages).values({
+      id: generateId(),
+      studyId,
+      code: stage.code,
+      label: labels[stage.code] || stage.label,
+      sortOrder: i,
+    });
+  }
+}
+
+export async function setDemandTypeLifecycle(typeId: string, stageId: string | null, opts?: { aiSuggestion?: string | null }) {
+  const data: Record<string, unknown> = {
+    lifecycleStageId: stageId,
+    lifecycleClassifiedAt: new Date(),
+  };
+  if (opts?.aiSuggestion !== undefined) data.lifecycleAiSuggestion = opts.aiSuggestion;
+  await db.update(demandTypes).set(data).where(eq(demandTypes.id, typeId));
+}
+
+export async function setWorkTypeLifecycle(typeId: string, stageId: string | null, opts?: { aiSuggestion?: string | null }) {
+  const data: Record<string, unknown> = {
+    lifecycleStageId: stageId,
+    lifecycleClassifiedAt: new Date(),
+  };
+  if (opts?.aiSuggestion !== undefined) data.lifecycleAiSuggestion = opts.aiSuggestion;
+  await db.update(workTypes).set(data).where(eq(workTypes.id, typeId));
+}
+
+export async function getDemandTypeById(id: string) {
+  const r = await db.select().from(demandTypes).where(eq(demandTypes.id, id));
+  return r[0] || null;
+}
+
+export async function getWorkTypeById(id: string) {
+  const r = await db.select().from(workTypes).where(eq(workTypes.id, id));
+  return r[0] || null;
+}
+
+export async function getLifecycleStageByCode(studyId: string, code: string) {
+  const r = await db.select().from(lifecycleStages).where(and(eq(lifecycleStages.studyId, studyId), eq(lifecycleStages.code, code)));
+  return r[0] || null;
+}
+
+export async function getTypesMissingLifecycle(studyId: string) {
+  const dts = await db.select().from(demandTypes).where(and(eq(demandTypes.studyId, studyId), isNull(demandTypes.lifecycleStageId)));
+  const wts = await db.select().from(workTypes).where(and(eq(workTypes.studyId, studyId), isNull(workTypes.lifecycleStageId)));
+  return { demandTypes: dts, workTypes: wts };
+}
+
+export async function setEntryLifecycleOverride(entryId: string, stageId: string | null) {
+  await db.update(demandEntries).set({ lifecycleStageId: stageId }).where(eq(demandEntries.id, entryId));
 }
 
 export async function searchEntries(studyId: string, options: { query?: string; typeId?: string; limit?: number }) {

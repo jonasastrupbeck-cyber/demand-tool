@@ -16,6 +16,15 @@ interface DemandType {
   category: 'value' | 'failure';
   label: string;
   operationalDefinition: string | null;
+  lifecycleStageId: string | null;
+  lifecycleAiSuggestion: string | null;
+}
+
+interface LifecycleStage {
+  id: string;
+  code: string;
+  label: string;
+  sortOrder: number;
 }
 
 interface ContactMethod {
@@ -31,6 +40,8 @@ interface PointOfTransaction {
 interface WorkType {
   id: string;
   label: string;
+  lifecycleStageId?: string | null;
+  lifecycleAiSuggestion?: string | null;
 }
 
 interface SystemConditionType {
@@ -51,6 +62,7 @@ interface StudyData {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   volumeMode: boolean;
+  lifecycleEnabled: boolean;
   activeLayer: number;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
@@ -60,6 +72,7 @@ interface StudyData {
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   systemConditions: SystemConditionType[];
+  lifecycleStages: LifecycleStage[];
 }
 
 export default function SettingsPage() {
@@ -96,6 +109,8 @@ export default function SettingsPage() {
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newSystemCondition, setNewSystemCondition] = useState('');
+  const [newLifecycleStage, setNewLifecycleStage] = useState('');
+  const [classifyingAll, setClassifyingAll] = useState(false);
 
   // Operational definition editing
   const [editingDefId, setEditingDefId] = useState<string | null>(null);
@@ -219,13 +234,24 @@ export default function SettingsPage() {
     e.preventDefault();
     const label = category === 'value' ? newValueType : newFailureType;
     if (!label.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types`, {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: label.trim(), category }),
     });
     if (category === 'value') setNewValueType('');
     else setNewFailureType('');
+    // Fire-and-forget AI lifecycle classification if enabled
+    if (study?.lifecycleEnabled && res.ok) {
+      try {
+        const { id: newId } = await res.json();
+        if (newId) {
+          fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${newId}/classify-lifecycle`, { method: 'POST' })
+            .then(() => loadStudy())
+            .catch(() => {});
+        }
+      } catch { /* noop */ }
+    }
     loadStudy();
   }
 
@@ -298,12 +324,22 @@ export default function SettingsPage() {
   async function addWorkTypeHandler(e: React.FormEvent) {
     e.preventDefault();
     if (!newWorkType.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-types`, {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/work-types`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: newWorkType.trim() }),
     });
     setNewWorkType('');
+    if (study?.lifecycleEnabled && res.ok) {
+      try {
+        const { id: newId } = await res.json();
+        if (newId) {
+          fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${newId}/classify-lifecycle`, { method: 'POST' })
+            .then(() => loadStudy())
+            .catch(() => {});
+        }
+      } catch { /* noop */ }
+    }
     loadStudy();
   }
 
@@ -366,6 +402,70 @@ export default function SettingsPage() {
 
   async function removeSystemCondition(id: string) {
     await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  // --- Lifecycle ---
+  async function toggleLifecycle() {
+    const newValue = !study?.lifecycleEnabled;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifecycleEnabled: newValue }),
+    });
+    await loadStudy();
+    // When turning on for the first time, kick off auto-classification of existing types in the background
+    if (newValue) {
+      classifyAllTypes(false);
+    }
+  }
+
+  async function addLifecycleStageHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newLifecycleStage.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newLifecycleStage.trim() }),
+    });
+    setNewLifecycleStage('');
+    loadStudy();
+  }
+
+  async function removeLifecycleStage(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function classifyAllTypes(force: boolean) {
+    setClassifyingAll(true);
+    try {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle/classify-all-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force }),
+      });
+      await loadStudy();
+    } finally {
+      setClassifyingAll(false);
+    }
+  }
+
+  async function setDemandTypeStage(typeId: string, stageId: string | null) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${typeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifecycleStageId: stageId }),
+    });
+    loadStudy();
+  }
+
+  async function setWorkTypeStage(typeId: string, stageId: string | null) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${typeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lifecycleStageId: stageId }),
+    });
     loadStudy();
   }
 
@@ -761,6 +861,96 @@ export default function SettingsPage() {
                 <input type="text" value={newSystemCondition} onChange={(e) => setNewSystemCondition(e.target.value)} placeholder={t('settings.addSystemCondition')} className={inputCls} />
                 <button type="submit" disabled={!newSystemCondition.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
               </form>
+            </>
+          )}
+        </div>
+
+        {/* Customer Lifecycle (optional) */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.lifecycle')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.lifecycleDesc')}</p>
+          <label className="flex items-center gap-3 cursor-pointer mb-4">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={study.lifecycleEnabled}
+                onChange={toggleLifecycle}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-indigo-600 transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+            </div>
+            <span className="text-sm text-gray-700 font-medium">{t('settings.enableLifecycle')}</span>
+          </label>
+          {study.lifecycleEnabled && (
+            <>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('settings.lifecycleStages')}</h3>
+              <ul className="space-y-2 mb-4">
+                {(study.lifecycleStages || []).map((ls) => (
+                  <li key={ls.id} className={`${itemCls} bg-indigo-50`}>
+                    <span className="text-sm text-indigo-700">{tl(ls.label)}</span>
+                    <button onClick={() => removeLifecycleStage(ls.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                  </li>
+                ))}
+              </ul>
+              <form onSubmit={addLifecycleStageHandler} className="flex gap-2 mb-4">
+                <input type="text" value={newLifecycleStage} onChange={(e) => setNewLifecycleStage(e.target.value)} placeholder={t('settings.addLifecycleStage')} className={inputCls} />
+                <button type="submit" disabled={!newLifecycleStage.trim()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">{t('settings.add')}</button>
+              </form>
+
+              <button
+                onClick={() => classifyAllTypes(true)}
+                disabled={classifyingAll || (study.lifecycleStages || []).length === 0}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {classifyingAll ? t('settings.classifying') : t('settings.classifyAllTypes')}
+              </button>
+
+              {/* Per-type stage editor: demand types */}
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('settings.demandTypes')}</h3>
+                <ul className="space-y-2">
+                  {study.demandTypes.map((dt) => (
+                    <li key={dt.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50">
+                      <span className={`text-sm ${dt.category === 'value' ? 'text-green-700' : 'text-red-700'} truncate`}>{tl(dt.label)}</span>
+                      <select
+                        value={dt.lifecycleStageId || ''}
+                        onChange={(e) => setDemandTypeStage(dt.id, e.target.value || null)}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-900"
+                      >
+                        <option value="">{t('settings.lifecycleNoStage')}</option>
+                        {(study.lifecycleStages || []).map((s) => (
+                          <option key={s.id} value={s.id}>{tl(s.label)}</option>
+                        ))}
+                      </select>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Per-type stage editor: work types */}
+              {study.workTrackingEnabled && study.workTypes.length > 0 && (
+                <div className="mt-5">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('settings.workTypes')}</h3>
+                  <ul className="space-y-2">
+                    {study.workTypes.map((wt) => (
+                      <li key={wt.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg bg-gray-50">
+                        <span className="text-sm text-amber-700 truncate">{tl(wt.label)}</span>
+                        <select
+                          value={wt.lifecycleStageId || ''}
+                          onChange={(e) => setWorkTypeStage(wt.id, e.target.value || null)}
+                          className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-900"
+                        >
+                          <option value="">{t('settings.lifecycleNoStage')}</option>
+                          {(study.lifecycleStages || []).map((s) => (
+                            <option key={s.id} value={s.id}>{tl(s.label)}</option>
+                          ))}
+                        </select>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </>
           )}
         </div>

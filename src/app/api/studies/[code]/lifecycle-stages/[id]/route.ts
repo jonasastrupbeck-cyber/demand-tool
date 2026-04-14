@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { workTypes } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
-import { getStudyByCode, deleteWorkType } from '@/lib/queries';
+import { getStudyByCode, updateLifecycleStage, deleteLifecycleStage } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -13,9 +10,10 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
-  if (body.lifecycleStageId !== undefined) {
-    await db.update(workTypes).set({ lifecycleStageId: body.lifecycleStageId }).where(eq(workTypes.id, id));
-  }
+  const updates: { label?: string; sortOrder?: number } = {};
+  if (typeof body.label === 'string') updates.label = body.label.trim();
+  if (typeof body.sortOrder === 'number') updates.sortOrder = body.sortOrder;
+  await updateLifecycleStage(id, updates);
   return NextResponse.json({ success: true });
 }
 
@@ -27,6 +25,6 @@ export async function DELETE(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
-  await deleteWorkType(id);
+  await deleteLifecycleStage(id);
   return new Response(null, { status: 204 });
 }
