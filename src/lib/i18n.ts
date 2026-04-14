@@ -1550,6 +1550,56 @@ const translations = {
     de: 'Wertnachfragen suchen...',
   },
 
+  // Capture form - inline type creation & search
+  'capture.addNew': {
+    en: '+',
+    da: '+',
+    sv: '+',
+    de: '+',
+  },
+  'capture.newTypePlaceholder': {
+    en: 'New type name...',
+    da: 'Nyt typenavn...',
+    sv: 'Nytt typnamn...',
+    de: 'Neuer Typname...',
+  },
+  'capture.searchEntries': {
+    en: 'Search previous entries',
+    da: 'Søg i tidligere registreringer',
+    sv: 'Sök i tidigare poster',
+    de: 'Frühere Einträge durchsuchen',
+  },
+  'capture.searchPlaceholder': {
+    en: 'Search verbatims...',
+    da: 'Søg i fritekst...',
+    sv: 'Sök i fritext...',
+    de: 'Freitext durchsuchen...',
+  },
+  'capture.searchNoResults': {
+    en: 'No matching entries',
+    da: 'Ingen matchende registreringer',
+    sv: 'Inga matchande poster',
+    de: 'Keine passenden Einträge',
+  },
+  'capture.showExamples': {
+    en: 'Show examples',
+    da: 'Vis eksempler',
+    sv: 'Visa exempel',
+    de: 'Beispiele anzeigen',
+  },
+  'capture.hideExamples': {
+    en: 'Hide',
+    da: 'Skjul',
+    sv: 'Dölj',
+    de: 'Ausblenden',
+  },
+  'capture.noExamples': {
+    en: 'No entries for this type yet',
+    da: 'Ingen registreringer for denne type endnu',
+    sv: 'Inga poster för denna typ ännu',
+    de: 'Noch keine Einträge für diesen Typ',
+  },
+
   // Reclassification warning
   'layers.reclassifyWarning': {
     en: '{count} entries still need reclassification for the current layer. Activate anyway?',

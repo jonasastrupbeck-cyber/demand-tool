@@ -607,3 +607,30 @@ export async function getWhatMattersForEntry(entryId: string) {
   return db.select().from(demandEntryWhatMatters)
     .where(eq(demandEntryWhatMatters.demandEntryId, entryId));
 }
+
+export async function searchEntries(studyId: string, options: { query?: string; typeId?: string; limit?: number }) {
+  const limit = options.limit || 10;
+  const conditions: ReturnType<typeof eq>[] = [eq(demandEntries.studyId, studyId)];
+
+  if (options.query) {
+    conditions.push(sql`${demandEntries.verbatim} ILIKE ${'%' + options.query + '%'}` as ReturnType<typeof eq>);
+  }
+  if (options.typeId) {
+    conditions.push(sql`(${demandEntries.demandTypeId} = ${options.typeId} OR ${demandEntries.workTypeId} = ${options.typeId})` as ReturnType<typeof eq>);
+  }
+
+  return db.select({
+    id: demandEntries.id,
+    verbatim: demandEntries.verbatim,
+    classification: demandEntries.classification,
+    entryType: demandEntries.entryType,
+    demandTypeLabel: demandTypes.label,
+    workTypeLabel: workTypes.label,
+  })
+    .from(demandEntries)
+    .leftJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
+    .leftJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+    .where(and(...conditions))
+    .orderBy(desc(demandEntries.createdAt))
+    .limit(limit);
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 
@@ -92,6 +92,23 @@ export default function CapturePage() {
   const [whatMatters, setWhatMatters] = useState('');
   const [workTypeId, setWorkTypeId] = useState('');
 
+  // Inline type creation state
+  const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'systemCondition'|'originalValue'|null>(null);
+  const [newTypeLabel, setNewTypeLabel] = useState('');
+  const [addingTypeLoading, setAddingTypeLoading] = useState(false);
+
+  // Quick-search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; verbatim: string; classification: string; entryType: string; demandTypeLabel: string | null; workTypeLabel: string | null }>>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Example verbatims state
+  const [examplesTypeId, setExamplesTypeId] = useState<string | null>(null);
+  const [examples, setExamples] = useState<Array<{ verbatim: string }>>([]);
+  const [examplesLoading, setExamplesLoading] = useState(false);
+  const examplesCache = useRef<Record<string, Array<{ verbatim: string }>>>({});
+
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
     if (res.ok) {
@@ -105,6 +122,14 @@ export default function CapturePage() {
       }
     }
     setLoading(false);
+  }, [code]);
+
+  const refreshStudy = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setStudy(data);
+    }
   }, [code]);
 
   const loadTodayCount = useCallback(async () => {
@@ -134,6 +159,18 @@ export default function CapturePage() {
     }
   }, [loadStudy, loadTodayCount, loadSuggestions, code]);
 
+  // Debounced search
+  useEffect(() => {
+    if (!searchOpen || searchQuery.length < 2) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/search?q=${encodeURIComponent(searchQuery)}`);
+      if (res.ok) setSearchResults(await res.json());
+      setSearchLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, searchOpen, code]);
+
   function resetForm() {
     setVerbatim('');
     setClassification('');
@@ -149,6 +186,69 @@ export default function CapturePage() {
     setWorkTypeId('');
     setError('');
     // Keep entryType sticky for batch entry
+  }
+
+  async function handleAddType(
+    apiPath: string,
+    extraBody: Record<string, string>,
+    onCreated: (id: string) => void
+  ) {
+    if (!newTypeLabel.trim()) return;
+    setAddingTypeLoading(true);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/${apiPath}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newTypeLabel.trim(), ...extraBody }),
+    });
+    if (res.ok) {
+      const { id } = await res.json();
+      await refreshStudy();
+      onCreated(id);
+    }
+    setNewTypeLabel('');
+    setAddingType(null);
+    setAddingTypeLoading(false);
+  }
+
+  function renderAddTypeInput(type: typeof addingType, apiPath: string, extraBody: Record<string, string>, onCreated: (id: string) => void) {
+    if (addingType !== type) return null;
+    return (
+      <div className="flex gap-2 mt-2">
+        <input
+          type="text"
+          value={newTypeLabel}
+          onChange={(e) => setNewTypeLabel(e.target.value)}
+          placeholder={t('capture.newTypePlaceholder')}
+          className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+          autoFocus
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddType(apiPath, extraBody, onCreated); } if (e.key === 'Escape') setAddingType(null); }}
+          disabled={addingTypeLoading}
+        />
+        <button type="button" onClick={() => handleAddType(apiPath, extraBody, onCreated)} disabled={!newTypeLabel.trim() || addingTypeLoading} className="px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">
+          {addingTypeLoading ? '...' : t('settings.add')}
+        </button>
+        <button type="button" onClick={() => { setAddingType(null); setNewTypeLabel(''); }} className="px-2 py-2 text-gray-400 hover:text-gray-600 text-sm">&times;</button>
+      </div>
+    );
+  }
+
+  const addBtn = (type: typeof addingType) => (
+    <button type="button" onClick={() => { setAddingType(type); setNewTypeLabel(''); }} className="px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-600 border border-dashed border-gray-300 hover:border-gray-400 transition-colors" title={t('capture.addNew')}>+</button>
+  );
+
+  async function toggleExamples(typeId: string) {
+    if (examplesTypeId === typeId) { setExamplesTypeId(null); return; }
+    setExamplesTypeId(typeId);
+    if (examplesCache.current[typeId]) { setExamples(examplesCache.current[typeId]); return; }
+    setExamplesLoading(true);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/search?typeId=${typeId}&limit=5`);
+    if (res.ok) {
+      const data = await res.json();
+      const items = data.map((d: { verbatim: string }) => ({ verbatim: d.verbatim }));
+      examplesCache.current[typeId] = items;
+      setExamples(items);
+    }
+    setExamplesLoading(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -373,6 +473,55 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* Search previous entries */}
+      <div className="mb-4">
+        <button
+          type="button"
+          onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); setSearchResults([]); }}
+          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1.5"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          {t('capture.searchEntries')}
+        </button>
+        {searchOpen && (
+          <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('capture.searchPlaceholder')}
+              className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+              autoFocus
+            />
+            {searchLoading && <p className="mt-2 text-xs text-gray-400">{t('capture.loading')}</p>}
+            {!searchLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
+              <p className="mt-2 text-xs text-gray-400">{t('capture.searchNoResults')}</p>
+            )}
+            {searchResults.length > 0 && (
+              <ul className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
+                {searchResults.map((r) => (
+                  <li key={r.id} className="flex items-start gap-2 p-2 bg-white rounded border border-gray-100">
+                    <span className={`shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                      r.classification === 'value' ? 'bg-green-100 text-green-700' :
+                      r.classification === 'failure' ? 'bg-red-100 text-red-700' :
+                      'bg-amber-100 text-amber-700'
+                    }`}>
+                      {r.classification === 'value' ? t('capture.value') : r.classification === 'failure' ? t('capture.failure') : '?'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{r.verbatim || '—'}</p>
+                      {(r.demandTypeLabel || r.workTypeLabel) && (
+                        <p className="text-xs text-gray-400 truncate">{tl(r.demandTypeLabel || r.workTypeLabel || '')}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Verbatim — the customer's words (hidden in volume mode) */}
         {!study.volumeMode && (
@@ -467,12 +616,32 @@ export default function CapturePage() {
         {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
-            <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectType')}</option>
-              {filteredDemandTypes.map((dt) => (
-                <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectType')}</option>
+                {filteredDemandTypes.map((dt) => (
+                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                ))}
+              </select>
+              {addBtn('demand')}
+            </div>
+            {renderAddTypeInput('demand', 'demand-types', { category: classification }, (id) => setDemandTypeId(id))}
+            {demandTypeId && (
+              <div className="mt-1">
+                <button type="button" onClick={() => toggleExamples(demandTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
+                  {examplesTypeId === demandTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
+                </button>
+                {examplesTypeId === demandTypeId && (
+                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
+                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
+                  <ul className="mt-1 space-y-0.5">
+                    {examples.map((ex, i) => (
+                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -480,12 +649,32 @@ export default function CapturePage() {
         {study.workTypesEnabled && !isDemand && classification && (
           <div>
             <label className={labelCls}>{t('capture.workTypeLabel')}</label>
-            <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectWorkType')}</option>
-              {study.workTypes.map((wt) => (
-                <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectWorkType')}</option>
+                {study.workTypes.map((wt) => (
+                  <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
+                ))}
+              </select>
+              {addBtn('work')}
+            </div>
+            {renderAddTypeInput('work', 'work-types', {}, (id) => setWorkTypeId(id))}
+            {workTypeId && (
+              <div className="mt-1">
+                <button type="button" onClick={() => toggleExamples(workTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
+                  {examplesTypeId === workTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
+                </button>
+                {examplesTypeId === workTypeId && (
+                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
+                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
+                  <ul className="mt-1 space-y-0.5">
+                    {examples.map((ex, i) => (
+                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -493,12 +682,16 @@ export default function CapturePage() {
         {study.activeLayer >= 3 && (
           <div>
             <label className={labelCls}>{t('capture.handlingLabel')}</label>
-            <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectHandling')}</option>
-              {study.handlingTypes.map((ht) => (
-                <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectHandling')}</option>
+                {study.handlingTypes.map((ht) => (
+                  <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
+                ))}
+              </select>
+              {addBtn('handling')}
+            </div>
+            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id))}
             {handlingTypeId && study.handlingTypes.find(h => h.id === handlingTypeId)?.operationalDefinition && (
               <p className="mt-1 text-xs text-gray-400 italic">{study.handlingTypes.find(h => h.id === handlingTypeId)!.operationalDefinition}</p>
             )}
@@ -532,7 +725,9 @@ export default function CapturePage() {
                     </button>
                   );
                 })}
+                {addBtn('systemCondition')}
               </div>
+              {renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => setSystemConditionIds(prev => [...prev, id]))}
             </div>
           ) : isDemand ? (
             <div className="relative">
@@ -565,12 +760,16 @@ export default function CapturePage() {
         {study.activeLayer >= 2 && isDemand && classification === 'failure' && (
           <div>
             <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
-            <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectOriginalValueDemand')}</option>
-              {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
-                <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectOriginalValueDemand')}</option>
+                {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
+                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                ))}
+              </select>
+              {addBtn('originalValue')}
+            </div>
+            {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id))}
           </div>
         )}
 
@@ -600,7 +799,9 @@ export default function CapturePage() {
                   </button>
                 );
               })}
+              {addBtn('whatMatters')}
             </div>
+            {renderAddTypeInput('whatMatters', 'what-matters-types', {}, (id) => setWhatMattersTypeIds(prev => [...prev, id]))}
           </div>
         )}
 
