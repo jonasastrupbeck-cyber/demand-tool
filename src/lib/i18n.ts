@@ -1527,6 +1527,24 @@ const translations = {
     sv: 'Vilken värdeefterfrågan härstammade detta fel från?',
     de: 'Von welcher Wertnachfrage stammt dieser Fehler?',
   },
+  'reclassify.editMoreFields': {
+    en: 'Edit more fields',
+    da: 'Rediger flere felter',
+    sv: 'Redigera fler fält',
+    de: 'Weitere Felder bearbeiten',
+  },
+  'reclassify.editEntry': {
+    en: 'Edit entry',
+    da: 'Rediger efterspørgsel',
+    sv: 'Redigera efterfrågan',
+    de: 'Nachfrage bearbeiten',
+  },
+  'dashboard.editEntry': {
+    en: 'Edit',
+    da: 'Rediger',
+    sv: 'Redigera',
+    de: 'Bearbeiten',
+  },
 
   // Capture form - what matters multi-select
   'capture.whatMattersSelect': {

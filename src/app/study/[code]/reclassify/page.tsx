@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import type { TranslationKey } from '@/lib/i18n';
+import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 
 interface DemandEntry {
   id: string;
@@ -38,9 +39,15 @@ interface StudyData {
   name: string;
   activeLayer: number;
   demandTypesEnabled: boolean;
+  workTypesEnabled: boolean;
+  systemConditionsEnabled: boolean;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
+  pointsOfTransaction: { id: string; label: string }[];
+  whatMattersTypes: { id: string; label: string }[];
+  workTypes: { id: string; label: string }[];
+  systemConditions: { id: string; label: string }[];
 }
 
 export default function ReclassifyPage() {
@@ -62,6 +69,9 @@ export default function ReclassifyPage() {
 
   // Value demand entries for Layer 4 linking
   const [valueDemandEntries, setValueDemandEntries] = useState<DemandEntry[]>([]);
+
+  // Edit-more-fields modal
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -299,14 +309,52 @@ export default function ReclassifyPage() {
           <p className="text-sm font-medium text-gray-700">{t('reclassify.linkToValue')}</p>
           <select value={linkedValueDemandEntryId} onChange={(e) => setLinkedValueDemandEntryId(e.target.value)} className={inputCls}>
             <option value="">{t('capture.searchValueDemands')}</option>
-            {valueDemandEntries.map((ve) => (
-              <option key={ve.id} value={ve.id}>
-                {ve.verbatim.length > 60 ? ve.verbatim.slice(0, 60) + '...' : ve.verbatim}
-              </option>
-            ))}
+            {(() => {
+              const demandTypeById = new Map(study.demandTypes.map((dt) => [dt.id, dt]));
+              const seenTypes = new Set<string>();
+              const typeOptions: { entryId: string; label: string }[] = [];
+              const untypedOptions: { entryId: string; verbatim: string }[] = [];
+
+              for (const ve of valueDemandEntries) {
+                if (ve.demandTypeId && demandTypeById.has(ve.demandTypeId)) {
+                  if (seenTypes.has(ve.demandTypeId)) continue;
+                  seenTypes.add(ve.demandTypeId);
+                  typeOptions.push({
+                    entryId: ve.id,
+                    label: tl(demandTypeById.get(ve.demandTypeId)!.label),
+                  });
+                } else {
+                  untypedOptions.push({ entryId: ve.id, verbatim: ve.verbatim });
+                }
+              }
+
+              return (
+                <>
+                  {typeOptions.map((o) => (
+                    <option key={o.entryId} value={o.entryId}>{o.label}</option>
+                  ))}
+                  {untypedOptions.map((o) => (
+                    <option key={o.entryId} value={o.entryId}>
+                      {o.verbatim.length > 60 ? o.verbatim.slice(0, 60) + '...' : o.verbatim}
+                    </option>
+                  ))}
+                </>
+              );
+            })()}
           </select>
         </div>
       )}
+
+      {/* Edit more fields (optional) */}
+      <div className="mb-3">
+        <button
+          type="button"
+          onClick={() => setShowEditModal(true)}
+          className="w-full py-2 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:border-gray-400 transition-colors"
+        >
+          + {t('reclassify.editMoreFields')}
+        </button>
+      </div>
 
       {/* Action buttons */}
       <div className="flex gap-3">
@@ -324,6 +372,16 @@ export default function ReclassifyPage() {
           {saving ? '...' : t('reclassify.saveNext')}
         </button>
       </div>
+
+      {showEditModal && entry && (
+        <EntryEditModal
+          code={code}
+          entryId={entry.id}
+          study={study as unknown as EntryEditModalStudy}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => { loadEntries(); loadValueDemandEntries(); }}
+        />
+      )}
     </div>
   );
 }

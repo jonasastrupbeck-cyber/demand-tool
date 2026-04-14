@@ -524,6 +524,10 @@ export async function updateEntry(entryId: string, data: {
   linkedValueDemandEntryId?: string | null;
   originalValueDemandTypeId?: string | null;
   failureCause?: string | null;
+  contactMethodId?: string | null;
+  pointOfTransactionId?: string | null;
+  workTypeId?: string | null;
+  whatMatters?: string | null;
   whatMattersTypeIds?: string[];
   systemConditionIds?: string[];
 }) {
@@ -537,6 +541,10 @@ export async function updateEntry(entryId: string, data: {
   if (data.linkedValueDemandEntryId !== undefined) updateFields.linkedValueDemandEntryId = data.linkedValueDemandEntryId;
   if (data.originalValueDemandTypeId !== undefined) updateFields.originalValueDemandTypeId = data.originalValueDemandTypeId;
   if (data.failureCause !== undefined) updateFields.failureCause = data.failureCause;
+  if (data.contactMethodId !== undefined) updateFields.contactMethodId = data.contactMethodId;
+  if (data.pointOfTransactionId !== undefined) updateFields.pointOfTransactionId = data.pointOfTransactionId;
+  if (data.workTypeId !== undefined) updateFields.workTypeId = data.workTypeId;
+  if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
 
   if (Object.keys(updateFields).length > 0) {
     await db.update(demandEntries).set(updateFields).where(eq(demandEntries.id, entryId));

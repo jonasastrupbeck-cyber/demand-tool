@@ -11,6 +11,7 @@ import type { NodeProps, LinkProps } from 'recharts/types/chart/Sankey';
 import type { DashboardData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
+import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 
 const THEME = {
   text: '#1f2937',
@@ -64,6 +65,8 @@ export default function DashboardPage() {
   const [entryFilter, setEntryFilter] = useState('');
   const [demandTypeMap, setDemandTypeMap] = useState<Map<string, string>>(new Map());
   const [notesGroupBy, setNotesGroupBy] = useState<'date' | 'type'>('date');
+  const [fullStudy, setFullStudy] = useState<EntryEditModalStudy | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   const getDateRangeParams = useCallback((): { from?: string; to?: string } => {
     if (dateRange === 'today') {
@@ -110,7 +113,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch(`/api/studies/${encodeURIComponent(code)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(s => { if (s) { setStudyName(s.name); setStudyPurpose(s.purpose || ''); setWorkTrackingEnabled(s.workTrackingEnabled); setDemandTypesEnabled(s.demandTypesEnabled ?? false); setActiveLayer(s.activeLayer ?? 5); } });
+      .then(s => { if (s) { setStudyName(s.name); setStudyPurpose(s.purpose || ''); setWorkTrackingEnabled(s.workTrackingEnabled); setDemandTypesEnabled(s.demandTypesEnabled ?? false); setActiveLayer(s.activeLayer ?? 5); setFullStudy(s as EntryEditModalStudy); } });
   }, [code]);
 
   // Fetch system conditions when a Sankey flow link is clicked
@@ -1139,6 +1142,13 @@ export default function DashboardPage() {
                           }`}>
                             {e.classification === 'value' ? t('capture.value') : e.classification === 'failure' ? t('capture.failure') : '?'}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEntryId(e.id)}
+                            className="shrink-0 text-xs px-2 py-0.5 rounded font-medium text-gray-500 bg-white border border-gray-200 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                          >
+                            {t('dashboard.editEntry')}
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1149,6 +1159,24 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Entry edit modal */}
+      {editingEntryId && fullStudy && (
+        <EntryEditModal
+          code={code}
+          entryId={editingEntryId}
+          study={fullStudy}
+          onClose={() => setEditingEntryId(null)}
+          onSaved={async () => {
+            await loadDashboard();
+            const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`);
+            if (res.ok) {
+              const d = await res.json();
+              setEntries(d.entries || []);
+            }
+          }}
+        />
+      )}
 
       {/* Flow causes modal */}
       {selectedFlow && (
