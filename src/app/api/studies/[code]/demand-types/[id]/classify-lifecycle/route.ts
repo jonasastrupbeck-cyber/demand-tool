@@ -3,6 +3,7 @@ import { getStudyByCode, getDemandTypeById, getLifecycleStages, getLifecycleStag
 import { classifyTypeStage } from '@/lib/ai/classify-lifecycle';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
