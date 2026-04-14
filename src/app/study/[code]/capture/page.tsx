@@ -473,9 +473,6 @@ export default function CapturePage() {
                 <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
               ))}
             </select>
-            {demandTypeId && filteredDemandTypes.find(d => d.id === demandTypeId)?.operationalDefinition && (
-              <p className="mt-1 text-xs text-gray-400 italic">{filteredDemandTypes.find(d => d.id === demandTypeId)!.operationalDefinition}</p>
-            )}
           </div>
         )}
 
@@ -520,7 +517,6 @@ export default function CapturePage() {
                     <button
                       key={sc.id}
                       type="button"
-                      title={sc.operationalDefinition || undefined}
                       onClick={() => {
                         setSystemConditionIds(prev =>
                           isSelected ? prev.filter(id => id !== sc.id) : [...prev, sc.id]
@@ -589,7 +585,6 @@ export default function CapturePage() {
                   <button
                     key={wm.id}
                     type="button"
-                    title={wm.operationalDefinition || undefined}
                     onClick={() => {
                       setWhatMattersTypeIds(prev =>
                         isSelected ? prev.filter(id => id !== wm.id) : [...prev, wm.id]

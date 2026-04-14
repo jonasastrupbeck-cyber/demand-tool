@@ -700,33 +700,9 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500 mb-2">{t('settings.valueDesc')}</p>
               <ul className="space-y-2 mb-4">
                 {valueTypes.map((dt) => (
-                  <li key={dt.id} className="py-2 px-3 rounded-lg bg-green-50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-green-700">{tl(dt.label)}</span>
-                      <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                    </div>
-                    {editingDefId === dt.id ? (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={editingDefValue}
-                          onChange={(e) => setEditingDefValue(e.target.value)}
-                          placeholder={t('settings.operationalDefinitionPlaceholder')}
-                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                          autoFocus
-                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                        />
-                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
-                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                      >
-                        {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                      </button>
-                    )}
+                  <li key={dt.id} className={`${itemCls} bg-green-50`}>
+                    <span className="text-sm text-green-700">{tl(dt.label)}</span>
+                    <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
               </ul>
@@ -740,33 +716,9 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500 mb-2">{t('settings.failureDesc')}</p>
               <ul className="space-y-2 mb-4">
                 {failureTypes.map((dt) => (
-                  <li key={dt.id} className="py-2 px-3 rounded-lg bg-red-50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-red-700">{tl(dt.label)}</span>
-                      <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                    </div>
-                    {editingDefId === dt.id ? (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={editingDefValue}
-                          onChange={(e) => setEditingDefValue(e.target.value)}
-                          placeholder={t('settings.operationalDefinitionPlaceholder')}
-                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                          autoFocus
-                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                        />
-                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
-                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                      >
-                        {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                      </button>
-                    )}
+                  <li key={dt.id} className={`${itemCls} bg-red-50`}>
+                    <span className="text-sm text-red-700">{tl(dt.label)}</span>
+                    <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
               </ul>
@@ -799,33 +751,9 @@ export default function SettingsPage() {
             <>
               <ul className="space-y-2 mb-4">
                 {(study.systemConditions || []).map((sc) => (
-                  <li key={sc.id} className="py-2 px-3 rounded-lg bg-red-50">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-red-700">{tl(sc.label)}</span>
-                      <button onClick={() => removeSystemCondition(sc.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                    </div>
-                    {editingDefId === sc.id ? (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={editingDefValue}
-                          onChange={(e) => setEditingDefValue(e.target.value)}
-                          placeholder={t('settings.operationalDefinitionPlaceholder')}
-                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                          autoFocus
-                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                        />
-                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEditDef(sc.id, sc.operationalDefinition, 'systemCondition')}
-                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                      >
-                        {sc.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                      </button>
-                    )}
+                  <li key={sc.id} className={`${itemCls} bg-red-50`}>
+                    <span className="text-sm text-red-700">{tl(sc.label)}</span>
+                    <button onClick={() => removeSystemCondition(sc.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
               </ul>
@@ -843,33 +771,9 @@ export default function SettingsPage() {
           <p className="text-sm text-gray-600 mb-3">{t('settings.whatMattersTypesDesc')}</p>
           <ul className="space-y-2 mb-4">
             {study.whatMattersTypes.map((wm) => (
-              <li key={wm.id} className="py-2 px-3 rounded-lg bg-blue-50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-blue-700">{tl(wm.label)}</span>
-                  <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                </div>
-                {editingDefId === wm.id ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={editingDefValue}
-                      onChange={(e) => setEditingDefValue(e.target.value)}
-                      placeholder={t('settings.operationalDefinitionPlaceholder')}
-                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                    />
-                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                    <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => startEditDef(wm.id, wm.operationalDefinition, 'whatMatters')}
-                    className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                  >
-                    {wm.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                  </button>
-                )}
+              <li key={wm.id} className={`${itemCls} bg-blue-50`}>
+                <span className="text-sm text-blue-700">{tl(wm.label)}</span>
+                <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
               </li>
             ))}
           </ul>
