@@ -45,6 +45,8 @@ interface StudyData {
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
   systemConditionsEnabled: boolean;
+  demandTypesEnabled: boolean;
+  workTypesEnabled: boolean;
   activeLayer: number;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -173,8 +175,8 @@ export default function CapturePage() {
     }
 
     if (entryType === 'demand') {
-      // Layer 2+: include demand type
-      if (activeLayer >= 2) {
+      // Include demand type when enabled
+      if (study?.demandTypesEnabled) {
         body.demandTypeId = demandTypeId || undefined;
         body.originalValueDemandTypeId = effectiveClassification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
         body.failureCause = effectiveClassification === 'failure' ? failureCause.trim() : undefined;
@@ -182,7 +184,7 @@ export default function CapturePage() {
       body.whatMattersTypeIds = whatMattersTypeIds.length > 0 ? whatMattersTypeIds : undefined;
       body.whatMatters = whatMatters.trim() || undefined;
     } else {
-      body.workTypeId = workTypeId || undefined;
+      body.workTypeId = study?.workTypesEnabled ? (workTypeId || undefined) : undefined;
     }
 
     // System conditions (both demand and work, when failure + enabled)
@@ -456,8 +458,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Demand type dropdown (Layer 2+, demand mode only) */}
-        {study.activeLayer >= 2 && isDemand && classification && classification !== 'unknown' && (
+        {/* Demand type dropdown (when demand types enabled, demand mode only) */}
+        {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
@@ -472,8 +474,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Work type dropdown (work mode only) */}
-        {!isDemand && classification && (
+        {/* Work type dropdown (when work types enabled, work mode only) */}
+        {study.workTypesEnabled && !isDemand && classification && (
           <div>
             <label className={labelCls}>{t('capture.workTypeLabel')}</label>
             <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>

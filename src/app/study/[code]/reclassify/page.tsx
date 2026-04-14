@@ -37,6 +37,7 @@ interface StudyData {
   id: string;
   name: string;
   activeLayer: number;
+  demandTypesEnabled: boolean;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -256,7 +257,7 @@ export default function ReclassifyPage() {
             </button>
           </div>
 
-          {classification && classification !== 'unknown' && filteredDemandTypes.length > 0 && (
+          {study.demandTypesEnabled && classification && classification !== 'unknown' && filteredDemandTypes.length > 0 && (
             <div>
               <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
                 <option value="">{t('capture.selectType')}</option>

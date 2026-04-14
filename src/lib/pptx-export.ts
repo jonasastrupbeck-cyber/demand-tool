@@ -29,6 +29,7 @@ export async function exportDashboardToPptx(
   dateRangeLabel: string,
   tl: (label: string) => string,
   activeLayer: number = 5,
+  demandTypesEnabled: boolean = true,
 ) {
   const pptx = new PptxGenJS();
 
@@ -116,7 +117,7 @@ export async function exportDashboardToPptx(
   }
 
   // Top demand type
-  if (activeLayer >= 2 && data.demandTypeCounts.length > 0) {
+  if (demandTypesEnabled && data.demandTypeCounts.length > 0) {
     const top = data.demandTypeCounts[0];
     const topPct = data.totalEntries > 0 ? Math.round((top.count / data.totalEntries) * 100) : 0;
     findings.push(`${t('dashboard.topDemandType', locale)}: ${tl(top.label)} (${topPct}%)`);
@@ -237,8 +238,8 @@ export async function exportDashboardToPptx(
     });
   }
 
-  // ── Slide 3: Top Demand Types (Layer 2+) ──
-  if (activeLayer >= 2 && data.demandTypeCounts.length > 0) {
+  // ── Slide 3: Top Demand Types ──
+  if (demandTypesEnabled && data.demandTypeCounts.length > 0) {
     const dtSlide = pptx.addSlide();
     dtSlide.background = { fill: 'ffffff' };
     addSlideTitle(dtSlide, t('dashboard.top10', locale));

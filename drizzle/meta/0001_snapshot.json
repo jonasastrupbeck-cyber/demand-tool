@@ -1,0 +1,875 @@
+{
+  "id": "da28ce2c-402f-41c1-9c7d-86dc038c2c23",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.contact_methods": {
+      "name": "contact_methods",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "contact_methods_study_id_studies_id_fk": {
+          "name": "contact_methods_study_id_studies_id_fk",
+          "tableFrom": "contact_methods",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.demand_entries": {
+      "name": "demand_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "verbatim": {
+          "name": "verbatim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "classification": {
+          "name": "classification",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entry_type": {
+          "name": "entry_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'demand'"
+        },
+        "handling_type_id": {
+          "name": "handling_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "demand_type_id": {
+          "name": "demand_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_method_id": {
+          "name": "contact_method_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "point_of_transaction_id": {
+          "name": "point_of_transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "what_matters_type_id": {
+          "name": "what_matters_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "original_value_demand_type_id": {
+          "name": "original_value_demand_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_type_id": {
+          "name": "work_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "linked_value_demand_entry_id": {
+          "name": "linked_value_demand_entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "failure_cause": {
+          "name": "failure_cause",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "what_matters": {
+          "name": "what_matters",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "collector_name": {
+          "name": "collector_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "demand_entries_study_id_studies_id_fk": {
+          "name": "demand_entries_study_id_studies_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_handling_type_id_handling_types_id_fk": {
+          "name": "demand_entries_handling_type_id_handling_types_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "handling_types",
+          "columnsFrom": [
+            "handling_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_demand_type_id_demand_types_id_fk": {
+          "name": "demand_entries_demand_type_id_demand_types_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "demand_types",
+          "columnsFrom": [
+            "demand_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_contact_method_id_contact_methods_id_fk": {
+          "name": "demand_entries_contact_method_id_contact_methods_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "contact_methods",
+          "columnsFrom": [
+            "contact_method_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_point_of_transaction_id_points_of_transaction_id_fk": {
+          "name": "demand_entries_point_of_transaction_id_points_of_transaction_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "points_of_transaction",
+          "columnsFrom": [
+            "point_of_transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_what_matters_type_id_what_matters_types_id_fk": {
+          "name": "demand_entries_what_matters_type_id_what_matters_types_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "what_matters_types",
+          "columnsFrom": [
+            "what_matters_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_original_value_demand_type_id_demand_types_id_fk": {
+          "name": "demand_entries_original_value_demand_type_id_demand_types_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "demand_types",
+          "columnsFrom": [
+            "original_value_demand_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "demand_entries_work_type_id_work_types_id_fk": {
+          "name": "demand_entries_work_type_id_work_types_id_fk",
+          "tableFrom": "demand_entries",
+          "tableTo": "work_types",
+          "columnsFrom": [
+            "work_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.demand_entry_system_conditions": {
+      "name": "demand_entry_system_conditions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "demand_entry_id": {
+          "name": "demand_entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system_condition_id": {
+          "name": "system_condition_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "demand_entry_system_conditions_demand_entry_id_demand_entries_id_fk": {
+          "name": "demand_entry_system_conditions_demand_entry_id_demand_entries_id_fk",
+          "tableFrom": "demand_entry_system_conditions",
+          "tableTo": "demand_entries",
+          "columnsFrom": [
+            "demand_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "demand_entry_system_conditions_system_condition_id_system_conditions_id_fk": {
+          "name": "demand_entry_system_conditions_system_condition_id_system_conditions_id_fk",
+          "tableFrom": "demand_entry_system_conditions",
+          "tableTo": "system_conditions",
+          "columnsFrom": [
+            "system_condition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.demand_entry_what_matters": {
+      "name": "demand_entry_what_matters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "demand_entry_id": {
+          "name": "demand_entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "what_matters_type_id": {
+          "name": "what_matters_type_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "demand_entry_what_matters_demand_entry_id_demand_entries_id_fk": {
+          "name": "demand_entry_what_matters_demand_entry_id_demand_entries_id_fk",
+          "tableFrom": "demand_entry_what_matters",
+          "tableTo": "demand_entries",
+          "columnsFrom": [
+            "demand_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "demand_entry_what_matters_what_matters_type_id_what_matters_types_id_fk": {
+          "name": "demand_entry_what_matters_what_matters_type_id_what_matters_types_id_fk",
+          "tableFrom": "demand_entry_what_matters",
+          "tableTo": "what_matters_types",
+          "columnsFrom": [
+            "what_matters_type_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.demand_types": {
+      "name": "demand_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operational_definition": {
+          "name": "operational_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "demand_types_study_id_studies_id_fk": {
+          "name": "demand_types_study_id_studies_id_fk",
+          "tableFrom": "demand_types",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.handling_types": {
+      "name": "handling_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operational_definition": {
+          "name": "operational_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "handling_types_study_id_studies_id_fk": {
+          "name": "handling_types_study_id_studies_id_fk",
+          "tableFrom": "handling_types",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.points_of_transaction": {
+      "name": "points_of_transaction",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "points_of_transaction_study_id_studies_id_fk": {
+          "name": "points_of_transaction_study_id_studies_id_fk",
+          "tableFrom": "points_of_transaction",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.studies": {
+      "name": "studies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "access_code": {
+          "name": "access_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "''"
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "''"
+        },
+        "one_stop_handling_type": {
+          "name": "one_stop_handling_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_contact_method_id": {
+          "name": "primary_contact_method_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "primary_point_of_transaction_id": {
+          "name": "primary_point_of_transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "work_tracking_enabled": {
+          "name": "work_tracking_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "system_conditions_enabled": {
+          "name": "system_conditions_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "demand_types_enabled": {
+          "name": "demand_types_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "work_types_enabled": {
+          "name": "work_types_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "active_layer": {
+          "name": "active_layer",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "consultant_pin": {
+          "name": "consultant_pin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "studies_access_code_unique": {
+          "name": "studies_access_code_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "access_code"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.system_conditions": {
+      "name": "system_conditions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operational_definition": {
+          "name": "operational_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "system_conditions_study_id_studies_id_fk": {
+          "name": "system_conditions_study_id_studies_id_fk",
+          "tableFrom": "system_conditions",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.what_matters_types": {
+      "name": "what_matters_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operational_definition": {
+          "name": "operational_definition",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "what_matters_types_study_id_studies_id_fk": {
+          "name": "what_matters_types_study_id_studies_id_fk",
+          "tableFrom": "what_matters_types",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.work_types": {
+      "name": "work_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "study_id": {
+          "name": "study_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "work_types_study_id_studies_id_fk": {
+          "name": "work_types_study_id_studies_id_fk",
+          "tableFrom": "work_types",
+          "tableTo": "studies",
+          "columnsFrom": [
+            "study_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1237,6 +1237,30 @@ const translations = {
     sv: 'Lägg till systemförhållande...',
     de: 'Systembedingung hinzufügen...',
   },
+  'settings.demandTypes': {
+    en: 'Demand Types',
+    da: 'Efterspørgselstyper',
+    sv: 'Efterfrågetyper',
+    de: 'Nachfragearten',
+  },
+  'settings.demandTypesDesc': {
+    en: 'When the team sees natural demand types emerging, enable this to add type classification to the capture form.',
+    da: 'Når teamet ser naturlige efterspørgselstyper opstå, aktiver dette for at tilføje typeklassificering til registreringsformularen.',
+    sv: 'När teamet ser naturliga efterfrågetyper framträda, aktivera detta för att lägga till typklassificering i registreringsformuläret.',
+    de: 'Wenn das Team natürliche Nachfragearten erkennt, aktivieren Sie dies, um die Typklassifizierung zum Erfassungsformular hinzuzufügen.',
+  },
+  'settings.enableDemandTypes': {
+    en: 'Enable demand type classification',
+    da: 'Aktiver efterspørgselstypeklassificering',
+    sv: 'Aktivera efterfrågetypklassificering',
+    de: 'Nachfrageart-Klassifizierung aktivieren',
+  },
+  'settings.enableWorkTypes': {
+    en: 'Enable work type classification',
+    da: 'Aktiver arbejdstypeklassificering',
+    sv: 'Aktivera arbetstypklassificering',
+    de: 'Arbeitstyp-Klassifizierung aktivieren',
+  },
 
   // Consultant PIN
   'landing.consultantPin': {
@@ -1314,10 +1338,10 @@ const translations = {
     de: 'Alle Schichten aktiv',
   },
   'layers.prereq2': {
-    en: 'Before activating: define at least one value and one failure demand type below',
-    da: 'Før aktivering: definer mindst én værdiskabende og én ikke-værdiskabende efterspørgselstype nedenfor',
-    sv: 'Före aktivering: definiera minst en värdeskapande och en icke-värdeskapande efterfrågetyp nedan',
-    de: 'Vor Aktivierung: definieren Sie mindestens eine Wert- und eine Fehler-Nachfrageart unten',
+    en: 'Ready to activate: practitioners will classify each demand as Value or Failure',
+    da: 'Klar til aktivering: medarbejdere vil klassificere hver efterspørgsel som Værdi eller Fejl',
+    sv: 'Redo att aktivera: medarbetare kommer att klassificera varje efterfrågan som Värde eller Icke-värde',
+    de: 'Bereit zur Aktivierung: Mitarbeiter werden jede Nachfrage als Wert oder Fehler klassifizieren',
   },
   'layers.prereq3': {
     en: 'Before activating: define at least one handling type below',
@@ -1344,10 +1368,10 @@ const translations = {
     de: 'Was ändert sich wenn Sie Schicht {layer} aktivieren',
   },
   'layers.guidance2': {
-    en: 'Practitioners will classify each demand as Value or Failure, and select a demand type. Existing entries will need reclassification.',
-    da: 'Medarbejdere skal klassificere hver efterspørgsel som Værdi eller Fejl, og vælge en efterspørgselstype. Eksisterende registreringer skal omklassificeres.',
-    sv: 'Medarbetare klassificerar varje efterfrågan som Värde eller Icke-värde, och väljer en efterfrågetyp. Befintliga poster behöver omklassificeras.',
-    de: 'Mitarbeiter klassifizieren jede Nachfrage als Wert oder Fehler und wählen einen Nachfragetyp. Bestehende Einträge müssen neu klassifiziert werden.',
+    en: 'Practitioners will classify each demand as Value or Failure. Existing entries will need reclassification. Demand types can be enabled separately when the team sees types emerging.',
+    da: 'Medarbejdere vil klassificere hver efterspørgsel som Værdi eller Fejl. Eksisterende registreringer skal omklassificeres. Efterspørgselstyper kan aktiveres separat når teamet ser typer opstå.',
+    sv: 'Medarbetare kommer att klassificera varje efterfrågan som Värde eller Icke-värde. Befintliga poster behöver omklassificeras. Efterfrågetyper kan aktiveras separat när teamet ser typer framträda.',
+    de: 'Mitarbeiter werden jede Nachfrage als Wert oder Fehler klassifizieren. Bestehende Einträge müssen neu klassifiziert werden. Nachfragearten können separat aktiviert werden wenn das Team Typen erkennt.',
   },
   'layers.guidance3': {
     en: 'Practitioners will record how each demand was handled (e.g. one-stop, pass-on). This reveals how the system responds to demand.',

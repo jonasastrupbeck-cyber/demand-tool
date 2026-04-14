@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [studyName, setStudyName] = useState('');
   const [studyPurpose, setStudyPurpose] = useState('');
   const [workTrackingEnabled, setWorkTrackingEnabled] = useState(false);
+  const [demandTypesEnabled, setDemandTypesEnabled] = useState(false);
   const [activeLayer, setActiveLayer] = useState(5);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('all');
@@ -109,7 +110,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch(`/api/studies/${encodeURIComponent(code)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(s => { if (s) { setStudyName(s.name); setStudyPurpose(s.purpose || ''); setWorkTrackingEnabled(s.workTrackingEnabled); setActiveLayer(s.activeLayer ?? 5); } });
+      .then(s => { if (s) { setStudyName(s.name); setStudyPurpose(s.purpose || ''); setWorkTrackingEnabled(s.workTrackingEnabled); setDemandTypesEnabled(s.demandTypesEnabled ?? false); setActiveLayer(s.activeLayer ?? 5); } });
   }, [code]);
 
   // Fetch system conditions when a Sankey flow link is clicked
@@ -163,7 +164,7 @@ export default function DashboardPage() {
       const rangeLabel = dateRange === 'custom' && (customFrom || customTo)
         ? [customFrom, customTo].filter(Boolean).join(' – ')
         : dateRangeLabels[dateRange];
-      await exportDashboardToPptx(data, studyName || code, locale, rangeLabel, tl, activeLayer);
+      await exportDashboardToPptx(data, studyName || code, locale, rangeLabel, tl, activeLayer, demandTypesEnabled);
     } catch (err) {
       console.error('PPTX export error:', err);
     }
@@ -422,8 +423,8 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </ChartCard>}
 
-            {/* Top 10 Demand Types (Layer 2+) */}
-            {activeLayer >= 2 && <ChartCard title={t('dashboard.top10')}>
+            {/* Top 10 Demand Types (when demand types enabled) */}
+            {demandTypesEnabled && <ChartCard title={t('dashboard.top10')}>
               <ResponsiveContainer width="100%" height={Math.max(300, translatedDemandTypeCounts.length * 40 + 40)}>
                 <BarChart data={translatedDemandTypeCounts} layout="vertical" margin={{ left: 10, right: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
@@ -696,7 +697,7 @@ export default function DashboardPage() {
             {notesByDate.size > 0 && (
               <ChartCard title={`${t('dashboard.whatMattersNotes')} (${data.whatMattersNotes.length})`}>
                 {/* Grouping toggle */}
-                {notesByDemandType.size > 1 && (
+                {demandTypesEnabled && notesByDemandType.size > 1 && (
                   <div className="flex gap-1 mb-3">
                     <button
                       onClick={() => setNotesGroupBy('date')}
@@ -1012,7 +1013,7 @@ export default function DashboardPage() {
                 ) : (
                   <>
                     {/* Filter by demand type */}
-                    {data.demandTypeCounts.length > 0 && (
+                    {demandTypesEnabled && data.demandTypeCounts.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
                         <button
                           onClick={() => setEntryFilter('')}

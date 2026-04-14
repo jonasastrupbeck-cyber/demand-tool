@@ -8,6 +8,8 @@ export interface Study {
   primaryPointOfTransactionId: string | null;
   workTrackingEnabled: boolean;
   systemConditionsEnabled: boolean;
+  demandTypesEnabled: boolean;
+  workTypesEnabled: boolean;
   activeLayer: number;
   consultantPin: string | null;
   createdAt: Date;

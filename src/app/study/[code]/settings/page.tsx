@@ -48,6 +48,8 @@ interface StudyData {
   oneStopHandlingType: string | null;
   workTrackingEnabled: boolean;
   systemConditionsEnabled: boolean;
+  demandTypesEnabled: boolean;
+  workTypesEnabled: boolean;
   activeLayer: number;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
@@ -309,6 +311,26 @@ export default function SettingsPage() {
     loadStudy();
   }
 
+  async function toggleDemandTypes() {
+    const newValue = !study?.demandTypesEnabled;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ demandTypesEnabled: newValue }),
+    });
+    loadStudy();
+  }
+
+  async function toggleWorkTypes() {
+    const newValue = !study?.workTypesEnabled;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workTypesEnabled: newValue }),
+    });
+    loadStudy();
+  }
+
   async function toggleSystemConditions() {
     const newValue = !study?.systemConditionsEnabled;
     await fetch(`/api/studies/${encodeURIComponent(code)}`, {
@@ -513,7 +535,7 @@ export default function SettingsPage() {
                 const prereqKey = `layers.prereq${next}` as TranslationKey;
                 const hasPrereq = next >= 2 && next <= 5;
                 const prereqMet = next === 2
-                  ? study.demandTypes.some(d => d.category === 'value') && study.demandTypes.some(d => d.category === 'failure')
+                  ? true
                   : next === 3 ? study.handlingTypes.length > 0
                   : next === 5 ? study.whatMattersTypes.length > 0
                   : true; // layer 4 has no hard prereq, just guidance
@@ -643,89 +665,107 @@ export default function SettingsPage() {
           </form>
         </div>
 
-        {/* Value demand types (Layer 2+) */}
-        {study.activeLayer >= 2 && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.valueDemandTypes')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.valueDesc')}</p>
-          <ul className="space-y-2 mb-4">
-            {valueTypes.map((dt) => (
-              <li key={dt.id} className="py-2 px-3 rounded-lg bg-green-50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-green-700">{tl(dt.label)}</span>
-                  <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                </div>
-                {editingDefId === dt.id ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={editingDefValue}
-                      onChange={(e) => setEditingDefValue(e.target.value)}
-                      placeholder={t('settings.operationalDefinitionPlaceholder')}
-                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                    />
-                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                    <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
-                    className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                  >
-                    {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          <form onSubmit={(e) => addDemandType(e, 'value')} className="flex gap-2">
-            <input type="text" value={newValueType} onChange={(e) => setNewValueType(e.target.value)} placeholder={t('settings.addValueType')} className={inputCls} />
-            <button type="submit" disabled={!newValueType.trim()} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">{t('settings.add')}</button>
-          </form>
-        </div>}
+        {/* Demand Types */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.demandTypes')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.demandTypesDesc')}</p>
+          <label className="flex items-center gap-3 cursor-pointer mb-4">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={study.demandTypesEnabled}
+                onChange={toggleDemandTypes}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+            </div>
+            <span className="text-sm text-gray-700 font-medium">{t('settings.enableDemandTypes')}</span>
+          </label>
+          {study.demandTypesEnabled && (
+            <>
+              {/* Value demand types */}
+              <h3 className="text-sm font-semibold mb-1 text-green-700">{t('settings.valueDemandTypes')}</h3>
+              <p className="text-xs text-gray-500 mb-2">{t('settings.valueDesc')}</p>
+              <ul className="space-y-2 mb-4">
+                {valueTypes.map((dt) => (
+                  <li key={dt.id} className="py-2 px-3 rounded-lg bg-green-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-green-700">{tl(dt.label)}</span>
+                      <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    </div>
+                    {editingDefId === dt.id ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={editingDefValue}
+                          onChange={(e) => setEditingDefValue(e.target.value)}
+                          placeholder={t('settings.operationalDefinitionPlaceholder')}
+                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
+                        />
+                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
+                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
+                      >
+                        {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <form onSubmit={(e) => addDemandType(e, 'value')} className="flex gap-2 mb-6">
+                <input type="text" value={newValueType} onChange={(e) => setNewValueType(e.target.value)} placeholder={t('settings.addValueType')} className={inputCls} />
+                <button type="submit" disabled={!newValueType.trim()} className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">{t('settings.add')}</button>
+              </form>
 
-        {/* Failure demand types (Layer 2+) */}
-        {study.activeLayer >= 2 && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.failureDemandTypes')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.failureDesc')}</p>
-          <ul className="space-y-2 mb-4">
-            {failureTypes.map((dt) => (
-              <li key={dt.id} className="py-2 px-3 rounded-lg bg-red-50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-red-700">{tl(dt.label)}</span>
-                  <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                </div>
-                {editingDefId === dt.id ? (
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      value={editingDefValue}
-                      onChange={(e) => setEditingDefValue(e.target.value)}
-                      placeholder={t('settings.operationalDefinitionPlaceholder')}
-                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
-                      autoFocus
-                      onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
-                    />
-                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
-                    <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
-                    className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
-                  >
-                    {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          <form onSubmit={(e) => addDemandType(e, 'failure')} className="flex gap-2">
-            <input type="text" value={newFailureType} onChange={(e) => setNewFailureType(e.target.value)} placeholder={t('settings.addFailureType')} className={inputCls} />
-            <button type="submit" disabled={!newFailureType.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
-          </form>
-        </div>}
+              {/* Failure demand types */}
+              <h3 className="text-sm font-semibold mb-1 text-red-700">{t('settings.failureDemandTypes')}</h3>
+              <p className="text-xs text-gray-500 mb-2">{t('settings.failureDesc')}</p>
+              <ul className="space-y-2 mb-4">
+                {failureTypes.map((dt) => (
+                  <li key={dt.id} className="py-2 px-3 rounded-lg bg-red-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-red-700">{tl(dt.label)}</span>
+                      <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    </div>
+                    {editingDefId === dt.id ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={editingDefValue}
+                          onChange={(e) => setEditingDefValue(e.target.value)}
+                          placeholder={t('settings.operationalDefinitionPlaceholder')}
+                          className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                          autoFocus
+                          onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
+                        />
+                        <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                        <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditDef(dt.id, dt.operationalDefinition, 'demand')}
+                        className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
+                      >
+                        {dt.operationalDefinition || t('settings.operationalDefinition') + '...'}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <form onSubmit={(e) => addDemandType(e, 'failure')} className="flex gap-2">
+                <input type="text" value={newFailureType} onChange={(e) => setNewFailureType(e.target.value)} placeholder={t('settings.addFailureType')} className={inputCls} />
+                <button type="submit" disabled={!newFailureType.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
+              </form>
+            </>
+          )}
+        </div>
 
         {/* System Conditions */}
         <div className={cardCls}>
@@ -852,18 +892,35 @@ export default function SettingsPage() {
           <div className={cardCls}>
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workTypes')}</h2>
             <p className="text-sm text-gray-600 mb-3">{t('settings.workTypesDesc')}</p>
-            <ul className="space-y-2 mb-4">
-              {(study.workTypes || []).map((wt) => (
-                <li key={wt.id} className={`${itemCls} bg-amber-50`}>
-                  <span className="text-sm text-amber-700">{tl(wt.label)}</span>
-                  <button onClick={() => removeWorkType(wt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                </li>
-              ))}
-            </ul>
-            <form onSubmit={addWorkTypeHandler} className="flex gap-2">
-              <input type="text" value={newWorkType} onChange={(e) => setNewWorkType(e.target.value)} placeholder={t('settings.addWorkType')} className={inputCls} />
-              <button type="submit" disabled={!newWorkType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-amber-600 hover:bg-amber-700">{t('settings.add')}</button>
-            </form>
+            <label className="flex items-center gap-3 cursor-pointer mb-4">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={study.workTypesEnabled}
+                  onChange={toggleWorkTypes}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-amber-600 transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">{t('settings.enableWorkTypes')}</span>
+            </label>
+            {study.workTypesEnabled && (
+              <>
+                <ul className="space-y-2 mb-4">
+                  {(study.workTypes || []).map((wt) => (
+                    <li key={wt.id} className={`${itemCls} bg-amber-50`}>
+                      <span className="text-sm text-amber-700">{tl(wt.label)}</span>
+                      <button onClick={() => removeWorkType(wt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    </li>
+                  ))}
+                </ul>
+                <form onSubmit={addWorkTypeHandler} className="flex gap-2">
+                  <input type="text" value={newWorkType} onChange={(e) => setNewWorkType(e.target.value)} placeholder={t('settings.addWorkType')} className={inputCls} />
+                  <button type="submit" disabled={!newWorkType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-amber-600 hover:bg-amber-700">{t('settings.add')}</button>
+                </form>
+              </>
+            )}
           </div>
         )}
         {/* Capture form preview */}
