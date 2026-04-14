@@ -494,58 +494,56 @@ export default function DashboardPage() {
               </ChartCard>
             </div>}
 
-            {/* Failure Flow Sankey (Layer 2+) */}
+            {/* Failures by original value demand type */}
+            {activeLayer >= 2 && data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0 && (
+              <ChartCard title={t('dashboard.failureByValueTitle')}>
+                <ResponsiveContainer width="100%" height={Math.max(200, data.failuresByOriginalValueDemand.length * 45)}>
+                  <BarChart data={data.failuresByOriginalValueDemand} layout="vertical" margin={{ left: 10, right: 60 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: THEME.textSecondary, fontSize: 12 }} />
+                    <YAxis type="category" dataKey="label" width={140} tick={{ fill: THEME.text, fontSize: 12 }} tickFormatter={(v: string) => tl(v)} />
+                    <Tooltip {...tooltipStyle} />
+                    <Bar dataKey="count" fill={COLORS.failure} radius={[0, 4, 4, 0]}
+                      label={(props) => {
+                        const total = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
+                        const pct = total > 0 ? Math.round(((props.value as number) / total) * 100) : 0;
+                        return `${props.value} (${pct}%)`;
+                      }}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            )}
+
+            {/* Failure Flow Sankey */}
             {activeLayer >= 2 && (() => {
               const flowLinks = data.failureFlowLinks || [];
-              if (flowLinks.length > 0) {
-                const sankeyData = buildSankeyData(flowLinks, tl);
-                const totalNodes = sankeyData.nodes.length;
-                const sc = sankeyData.sourceCount;
-                const meta = sankeyData.linkMeta;
-                return (
-                  <ChartCard title={t('dashboard.failureFlow')}>
-                    <p className="text-xs text-gray-500 mb-2 -mt-1">{t('dashboard.flowClickHint')}</p>
-                    <ResponsiveContainer width="100%" height={Math.max(300, totalNodes * 35)}>
-                      <Sankey
-                        data={sankeyData}
-                        nodePadding={24}
-                        nodeWidth={10}
-                        linkCurvature={0.5}
-                        margin={{ top: 10, right: 160, bottom: 10, left: 160 }}
-                        node={(props: NodeProps) => <SankeyNode {...props} sourceCount={sc} />}
-                        link={(props: LinkProps) => {
-                          const m = meta.get(props.index);
-                          return <SankeyLink {...props} onClick={m ? () => setSelectedFlow(m) : undefined} />;
-                        }}
-                      >
-                        <Tooltip />
-                      </Sankey>
-                    </ResponsiveContainer>
-                  </ChartCard>
-                );
-              }
-              if (data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) {
-                return (
-                  <ChartCard title={t('dashboard.failureByValueTitle')}>
-                    <ResponsiveContainer width="100%" height={Math.max(200, data.failuresByOriginalValueDemand.length * 45)}>
-                      <BarChart data={data.failuresByOriginalValueDemand} layout="vertical" margin={{ left: 10, right: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
-                        <XAxis type="number" allowDecimals={false} tick={{ fill: THEME.textSecondary, fontSize: 12 }} />
-                        <YAxis type="category" dataKey="label" width={140} tick={{ fill: THEME.text, fontSize: 12 }} tickFormatter={(v: string) => tl(v)} />
-                        <Tooltip {...tooltipStyle} />
-                        <Bar dataKey="count" fill={COLORS.failure} radius={[0, 4, 4, 0]}
-                          label={(props) => {
-                            const total = data.failuresByOriginalValueDemand.reduce((s, d) => s + d.count, 0);
-                            const pct = total > 0 ? Math.round(((props.value as number) / total) * 100) : 0;
-                            return `${props.value} (${pct}%)`;
-                          }}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
-                );
-              }
-              return null;
+              if (flowLinks.length === 0) return null;
+              const sankeyData = buildSankeyData(flowLinks, tl);
+              const totalNodes = sankeyData.nodes.length;
+              const sc = sankeyData.sourceCount;
+              const meta = sankeyData.linkMeta;
+              return (
+                <ChartCard title={t('dashboard.failureFlow')}>
+                  <p className="text-xs text-gray-500 mb-2 -mt-1">{t('dashboard.flowClickHint')}</p>
+                  <ResponsiveContainer width="100%" height={Math.max(300, totalNodes * 35)}>
+                    <Sankey
+                      data={sankeyData}
+                      nodePadding={24}
+                      nodeWidth={10}
+                      linkCurvature={0.5}
+                      margin={{ top: 10, right: 160, bottom: 10, left: 160 }}
+                      node={(props: NodeProps) => <SankeyNode {...props} sourceCount={sc} />}
+                      link={(props: LinkProps) => {
+                        const m = meta.get(props.index);
+                        return <SankeyLink {...props} onClick={m ? () => setSelectedFlow(m) : undefined} />;
+                      }}
+                    >
+                      <Tooltip />
+                    </Sankey>
+                  </ResponsiveContainer>
+                </ChartCard>
+              );
             })()}
 
             {/* Contact methods + What Matters */}
