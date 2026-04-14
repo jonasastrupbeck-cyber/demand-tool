@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
+import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 
 interface HandlingType {
   id: string;
@@ -168,15 +169,6 @@ export default function SettingsPage() {
     });
     localStorage.setItem(`consultant_pin_${code}`, newPinInput.trim());
     setNewPinInput('');
-    loadStudy();
-  }
-
-  async function toggleCapture(field: 'classificationEnabled' | 'handlingEnabled' | 'valueLinkingEnabled' | 'systemConditionsEnabled' | 'workTypesEnabled' | 'demandTypesEnabled', value: boolean) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
-    });
     loadStudy();
   }
 
@@ -576,28 +568,7 @@ export default function SettingsPage() {
 
         {/* What are we capturing? — toggles that replaced layer activation */}
         <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('capture.toggles.title')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('capture.toggles.desc')}</p>
-          <div className="space-y-2">
-            {([
-              { key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
-              { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
-              { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
-              { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
-              { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
-              { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
-            ] as const).map((row) => (
-              <label key={row.key} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer">
-                <span className="text-sm text-gray-700">{row.label}</span>
-                <input
-                  type="checkbox"
-                  checked={row.value}
-                  onChange={(e) => toggleCapture(row.key, e.target.checked)}
-                  className="h-4 w-4 accent-[#ac2c2d]"
-                />
-              </label>
-            ))}
-          </div>
+          <CaptureTogglesPanel code={code} study={study} onChange={loadStudy} />
         </div>
 
         {/* Access code */}

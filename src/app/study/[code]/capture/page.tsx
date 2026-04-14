@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import EntryEditModal from '@/components/EntryEditModal';
+import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 
 interface HandlingType {
   id: string;
@@ -96,6 +97,7 @@ export default function CapturePage() {
   const [filter, setFilter] = useState<'all' | 'needsClassification' | 'needsHandling' | 'needsValueLink'>('all');
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [listLimit, setListLimit] = useState(50);
+  const [showTogglesModal, setShowTogglesModal] = useState(false);
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
@@ -441,9 +443,31 @@ export default function CapturePage() {
             </button>
           </div>
         </div>
-        <span className="text-sm px-3 py-1 rounded-full font-medium bg-blue-50 text-blue-700">
-          {t('capture.today')}: {todayCount}
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowTogglesModal(true)}
+            title={t('capture.toggles.title')}
+            aria-label={t('capture.toggles.title')}
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="4" y1="21" x2="4" y2="14"></line>
+              <line x1="4" y1="10" x2="4" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12" y2="3"></line>
+              <line x1="20" y1="21" x2="20" y2="16"></line>
+              <line x1="20" y1="12" x2="20" y2="3"></line>
+              <line x1="1" y1="14" x2="7" y2="14"></line>
+              <line x1="9" y1="8" x2="15" y2="8"></line>
+              <line x1="17" y1="16" x2="23" y2="16"></line>
+            </svg>
+            <span className="hidden sm:inline">{t('capture.toggles.title')}</span>
+          </button>
+          <span className="text-sm px-3 py-1 rounded-full font-medium bg-blue-50 text-blue-700">
+            {t('capture.today')}: {todayCount}
+          </span>
+        </div>
       </div>
 
       {/* Demand / Work tabs (only when work tracking is enabled) */}
@@ -968,6 +992,38 @@ export default function CapturePage() {
           onSaved={() => { loadTodayCount(); loadPendingCounts(); }}
           onStudyRefresh={refreshStudy}
         />
+      )}
+
+      {showTogglesModal && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowTogglesModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+              <h3 className="font-bold text-gray-900">{t('capture.toggles.title')}</h3>
+              <button
+                onClick={() => setShowTogglesModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-600 mb-3">{t('capture.toggles.desc')}</p>
+              <CaptureTogglesPanel
+                code={code}
+                study={study}
+                onChange={refreshStudy}
+                showHeader={false}
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
