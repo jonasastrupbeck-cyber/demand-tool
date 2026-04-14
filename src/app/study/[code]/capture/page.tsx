@@ -467,7 +467,7 @@ export default function CapturePage() {
       {/* Demand / Work tabs (only when work tracking is enabled) */}
       {study.workTrackingEnabled && (
         <div className="mb-4">
-          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
+          <div className="grid grid-cols-2 gap-2 p-1 bg-gray-200 rounded-lg">
             <button
               type="button"
               onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
@@ -562,33 +562,33 @@ export default function CapturePage() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
                 className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
                   classification === 'value'
                     ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
-                    : 'bg-green-50 text-green-700 border-2 border-green-200 hover:border-green-400'
+                    : 'bg-gray-200 text-green-700 hover:bg-gray-300'
                 }`}
               >
                 {t('capture.value')}
               </button>
               <button
                 type="button"
-                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
+                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); setMoreDetailsOpen(true); }}
                 className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
                   classification === 'failure'
                     ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
-                    : 'bg-red-50 text-red-700 border-2 border-red-200 hover:border-red-400'
+                    : 'bg-gray-200 text-red-700 hover:bg-gray-300'
                 }`}
               >
                 {t('capture.failure')}
               </button>
               <button
                 type="button"
-                onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
                 className={`py-3.5 rounded-lg font-semibold text-base transition-all ${
                   classification === 'unknown'
                     ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500 ring-offset-2'
-                    : 'bg-amber-50 text-amber-700 border-2 border-amber-200 hover:border-amber-400'
+                    : 'bg-gray-200 text-amber-700 hover:bg-gray-300'
                 }`}
               >
                 {t('capture.unknown')}
