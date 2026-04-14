@@ -1623,6 +1623,24 @@ const translations = {
     sv: 'Vad registrerar vi?',
     de: 'Was erfassen wir?',
   },
+  'capture.moreDetails': {
+    en: 'More details',
+    da: 'Flere detaljer',
+    sv: 'Mer detaljer',
+    de: 'Weitere Details',
+  },
+  'capture.editName': {
+    en: 'Change name',
+    da: 'Skift navn',
+    sv: 'Byt namn',
+    de: 'Name ändern',
+  },
+  'capture.entriesSheetTrigger': {
+    en: 'Entries',
+    da: 'Registreringer',
+    sv: 'Poster',
+    de: 'Einträge',
+  },
   'capture.toggles.desc': {
     en: 'Turn on only what the team is ready to learn from. You can change this at any time.',
     da: 'Slå kun det til, som teamet er klar til at lære af. Du kan ændre det når som helst.',

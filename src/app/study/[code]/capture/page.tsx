@@ -98,6 +98,8 @@ export default function CapturePage() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [listLimit, setListLimit] = useState(50);
   const [showTogglesModal, setShowTogglesModal] = useState(false);
+  const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
+  const [entriesSheetOpen, setEntriesSheetOpen] = useState(false);
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
@@ -428,46 +430,38 @@ export default function CapturePage() {
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
-      {/* Header with collector name and today's count */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{study.name}</h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-sm text-gray-500">{collectorName}</span>
+      {/* Header: study name, collector (with pencil), settings icon */}
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 truncate">{study.name}</h1>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-sm text-gray-500 truncate">{collectorName}</span>
             <button
               type="button"
               onClick={() => { localStorage.removeItem(`collector_${code}`); setCollectorName(''); setNameConfirmed(false); }}
-              className="text-xs text-[#ac2c2d] hover:text-[#8a2324]"
+              title={t('capture.editName')}
+              aria-label={t('capture.editName')}
+              className="text-gray-400 hover:text-gray-600"
             >
-              {t('capture.notYou')}
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              </svg>
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowTogglesModal(true)}
-            title={t('capture.toggles.title')}
-            aria-label={t('capture.toggles.title')}
-            className="inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full font-medium bg-gray-100 text-gray-700 hover:bg-gray-200"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="4" y1="21" x2="4" y2="14"></line>
-              <line x1="4" y1="10" x2="4" y2="3"></line>
-              <line x1="12" y1="21" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12" y2="3"></line>
-              <line x1="20" y1="21" x2="20" y2="16"></line>
-              <line x1="20" y1="12" x2="20" y2="3"></line>
-              <line x1="1" y1="14" x2="7" y2="14"></line>
-              <line x1="9" y1="8" x2="15" y2="8"></line>
-              <line x1="17" y1="16" x2="23" y2="16"></line>
-            </svg>
-            <span className="hidden sm:inline">{t('capture.toggles.title')}</span>
-          </button>
-          <span className="text-sm px-3 py-1 rounded-full font-medium bg-blue-50 text-blue-700">
-            {t('capture.today')}: {todayCount}
-          </span>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowTogglesModal(true)}
+          title={t('capture.toggles.title')}
+          aria-label={t('capture.toggles.title')}
+          className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full text-gray-600 bg-gray-100 hover:bg-gray-200"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
       </div>
 
       {/* Demand / Work tabs (only when work tracking is enabled) */}
@@ -537,55 +531,6 @@ export default function CapturePage() {
         </div>
       )}
 
-      {/* Search previous entries */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => { setSearchOpen(!searchOpen); setSearchQuery(''); setSearchResults([]); }}
-          className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1.5"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          {t('capture.searchEntries')}
-        </button>
-        {searchOpen && (
-          <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('capture.searchPlaceholder')}
-              className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-              autoFocus
-            />
-            {searchLoading && <p className="mt-2 text-xs text-gray-400">{t('capture.loading')}</p>}
-            {!searchLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
-              <p className="mt-2 text-xs text-gray-400">{t('capture.searchNoResults')}</p>
-            )}
-            {searchResults.length > 0 && (
-              <ul className="mt-2 space-y-1.5 max-h-48 overflow-y-auto">
-                {searchResults.map((r) => (
-                  <li key={r.id} className="flex items-start gap-2 p-2 bg-white rounded border border-gray-100">
-                    <span className={`shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                      r.classification === 'value' ? 'bg-green-100 text-green-700' :
-                      r.classification === 'failure' ? 'bg-red-100 text-red-700' :
-                      'bg-amber-100 text-amber-700'
-                    }`}>
-                      {r.classification === 'value' ? t('capture.value') : r.classification === 'failure' ? t('capture.failure') : '?'}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm text-gray-700 truncate">{r.verbatim || '—'}</p>
-                      {(r.demandTypeLabel || r.workTypeLabel) && (
-                        <p className="text-xs text-gray-400 truncate">{tl(r.demandTypeLabel || r.workTypeLabel || '')}</p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Verbatim — the customer's words (hidden in volume mode) */}
         {!study.volumeMode && (
@@ -602,30 +547,6 @@ export default function CapturePage() {
               autoFocus
               required
             />
-          </div>
-        )}
-
-        {/* Contact method */}
-        <div>
-          <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
-          <select value={contactMethodId} onChange={(e) => setContactMethodId(e.target.value)} className={inputCls}>
-            <option value="">{t('capture.selectContactMethod')}</option>
-            {study.contactMethods.map((cm) => (
-              <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Point of transaction */}
-        {study.pointsOfTransaction.length > 0 && (
-          <div>
-            <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
-            <select value={pointOfTransactionId} onChange={(e) => setPointOfTransactionId(e.target.value)} className={inputCls}>
-              <option value="">{t('capture.selectPointOfTransaction')}</option>
-              {study.pointsOfTransaction.map((pot) => (
-                <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-              ))}
-            </select>
           </div>
         )}
 
@@ -673,6 +594,45 @@ export default function CapturePage() {
                 {t('capture.unknown')}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* More details disclosure — hides secondary fields by default */}
+        <button
+          type="button"
+          onClick={() => setMoreDetailsOpen((o) => !o)}
+          aria-expanded={moreDetailsOpen}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 py-1"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: moreDetailsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 120ms' }}>
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+          {t('capture.moreDetails')}
+        </button>
+
+        {moreDetailsOpen && (
+        <div className="space-y-4 pl-3 border-l-2 border-gray-100">
+        {/* Contact method */}
+        <div>
+          <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
+          <select value={contactMethodId} onChange={(e) => setContactMethodId(e.target.value)} className={inputCls}>
+            <option value="">{t('capture.selectContactMethod')}</option>
+            {study.contactMethods.map((cm) => (
+              <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Point of transaction */}
+        {study.pointsOfTransaction.length > 0 && (
+          <div>
+            <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
+            <select value={pointOfTransactionId} onChange={(e) => setPointOfTransactionId(e.target.value)} className={inputCls}>
+              <option value="">{t('capture.selectPointOfTransaction')}</option>
+              {study.pointsOfTransaction.map((pot) => (
+                <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+              ))}
+            </select>
           </div>
         )}
 
@@ -876,6 +836,8 @@ export default function CapturePage() {
             <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
           </div>
         )}
+        </div>
+        )}
 
         {/* Submit button - sticky at bottom */}
         <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
@@ -891,82 +853,171 @@ export default function CapturePage() {
         </div>
       </form>
 
-      {/* Entries list with filter chips */}
-      <div className="mt-8">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('capture.entriesListTitle')}</h2>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {([
-            { key: 'all', label: t('capture.filterAll'), count: entries.length, show: true },
-            { key: 'needsClassification', label: t('capture.filterNeedsClassification'), count: pendingCounts.needsClassification, show: study.classificationEnabled },
-            { key: 'needsHandling', label: t('capture.filterNeedsHandling'), count: pendingCounts.needsHandling, show: study.handlingEnabled },
-            { key: 'needsValueLink', label: t('capture.filterNeedsValueLink'), count: pendingCounts.needsValueLink, show: study.valueLinkingEnabled },
-          ] as const).filter(c => c.show).map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => setFilter(chip.key as typeof filter)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                filter === chip.key
-                  ? 'bg-[#ac2c2d] text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {chip.label} {chip.key !== 'all' && `(${chip.count})`}
-            </button>
-          ))}
-        </div>
-
-        <ul className="space-y-2">
-          {entries
-            .filter((e) => {
-              if (filter === 'needsClassification') return e.classification === 'unknown';
-              if (filter === 'needsHandling') return !e.handlingTypeId;
-              if (filter === 'needsValueLink') return e.entryType === 'demand' && e.classification === 'failure' && !e.linkedValueDemandEntryId;
-              return true;
-            })
-            .slice(0, listLimit)
-            .map((e) => {
-              const dt = study.demandTypes.find(d => d.id === e.demandTypeId);
-              const ht = study.handlingTypes.find(h => h.id === e.handlingTypeId);
-              return (
-                <li key={e.id} className="p-3 rounded-lg border border-gray-200 bg-white">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                        <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          e.classification === 'value' ? 'bg-green-100 text-green-700' :
-                          e.classification === 'failure' ? 'bg-red-100 text-red-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                          {e.classification === 'value' ? t('capture.value') : e.classification === 'failure' ? t('capture.failure') : '?'}
-                        </span>
-                        {dt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(dt.label)}</span>}
-                        {ht && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(ht.label)}</span>}
-                      </div>
-                      <p className="text-sm text-gray-700 line-clamp-2">{e.verbatim || '—'}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingEntryId(e.id)}
-                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200"
-                    >
-                      {t('capture.edit')}
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-        </ul>
-        {entries.length > listLimit && (
-          <button
-            type="button"
-            onClick={() => setListLimit((n) => n + 50)}
-            className="mt-3 text-sm text-gray-500 hover:text-gray-700"
-          >
-            {t('capture.showMore')}
-          </button>
-        )}
+      {/* Entries sheet trigger — stays near the bottom of the scroll area, above the sticky Save */}
+      <div className="mt-8 mb-24">
+        <button
+          type="button"
+          onClick={() => setEntriesSheetOpen(true)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-left"
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-medium text-gray-800">
+              {t('capture.entriesSheetTrigger')} · {entries.length}
+            </div>
+            <div className="text-xs text-gray-500 truncate">
+              {[
+                study.classificationEnabled && pendingCounts.needsClassification > 0 && `${pendingCounts.needsClassification} ${t('capture.filterNeedsClassification').toLowerCase()}`,
+                study.handlingEnabled && pendingCounts.needsHandling > 0 && `${pendingCounts.needsHandling} ${t('capture.filterNeedsHandling').toLowerCase()}`,
+                study.valueLinkingEnabled && pendingCounts.needsValueLink > 0 && `${pendingCounts.needsValueLink} ${t('capture.filterNeedsValueLink').toLowerCase()}`,
+              ].filter(Boolean).join(' · ') || `${t('capture.today')}: ${todayCount}`}
+            </div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-gray-400">
+            <polyline points="18 15 12 9 6 15"></polyline>
+          </svg>
+        </button>
       </div>
+
+      {/* Entries bottom sheet */}
+      {entriesSheetOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center"
+          onClick={() => setEntriesSheetOpen(false)}
+        >
+          <div
+            className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sheet header */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">{t('capture.entriesListTitle')}</h3>
+              <button
+                onClick={() => setEntriesSheetOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="px-4 pt-3">
+              <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+                  placeholder={t('capture.searchPlaceholder')}
+                  className="w-full pl-9 pr-3 py-2 rounded-lg text-sm text-gray-900 bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-[#ac2c2d] focus:bg-white outline-none"
+                />
+              </div>
+              {searchLoading && <p className="mt-2 text-xs text-gray-400">{t('capture.loading')}</p>}
+              {!searchLoading && searchQuery.length >= 2 && searchResults.length === 0 && (
+                <p className="mt-2 text-xs text-gray-400">{t('capture.searchNoResults')}</p>
+              )}
+              {searchResults.length > 0 && (
+                <ul className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                  {searchResults.map((r) => (
+                    <li key={r.id} className="flex items-start gap-2 p-2 bg-gray-50 rounded border border-gray-100">
+                      <span className={`shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        r.classification === 'value' ? 'bg-green-100 text-green-700' :
+                        r.classification === 'failure' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {r.classification === 'value' ? t('capture.value') : r.classification === 'failure' ? t('capture.failure') : '?'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-700 truncate">{r.verbatim || '—'}</p>
+                        {(r.demandTypeLabel || r.workTypeLabel) && (
+                          <p className="text-xs text-gray-400 truncate">{tl(r.demandTypeLabel || r.workTypeLabel || '')}</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Filter chips */}
+            <div className="px-4 py-3 flex flex-wrap gap-2 border-b border-gray-100">
+              {([
+                { key: 'all', label: t('capture.filterAll'), count: entries.length, show: true },
+                { key: 'needsClassification', label: t('capture.filterNeedsClassification'), count: pendingCounts.needsClassification, show: study.classificationEnabled },
+                { key: 'needsHandling', label: t('capture.filterNeedsHandling'), count: pendingCounts.needsHandling, show: study.handlingEnabled },
+                { key: 'needsValueLink', label: t('capture.filterNeedsValueLink'), count: pendingCounts.needsValueLink, show: study.valueLinkingEnabled },
+              ] as const).filter(c => c.show).map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setFilter(chip.key as typeof filter)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    filter === chip.key
+                      ? 'bg-[#ac2c2d] text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {chip.label} {chip.key !== 'all' && `(${chip.count})`}
+                </button>
+              ))}
+            </div>
+
+            {/* Entries list */}
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <ul className="space-y-2">
+                {entries
+                  .filter((e) => {
+                    if (filter === 'needsClassification') return e.classification === 'unknown';
+                    if (filter === 'needsHandling') return !e.handlingTypeId;
+                    if (filter === 'needsValueLink') return e.entryType === 'demand' && e.classification === 'failure' && !e.linkedValueDemandEntryId;
+                    return true;
+                  })
+                  .slice(0, listLimit)
+                  .map((e) => {
+                    const dt = study.demandTypes.find(d => d.id === e.demandTypeId);
+                    const ht = study.handlingTypes.find(h => h.id === e.handlingTypeId);
+                    return (
+                      <li key={e.id} className="p-3 rounded-lg border border-gray-200 bg-white">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                              <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                e.classification === 'value' ? 'bg-green-100 text-green-700' :
+                                e.classification === 'failure' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {e.classification === 'value' ? t('capture.value') : e.classification === 'failure' ? t('capture.failure') : '?'}
+                              </span>
+                              {dt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(dt.label)}</span>}
+                              {ht && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(ht.label)}</span>}
+                            </div>
+                            <p className="text-sm text-gray-700 line-clamp-2">{e.verbatim || '—'}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEntryId(e.id)}
+                            className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200"
+                          >
+                            {t('capture.edit')}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+              {entries.length > listLimit && (
+                <button
+                  type="button"
+                  onClick={() => setListLimit((n) => n + 50)}
+                  className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+                >
+                  {t('capture.showMore')}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingEntryId && (
         <EntryEditModal
