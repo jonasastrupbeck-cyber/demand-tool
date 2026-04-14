@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
+import InlineTypeAdder from './InlineTypeAdder';
 
 interface HandlingType { id: string; label: string }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
@@ -13,6 +14,9 @@ interface SystemCondition { id: string; label: string }
 
 export interface EntryEditModalStudy {
   activeLayer: number;
+  classificationEnabled: boolean;
+  handlingEnabled: boolean;
+  valueLinkingEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   systemConditionsEnabled: boolean;
@@ -48,9 +52,10 @@ interface Props {
   study: EntryEditModalStudy;
   onClose: () => void;
   onSaved?: () => void;
+  onStudyRefresh?: () => Promise<void> | void;
 }
 
-export default function EntryEditModal({ code, entryId, study, onClose, onSaved }: Props) {
+export default function EntryEditModal({ code, entryId, study, onClose, onSaved, onStudyRefresh }: Props) {
   const { t, tl } = useLocale();
 
   const [loading, setLoading] = useState(true);
@@ -141,7 +146,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
             </div>
 
             {/* Classification */}
-            {study.activeLayer >= 2 && (
+            {study.classificationEnabled && (
               <div>
                 <label className={labelCls}>{t('reclassify.classifyAs')}</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -175,18 +180,28 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
             {isDemand && study.demandTypesEnabled && entry.classification !== 'unknown' && (
               <div>
                 <label className={labelCls}>{t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}</label>
-                <select
-                  value={entry.demandTypeId || ''}
-                  onChange={(e) => setEntry({ ...entry, demandTypeId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectType')}</option>
-                  {study.demandTypes
-                    .filter((dt) => dt.category === entry.classification)
-                    .map((dt) => (
-                      <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                    ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.demandTypeId || ''}
+                    onChange={(e) => setEntry({ ...entry, demandTypeId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.selectType')}</option>
+                    {study.demandTypes
+                      .filter((dt) => dt.category === entry.classification)
+                      .map((dt) => (
+                        <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                      ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="demand-types"
+                    extraBody={{ category: entry.classification as string }}
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, demandTypeId: id })}
+                    compact
+                  />
+                </div>
               </div>
             )}
 
@@ -194,71 +209,107 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
             {!isDemand && study.workTypesEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.workTypeLabel')}</label>
-                <select
-                  value={entry.workTypeId || ''}
-                  onChange={(e) => setEntry({ ...entry, workTypeId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectWorkType')}</option>
-                  {study.workTypes.map((wt) => (
-                    <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.workTypeId || ''}
+                    onChange={(e) => setEntry({ ...entry, workTypeId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.selectWorkType')}</option>
+                    {study.workTypes.map((wt) => (
+                      <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
+                    ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="work-types"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, workTypeId: id })}
+                    compact
+                  />
+                </div>
               </div>
             )}
 
             {/* Handling type */}
-            {study.activeLayer >= 3 && (
+            {study.handlingEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.handlingLabel')}</label>
-                <select
-                  value={entry.handlingTypeId || ''}
-                  onChange={(e) => setEntry({ ...entry, handlingTypeId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectHandling')}</option>
-                  {study.handlingTypes.map((ht) => (
-                    <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.handlingTypeId || ''}
+                    onChange={(e) => setEntry({ ...entry, handlingTypeId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.selectHandling')}</option>
+                    {study.handlingTypes.map((ht) => (
+                      <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
+                    ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="handling-types"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
+                    compact
+                  />
+                </div>
               </div>
             )}
 
             {/* Contact method */}
             <div>
               <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
-              <select
-                value={entry.contactMethodId || ''}
-                onChange={(e) => setEntry({ ...entry, contactMethodId: e.target.value || null })}
-                className={inputCls}
-              >
-                <option value="">{t('capture.selectContactMethod')}</option>
-                {study.contactMethods.map((cm) => (
-                  <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={entry.contactMethodId || ''}
+                  onChange={(e) => setEntry({ ...entry, contactMethodId: e.target.value || null })}
+                  className={inputCls}
+                >
+                  <option value="">{t('capture.selectContactMethod')}</option>
+                  {study.contactMethods.map((cm) => (
+                    <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+                  ))}
+                </select>
+                <InlineTypeAdder
+                  code={code}
+                  apiPath="contact-methods"
+                  onRefresh={onStudyRefresh}
+                  onCreated={(id) => setEntry({ ...entry, contactMethodId: id })}
+                  compact
+                />
+              </div>
             </div>
 
             {/* Point of transaction */}
             <div>
               <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
-              <select
-                value={entry.pointOfTransactionId || ''}
-                onChange={(e) => setEntry({ ...entry, pointOfTransactionId: e.target.value || null })}
-                className={inputCls}
-              >
-                <option value="">{t('capture.selectPointOfTransaction')}</option>
-                {study.pointsOfTransaction.map((pot) => (
-                  <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={entry.pointOfTransactionId || ''}
+                  onChange={(e) => setEntry({ ...entry, pointOfTransactionId: e.target.value || null })}
+                  className={inputCls}
+                >
+                  <option value="">{t('capture.selectPointOfTransaction')}</option>
+                  {study.pointsOfTransaction.map((pot) => (
+                    <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+                  ))}
+                </select>
+                <InlineTypeAdder
+                  code={code}
+                  apiPath="points-of-transaction"
+                  onRefresh={onStudyRefresh}
+                  onCreated={(id) => setEntry({ ...entry, pointOfTransactionId: id })}
+                  compact
+                />
+              </div>
             </div>
 
             {/* System conditions (failure only) */}
-            {isFailure && study.systemConditionsEnabled && study.systemConditions.length > 0 && (
+            {isFailure && study.systemConditionsEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {study.systemConditions.map((sc) => {
                     const selected = systemConditionIds.includes(sc.id);
                     return (
@@ -280,6 +331,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
                       </button>
                     );
                   })}
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="system-conditions"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setSystemConditionIds((prev) => [...prev, id])}
+                    compact
+                  />
                 </div>
               </div>
             )}
@@ -299,27 +357,37 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
             )}
 
             {/* Original value demand (failure demand only) */}
-            {isFailure && isDemand && (
+            {isFailure && isDemand && study.valueLinkingEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
-                <select
-                  value={entry.originalValueDemandTypeId || ''}
-                  onChange={(e) => setEntry({ ...entry, originalValueDemandTypeId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectOriginalValueDemand')}</option>
-                  {study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => (
-                    <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.originalValueDemandTypeId || ''}
+                    onChange={(e) => setEntry({ ...entry, originalValueDemandTypeId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.selectOriginalValueDemand')}</option>
+                    {study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => (
+                      <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                    ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="demand-types"
+                    extraBody={{ category: 'value' }}
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, originalValueDemandTypeId: id })}
+                    compact
+                  />
+                </div>
               </div>
             )}
 
             {/* What matters multi-select (demand only) */}
-            {isDemand && study.whatMattersTypes.length > 0 && (
+            {isDemand && (
               <div>
                 <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {study.whatMattersTypes.map((wm) => {
                     const selected = whatMattersTypeIds.includes(wm.id);
                     return (
@@ -341,6 +409,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved 
                       </button>
                     );
                   })}
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="what-matters-types"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setWhatMattersTypeIds((prev) => [...prev, id])}
+                    compact
+                  />
                 </div>
               </div>
             )}

@@ -743,6 +743,34 @@ export async function setEntryLifecycleOverride(entryId: string, stageId: string
   await db.update(demandEntries).set({ lifecycleStageId: stageId }).where(eq(demandEntries.id, entryId));
 }
 
+export async function getPendingCounts(studyId: string) {
+  // Needs classification: entries still marked 'unknown'
+  const needsClass = await db.select({ count: sql<number>`count(*)::int` })
+    .from(demandEntries)
+    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.classification, 'unknown')));
+
+  // Needs handling: no handlingTypeId (demand entries only — handling also applies to work but often skipped)
+  const needsHandling = await db.select({ count: sql<number>`count(*)::int` })
+    .from(demandEntries)
+    .where(and(eq(demandEntries.studyId, studyId), isNull(demandEntries.handlingTypeId)));
+
+  // Needs value link: failure demand entries without a linked value demand entry
+  const needsValueLink = await db.select({ count: sql<number>`count(*)::int` })
+    .from(demandEntries)
+    .where(and(
+      eq(demandEntries.studyId, studyId),
+      eq(demandEntries.entryType, 'demand'),
+      eq(demandEntries.classification, 'failure'),
+      isNull(demandEntries.linkedValueDemandEntryId),
+    ));
+
+  return {
+    needsClassification: needsClass[0]?.count || 0,
+    needsHandling: needsHandling[0]?.count || 0,
+    needsValueLink: needsValueLink[0]?.count || 0,
+  };
+}
+
 export async function searchEntries(studyId: string, options: { query?: string; typeId?: string; limit?: number }) {
   const limit = options.limit || 10;
   const conditions: ReturnType<typeof eq>[] = [eq(demandEntries.studyId, studyId)];

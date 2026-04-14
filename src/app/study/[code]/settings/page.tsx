@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
-import type { TranslationKey } from '@/lib/i18n';
 
 interface HandlingType {
   id: string;
@@ -64,6 +63,9 @@ interface StudyData {
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;
+  classificationEnabled: boolean;
+  handlingEnabled: boolean;
+  valueLinkingEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -91,7 +93,6 @@ export default function SettingsPage() {
   const [newPinInput, setNewPinInput] = useState('');
 
   // Layer activation
-  const [activatingLayer, setActivatingLayer] = useState(false);
 
   // Purpose
   const [purposeInput, setPurposeInput] = useState('');
@@ -170,37 +171,12 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  async function handleActivateLayer() {
-    if (!study) return;
-    const nextLayer = study.activeLayer + 1;
-    if (nextLayer > 5) return;
-
-    // Check if there are pending reclassification items for the current layer
-    const currentLayer = study.activeLayer;
-    let reclassifyCount = 0;
-    if (currentLayer >= 2) {
-      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/reclassify?layer=${currentLayer}`);
-      if (res.ok) {
-        const data = await res.json();
-        reclassifyCount = data.entries?.length || 0;
-      }
-    }
-
-    const confirmMsg = reclassifyCount > 0
-      ? t('layers.reclassifyWarning', { count: String(reclassifyCount) })
-      : t('layers.noReclassifyNeeded', { layer: String(nextLayer) });
-
-    const confirmed = window.confirm(confirmMsg);
-    if (!confirmed) return;
-
-    setActivatingLayer(true);
-    const pin = localStorage.getItem(`consultant_pin_${code}`) || '';
-    await fetch(`/api/studies/${encodeURIComponent(code)}/activate-layer`, {
+  async function toggleCapture(field: 'classificationEnabled' | 'handlingEnabled' | 'valueLinkingEnabled' | 'systemConditionsEnabled' | 'workTypesEnabled' | 'demandTypesEnabled', value: boolean) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin, targetLayer: nextLayer }),
+      body: JSON.stringify({ [field]: value }),
     });
-    setActivatingLayer(false);
     loadStudy();
   }
 
@@ -549,14 +525,6 @@ export default function SettingsPage() {
   const valueTypes = study.demandTypes.filter(dt => dt.category === 'value');
   const failureTypes = study.demandTypes.filter(dt => dt.category === 'failure');
 
-  const layerDescriptions: Record<number, string> = {
-    1: t('layers.description1'),
-    2: t('layers.description2'),
-    3: t('layers.description3'),
-    4: t('layers.description4'),
-    5: t('layers.description5'),
-  };
-
   return (
     <div className="pb-8">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
@@ -606,70 +574,30 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Layer Control */}
+        {/* What are we capturing? — toggles that replaced layer activation */}
         <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-3 text-gray-900">{t('layers.title')}</h2>
-          <div className="space-y-2 mb-4">
-            {[1, 2, 3, 4, 5].map((layer) => {
-              const isActive = study.activeLayer >= layer;
-              const isNext = layer === study.activeLayer + 1;
-              return (
-                <div
-                  key={layer}
-                  className={`flex items-center justify-between py-2 px-3 rounded-lg ${
-                    isActive ? 'bg-green-50 border border-green-200' : isNext ? 'bg-gray-50 border border-dashed border-gray-300' : 'bg-gray-50 border border-gray-100 opacity-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isActive ? 'bg-green-600 text-white' : 'bg-gray-300 text-white'}`}>
-                      {layer}
-                    </span>
-                    <span className={`text-sm ${isActive ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                      {layerDescriptions[layer]}
-                    </span>
-                  </div>
-                  {isActive && (
-                    <span className="text-xs text-green-600 font-medium">&#10003;</span>
-                  )}
-                </div>
-              );
-            })}
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('capture.toggles.title')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('capture.toggles.desc')}</p>
+          <div className="space-y-2">
+            {([
+              { key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
+              { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
+              { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
+              { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
+              { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+              { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
+            ] as const).map((row) => (
+              <label key={row.key} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer">
+                <span className="text-sm text-gray-700">{row.label}</span>
+                <input
+                  type="checkbox"
+                  checked={row.value}
+                  onChange={(e) => toggleCapture(row.key, e.target.checked)}
+                  className="h-4 w-4 accent-[#ac2c2d]"
+                />
+              </label>
+            ))}
           </div>
-          {study.activeLayer < 5 ? (
-            <>
-              <div className="p-3 mb-3 rounded-lg bg-amber-50 border border-amber-200">
-                <p className="text-xs font-medium text-amber-800 mb-1">{t('layers.guidanceTitle', { layer: String(study.activeLayer + 1) })}</p>
-                <p className="text-xs text-amber-700">{t(`layers.guidance${study.activeLayer + 1}` as TranslationKey)}</p>
-              </div>
-              {(() => {
-                const next = study.activeLayer + 1;
-                const prereqKey = `layers.prereq${next}` as TranslationKey;
-                const hasPrereq = next >= 2 && next <= 5;
-                const prereqMet = next === 2
-                  ? true
-                  : next === 3 ? study.handlingTypes.length > 0
-                  : next === 5 ? study.whatMattersTypes.length > 0
-                  : true; // layer 4 has no hard prereq, just guidance
-                if (hasPrereq && !prereqMet) {
-                  return (
-                    <div className="p-2.5 mb-3 rounded-lg bg-red-50 border border-red-200">
-                      <p className="text-xs text-red-700">{t(prereqKey)}</p>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-              <button
-                onClick={handleActivateLayer}
-                disabled={activatingLayer}
-                className="w-full px-4 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
-              >
-                {activatingLayer ? '...' : t('layers.activate', { layer: String(study.activeLayer + 1) })}
-              </button>
-            </>
-          ) : (
-            <p className="text-sm text-green-600 font-medium text-center">{t('layers.allActive')}</p>
-          )}
         </div>
 
         {/* Access code */}
@@ -688,8 +616,8 @@ export default function SettingsPage() {
 
 
 
-        {/* Handling types (Layer 3+) */}
-        {study.activeLayer >= 3 && <div className={cardCls}>
+        {/* Handling types — visible whenever handling is enabled */}
+        {study.handlingEnabled && <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.handlingTypes')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.handlingDesc')}</p>
           <ul className="space-y-2 mb-4">
@@ -1084,8 +1012,8 @@ export default function SettingsPage() {
                   </select>
                 </div>
               )}
-              {/* Classification (Layer 2+) */}
-              {study.activeLayer >= 2 && (
+              {/* Classification */}
+              {study.classificationEnabled && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('capture.classification')}</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -1094,8 +1022,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-              {/* Demand type (Layer 2+) */}
-              {study.activeLayer >= 2 && valueTypes.length > 0 && (
+              {/* Demand type */}
+              {study.classificationEnabled && valueTypes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: '' })}</label>
                   <div className="flex flex-wrap gap-1.5">
@@ -1108,8 +1036,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
-              {/* Handling (Layer 3+) */}
-              {study.activeLayer >= 3 && study.handlingTypes.length > 0 && (
+              {/* Handling */}
+              {study.handlingEnabled && study.handlingTypes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{t('capture.handlingLabel')}</label>
                   <select disabled className="w-full px-3 py-2 rounded-lg text-sm text-gray-400 bg-gray-50 border border-gray-200">

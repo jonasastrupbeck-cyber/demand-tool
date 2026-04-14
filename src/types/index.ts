@@ -12,6 +12,9 @@ export interface Study {
   workTypesEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
+  classificationEnabled: boolean;
+  handlingEnabled: boolean;
+  valueLinkingEnabled: boolean;
   consultantPin: string | null;
   createdAt: Date;
   isActive: boolean;

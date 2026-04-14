@@ -23,6 +23,23 @@ export async function GET(
     getLifecycleStages(study.id),
   ]);
 
+  // Auto-seed new boolean toggles from legacy activeLayer on first read after upgrade.
+  // Once any toggle is non-default OR is derived, we treat the booleans as authoritative.
+  const needsSeed = study.activeLayer > 1
+    && !study.classificationEnabled
+    && !study.handlingEnabled
+    && !study.valueLinkingEnabled;
+  if (needsSeed) {
+    const seeded: Record<string, boolean> = {};
+    if (study.activeLayer >= 2) seeded.classificationEnabled = true;
+    if (study.activeLayer >= 3) seeded.handlingEnabled = true;
+    if (study.activeLayer >= 4) seeded.valueLinkingEnabled = true;
+    if (Object.keys(seeded).length > 0) {
+      await updateStudy(study.id, seeded);
+      Object.assign(study, seeded);
+    }
+  }
+
   return NextResponse.json({
     ...study,
     handlingTypes: hTypes,
@@ -59,6 +76,9 @@ export async function PUT(
   if (body.workTypesEnabled !== undefined) updates.workTypesEnabled = body.workTypesEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
+  if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;
+  if (body.handlingEnabled !== undefined) updates.handlingEnabled = body.handlingEnabled;
+  if (body.valueLinkingEnabled !== undefined) updates.valueLinkingEnabled = body.valueLinkingEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);

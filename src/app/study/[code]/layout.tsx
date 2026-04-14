@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
@@ -12,28 +11,10 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const code = params.code as string;
   const { locale, setLocale, t } = useLocale();
-  const [reclassifyCount, setReclassifyCount] = useState(0);
-  const [activeLayer, setActiveLayer] = useState(0);
-
-  const fetchStudyMeta = useCallback(async () => {
-    try {
-      const [rRes, sRes] = await Promise.all([
-        fetch(`/api/studies/${encodeURIComponent(code)}/reclassify/count`),
-        fetch(`/api/studies/${encodeURIComponent(code)}`),
-      ]);
-      if (rRes.ok) { const d = await rRes.json(); setReclassifyCount(d.count || 0); }
-      if (sRes.ok) { const d = await sRes.json(); setActiveLayer(d.activeLayer ?? 1); }
-    } catch { /* ignore */ }
-  }, [code]);
-
-  useEffect(() => {
-    fetchStudyMeta();
-  }, [fetchStudyMeta, pathname]);
 
   const workflowTabs: Array<{ labelKey: TranslationKey; href: string }> = [
     { labelKey: 'nav.capture', href: `/study/${code}/capture` },
     { labelKey: 'nav.dashboard', href: `/study/${code}/dashboard` },
-    { labelKey: 'nav.reclassify', href: `/study/${code}/reclassify` },
   ];
   const settingsTab = { labelKey: 'nav.settings' as TranslationKey, href: `/study/${code}/settings` };
 
@@ -58,11 +39,6 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
               <span className="text-xs font-mono px-2 py-1 rounded text-gray-500 bg-gray-100">
                 {code}
               </span>
-              {activeLayer > 0 && (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#ac2c2d] text-white">
-                  L{activeLayer}
-                </span>
-              )}
             </div>
           </div>
           <div className="flex -mb-px">
@@ -80,11 +56,6 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
                     }`}
                   >
                     {t(tab.labelKey)}
-                    {tab.labelKey === 'nav.reclassify' && reclassifyCount > 0 && (
-                      <span className="ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                        {reclassifyCount}
-                      </span>
-                    )}
                   </Link>
                 );
               })}

@@ -113,7 +113,22 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch(`/api/studies/${encodeURIComponent(code)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(s => { if (s) { setStudyName(s.name); setStudyPurpose(s.purpose || ''); setWorkTrackingEnabled(s.workTrackingEnabled); setDemandTypesEnabled(s.demandTypesEnabled ?? false); setActiveLayer(s.activeLayer ?? 5); setFullStudy(s as EntryEditModalStudy); } });
+      .then(s => {
+        if (!s) return;
+        setStudyName(s.name);
+        setStudyPurpose(s.purpose || '');
+        setWorkTrackingEnabled(s.workTrackingEnabled);
+        setDemandTypesEnabled(s.demandTypesEnabled ?? false);
+        // Derive effective layer from the capture toggles so the dashboard
+        // gates stay in sync with what the team chose to capture.
+        let effective = 1;
+        if (s.classificationEnabled) effective = 2;
+        if (s.handlingEnabled) effective = Math.max(effective, 3);
+        if (s.valueLinkingEnabled) effective = Math.max(effective, 4);
+        if ((s.whatMattersTypes?.length || 0) > 0) effective = Math.max(effective, 5);
+        setActiveLayer(effective);
+        setFullStudy(s as EntryEditModalStudy);
+      });
   }, [code]);
 
   // Fetch system conditions when a Sankey flow link is clicked

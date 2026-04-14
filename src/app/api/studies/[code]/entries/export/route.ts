@@ -19,7 +19,13 @@ export async function GET(
   const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
 
-  const activeLayer = study.activeLayer ?? 5;
+  // Derive effective layer from the new capture toggles so exports stay in sync
+  // with what the team chose to capture. Legacy activeLayer is a fallback.
+  let activeLayer = 1;
+  if (study.classificationEnabled) activeLayer = 2;
+  if (study.handlingEnabled) activeLayer = Math.max(activeLayer, 3);
+  if (study.valueLinkingEnabled) activeLayer = Math.max(activeLayer, 4);
+  if (activeLayer === 1) activeLayer = study.activeLayer ?? 5;
 
   // Only fetch lookup data needed for the active layer
   const fetches: Promise<unknown>[] = [

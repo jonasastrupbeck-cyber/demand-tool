@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
+import EntryEditModal from '@/components/EntryEditModal';
 
 interface HandlingType {
   id: string;
@@ -49,6 +50,9 @@ interface StudyData {
   workTypesEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
+  classificationEnabled: boolean;
+  handlingEnabled: boolean;
+  valueLinkingEnabled: boolean;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -74,6 +78,24 @@ export default function CapturePage() {
   const [collectorName, setCollectorName] = useState('');
   const [nameConfirmed, setNameConfirmed] = useState(false);
   const [lastEntry, setLastEntry] = useState<{ id: string; verbatim: string } | null>(null);
+
+  // Entries list + filter chips
+  interface EntryRow {
+    id: string;
+    verbatim: string;
+    classification: 'value' | 'failure' | 'unknown';
+    entryType: 'demand' | 'work';
+    demandTypeId: string | null;
+    handlingTypeId: string | null;
+    linkedValueDemandEntryId: string | null;
+    createdAt: string;
+    collectorName: string | null;
+  }
+  const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [pendingCounts, setPendingCounts] = useState({ needsClassification: 0, needsHandling: 0, needsValueLink: 0 });
+  const [filter, setFilter] = useState<'all' | 'needsClassification' | 'needsHandling' | 'needsValueLink'>('all');
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [listLimit, setListLimit] = useState(50);
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
@@ -137,6 +159,19 @@ export default function CapturePage() {
     if (res.ok) {
       const data = await res.json();
       setTodayCount(data.todayCount);
+      setEntries(data.entries || []);
+    }
+  }, [code]);
+
+  const loadPendingCounts = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/pending-counts`);
+    if (res.ok) {
+      const data = await res.json();
+      setPendingCounts({
+        needsClassification: data.needsClassification || 0,
+        needsHandling: data.needsHandling || 0,
+        needsValueLink: data.needsValueLink || 0,
+      });
     }
   }, [code]);
 
@@ -152,12 +187,13 @@ export default function CapturePage() {
     loadStudy();
     loadTodayCount();
     loadSuggestions();
+    loadPendingCounts();
     const saved = localStorage.getItem(`collector_${code}`);
     if (saved) {
       setCollectorName(saved);
       setNameConfirmed(true);
     }
-  }, [loadStudy, loadTodayCount, loadSuggestions, code]);
+  }, [loadStudy, loadTodayCount, loadSuggestions, loadPendingCounts, code]);
 
   // Debounced search
   useEffect(() => {
@@ -253,9 +289,11 @@ export default function CapturePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const activeLayer = study?.activeLayer || 1;
-    // At Layer 1, classification is auto-set to 'unknown'
-    const effectiveClassification = activeLayer < 2 ? 'unknown' : classification;
+    const classificationOn = !!study?.classificationEnabled;
+    const handlingOn = !!study?.handlingEnabled;
+    const valueLinkingOn = !!study?.valueLinkingEnabled;
+    // When classification is off, default to 'unknown' so entries still save.
+    const effectiveClassification = !classificationOn ? 'unknown' : classification;
     const isVolumeMode = study?.volumeMode ?? false;
     if (!isVolumeMode && !verbatim.trim()) return;
     if (!effectiveClassification) return;
@@ -272,8 +310,8 @@ export default function CapturePage() {
       collectorName: collectorName.trim() || undefined,
     };
 
-    // Layer 3+: include handling
-    if (activeLayer >= 3) {
+    // Handling — only when the toggle is on.
+    if (handlingOn) {
       body.handlingTypeId = handlingTypeId || undefined;
     }
 
@@ -281,7 +319,7 @@ export default function CapturePage() {
       // Include demand type when enabled
       if (study?.demandTypesEnabled) {
         body.demandTypeId = demandTypeId || undefined;
-        body.originalValueDemandTypeId = effectiveClassification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
+        body.originalValueDemandTypeId = valueLinkingOn && effectiveClassification === 'failure' ? (originalValueDemandTypeId || undefined) : undefined;
         body.failureCause = effectiveClassification === 'failure' ? failureCause.trim() : undefined;
       }
       body.whatMattersTypeIds = whatMattersTypeIds.length > 0 ? whatMattersTypeIds : undefined;
@@ -314,6 +352,8 @@ export default function CapturePage() {
     setTodayCount((c) => c + 1);
     resetForm();
     loadSuggestions();
+    loadTodayCount();
+    loadPendingCounts();
 
     setTimeout(() => setSuccess(false), 4000);
   }
@@ -565,8 +605,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Value / Failure / ? toggle (Layer 2+) */}
-        {(study.activeLayer >= 2) && (
+        {/* Value / Failure / ? toggle — when classification is on */}
+        {study.classificationEnabled && (
           <div>
             <label className={`${labelCls} mb-2`}>{t('capture.classification')}{req}</label>
             {!isDemand && (
@@ -678,8 +718,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Handling type dropdown (Layer 3+) */}
-        {study.activeLayer >= 3 && (
+        {/* Handling type dropdown — when handling toggle is on */}
+        {study.handlingEnabled && (
           <div>
             <label className={labelCls}>{t('capture.handlingLabel')}</label>
             <div className="flex gap-2">
@@ -698,8 +738,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* System conditions / failure cause (Layer 2+, failure only — both demand and work) */}
-        {study.activeLayer >= 2 && classification === 'failure' && (
+        {/* System conditions / failure cause — when classification is on and entry is a failure */}
+        {study.classificationEnabled && classification === 'failure' && (
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
               <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
@@ -756,8 +796,8 @@ export default function CapturePage() {
           ) : null
         )}
 
-        {/* Original value demand (Layer 2+, demand + failure only) */}
-        {study.activeLayer >= 2 && isDemand && classification === 'failure' && (
+        {/* Original value demand — value linking toggle on, demand + failure only */}
+        {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
           <div>
             <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
             <div className="flex gap-2">
@@ -818,7 +858,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || (!study.volumeMode && !verbatim.trim()) || ((study?.activeLayer || 1) >= 2 && !classification)}
+              disabled={submitting || (!study.volumeMode && !verbatim.trim()) || (study.classificationEnabled && !classification)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
@@ -826,6 +866,109 @@ export default function CapturePage() {
           </div>
         </div>
       </form>
+
+      {/* Entries list with filter chips */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">{t('capture.entriesListTitle')}</h2>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {([
+            { key: 'all', label: t('capture.filterAll'), count: entries.length, show: true },
+            { key: 'needsClassification', label: t('capture.filterNeedsClassification'), count: pendingCounts.needsClassification, show: study.classificationEnabled },
+            { key: 'needsHandling', label: t('capture.filterNeedsHandling'), count: pendingCounts.needsHandling, show: study.handlingEnabled },
+            { key: 'needsValueLink', label: t('capture.filterNeedsValueLink'), count: pendingCounts.needsValueLink, show: study.valueLinkingEnabled },
+          ] as const).filter(c => c.show).map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => setFilter(chip.key as typeof filter)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                filter === chip.key
+                  ? 'bg-[#ac2c2d] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {chip.label} {chip.key !== 'all' && `(${chip.count})`}
+            </button>
+          ))}
+        </div>
+
+        <ul className="space-y-2">
+          {entries
+            .filter((e) => {
+              if (filter === 'needsClassification') return e.classification === 'unknown';
+              if (filter === 'needsHandling') return !e.handlingTypeId;
+              if (filter === 'needsValueLink') return e.entryType === 'demand' && e.classification === 'failure' && !e.linkedValueDemandEntryId;
+              return true;
+            })
+            .slice(0, listLimit)
+            .map((e) => {
+              const dt = study.demandTypes.find(d => d.id === e.demandTypeId);
+              const ht = study.handlingTypes.find(h => h.id === e.handlingTypeId);
+              return (
+                <li key={e.id} className="p-3 rounded-lg border border-gray-200 bg-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                        <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          e.classification === 'value' ? 'bg-green-100 text-green-700' :
+                          e.classification === 'failure' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {e.classification === 'value' ? t('capture.value') : e.classification === 'failure' ? t('capture.failure') : '?'}
+                        </span>
+                        {dt && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(dt.label)}</span>}
+                        {ht && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">{tl(ht.label)}</span>}
+                      </div>
+                      <p className="text-sm text-gray-700 line-clamp-2">{e.verbatim || '—'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingEntryId(e.id)}
+                      className="shrink-0 text-xs px-2.5 py-1.5 rounded-lg font-medium text-gray-700 bg-gray-100 hover:bg-gray-200"
+                    >
+                      {t('capture.edit')}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+        </ul>
+        {entries.length > listLimit && (
+          <button
+            type="button"
+            onClick={() => setListLimit((n) => n + 50)}
+            className="mt-3 text-sm text-gray-500 hover:text-gray-700"
+          >
+            {t('capture.showMore')}
+          </button>
+        )}
+      </div>
+
+      {editingEntryId && (
+        <EntryEditModal
+          code={code}
+          entryId={editingEntryId}
+          study={{
+            activeLayer: study.activeLayer,
+            classificationEnabled: study.classificationEnabled,
+            handlingEnabled: study.handlingEnabled,
+            valueLinkingEnabled: study.valueLinkingEnabled,
+            demandTypesEnabled: study.demandTypesEnabled,
+            workTypesEnabled: study.workTypesEnabled,
+            systemConditionsEnabled: study.systemConditionsEnabled,
+            handlingTypes: study.handlingTypes.map(h => ({ id: h.id, label: h.label })),
+            demandTypes: study.demandTypes.map(d => ({ id: d.id, category: d.category, label: d.label })),
+            contactMethods: study.contactMethods,
+            pointsOfTransaction: study.pointsOfTransaction,
+            whatMattersTypes: study.whatMattersTypes.map(w => ({ id: w.id, label: w.label })),
+            workTypes: study.workTypes,
+            systemConditions: (study.systemConditions || []).map(s => ({ id: s.id, label: s.label })),
+          }}
+          onClose={() => setEditingEntryId(null)}
+          onSaved={() => { loadTodayCount(); loadPendingCounts(); }}
+          onStudyRefresh={refreshStudy}
+        />
+      )}
     </div>
   );
 }
