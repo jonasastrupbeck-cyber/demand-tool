@@ -278,10 +278,10 @@ const translations = {
     de: 'Ursache der Fehlernachfrage (Systembedingung)',
   },
   'capture.systemConditionsLabel': {
-    en: 'System conditions (what caused this failure?)',
-    da: 'Systemforhold (hvad forårsagede denne fejl?)',
-    sv: 'Systemförhållanden (vad orsakade detta fel?)',
-    de: 'Systembedingungen (was hat diesen Fehler verursacht?)',
+    en: 'System conditions (what caused this failure or inability to handle one-stop?)',
+    da: 'Systemforhold (hvad forårsagede denne fejl eller manglende evne til at håndtere one-stop?)',
+    sv: 'Systemförhållanden (vad orsakade detta fel eller oförmåga att hantera one-stop?)',
+    de: 'Systembedingungen (was hat diesen Fehler oder die Unfähigkeit zur One-Stop-Bearbeitung verursacht?)',
   },
   'capture.thinkingLabel': {
     en: 'What was the thinking causing the system conditions?',

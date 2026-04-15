@@ -486,9 +486,27 @@ export async function createEntry(studyId: string, data: {
     }
   }
 
-  // Insert system condition junction records
+  // Insert system condition junction records.
+  // Visible when: failure demand, sequence work, or value demand routed to a non-one-stop capability
+  // (mirrors the UI gate in src/app/study/[code]/capture/page.tsx and EntryEditModal).
   const scIds = data.systemConditionIds || [];
-  const scVisible = data.classification === 'failure' || data.classification === 'sequence';
+  let oneStopHandlingType: string | null = null;
+  if (data.classification === 'value' && isDemand) {
+    const studyRow = await db.select({ oneStop: studies.oneStopHandlingType })
+      .from(studies)
+      .where(eq(studies.id, studyId))
+      .limit(1);
+    oneStopHandlingType = studyRow[0]?.oneStop ?? null;
+  }
+  const scVisible =
+    data.classification === 'failure'
+    || (!isDemand && data.classification === 'sequence')
+    || (
+      isDemand
+      && data.classification === 'value'
+      && !!data.handlingTypeId
+      && data.handlingTypeId !== (oneStopHandlingType || '')
+    );
   if (scVisible && scIds.length > 0) {
     for (const scId of scIds) {
       await db.insert(demandEntrySystemConditions).values({
