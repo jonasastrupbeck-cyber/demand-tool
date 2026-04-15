@@ -21,6 +21,7 @@ export interface EntryEditModalStudy {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   systemConditionsEnabled: boolean;
+  oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -66,6 +67,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
   const [thinkingIds, setThinkingIds] = useState<string[]>([]);
+  const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +80,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         setWhatMattersTypeIds(data.whatMattersTypeIds || []);
         setSystemConditionIds(data.systemConditionIds || []);
         setThinkingIds(data.thinkingIds || []);
+        // Auto-open the note disclosure if the field already has content.
+        setWhatMattersNoteOpen(Boolean(data.entry?.whatMatters && data.entry.whatMatters.trim()));
       }
       if (!cancelled) setLoading(false);
     })();
@@ -116,8 +120,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
   const isDemand = entry?.entryType === 'demand';
   const isFailure = entry?.classification === 'failure';
-  // System conditions + Thinking visible on failure (all) and on sequence (work only).
-  const scVisible = (entry?.classification === 'failure') || (entry?.entryType === 'work' && entry?.classification === 'sequence');
+  // System conditions + Thinking visible on:
+  //   - any failure entry
+  //   - work + sequence
+  //   - demand + value when a non-one-stop Capability is selected ("why not one stop?")
+  const scVisible =
+    entry?.classification === 'failure'
+    || (entry?.entryType === 'work' && entry?.classification === 'sequence')
+    || (
+      entry?.entryType === 'demand'
+      && entry?.classification === 'value'
+      && !!entry?.handlingTypeId
+      && entry?.handlingTypeId !== (study.oneStopHandlingType || '')
+    );
 
   return (
     <div
@@ -160,7 +175,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               const tone = (c: 'value' | 'failure' | 'unknown' | 'sequence') =>
                 c === 'value' ? { active: 'bg-green-600 text-white ring-2 ring-green-600 ring-offset-2', idle: 'bg-green-50 text-green-700 border border-green-200 hover:border-green-400' }
                 : c === 'failure' ? { active: 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-2', idle: 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400' }
-                : c === 'sequence' ? { active: 'bg-orange-500 text-white ring-2 ring-orange-500 ring-offset-2', idle: 'bg-orange-50 text-orange-700 border border-orange-200 hover:border-orange-400' }
+                : c === 'sequence' ? { active: 'bg-green-500 text-white ring-2 ring-green-500 ring-offset-2', idle: 'bg-green-50 text-green-700 border border-green-200 hover:border-green-400' }
                 : { active: 'bg-gray-600 text-white ring-2 ring-gray-600 ring-offset-2', idle: 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400' };
               const label = (c: 'value' | 'failure' | 'unknown' | 'sequence') =>
                 c === 'value' ? (isDemand ? t('capture.value') : t('capture.classificationWorkValue'))
@@ -244,7 +259,104 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Handling type */}
+            {/* Original value demand (failure demand only) — moved up */}
+            {isFailure && isDemand && study.valueLinkingEnabled && (
+              <div>
+                <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.originalValueDemandTypeId || ''}
+                    onChange={(e) => setEntry({ ...entry, originalValueDemandTypeId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.selectOriginalValueDemand')}</option>
+                    {study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => (
+                      <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                    ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="demand-types"
+                    extraBody={{ category: 'value' }}
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, originalValueDemandTypeId: id })}
+                    compact
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* What matters multi-select (demand only) — moved up */}
+            {isDemand && (
+              <div>
+                <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {study.whatMattersTypes.map((wm) => {
+                    const selected = whatMattersTypeIds.includes(wm.id);
+                    return (
+                      <button
+                        key={wm.id}
+                        type="button"
+                        onClick={() =>
+                          setWhatMattersTypeIds((prev) =>
+                            selected ? prev.filter((id) => id !== wm.id) : [...prev, wm.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          selected
+                            ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-1'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-400'
+                        }`}
+                      >
+                        {tl(wm.label)}
+                      </button>
+                    );
+                  })}
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="what-matters-types"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setWhatMattersTypeIds((prev) => [...prev, id])}
+                    compact
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* What matters note (demand only) — collapsed by default, auto-opens if field has text */}
+            {isDemand && (
+              (whatMattersNoteOpen || (entry.whatMatters && entry.whatMatters.trim())) ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={labelCls + ' mb-0'}>{t('capture.whatMattersLabel')}</label>
+                    <button
+                      type="button"
+                      onClick={() => { setEntry({ ...entry, whatMatters: null }); setWhatMattersNoteOpen(false); }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      {t('capture.hideNote')}
+                    </button>
+                  </div>
+                  <textarea
+                    value={entry.whatMatters || ''}
+                    onChange={(e) => setEntry({ ...entry, whatMatters: e.target.value })}
+                    placeholder={t('capture.whatMattersPlaceholder')}
+                    rows={2}
+                    className={inputCls}
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setWhatMattersNoteOpen(true)}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  {t('capture.addNote')}
+                </button>
+              )
+            )}
+
+            {/* Handling type / Capability of response */}
             {study.handlingEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.handlingLabel')}</label>
@@ -406,83 +518,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Original value demand (failure demand only) */}
-            {isFailure && isDemand && study.valueLinkingEnabled && (
-              <div>
-                <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
-                <div className="flex gap-2">
-                  <select
-                    value={entry.originalValueDemandTypeId || ''}
-                    onChange={(e) => setEntry({ ...entry, originalValueDemandTypeId: e.target.value || null })}
-                    className={inputCls}
-                  >
-                    <option value="">{t('capture.selectOriginalValueDemand')}</option>
-                    {study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => (
-                      <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                    ))}
-                  </select>
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="demand-types"
-                    extraBody={{ category: 'value' }}
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setEntry({ ...entry, originalValueDemandTypeId: id })}
-                    compact
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* What matters multi-select (demand only) */}
-            {isDemand && (
-              <div>
-                <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {study.whatMattersTypes.map((wm) => {
-                    const selected = whatMattersTypeIds.includes(wm.id);
-                    return (
-                      <button
-                        key={wm.id}
-                        type="button"
-                        onClick={() =>
-                          setWhatMattersTypeIds((prev) =>
-                            selected ? prev.filter((id) => id !== wm.id) : [...prev, wm.id]
-                          )
-                        }
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          selected
-                            ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-1'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-400'
-                        }`}
-                      >
-                        {tl(wm.label)}
-                      </button>
-                    );
-                  })}
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="what-matters-types"
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setWhatMattersTypeIds((prev) => [...prev, id])}
-                    compact
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* What matters free text (demand only) */}
-            {isDemand && (
-              <div>
-                <label className={labelCls}>{t('capture.whatMattersLabel')}</label>
-                <textarea
-                  value={entry.whatMatters || ''}
-                  onChange={(e) => setEntry({ ...entry, whatMatters: e.target.value })}
-                  placeholder={t('capture.whatMattersPlaceholder')}
-                  rows={2}
-                  className={inputCls}
-                />
-              </div>
-            )}
           </div>
         )}
 

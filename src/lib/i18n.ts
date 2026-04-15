@@ -355,6 +355,18 @@ const translations = {
     sv: 'Vad bryr sig kunden verkligen om?',
     de: 'Was ist dem Kunden wirklich wichtig?',
   },
+  'capture.addNote': {
+    en: '+ Add note',
+    da: '+ Tilf\u00f8j note',
+    sv: '+ L\u00e4gg till anteckning',
+    de: '+ Notiz hinzuf\u00fcgen',
+  },
+  'capture.hideNote': {
+    en: 'Hide note',
+    da: 'Skjul note',
+    sv: 'D\u00f6lj anteckning',
+    de: 'Notiz ausblenden',
+  },
   'capture.save': {
     en: 'Save Demand Entry',
     da: 'Gem eftersp\u00f8rgselsregistrering',

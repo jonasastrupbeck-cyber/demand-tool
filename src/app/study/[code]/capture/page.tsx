@@ -54,6 +54,7 @@ interface StudyData {
   classificationEnabled: boolean;
   handlingEnabled: boolean;
   valueLinkingEnabled: boolean;
+  oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -119,6 +120,7 @@ export default function CapturePage() {
   const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
   const [thinkingIds, setThinkingIds] = useState<string[]>([]);
   const [whatMatters, setWhatMatters] = useState('');
+  const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   const [workTypeId, setWorkTypeId] = useState('');
 
   // Inline type creation state
@@ -241,6 +243,7 @@ export default function CapturePage() {
     setSystemConditionIds([]);
     setThinkingIds([]);
     setWhatMatters('');
+    setWhatMattersNoteOpen(false);
     setWorkTypeId('');
     setError('');
     // Keep entryType sticky for batch entry
@@ -453,6 +456,20 @@ export default function CapturePage() {
 
   const isDemand = entryType === 'demand';
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
+  // System conditions + Thinking are visible on:
+  //   - any failure entry
+  //   - work + sequence
+  //   - demand + value when capability is selected and is NOT the one-stop handling type
+  //     (the "why not one stop?" question)
+  const scVisible =
+    classification === 'failure'
+    || (!isDemand && classification === 'sequence')
+    || (
+      isDemand
+      && classification === 'value'
+      && !!handlingTypeId
+      && handlingTypeId !== (study.oneStopHandlingType || '')
+    );
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">
@@ -642,8 +659,8 @@ export default function CapturePage() {
                   onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
                   className={`py-3.5 rounded-lg font-semibold text-sm transition-all ${
                     classification === 'sequence'
-                      ? 'bg-orange-500 text-white shadow-md ring-2 ring-orange-500 ring-offset-2'
-                      : 'bg-gray-200 text-orange-700 hover:bg-gray-300'
+                      ? 'bg-green-500 text-white shadow-md ring-2 ring-green-500 ring-offset-2'
+                      : 'bg-gray-200 text-green-700 hover:bg-gray-300'
                   }`}
                 >
                   {t('capture.classificationWorkSequence')}
@@ -690,7 +707,90 @@ export default function CapturePage() {
 
         {moreDetailsOpen && (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
-        {/* What matters multi-select (demand only) — moved to top per VM flow */}
+        {/* Demand type (moved up — part of the same "what is this" decision) */}
+        {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
+          <div>
+            <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
+            <div className="flex gap-2">
+              <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectType')}</option>
+                {filteredDemandTypes.map((dt) => (
+                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                ))}
+              </select>
+              {addBtn('demand')}
+            </div>
+            {renderAddTypeInput('demand', 'demand-types', { category: classification }, (id) => setDemandTypeId(id))}
+            {demandTypeId && (
+              <div className="mt-1">
+                <button type="button" onClick={() => toggleExamples(demandTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
+                  {examplesTypeId === demandTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
+                </button>
+                {examplesTypeId === demandTypeId && (
+                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
+                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
+                  <ul className="mt-1 space-y-0.5">
+                    {examples.map((ex, i) => (
+                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Work type (work only) — moved up, sits under classification row */}
+        {study.workTypesEnabled && !isDemand && classification && (
+          <div>
+            <label className={labelCls}>{t('capture.workTypeLabel')}</label>
+            <div className="flex gap-2">
+              <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectWorkType')}</option>
+                {study.workTypes.map((wt) => (
+                  <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
+                ))}
+              </select>
+              {addBtn('work')}
+            </div>
+            {renderAddTypeInput('work', 'work-types', {}, (id) => setWorkTypeId(id))}
+            {workTypeId && (
+              <div className="mt-1">
+                <button type="button" onClick={() => toggleExamples(workTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
+                  {examplesTypeId === workTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
+                </button>
+                {examplesTypeId === workTypeId && (
+                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
+                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
+                  <ul className="mt-1 space-y-0.5">
+                    {examples.map((ex, i) => (
+                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Original value demand — failure demand only. Moved up: it's the natural follow-up to "failure of what?" */}
+        {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
+          <div>
+            <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
+            <div className="flex gap-2">
+              <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.selectOriginalValueDemand')}</option>
+                {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
+                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
+                ))}
+              </select>
+              {addBtn('originalValue')}
+            </div>
+            {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id))}
+          </div>
+        )}
+
+        {/* What matters multi-select pills (demand only) */}
         {isDemand && study.whatMattersTypes.length > 0 && (
           <div>
             <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
@@ -722,15 +822,34 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters free text (demand only) */}
+        {/* What matters note — collapsed by default. Auto-opens if the field already has text. */}
         {isDemand && (
-          <div>
-            <label className={labelCls}>{t('capture.whatMattersLabel')}</label>
-            <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
-          </div>
+          (whatMattersNoteOpen || whatMatters.trim()) ? (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className={labelCls + ' mb-0'}>{t('capture.whatMattersLabel')}</label>
+                <button
+                  type="button"
+                  onClick={() => { setWhatMatters(''); setWhatMattersNoteOpen(false); }}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  {t('capture.hideNote')}
+                </button>
+              </div>
+              <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setWhatMattersNoteOpen(true)}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {t('capture.addNote')}
+            </button>
+          )
         )}
 
-        {/* Capability of response (formerly "Handling") — now renders for demand AND work */}
+        {/* Capability of response (formerly "Handling") — renders for demand AND work */}
         {study.handlingEnabled && (
           <div>
             <label className={labelCls}>{t('capture.handlingLabel')}</label>
@@ -750,8 +869,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* System conditions / failure cause — failure (all) or sequence (work only) */}
-        {study.classificationEnabled && (classification === 'failure' || (!isDemand && classification === 'sequence')) && (
+        {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability */}
+        {study.classificationEnabled && scVisible && (
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
               <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
@@ -809,7 +928,7 @@ export default function CapturePage() {
         )}
 
         {/* Thinking — mirrors system conditions visibility. Study-scoped library + add on the fly. */}
-        {study.classificationEnabled && study.systemConditionsEnabled && (classification === 'failure' || (!isDemand && classification === 'sequence')) && (
+        {study.classificationEnabled && study.systemConditionsEnabled && scVisible && (
           <div>
             <label className={labelCls}>{t('capture.thinkingLabel')}</label>
             <div className="flex flex-wrap gap-2">
@@ -840,88 +959,6 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Demand type dropdown (when demand types enabled, demand mode only) */}
-        {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
-          <div>
-            <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
-            <div className="flex gap-2">
-              <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.selectType')}</option>
-                {filteredDemandTypes.map((dt) => (
-                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                ))}
-              </select>
-              {addBtn('demand')}
-            </div>
-            {renderAddTypeInput('demand', 'demand-types', { category: classification }, (id) => setDemandTypeId(id))}
-            {demandTypeId && (
-              <div className="mt-1">
-                <button type="button" onClick={() => toggleExamples(demandTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
-                  {examplesTypeId === demandTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
-                </button>
-                {examplesTypeId === demandTypeId && (
-                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
-                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
-                  <ul className="mt-1 space-y-0.5">
-                    {examples.map((ex, i) => (
-                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Work type dropdown (when work types enabled, work mode only) */}
-        {study.workTypesEnabled && !isDemand && classification && (
-          <div>
-            <label className={labelCls}>{t('capture.workTypeLabel')}</label>
-            <div className="flex gap-2">
-              <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.selectWorkType')}</option>
-                {study.workTypes.map((wt) => (
-                  <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
-                ))}
-              </select>
-              {addBtn('work')}
-            </div>
-            {renderAddTypeInput('work', 'work-types', {}, (id) => setWorkTypeId(id))}
-            {workTypeId && (
-              <div className="mt-1">
-                <button type="button" onClick={() => toggleExamples(workTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
-                  {examplesTypeId === workTypeId ? t('capture.hideExamples') : t('capture.showExamples')}
-                </button>
-                {examplesTypeId === workTypeId && (
-                  examplesLoading ? <p className="mt-1 text-xs text-gray-300">...</p> :
-                  examples.length === 0 ? <p className="mt-1 text-xs text-gray-300">{t('capture.noExamples')}</p> :
-                  <ul className="mt-1 space-y-0.5">
-                    {examples.map((ex, i) => (
-                      <li key={i} className="text-xs text-gray-400 truncate">&ldquo;{ex.verbatim}&rdquo;</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Original value demand — value linking toggle on, demand + failure only */}
-        {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
-          <div>
-            <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
-            <div className="flex gap-2">
-              <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.selectOriginalValueDemand')}</option>
-                {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
-                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                ))}
-              </select>
-              {addBtn('originalValue')}
-            </div>
-            {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id))}
-          </div>
-        )}
         </div>
         )}
 
@@ -1009,7 +1046,7 @@ export default function CapturePage() {
                       <span className={`shrink-0 mt-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium ${
                         r.classification === 'value' ? 'bg-green-100 text-green-700' :
                         r.classification === 'failure' ? 'bg-red-100 text-red-700' :
-                        r.classification === 'sequence' ? 'bg-orange-100 text-orange-700' :
+                        r.classification === 'sequence' ? 'bg-emerald-100 text-emerald-700' :
                         'bg-amber-100 text-amber-700'
                       }`}>
                         {r.classification === 'value' ? t('capture.value') : r.classification === 'failure' ? t('capture.failure') : r.classification === 'sequence' ? t('capture.classificationWorkSequence') : '?'}
@@ -1071,7 +1108,7 @@ export default function CapturePage() {
                               <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                                 e.classification === 'value' ? 'bg-green-100 text-green-700' :
                                 e.classification === 'failure' ? 'bg-red-100 text-red-700' :
-                                e.classification === 'sequence' ? 'bg-orange-100 text-orange-700' :
+                                e.classification === 'sequence' ? 'bg-emerald-100 text-emerald-700' :
                                 'bg-amber-100 text-amber-700'
                               }`}>
                                 {e.classification === 'value' ? t('capture.value') : e.classification === 'failure' ? t('capture.failure') : e.classification === 'sequence' ? t('capture.classificationWorkSequence') : '?'}
@@ -1119,6 +1156,7 @@ export default function CapturePage() {
             demandTypesEnabled: study.demandTypesEnabled,
             workTypesEnabled: study.workTypesEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
+            oneStopHandlingType: study.oneStopHandlingType,
             handlingTypes: study.handlingTypes.map(h => ({ id: h.id, label: h.label })),
             demandTypes: study.demandTypes.map(d => ({ id: d.id, category: d.category, label: d.label })),
             contactMethods: study.contactMethods,
