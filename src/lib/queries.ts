@@ -594,6 +594,7 @@ export async function getEntriesForReclassification(studyId: string, layer: numb
   } else if (layer === 4) {
     conditions.push(eq(demandEntries.classification, 'failure'));
     conditions.push(isNull(demandEntries.linkedValueDemandEntryId));
+    conditions.push(isNull(demandEntries.originalValueDemandTypeId));
   }
 
   return db.select().from(demandEntries)
@@ -762,6 +763,7 @@ export async function getPendingCounts(studyId: string) {
       eq(demandEntries.entryType, 'demand'),
       eq(demandEntries.classification, 'failure'),
       isNull(demandEntries.linkedValueDemandEntryId),
+      isNull(demandEntries.originalValueDemandTypeId),
     ));
 
   return {

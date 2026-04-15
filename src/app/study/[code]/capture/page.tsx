@@ -969,7 +969,7 @@ export default function CapturePage() {
                   .filter((e) => {
                     if (filter === 'needsClassification') return e.classification === 'unknown';
                     if (filter === 'needsHandling') return !e.handlingTypeId;
-                    if (filter === 'needsValueLink') return e.entryType === 'demand' && e.classification === 'failure' && !e.linkedValueDemandEntryId;
+                    if (filter === 'needsValueLink') return e.entryType === 'demand' && e.classification === 'failure' && !e.linkedValueDemandEntryId && !e.originalValueDemandTypeId;
                     return true;
                   })
                   .slice(0, listLimit)
