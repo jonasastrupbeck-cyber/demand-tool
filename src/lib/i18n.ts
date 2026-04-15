@@ -231,9 +231,9 @@ const translations = {
   },
   'capture.classificationWorkSequence': {
     en: 'Sequence Work',
-    da: 'Sequence Work',
-    sv: 'Sequence Work',
-    de: 'Sequence Work',
+    da: 'Sekvensarbejde',
+    sv: 'Sekvensarbete',
+    de: 'Sequenzarbeit',
   },
   'capture.demandTypeLabel': {
     en: 'Type of {classification} demand',
