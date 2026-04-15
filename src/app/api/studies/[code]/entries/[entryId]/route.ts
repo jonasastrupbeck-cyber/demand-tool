@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry } from '@/lib/queries';
+import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry } from '@/lib/queries';
 
 export async function GET(
   _request: Request,
@@ -18,15 +18,17 @@ export async function GET(
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
-  const [wmRows, scRows] = await Promise.all([
+  const [wmRows, scRows, thRows] = await Promise.all([
     getWhatMattersForEntry(entryId),
     getSystemConditionsForEntry(entryId),
+    getThinkingsForEntry(entryId),
   ]);
 
   return NextResponse.json({
     entry,
     whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId),
     systemConditionIds: scRows.map((r) => r.systemConditionId),
+    thinkingIds: thRows.map((r) => r.thinkingId),
   });
 }
 
@@ -52,6 +54,7 @@ export async function PATCH(
   if (body.failureCause !== undefined) updates.failureCause = body.failureCause;
   if (body.whatMattersTypeIds !== undefined) updates.whatMattersTypeIds = body.whatMattersTypeIds;
   if (body.systemConditionIds !== undefined) updates.systemConditionIds = body.systemConditionIds;
+  if (body.thinkingIds !== undefined) updates.thinkingIds = body.thinkingIds;
   if (body.contactMethodId !== undefined) updates.contactMethodId = body.contactMethodId;
   if (body.pointOfTransactionId !== undefined) updates.pointOfTransactionId = body.pointOfTransactionId;
   if (body.workTypeId !== undefined) updates.workTypeId = body.workTypeId;

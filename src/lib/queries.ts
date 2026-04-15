@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -341,6 +341,43 @@ export async function getSystemConditionsForEntry(entryId: string) {
     .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
 }
 
+// --- Thinkings (mirrors System Conditions) ---
+
+export async function getThinkings(studyId: string) {
+  return db.select().from(thinkings).where(eq(thinkings.studyId, studyId)).orderBy(asc(thinkings.sortOrder));
+}
+
+export async function addThinking(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getThinkings(studyId);
+  await db.insert(thinkings).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function updateThinking(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(thinkings).set(data).where(eq(thinkings.id, id));
+}
+
+export async function deleteThinking(id: string) {
+  await db.delete(thinkings).where(eq(thinkings.id, id));
+}
+
+export async function getThinkingsForEntries(entryIds: string[]) {
+  if (entryIds.length === 0) return [];
+  return db.select().from(demandEntryThinkings)
+    .where(inArray(demandEntryThinkings.demandEntryId, entryIds));
+}
+
+export async function getThinkingsForEntry(entryId: string) {
+  return db.select().from(demandEntryThinkings)
+    .where(eq(demandEntryThinkings.demandEntryId, entryId));
+}
+
 export async function getPointsOfTransaction(studyId: string) {
   return db.select().from(pointsOfTransaction).where(eq(pointsOfTransaction.studyId, studyId)).orderBy(asc(pointsOfTransaction.sortOrder));
 }
@@ -397,7 +434,7 @@ export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en
 
 export async function createEntry(studyId: string, data: {
   verbatim: string;
-  classification: 'value' | 'failure' | 'unknown';
+  classification: 'value' | 'failure' | 'unknown' | 'sequence';
   entryType?: 'demand' | 'work';
   handlingTypeId?: string;
   demandTypeId?: string;
@@ -406,6 +443,7 @@ export async function createEntry(studyId: string, data: {
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
   systemConditionIds?: string[];
+  thinkingIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -450,12 +488,25 @@ export async function createEntry(studyId: string, data: {
 
   // Insert system condition junction records
   const scIds = data.systemConditionIds || [];
-  if (data.classification === 'failure' && scIds.length > 0) {
+  const scVisible = data.classification === 'failure' || data.classification === 'sequence';
+  if (scVisible && scIds.length > 0) {
     for (const scId of scIds) {
       await db.insert(demandEntrySystemConditions).values({
         id: generateId(),
         demandEntryId: id,
         systemConditionId: scId,
+      });
+    }
+  }
+
+  // Insert thinking junction records (mirrors system conditions visibility)
+  const thIds = data.thinkingIds || [];
+  if (scVisible && thIds.length > 0) {
+    for (const thId of thIds) {
+      await db.insert(demandEntryThinkings).values({
+        id: generateId(),
+        demandEntryId: id,
+        thinkingId: thId,
       });
     }
   }
@@ -518,7 +569,7 @@ export async function activateLayer(studyId: string, targetLayer: number) {
 }
 
 export async function updateEntry(entryId: string, data: {
-  classification?: 'value' | 'failure' | 'unknown';
+  classification?: 'value' | 'failure' | 'unknown' | 'sequence';
   demandTypeId?: string | null;
   handlingTypeId?: string | null;
   linkedValueDemandEntryId?: string | null;
@@ -530,8 +581,9 @@ export async function updateEntry(entryId: string, data: {
   whatMatters?: string | null;
   whatMattersTypeIds?: string[];
   systemConditionIds?: string[];
+  thinkingIds?: string[];
 }) {
-  const { whatMattersTypeIds, systemConditionIds, ...entryData } = data;
+  const { whatMattersTypeIds, systemConditionIds, thinkingIds, ...entryData } = data;
 
   // Update the entry fields
   const updateFields: Record<string, unknown> = {};
@@ -573,11 +625,24 @@ export async function updateEntry(entryId: string, data: {
       });
     }
   }
+
+  // Update thinking junction records if provided
+  if (thinkingIds !== undefined) {
+    await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
+    for (const thId of thinkingIds) {
+      await db.insert(demandEntryThinkings).values({
+        id: generateId(),
+        demandEntryId: entryId,
+        thinkingId: thId,
+      });
+    }
+  }
 }
 
 export async function deleteEntry(entryId: string) {
   await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
   await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+  await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
   await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
 }
 

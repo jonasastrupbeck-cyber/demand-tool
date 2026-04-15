@@ -40,8 +40,8 @@ export async function POST(
     return NextResponse.json({ error: 'Demand verbatim is required' }, { status: 400 });
   }
 
-  if (!body.classification || !['value', 'failure', 'unknown'].includes(body.classification)) {
-    return NextResponse.json({ error: 'Classification must be "value", "failure", or "unknown"' }, { status: 400 });
+  if (!body.classification || !['value', 'failure', 'unknown', 'sequence'].includes(body.classification)) {
+    return NextResponse.json({ error: 'Classification must be "value", "failure", "unknown", or "sequence"' }, { status: 400 });
   }
 
   const entryType = body.entryType === 'work' ? 'work' : 'demand';
@@ -57,6 +57,7 @@ export async function POST(
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     whatMattersTypeIds: Array.isArray(body.whatMattersTypeIds) ? body.whatMattersTypeIds : undefined,
     systemConditionIds: Array.isArray(body.systemConditionIds) ? body.systemConditionIds : undefined,
+    thinkingIds: Array.isArray(body.thinkingIds) ? body.thinkingIds : undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     workTypeId: body.workTypeId || undefined,
     linkedValueDemandEntryId: body.linkedValueDemandEntryId || undefined,

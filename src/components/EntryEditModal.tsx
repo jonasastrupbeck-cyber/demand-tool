@@ -11,6 +11,7 @@ interface PointOfTransaction { id: string; label: string }
 interface WhatMattersType { id: string; label: string }
 interface WorkType { id: string; label: string }
 interface SystemCondition { id: string; label: string }
+interface Thinking { id: string; label: string }
 
 export interface EntryEditModalStudy {
   activeLayer: number;
@@ -27,12 +28,13 @@ export interface EntryEditModalStudy {
   whatMattersTypes: WhatMattersType[];
   workTypes: WorkType[];
   systemConditions: SystemCondition[];
+  thinkings: Thinking[];
 }
 
 interface EntryFull {
   id: string;
   verbatim: string;
-  classification: 'value' | 'failure' | 'unknown';
+  classification: 'value' | 'failure' | 'unknown' | 'sequence';
   entryType: 'demand' | 'work';
   demandTypeId: string | null;
   handlingTypeId: string | null;
@@ -63,6 +65,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
+  const [thinkingIds, setThinkingIds] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +77,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         setEntry(data.entry);
         setWhatMattersTypeIds(data.whatMattersTypeIds || []);
         setSystemConditionIds(data.systemConditionIds || []);
+        setThinkingIds(data.thinkingIds || []);
       }
       if (!cancelled) setLoading(false);
     })();
@@ -95,6 +99,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       whatMatters: entry.whatMatters || null,
       whatMattersTypeIds,
       systemConditionIds,
+      thinkingIds,
     };
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -111,6 +116,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
   const isDemand = entry?.entryType === 'demand';
   const isFailure = entry?.classification === 'failure';
+  // System conditions + Thinking visible on failure (all) and on sequence (work only).
+  const scVisible = (entry?.classification === 'failure') || (entry?.entryType === 'work' && entry?.classification === 'sequence');
 
   return (
     <div
@@ -145,39 +152,45 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               <p className="text-base text-gray-900 leading-relaxed">&ldquo;{entry.verbatim}&rdquo;</p>
             </div>
 
-            {/* Classification */}
-            {study.classificationEnabled && (
-              <div>
-                <label className={labelCls}>{t('reclassify.classifyAs')}</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['value', 'failure', 'unknown'] as const).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setEntry({ ...entry, classification: c, demandTypeId: null })}
-                      className={`py-2 rounded-lg font-semibold text-sm transition-all ${
-                        entry.classification === c
-                          ? c === 'value'
-                            ? 'bg-green-600 text-white ring-2 ring-green-600 ring-offset-2'
-                            : c === 'failure'
-                              ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-2'
-                              : 'bg-gray-600 text-white ring-2 ring-gray-600 ring-offset-2'
-                          : c === 'value'
-                            ? 'bg-green-50 text-green-700 border border-green-200 hover:border-green-400'
-                            : c === 'failure'
-                              ? 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                              : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
-                      }`}
-                    >
-                      {c === 'value' ? t('capture.value') : c === 'failure' ? t('capture.failure') : '?'}
-                    </button>
-                  ))}
+            {/* Classification — work gets an extra Sequence button */}
+            {study.classificationEnabled && (() => {
+              const options = isDemand
+                ? (['value', 'failure', 'unknown'] as const)
+                : (['value', 'sequence', 'failure', 'unknown'] as const);
+              const tone = (c: 'value' | 'failure' | 'unknown' | 'sequence') =>
+                c === 'value' ? { active: 'bg-green-600 text-white ring-2 ring-green-600 ring-offset-2', idle: 'bg-green-50 text-green-700 border border-green-200 hover:border-green-400' }
+                : c === 'failure' ? { active: 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-2', idle: 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400' }
+                : c === 'sequence' ? { active: 'bg-orange-500 text-white ring-2 ring-orange-500 ring-offset-2', idle: 'bg-orange-50 text-orange-700 border border-orange-200 hover:border-orange-400' }
+                : { active: 'bg-gray-600 text-white ring-2 ring-gray-600 ring-offset-2', idle: 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400' };
+              const label = (c: 'value' | 'failure' | 'unknown' | 'sequence') =>
+                c === 'value' ? (isDemand ? t('capture.value') : t('capture.classificationWorkValue'))
+                : c === 'failure' ? (isDemand ? t('capture.failure') : t('capture.classificationWorkFailure'))
+                : c === 'sequence' ? t('capture.classificationWorkSequence')
+                : '?';
+              return (
+                <div>
+                  <label className={labelCls}>{t('reclassify.classifyAs')}</label>
+                  <div className={`grid ${isDemand ? 'grid-cols-3' : 'grid-cols-4'} gap-2`}>
+                    {options.map((c) => {
+                      const t1 = tone(c);
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setEntry({ ...entry, classification: c, demandTypeId: null })}
+                          className={`py-2 rounded-lg font-semibold text-sm transition-all ${entry.classification === c ? t1.active : t1.idle}`}
+                        >
+                          {label(c)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Demand type (demand entries) */}
-            {isDemand && study.demandTypesEnabled && entry.classification !== 'unknown' && (
+            {isDemand && study.demandTypesEnabled && entry.classification !== 'unknown' && entry.classification !== 'sequence' && (
               <div>
                 <label className={labelCls}>{t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}</label>
                 <div className="flex gap-2">
@@ -305,8 +318,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             </div>
 
-            {/* System conditions (failure only) */}
-            {isFailure && study.systemConditionsEnabled && (
+            {/* System conditions — failure (all) or sequence (work only) */}
+            {scVisible && study.systemConditionsEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -336,6 +349,43 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     apiPath="system-conditions"
                     onRefresh={onStudyRefresh}
                     onCreated={(id) => setSystemConditionIds((prev) => [...prev, id])}
+                    compact
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Thinking — mirrors system conditions visibility */}
+            {scVisible && study.systemConditionsEnabled && (
+              <div>
+                <label className={labelCls}>{t('capture.thinkingLabel')}</label>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {(study.thinkings || []).map((th) => {
+                    const selected = thinkingIds.includes(th.id);
+                    return (
+                      <button
+                        key={th.id}
+                        type="button"
+                        onClick={() =>
+                          setThinkingIds((prev) =>
+                            selected ? prev.filter((id) => id !== th.id) : [...prev, th.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                          selected
+                            ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
+                            : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
+                        }`}
+                      >
+                        {tl(th.label)}
+                      </button>
+                    );
+                  })}
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="thinkings"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setThinkingIds((prev) => [...prev, id])}
                     compact
                   />
                 </div>

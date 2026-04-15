@@ -89,7 +89,7 @@ export const demandEntries = pgTable('demand_entries', {
   studyId: text('study_id').notNull().references(() => studies.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   verbatim: text('verbatim').notNull(),
-  classification: text('classification').$type<'value' | 'failure' | 'unknown'>().notNull(),
+  classification: text('classification').$type<'value' | 'failure' | 'unknown' | 'sequence'>().notNull(),
   entryType: text('entry_type').$type<'demand' | 'work'>().notNull().default('demand'),
   handlingTypeId: text('handling_type_id').references(() => handlingTypes.id),
   demandTypeId: text('demand_type_id').references(() => demandTypes.id),
@@ -123,4 +123,18 @@ export const demandEntrySystemConditions = pgTable('demand_entry_system_conditio
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
+});
+
+export const thinkings = pgTable('thinkings', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  operationalDefinition: text('operational_definition'),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+export const demandEntryThinkings = pgTable('demand_entry_thinkings', {
+  id: text('id').primaryKey(),
+  demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
+  thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
 });

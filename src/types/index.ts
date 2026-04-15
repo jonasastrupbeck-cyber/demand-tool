@@ -71,7 +71,7 @@ export interface DemandEntry {
   studyId: string;
   createdAt: Date;
   verbatim: string;
-  classification: 'value' | 'failure' | 'unknown';
+  classification: 'value' | 'failure' | 'unknown' | 'sequence';
   entryType: 'demand' | 'work';
   handlingTypeId: string | null;
   demandTypeId: string | null;
@@ -80,6 +80,7 @@ export interface DemandEntry {
   whatMattersTypeId: string | null;
   whatMattersTypeIds: string[];
   systemConditionIds: string[];
+  thinkingIds: string[];
   originalValueDemandTypeId: string | null;
   workTypeId: string | null;
   linkedValueDemandEntryId: string | null;
@@ -123,7 +124,7 @@ export interface DashboardData {
 
 export interface CreateEntryInput {
   verbatim: string;
-  classification: 'value' | 'failure' | 'unknown';
+  classification: 'value' | 'failure' | 'unknown' | 'sequence';
   entryType?: 'demand' | 'work';
   handlingTypeId?: string;
   demandTypeId?: string;
@@ -132,6 +133,7 @@ export interface CreateEntryInput {
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
   systemConditionIds?: string[];
+  thinkingIds?: string[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -158,4 +160,18 @@ export interface DemandEntrySystemCondition {
   id: string;
   demandEntryId: string;
   systemConditionId: string;
+}
+
+export interface Thinking {
+  id: string;
+  studyId: string;
+  label: string;
+  operationalDefinition: string | null;
+  sortOrder: number;
+}
+
+export interface DemandEntryThinking {
+  id: string;
+  demandEntryId: string;
+  thinkingId: string;
 }

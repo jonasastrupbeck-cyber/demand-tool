@@ -217,6 +217,24 @@ const translations = {
     sv: 'Icke-v\u00e4rdeskapande',
     de: 'Fehler',
   },
+  'capture.classificationWorkValue': {
+    en: 'Value Work',
+    da: 'V\u00e6rdiskabende',
+    sv: 'V\u00e4rdeskapande',
+    de: 'Wert',
+  },
+  'capture.classificationWorkFailure': {
+    en: 'Failure Work',
+    da: 'Ikke-v\u00e6rdiskabende',
+    sv: 'Icke-v\u00e4rdeskapande',
+    de: 'Fehler',
+  },
+  'capture.classificationWorkSequence': {
+    en: 'Sequence Work',
+    da: 'Sequence Work',
+    sv: 'Sequence Work',
+    de: 'Sequence Work',
+  },
   'capture.demandTypeLabel': {
     en: 'Type of {classification} demand',
     da: 'Type af {classification} eftersp\u00f8rgsel',
@@ -230,7 +248,7 @@ const translations = {
     de: 'Typ ausw\u00e4hlen...',
   },
   'capture.handlingLabel': {
-    en: 'Handling at point of transaction',
+    en: 'Capability of response',
     da: 'H\u00e5ndtering ved transaktionspunktet',
     sv: 'Hantering vid transaktionspunkten',
     de: 'Bearbeitung am Transaktionspunkt',
@@ -265,6 +283,18 @@ const translations = {
     sv: 'Systemförhållanden (vad orsakade detta fel?)',
     de: 'Systembedingungen (was hat diesen Fehler verursacht?)',
   },
+  'capture.thinkingLabel': {
+    en: 'What was the thinking causing the system conditions?',
+    da: 'Hvilken t\u00e6nkning for\u00e5rsagede disse systemforhold?',
+    sv: 'Vilket t\u00e4nkande orsakade dessa systemf\u00f6rh\u00e5llanden?',
+    de: 'Welches Denken hat diese Systembedingungen verursacht?',
+  },
+  'capture.addThinking': {
+    en: 'Add thinking',
+    da: 'Tilf\u00f8j t\u00e6nkning',
+    sv: 'L\u00e4gg till t\u00e4nkande',
+    de: 'Denken hinzuf\u00fcgen',
+  },
   'capture.failureCausePlaceholder': {
     en: 'What system condition caused this failure demand?',
     da: 'Hvilket systemforhold for\u00e5rsagede denne ikke-v\u00e6rdiskabende eftersp\u00f8rgsel?',
@@ -282,6 +312,24 @@ const translations = {
     da: 'V\u00e6lg kontaktmetode...',
     sv: 'V\u00e4lj kontaktmetod...',
     de: 'Kontaktmethode ausw\u00e4hlen...',
+  },
+  'capture.sessionContext': {
+    en: 'Session context (applies to every entry)',
+    da: 'Sessionskontekst (g\u00e6lder for alle registreringer)',
+    sv: 'Sessionskontext (g\u00e4ller alla poster)',
+    de: 'Sitzungskontext (gilt f\u00fcr jeden Eintrag)',
+  },
+  'capture.sessionPointOfTransactionLabel': {
+    en: 'Point of transaction',
+    da: 'Transaktionspunkt',
+    sv: 'Transaktionspunkt',
+    de: 'Transaktionspunkt',
+  },
+  'capture.sessionContactMethodLabel': {
+    en: 'Contact method',
+    da: 'Kontaktmetode',
+    sv: 'Kontaktmetod',
+    de: 'Kontaktmethode',
   },
   'capture.whatMattersTypeLabel': {
     en: 'What matters category',
@@ -1237,6 +1285,24 @@ const translations = {
     sv: 'Lägg till systemförhållande...',
     de: 'Systembedingung hinzufügen...',
   },
+  'settings.thinkings': {
+    en: 'Thinking',
+    da: 'T\u00e6nkning',
+    sv: 'T\u00e4nkande',
+    de: 'Denken',
+  },
+  'settings.thinkingsDesc': {
+    en: 'The thinking behind system conditions. Collectors tick these when logging a failure — or add new ones on the fly.',
+    da: 'T\u00e6nkningen bag systemforholdene. Indsamlere krydser af her n\u00e5r de logger en fejl \u2014 eller tilf\u00f8jer nye p\u00e5 stedet.',
+    sv: 'T\u00e4nkandet bakom systemf\u00f6rh\u00e5llandena. Insamlare kryssar i dessa n\u00e4r de loggar ett fel \u2014 eller l\u00e4gger till nya p\u00e5 platsen.',
+    de: 'Das Denken hinter den Systembedingungen. Erfasser h\u00e4kchen diese beim Loggen eines Fehlers an \u2014 oder f\u00fcgen neue hinzu.',
+  },
+  'settings.addThinking': {
+    en: 'Add thinking...',
+    da: 'Tilf\u00f8j t\u00e6nkning...',
+    sv: 'L\u00e4gg till t\u00e4nkande...',
+    de: 'Denken hinzuf\u00fcgen...',
+  },
   'settings.demandTypes': {
     en: 'Demand Types',
     da: 'Efterspørgselstyper',
@@ -1654,7 +1720,7 @@ const translations = {
     de: 'Als Wert / Fehler klassifizieren',
   },
   'capture.toggles.handling': {
-    en: 'Capture handling type',
+    en: 'Capture capability of response',
     da: 'Registrer håndteringstype',
     sv: 'Registrera hanteringstyp',
     de: 'Bearbeitungstyp erfassen',

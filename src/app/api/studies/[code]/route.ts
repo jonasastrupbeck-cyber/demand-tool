@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, lcStages] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, thTypes, lcStages] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -20,6 +20,7 @@ export async function GET(
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
     getSystemConditions(study.id),
+    getThinkings(study.id),
     getLifecycleStages(study.id),
   ]);
 
@@ -49,6 +50,7 @@ export async function GET(
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
     systemConditions: scTypes,
+    thinkings: thTypes,
     lifecycleStages: lcStages,
   });
 }

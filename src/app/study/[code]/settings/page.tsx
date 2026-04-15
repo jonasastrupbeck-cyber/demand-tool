@@ -75,6 +75,7 @@ interface StudyData {
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   systemConditions: SystemConditionType[];
+  thinkings: SystemConditionType[];
   lifecycleStages: LifecycleStage[];
 }
 
@@ -111,6 +112,7 @@ export default function SettingsPage() {
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newSystemCondition, setNewSystemCondition] = useState('');
+  const [newThinking, setNewThinking] = useState('');
   const [newLifecycleStage, setNewLifecycleStage] = useState('');
   const [classifyingAll, setClassifyingAll] = useState(false);
 
@@ -370,6 +372,23 @@ export default function SettingsPage() {
 
   async function removeSystemCondition(id: string) {
     await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function addThinkingHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newThinking.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/thinkings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newThinking.trim() }),
+    });
+    setNewThinking('');
+    loadStudy();
+  }
+
+  async function removeThinking(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/thinkings/${id}`, { method: 'DELETE' });
     loadStudy();
   }
 
@@ -763,6 +782,26 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+
+        {/* Thinking — library mirrors System Conditions. Visible whenever SC is enabled. */}
+        {study.systemConditionsEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.thinkings')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.thinkingsDesc')}</p>
+            <ul className="space-y-2 mb-4">
+              {(study.thinkings || []).map((th) => (
+                <li key={th.id} className={`${itemCls} bg-red-50`}>
+                  <span className="text-sm text-red-700">{tl(th.label)}</span>
+                  <button onClick={() => removeThinking(th.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                </li>
+              ))}
+            </ul>
+            <form onSubmit={addThinkingHandler} className="flex gap-2">
+              <input type="text" value={newThinking} onChange={(e) => setNewThinking(e.target.value)} placeholder={t('settings.addThinking')} className={inputCls} />
+              <button type="submit" disabled={!newThinking.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
+            </form>
+          </div>
+        )}
 
         {/* Customer Lifecycle (optional) */}
         <div className={cardCls}>
