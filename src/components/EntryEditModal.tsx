@@ -167,6 +167,45 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               <p className="text-base text-gray-900 leading-relaxed">&ldquo;{entry.verbatim}&rdquo;</p>
             </div>
 
+            {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip */}
+            {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
+              <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                <p className="text-xs text-gray-500 mb-2">{t('capture.sessionContext')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {study.pointsOfTransaction.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t('capture.sessionPointOfTransactionLabel')}</label>
+                      <select
+                        value={entry.pointOfTransactionId || ''}
+                        onChange={(e) => setEntry({ ...entry, pointOfTransactionId: e.target.value || null })}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                      >
+                        <option value="">{t('capture.selectPointOfTransaction')}</option>
+                        {study.pointsOfTransaction.map((pot) => (
+                          <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {study.contactMethods.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{t('capture.sessionContactMethodLabel')}</label>
+                      <select
+                        value={entry.contactMethodId || ''}
+                        onChange={(e) => setEntry({ ...entry, contactMethodId: e.target.value || null })}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                      >
+                        <option value="">{t('capture.selectContactMethod')}</option>
+                        {study.contactMethods.map((cm) => (
+                          <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Classification — work gets an extra Sequence button */}
             {study.classificationEnabled && (() => {
               const options = isDemand
@@ -382,89 +421,54 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Contact method */}
-            <div>
-              <label className={labelCls}>{t('capture.contactMethodLabel')}</label>
-              <div className="flex gap-2">
-                <select
-                  value={entry.contactMethodId || ''}
-                  onChange={(e) => setEntry({ ...entry, contactMethodId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectContactMethod')}</option>
-                  {study.contactMethods.map((cm) => (
-                    <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-                  ))}
-                </select>
-                <InlineTypeAdder
-                  code={code}
-                  apiPath="contact-methods"
-                  onRefresh={onStudyRefresh}
-                  onCreated={(id) => setEntry({ ...entry, contactMethodId: id })}
-                  compact
-                />
-              </div>
-            </div>
-
-            {/* Point of transaction */}
-            <div>
-              <label className={labelCls}>{t('capture.pointOfTransactionLabel')}</label>
-              <div className="flex gap-2">
-                <select
-                  value={entry.pointOfTransactionId || ''}
-                  onChange={(e) => setEntry({ ...entry, pointOfTransactionId: e.target.value || null })}
-                  className={inputCls}
-                >
-                  <option value="">{t('capture.selectPointOfTransaction')}</option>
-                  {study.pointsOfTransaction.map((pot) => (
-                    <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-                  ))}
-                </select>
-                <InlineTypeAdder
-                  code={code}
-                  apiPath="points-of-transaction"
-                  onRefresh={onStudyRefresh}
-                  onCreated={(id) => setEntry({ ...entry, pointOfTransactionId: id })}
-                  compact
-                />
-              </div>
-            </div>
-
-            {/* System conditions — failure (all) or sequence (work only) */}
-            {scVisible && study.systemConditionsEnabled && (
-              <div>
-                <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {study.systemConditions.map((sc) => {
-                    const selected = systemConditionIds.includes(sc.id);
-                    return (
-                      <button
-                        key={sc.id}
-                        type="button"
-                        onClick={() =>
-                          setSystemConditionIds((prev) =>
-                            selected ? prev.filter((id) => id !== sc.id) : [...prev, sc.id]
-                          )
-                        }
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          selected
-                            ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
-                            : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                        }`}
-                      >
-                        {tl(sc.label)}
-                      </button>
-                    );
-                  })}
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="system-conditions"
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setSystemConditionIds((prev) => [...prev, id])}
-                    compact
+            {/* System conditions OR failure-cause textarea — same slot, mirrors Capture */}
+            {scVisible && (
+              study.systemConditionsEnabled && study.systemConditions.length > 0 ? (
+                <div>
+                  <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {study.systemConditions.map((sc) => {
+                      const selected = systemConditionIds.includes(sc.id);
+                      return (
+                        <button
+                          key={sc.id}
+                          type="button"
+                          onClick={() =>
+                            setSystemConditionIds((prev) =>
+                              selected ? prev.filter((id) => id !== sc.id) : [...prev, sc.id]
+                            )
+                          }
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                            selected
+                              ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
+                              : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
+                          }`}
+                        >
+                          {tl(sc.label)}
+                        </button>
+                      );
+                    })}
+                    <InlineTypeAdder
+                      code={code}
+                      apiPath="system-conditions"
+                      onRefresh={onStudyRefresh}
+                      onCreated={(id) => setSystemConditionIds((prev) => [...prev, id])}
+                      compact
+                    />
+                  </div>
+                </div>
+              ) : isFailure && isDemand ? (
+                <div>
+                  <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
+                  <textarea
+                    value={entry.failureCause || ''}
+                    onChange={(e) => setEntry({ ...entry, failureCause: e.target.value })}
+                    placeholder={t('capture.failureCausePlaceholder')}
+                    rows={2}
+                    className={inputCls}
                   />
                 </div>
-              </div>
+              ) : null
             )}
 
             {/* Thinking — mirrors system conditions visibility */}
@@ -504,19 +508,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Failure cause (failure demand only) */}
-            {isFailure && isDemand && (
-              <div>
-                <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
-                <textarea
-                  value={entry.failureCause || ''}
-                  onChange={(e) => setEntry({ ...entry, failureCause: e.target.value })}
-                  placeholder={t('capture.failureCausePlaceholder')}
-                  rows={2}
-                  className={inputCls}
-                />
-              </div>
-            )}
 
           </div>
         )}
