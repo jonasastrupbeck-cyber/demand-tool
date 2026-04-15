@@ -89,6 +89,7 @@ export default function CapturePage() {
     demandTypeId: string | null;
     handlingTypeId: string | null;
     linkedValueDemandEntryId: string | null;
+    originalValueDemandTypeId: string | null;
     createdAt: string;
     collectorName: string | null;
   }
