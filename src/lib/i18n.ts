@@ -278,16 +278,16 @@ const translations = {
     de: 'Ursache der Fehlernachfrage (Systembedingung)',
   },
   'capture.systemConditionsLabel': {
-    en: 'System conditions (what caused this failure or inability to handle one-stop?)',
+    en: 'System condition(s) (what caused this failure or inability to handle one-stop?)',
     da: 'Systemforhold (hvad forårsagede denne fejl eller manglende evne til at håndtere one-stop?)',
-    sv: 'Systemförhållanden (vad orsakade detta fel eller oförmåga att hantera one-stop?)',
-    de: 'Systembedingungen (was hat diesen Fehler oder die Unfähigkeit zur One-Stop-Bearbeitung verursacht?)',
+    sv: 'Systemförhållande(n) (vad orsakade detta fel eller oförmåga att hantera one-stop?)',
+    de: 'Systembedingung(en) (was hat diesen Fehler oder die Unfähigkeit zur One-Stop-Bearbeitung verursacht?)',
   },
   'capture.thinkingLabel': {
-    en: 'What was the thinking causing the system conditions?',
+    en: 'What was the thinking causing the system condition(s)?',
     da: 'Hvilken t\u00e6nkning for\u00e5rsagede disse systemforhold?',
-    sv: 'Vilket t\u00e4nkande orsakade dessa systemf\u00f6rh\u00e5llanden?',
-    de: 'Welches Denken hat diese Systembedingungen verursacht?',
+    sv: 'Vilket t\u00e4nkande orsakade systemf\u00f6rh\u00e5llande(n)?',
+    de: 'Welches Denken hat die Systembedingung(en) verursacht?',
   },
   'capture.addThinking': {
     en: 'Add thinking',
