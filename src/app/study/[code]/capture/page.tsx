@@ -1012,7 +1012,12 @@ export default function CapturePage() {
                           onChange={(e) => {
                             const id = e.target.value;
                             if (!id) return;
-                            setSystemConditions(prev => [...prev, { id, dimension: 'hinders' }]);
+                            // Dynamic default: on value classification, default a newly added SC
+                            // to "helps" (what helped the customer's purpose); otherwise default
+                            // to "hinders" (what blocked the customer's purpose). Per Jonas feedback
+                            // 2026-04-16 — makes the more-likely-correct answer the default.
+                            const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                            setSystemConditions(prev => [...prev, { id, dimension: defaultDim }]);
                             setScPickerOpen(false);
                           }}
                           className={inputCls}
@@ -1045,7 +1050,8 @@ export default function CapturePage() {
                 })()}
               </div>
               {renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => {
-                setSystemConditions(prev => prev.some(p => p.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]);
+                const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                setSystemConditions(prev => prev.some(p => p.id === id) ? prev : [...prev, { id, dimension: defaultDim }]);
                 setScPickerOpen(false);
               })}
             </div>

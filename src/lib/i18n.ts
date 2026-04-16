@@ -296,10 +296,10 @@ const translations = {
     de: 'Ursache der Fehlernachfrage (Systembedingung)',
   },
   'capture.systemConditionsLabel': {
-    en: 'System condition(s) (what caused this failure or inability to handle one-stop?)',
-    da: 'Systemforhold (hvad forårsagede denne fejl eller manglende evne til at håndtere one-stop?)',
-    sv: 'Systemförhållande(n) (vad orsakade detta fel eller oförmåga att hantera one-stop?)',
-    de: 'Systembedingung(en) (was hat diesen Fehler oder die Unfähigkeit zur One-Stop-Bearbeitung verursacht?)',
+    en: 'What influenced what you did to handle the customer demand?',
+    da: 'Hvad påvirkede det, du gjorde for at håndtere kundens efterspørgsel?',
+    sv: 'Vad påverkade det du gjorde för att hantera kundens efterfrågan?',
+    de: 'Was beeinflusste, wie Sie die Kundenanfrage bearbeitet haben?',
   },
   'capture.thinkingLabel': {
     en: 'What was the thinking causing the system condition(s)?',

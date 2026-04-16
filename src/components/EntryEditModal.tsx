@@ -574,7 +574,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           onChange={(e) => {
                             const id = e.target.value;
                             if (id) {
-                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]));
+                              // Dynamic default: value entry → helps, else → hinders
+                              // (Jonas feedback 2026-04-16)
+                              const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
+                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: defaultDim }]));
                               setScPickerOpen(false);
                             }
                           }}
@@ -592,7 +595,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           apiPath="system-conditions"
                           onRefresh={onStudyRefresh}
                           onCreated={(id) => {
-                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]));
+                            const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
+                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: defaultDim }]));
                             setScPickerOpen(false);
                           }}
                           compact
