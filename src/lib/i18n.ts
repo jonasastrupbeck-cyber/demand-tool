@@ -681,17 +681,27 @@ const translations = {
     sv: 'V\u00e4lj t\u00e4nkande att l\u00e4gga till...',
     de: 'Denkweise zum Hinzuf\u00fcgen w\u00e4hlen...',
   },
+  // Helps / Hinders labels — explicit customer-lens framing (Ali feedback
+  // 2026-04-16): Vanguard only studies the system through the customer's
+  // eyes. A "helps" from the contact centre's view is irrelevant — only
+  // whether the system condition helps or hinders the customer's purpose.
   'capture.scHelps': {
-    en: 'Helps',
-    da: 'Hj\u00e6lper',
-    sv: 'Hj\u00e4lper',
-    de: 'Hilft',
+    en: "Helps customer's purpose",
+    da: 'Hj\u00e6lper kundens form\u00e5l',
+    sv: 'Hj\u00e4lper kundens syfte',
+    de: 'F\u00f6rdert Kundenzweck',
   },
   'capture.scHinders': {
-    en: 'Hinders',
-    da: 'Hindrer',
-    sv: 'Hindrar',
-    de: 'Hindert',
+    en: "Hinders customer's purpose",
+    da: 'Hindrer kundens form\u00e5l',
+    sv: 'Hindrar kundens syfte',
+    de: 'Hemmt Kundenzweck',
+  },
+  'capture.scDimensionHint': {
+    en: "Look from the customer's point of view, not the organisation's.",
+    da: 'Se det fra kundens synspunkt, ikke organisationens.',
+    sv: 'Betrakta det ur kundens synvinkel, inte organisationens.',
+    de: 'Aus Sicht des Kunden betrachten, nicht der Organisation.',
   },
   'capture.addSystemConditionButton': {
     en: '+ Add system condition',

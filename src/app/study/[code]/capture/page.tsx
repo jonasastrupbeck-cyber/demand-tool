@@ -968,6 +968,7 @@ export default function CapturePage() {
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
               <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
+              <p className="text-xs text-gray-500 -mt-1 mb-2">{t('capture.scDimensionHint')}</p>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
                   const sc = (study.systemConditions || []).find(s => s.id === entry.id);
