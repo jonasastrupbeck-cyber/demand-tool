@@ -575,14 +575,22 @@ export default function DashboardPage() {
               for (const r of rows) {
                 if (!stageSeen.has(r.stageLabel)) { stageSeen.add(r.stageLabel); stageOrder.push(r.stageLabel); }
               }
-              // Type nodes ordered value-first, then failure, stable within each
+              // Type nodes grouped by stage (in stage order), then value-before-failure
+              // within each stage. Shared types — those that appear under more than one
+              // stage — are placed with their first-seen stage. This keeps each stage's
+              // outflows as a contiguous block on the right side of the Sankey so the
+              // value/failure grouping for that stage is visually coherent.
+              // (Feedback 2026-04-16: previous ordering separated all value from all
+              // failure globally, which made links cross unnecessarily.)
               const typeOrder: Array<{ label: string; category: 'value' | 'failure' }> = [];
               const typeSeen = new Set<string>();
-              for (const cat of ['value', 'failure'] as const) {
-                for (const r of rows) {
-                  if (r.demandTypeCategory === cat && !typeSeen.has(r.demandTypeLabel)) {
-                    typeSeen.add(r.demandTypeLabel);
-                    typeOrder.push({ label: r.demandTypeLabel, category: cat });
+              for (const stage of stageOrder) {
+                for (const cat of ['value', 'failure'] as const) {
+                  for (const r of rows) {
+                    if (r.stageLabel === stage && r.demandTypeCategory === cat && !typeSeen.has(r.demandTypeLabel)) {
+                      typeSeen.add(r.demandTypeLabel);
+                      typeOrder.push({ label: r.demandTypeLabel, category: cat });
+                    }
                   }
                 }
               }
