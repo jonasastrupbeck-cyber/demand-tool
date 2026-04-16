@@ -676,8 +676,8 @@ export default function CapturePage() {
                       value={block.tag}
                       onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'failure' } : b))}
                       options={[
-                        { value: 'value', label: t('capture.workBlockTagValue') },
-                        { value: 'failure', label: t('capture.workBlockTagFailure') },
+                        { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                        { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                       ]}
                     />
                     <button
@@ -987,8 +987,8 @@ export default function CapturePage() {
                       </div>
                       <SegmentedToggle
                         options={[
-                          { value: 'hinders', label: t('capture.scHinders') },
-                          { value: 'helps', label: t('capture.scHelps') },
+                          { value: 'hinders', label: t('capture.scHinders'), activeColor: 'red' },
+                          { value: 'helps', label: t('capture.scHelps'), activeColor: 'green' },
                         ]}
                         value={entry.dimension}
                         onChange={(v) => {

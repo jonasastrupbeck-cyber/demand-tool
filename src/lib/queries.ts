@@ -276,6 +276,10 @@ export async function addContactMethod(studyId: string, label: string) {
   return id;
 }
 
+export async function updateContactMethod(id: string, data: { label?: string }) {
+  await db.update(contactMethods).set(data).where(eq(contactMethods.id, id));
+}
+
 export async function deleteContactMethod(id: string) {
   await db.delete(contactMethods).where(eq(contactMethods.id, id));
 }
@@ -442,6 +446,10 @@ export async function addWorkType(studyId: string, label: string) {
     sortOrder: existing.length,
   });
   return id;
+}
+
+export async function updateWorkType(id: string, data: { label?: string }) {
+  await db.update(workTypes).set(data).where(eq(workTypes.id, id));
 }
 
 export async function deleteWorkType(id: string) {

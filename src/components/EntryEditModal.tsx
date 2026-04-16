@@ -202,8 +202,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       <div className="flex items-start justify-between gap-2">
                         <SegmentedToggle
                           options={[
-                            { value: 'value', label: t('capture.workBlockTagValue') },
-                            { value: 'failure', label: t('capture.workBlockTagFailure') },
+                            { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                            { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                           ]}
                           value={b.tag}
                           onChange={(v) => {
@@ -555,8 +555,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           </div>
                           <SegmentedToggle
                             options={[
-                              { value: 'hinders', label: t('capture.scHinders') },
-                              { value: 'helps', label: t('capture.scHelps') },
+                              { value: 'hinders', label: t('capture.scHinders'), activeColor: 'red' },
+                              { value: 'helps', label: t('capture.scHelps'), activeColor: 'green' },
                             ]}
                             value={entry.dimension}
                             onChange={(v) => {

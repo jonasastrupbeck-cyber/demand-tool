@@ -537,6 +537,12 @@ const translations = {
     sv: 'Spara',
     de: 'Speichern',
   },
+  'settings.editLabel': {
+    en: 'Edit name',
+    da: 'Rediger navn',
+    sv: 'Redigera namn',
+    de: 'Name bearbeiten',
+  },
   'settings.saved': {
     en: 'Saved',
     da: 'Gemt',

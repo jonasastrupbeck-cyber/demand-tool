@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { workTypes } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { getStudyByCode, deleteWorkType } from '@/lib/queries';
+import { getStudyByCode, deleteWorkType, updateWorkType } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -13,6 +13,9 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
+  if (typeof body.label === 'string' && body.label.trim()) {
+    await updateWorkType(id, { label: body.label.trim() });
+  }
   if (body.lifecycleStageId !== undefined) {
     await db.update(workTypes).set({ lifecycleStageId: body.lifecycleStageId }).where(eq(workTypes.id, id));
   }

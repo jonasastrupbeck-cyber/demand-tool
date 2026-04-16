@@ -10,7 +10,8 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
-  const updates: { operationalDefinition?: string | null } = {};
+  const updates: { label?: string; operationalDefinition?: string | null } = {};
+  if (typeof body.label === 'string' && body.label.trim()) updates.label = body.label.trim();
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
 
   await updateWhatMattersType(id, updates);

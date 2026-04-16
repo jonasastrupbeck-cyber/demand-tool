@@ -124,6 +124,15 @@ export default function SettingsPage() {
   const [editingDefValue, setEditingDefValue] = useState('');
   const [editingDefType, setEditingDefType] = useState<'handling' | 'demand' | 'whatMatters' | 'systemCondition' | 'lifeProblem'>('handling');
 
+  // Label editing (covers all 9 taxonomies — Ali feedback 2026-04-16: fix a typo
+  // in a COR title, etc. Previously the only editable field per row was
+  // operationalDefinition; the label itself required delete-and-re-add which
+  // broke existing references.)
+  type LabelEditType = 'handling' | 'demand' | 'contactMethod' | 'pointOfTransaction' | 'whatMatters' | 'systemCondition' | 'thinking' | 'lifeProblem' | 'workType';
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState('');
+  const [editingLabelType, setEditingLabelType] = useState<LabelEditType>('handling');
+
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
     if (res.ok) {
@@ -504,6 +513,78 @@ export default function SettingsPage() {
     loadStudy();
   }
 
+  // Label editing — same pattern as saveOperationalDefinition, but covers all 9
+  // taxonomies that have a user-editable label.
+  const LABEL_PATH_MAP: Record<LabelEditType, string> = {
+    handling: 'handling-types',
+    demand: 'demand-types',
+    contactMethod: 'contact-methods',
+    pointOfTransaction: 'points-of-transaction',
+    whatMatters: 'what-matters-types',
+    systemCondition: 'system-conditions',
+    thinking: 'thinkings',
+    lifeProblem: 'life-problems',
+    workType: 'work-types',
+  };
+
+  function startEditLabel(id: string, currentLabel: string, type: LabelEditType) {
+    setEditingLabelId(id);
+    setEditingLabelValue(currentLabel);
+    setEditingLabelType(type);
+  }
+
+  async function saveLabel() {
+    if (!editingLabelId) return;
+    const trimmed = editingLabelValue.trim();
+    if (!trimmed) { setEditingLabelId(null); return; }
+    await fetch(`/api/studies/${encodeURIComponent(code)}/${LABEL_PATH_MAP[editingLabelType]}/${editingLabelId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: trimmed }),
+    });
+    setEditingLabelId(null);
+    setEditingLabelValue('');
+    loadStudy();
+  }
+
+  // Renders either the label (with a small pencil icon to enter edit mode) or
+  // an inline input when this row is being edited. Used in all 9 taxonomy lists.
+  // `labelClassName` lets demand types keep their semantic colour (green for
+  // value, red for failure) instead of the default gray.
+  function renderLabel(id: string, label: string, type: LabelEditType, labelClassName: string = 'text-sm text-gray-800') {
+    if (editingLabelId === id && editingLabelType === type) {
+      return (
+        <span className="inline-flex items-center gap-1">
+          <input
+            type="text"
+            value={editingLabelValue}
+            onChange={(e) => setEditingLabelValue(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') setEditingLabelId(null); }}
+            className="px-2 py-0.5 rounded text-sm text-gray-800 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+          />
+          <button onClick={saveLabel} className="text-xs px-2 py-0.5 bg-[#ac2c2d] text-white rounded">{t('settings.save')}</button>
+          <button onClick={() => setEditingLabelId(null)} className="text-xs px-1 text-gray-500" aria-label="Cancel">&times;</button>
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <span className={labelClassName}>{tl(label)}</span>
+        <button
+          onClick={() => startEditLabel(id, label, type)}
+          className="text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label={t('settings.editLabel')}
+          title={t('settings.editLabel')}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          </svg>
+        </button>
+      </span>
+    );
+  }
+
   async function savePurpose() {
     await fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
@@ -644,7 +725,7 @@ export default function SettingsPage() {
               <li key={ht.id} className="py-2 px-3 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-800">{tl(ht.label)}</span>
+                    {renderLabel(ht.id, ht.label, 'handling')}
                     {study.oneStopHandlingType === ht.id && (
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">{t('settings.oneStop')}</span>
                     )}
@@ -694,7 +775,7 @@ export default function SettingsPage() {
           <ul className="space-y-2 mb-4">
             {study.contactMethods.map((cm) => (
               <li key={cm.id} className={itemCls}>
-                <span className="text-sm text-gray-800">{tl(cm.label)}</span>
+                {renderLabel(cm.id, cm.label, 'contactMethod')}
                 <button onClick={() => removeContactMethod(cm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
               </li>
             ))}
@@ -712,7 +793,7 @@ export default function SettingsPage() {
           <ul className="space-y-2 mb-4">
             {(study.pointsOfTransaction || []).map((pot) => (
               <li key={pot.id} className={itemCls}>
-                <span className="text-sm text-gray-800">{tl(pot.label)}</span>
+                {renderLabel(pot.id, pot.label, 'pointOfTransaction')}
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                     <input
@@ -759,7 +840,7 @@ export default function SettingsPage() {
               <ul className="space-y-2 mb-4">
                 {valueTypes.map((dt) => (
                   <li key={dt.id} className={`${itemCls} bg-green-50`}>
-                    <span className="text-sm text-green-700">{tl(dt.label)}</span>
+                    {renderLabel(dt.id, dt.label, 'demand', 'text-sm text-green-700')}
                     <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
@@ -775,7 +856,7 @@ export default function SettingsPage() {
               <ul className="space-y-2 mb-4">
                 {failureTypes.map((dt) => (
                   <li key={dt.id} className={`${itemCls} bg-red-50`}>
-                    <span className="text-sm text-red-700">{tl(dt.label)}</span>
+                    {renderLabel(dt.id, dt.label, 'demand', 'text-sm text-red-700')}
                     <button onClick={() => removeDemandType(dt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
@@ -810,7 +891,7 @@ export default function SettingsPage() {
               <ul className="space-y-2 mb-4">
                 {(study.systemConditions || []).map((sc) => (
                   <li key={sc.id} className={`${itemCls} bg-red-50`}>
-                    <span className="text-sm text-red-700">{tl(sc.label)}</span>
+                    {renderLabel(sc.id, sc.label, 'systemCondition', 'text-sm text-red-700')}
                     <button onClick={() => removeSystemCondition(sc.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                   </li>
                 ))}
@@ -831,7 +912,7 @@ export default function SettingsPage() {
             <ul className="space-y-2 mb-4">
               {(study.thinkings || []).map((th) => (
                 <li key={th.id} className={`${itemCls} bg-red-50`}>
-                  <span className="text-sm text-red-700">{tl(th.label)}</span>
+                  {renderLabel(th.id, th.label, 'thinking', 'text-sm text-red-700')}
                   <button onClick={() => removeThinking(th.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                 </li>
               ))}
@@ -940,7 +1021,7 @@ export default function SettingsPage() {
           <ul className="space-y-2 mb-4">
             {study.whatMattersTypes.map((wm) => (
               <li key={wm.id} className={`${itemCls} bg-blue-50`}>
-                <span className="text-sm text-blue-700">{tl(wm.label)}</span>
+                {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
                 <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
               </li>
             ))}
@@ -959,7 +1040,7 @@ export default function SettingsPage() {
             {study.lifeProblems.map((lp) => (
               <li key={lp.id} className="py-2 px-3 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-800">{tl(lp.label)}</span>
+                  {renderLabel(lp.id, lp.label, 'lifeProblem')}
                   <button onClick={() => removeLifeProblem(lp.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                 </div>
                 {editingDefId === lp.id ? (
@@ -1035,7 +1116,7 @@ export default function SettingsPage() {
                 <ul className="space-y-2 mb-4">
                   {(study.workTypes || []).map((wt) => (
                     <li key={wt.id} className={`${itemCls} bg-amber-50`}>
-                      <span className="text-sm text-amber-700">{tl(wt.label)}</span>
+                      {renderLabel(wt.id, wt.label, 'workType', 'text-sm text-amber-700')}
                       <button onClick={() => removeWorkType(wt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                     </li>
                   ))}
