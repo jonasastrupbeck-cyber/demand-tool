@@ -296,10 +296,48 @@ const translations = {
     de: 'Ursache der Fehlernachfrage (Systembedingung)',
   },
   'capture.systemConditionsLabel': {
-    en: 'What influenced what you did to handle the customer demand?',
-    da: 'Hvad påvirkede det, du gjorde for at håndtere kundens efterspørgsel?',
-    sv: 'Vad påverkade det du gjorde för att hantera kundens efterfrågan?',
-    de: 'Was beeinflusste, wie Sie die Kundenanfrage bearbeitet haben?',
+    en: "What helped or hindered delivering the customer's purpose?",
+    da: 'Hvad hjalp eller hindrede leveringen af kundens formål?',
+    sv: 'Vad hjälpte eller hindrade leveransen av kundens syfte?',
+    de: 'Was half oder hinderte die Erfüllung des Kundenzwecks?',
+  },
+  // Chips shown on each SC card indicating which of the five capture fields
+  // the SC attaches to. User toggles these on/off. Per Ali 2026-04-16.
+  'capture.scAttachHint': {
+    en: 'Attach this system condition to:',
+    da: 'Knyt dette systemforhold til:',
+    sv: 'Koppla detta systemförhållande till:',
+    de: 'Diese Systembedingung anhängen an:',
+  },
+  'capture.scAttachLifeProblem': {
+    en: 'Life problem',
+    da: 'Livsproblem',
+    sv: 'Livsproblem',
+    de: 'Lebensproblem',
+  },
+  'capture.scAttachDemand': {
+    en: 'Demand',
+    da: 'Efterspørgsel',
+    sv: 'Efterfrågan',
+    de: 'Nachfrage',
+  },
+  'capture.scAttachWhatMatters': {
+    en: 'What matters',
+    da: 'Hvad betyder noget',
+    sv: 'Vad som spelar roll',
+    de: 'Was wichtig ist',
+  },
+  'capture.scAttachCor': {
+    en: 'CoR',
+    da: 'CoR',
+    sv: 'CoR',
+    de: 'CoR',
+  },
+  'capture.scAttachWork': {
+    en: 'Work',
+    da: 'Arbejde',
+    sv: 'Arbete',
+    de: 'Arbeit',
   },
   'capture.thinkingLabel': {
     en: 'What was the thinking causing the system condition(s)?',

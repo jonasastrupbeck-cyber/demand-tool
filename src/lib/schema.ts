@@ -134,6 +134,13 @@ export const demandEntrySystemConditions = pgTable('demand_entry_system_conditio
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
   dimension: text('dimension').notNull().default('hinders').$type<'helps' | 'hinders'>(),
+  // Per Ali feedback 2026-04-16: each SC attachment tags which of the five
+  // captured fields it helps or hinders. At least one should be true.
+  attachesToLifeProblem: boolean('attaches_to_life_problem').notNull().default(false),
+  attachesToDemand:      boolean('attaches_to_demand').notNull().default(false),
+  attachesToWhatMatters: boolean('attaches_to_what_matters').notNull().default(false),
+  attachesToCor:         boolean('attaches_to_cor').notNull().default(false),
+  attachesToWork:        boolean('attaches_to_work').notNull().default(false),
 }, (t) => ({
   uniqEntrySc: unique().on(t.demandEntryId, t.systemConditionId),
 }));

@@ -487,7 +487,17 @@ export async function createEntry(studyId: string, data: {
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
-  systemConditions?: { id: string; dimension: 'helps' | 'hinders' }[];
+  systemConditions?: {
+    id: string;
+    dimension: 'helps' | 'hinders';
+    // Per Ali feedback 2026-04-16: each SC attaches to one or more of the
+    // five capture fields (LP2BS, Demand, What Matters, CoR, Work).
+    attachesToLifeProblem?: boolean;
+    attachesToDemand?: boolean;
+    attachesToWhatMatters?: boolean;
+    attachesToCor?: boolean;
+    attachesToWork?: boolean;
+  }[];
   thinkings?: { id: string; logic: string }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
@@ -548,11 +558,20 @@ export async function createEntry(studyId: string, data: {
   const scVisible = !!data.classification && data.classification !== 'unknown';
   if (scVisible && scs.length > 0) {
     for (const sc of scs) {
+      // Attachment defaults: if the caller didn't specify any, assume attaches
+      // to Demand — matches the old implicit semantics so existing callers
+      // (seeder, import, older UI) keep working.
+      const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
       await db.insert(demandEntrySystemConditions).values({
         id: generateId(),
         demandEntryId: id,
         systemConditionId: sc.id,
         dimension: sc.dimension || 'hinders',
+        attachesToLifeProblem: !!sc.attachesToLifeProblem,
+        attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
+        attachesToWhatMatters: !!sc.attachesToWhatMatters,
+        attachesToCor:         !!sc.attachesToCor,
+        attachesToWork:        !!sc.attachesToWork,
       });
     }
   }
@@ -654,7 +673,17 @@ export async function updateEntry(entryId: string, data: {
   workTypeId?: string | null;
   whatMatters?: string | null;
   whatMattersTypeIds?: string[];
-  systemConditions?: { id: string; dimension: 'helps' | 'hinders' }[];
+  systemConditions?: {
+    id: string;
+    dimension: 'helps' | 'hinders';
+    // Per Ali feedback 2026-04-16: each SC attaches to one or more of the
+    // five capture fields (LP2BS, Demand, What Matters, CoR, Work).
+    attachesToLifeProblem?: boolean;
+    attachesToDemand?: boolean;
+    attachesToWhatMatters?: boolean;
+    attachesToCor?: boolean;
+    attachesToWork?: boolean;
+  }[];
   thinkings?: { id: string; logic: string }[];
   lifeProblemId?: string | null;
   workBlocks?: { tag: 'value' | 'failure'; text: string }[];
@@ -696,15 +725,21 @@ export async function updateEntry(entryId: string, data: {
     }
   }
 
-  // Update system condition junction records if provided. Carries per-pair dimension.
+  // Update system condition junction records if provided. Carries per-pair dimension + 5 field attachments.
   if (systemConditions !== undefined) {
     await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
     for (const sc of systemConditions) {
+      const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
       await db.insert(demandEntrySystemConditions).values({
         id: generateId(),
         demandEntryId: entryId,
         systemConditionId: sc.id,
         dimension: sc.dimension || 'hinders',
+        attachesToLifeProblem: !!sc.attachesToLifeProblem,
+        attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
+        attachesToWhatMatters: !!sc.attachesToWhatMatters,
+        attachesToCor:         !!sc.attachesToCor,
+        attachesToWork:        !!sc.attachesToWork,
       });
     }
   }

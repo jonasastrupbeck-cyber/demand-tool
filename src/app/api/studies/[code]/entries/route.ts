@@ -66,9 +66,22 @@ export async function POST(
     systemConditions: Array.isArray(body.systemConditions) && body.systemConditions.every((s: unknown) =>
       s && typeof s === 'object' && typeof (s as { id?: unknown }).id === 'string'
     )
-      ? body.systemConditions.map((s: { id: string; dimension?: string }) => ({
+      ? body.systemConditions.map((s: {
+          id: string;
+          dimension?: string;
+          attachesToLifeProblem?: boolean;
+          attachesToDemand?: boolean;
+          attachesToWhatMatters?: boolean;
+          attachesToCor?: boolean;
+          attachesToWork?: boolean;
+        }) => ({
           id: s.id,
           dimension: s.dimension === 'helps' ? 'helps' as const : 'hinders' as const,
+          attachesToLifeProblem: !!s.attachesToLifeProblem,
+          attachesToDemand:      !!s.attachesToDemand,
+          attachesToWhatMatters: !!s.attachesToWhatMatters,
+          attachesToCor:         !!s.attachesToCor,
+          attachesToWork:        !!s.attachesToWork,
         }))
       : undefined,
     thinkings: Array.isArray(body.thinkings) && body.thinkings.every((t: unknown) =>

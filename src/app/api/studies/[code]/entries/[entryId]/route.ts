@@ -31,6 +31,11 @@ export async function GET(
     systemConditions: scRows.map((r) => ({
       id: r.systemConditionId,
       dimension: (r.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+      attachesToLifeProblem: r.attachesToLifeProblem,
+      attachesToDemand:      r.attachesToDemand,
+      attachesToWhatMatters: r.attachesToWhatMatters,
+      attachesToCor:         r.attachesToCor,
+      attachesToWork:        r.attachesToWork,
     })),
     thinkings: thRows.map((r) => ({ id: r.thinkingId, logic: r.logic ?? '' })),
     workBlocks: wbRows.map((r) => ({
@@ -67,9 +72,22 @@ export async function PATCH(
     )) {
       return NextResponse.json({ error: 'systemConditions must be an array of { id, dimension? }' }, { status: 400 });
     }
-    updates.systemConditions = body.systemConditions.map((s: { id: string; dimension?: string }) => ({
+    updates.systemConditions = body.systemConditions.map((s: {
+      id: string;
+      dimension?: string;
+      attachesToLifeProblem?: boolean;
+      attachesToDemand?: boolean;
+      attachesToWhatMatters?: boolean;
+      attachesToCor?: boolean;
+      attachesToWork?: boolean;
+    }) => ({
       id: s.id,
       dimension: (s.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+      attachesToLifeProblem: !!s.attachesToLifeProblem,
+      attachesToDemand:      !!s.attachesToDemand,
+      attachesToWhatMatters: !!s.attachesToWhatMatters,
+      attachesToCor:         !!s.attachesToCor,
+      attachesToWork:        !!s.attachesToWork,
     }));
   }
   if (body.thinkings !== undefined) {

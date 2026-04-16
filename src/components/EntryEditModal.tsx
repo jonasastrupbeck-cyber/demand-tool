@@ -70,7 +70,18 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
-  const [systemConditions, setSystemConditions] = useState<{ id: string; dimension: 'helps' | 'hinders' }[]>([]);
+  // Attachment flags per SC — which of the 5 capture fields this SC is about.
+  // Ali feedback 2026-04-16.
+  type ScAttachment = {
+    id: string;
+    dimension: 'helps' | 'hinders';
+    attachesToLifeProblem: boolean;
+    attachesToDemand: boolean;
+    attachesToWhatMatters: boolean;
+    attachesToCor: boolean;
+    attachesToWork: boolean;
+  };
+  const [systemConditions, setSystemConditions] = useState<ScAttachment[]>([]);
   const [scPickerOpen, setScPickerOpen] = useState(false);
   const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
   const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
@@ -86,7 +97,20 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         const data = await res.json();
         setEntry(data.entry);
         setWhatMattersTypeIds(data.whatMattersTypeIds || []);
-        setSystemConditions(Array.isArray(data.systemConditions) ? data.systemConditions : []);
+        // Normalise loaded SCs so callers can always read the 5 attachment
+        // booleans. Older rows without attachment data default to attachesToDemand.
+        setSystemConditions(Array.isArray(data.systemConditions) ? data.systemConditions.map((sc: Partial<ScAttachment> & { id: string; dimension: 'helps' | 'hinders' }) => {
+          const hasAny = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
+          return {
+            id: sc.id,
+            dimension: sc.dimension,
+            attachesToLifeProblem: !!sc.attachesToLifeProblem,
+            attachesToDemand:      hasAny ? !!sc.attachesToDemand : true,
+            attachesToWhatMatters: !!sc.attachesToWhatMatters,
+            attachesToCor:         !!sc.attachesToCor,
+            attachesToWork:        !!sc.attachesToWork,
+          };
+        }) : []);
         setThinkings(Array.isArray(data.thinkings) ? data.thinkings : []);
         setWorkBlocks(Array.isArray(data.workBlocks) ? data.workBlocks : []);
         // Auto-open the note disclosure if the field already has content.
@@ -564,6 +588,36 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             }}
                             ariaLabel={t('capture.systemConditionsLabel')}
                           />
+                          {/* Attachment chips (Ali 2026-04-16) */}
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">{t('capture.scAttachHint')}</p>
+                            <div className="flex flex-wrap gap-1">
+                              {([
+                                ['attachesToLifeProblem', 'capture.scAttachLifeProblem'],
+                                ['attachesToDemand',      'capture.scAttachDemand'],
+                                ['attachesToWhatMatters', 'capture.scAttachWhatMatters'],
+                                ['attachesToCor',         'capture.scAttachCor'],
+                                ['attachesToWork',        'capture.scAttachWork'],
+                              ] as const).map(([field, key]) => {
+                                const on = entry[field];
+                                return (
+                                  <button
+                                    key={field}
+                                    type="button"
+                                    onClick={() => setSystemConditions((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: !p[field] } : p))}
+                                    className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                      on
+                                        ? 'bg-[#ac2c2d] text-white border-[#ac2c2d]'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:border-[#ac2c2d] hover:text-[#ac2c2d]'
+                                    }`}
+                                    aria-pressed={on}
+                                  >
+                                    {t(key)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -574,10 +628,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           onChange={(e) => {
                             const id = e.target.value;
                             if (id) {
-                              // Dynamic default: value entry → helps, else → hinders
-                              // (Jonas feedback 2026-04-16)
+                              // Dynamic default dimension (value → helps, else → hinders)
+                              // and default attachment (Work on work entries, Demand otherwise).
                               const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
-                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: defaultDim }]));
+                              const isWork = entry?.entryType === 'work';
+                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
+                                id,
+                                dimension: defaultDim,
+                                attachesToLifeProblem: false,
+                                attachesToDemand: !isWork,
+                                attachesToWhatMatters: false,
+                                attachesToCor: false,
+                                attachesToWork: isWork,
+                              }]));
                               setScPickerOpen(false);
                             }
                           }}
@@ -596,7 +659,16 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           onRefresh={onStudyRefresh}
                           onCreated={(id) => {
                             const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
-                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: defaultDim }]));
+                            const isWork = entry?.entryType === 'work';
+                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
+                              id,
+                              dimension: defaultDim,
+                              attachesToLifeProblem: false,
+                              attachesToDemand: !isWork,
+                              attachesToWhatMatters: false,
+                              attachesToCor: false,
+                              attachesToWork: isWork,
+                            }]));
                             setScPickerOpen(false);
                           }}
                           compact
