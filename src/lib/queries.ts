@@ -539,27 +539,13 @@ export async function createEntry(studyId: string, data: {
   }
 
   // Insert system condition junction records.
-  // Visible when: failure demand, sequence work, or value demand routed to a non-one-stop capability
-  // (mirrors the UI gate in src/app/study/[code]/capture/page.tsx and EntryEditModal).
+  // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY outcome,
+  // so SC is accepted on every classified entry (mirrors the UI gate in
+  // capture/page.tsx and EntryEditModal.tsx). Only rejected when classification
+  // is unset or 'unknown'.
   // Each entry carries a "dimension" (helps | hinders) — Phase 2 / Item 3.
   const scs = data.systemConditions || [];
-  let oneStopHandlingType: string | null = null;
-  if (data.classification === 'value' && isDemand) {
-    const studyRow = await db.select({ oneStop: studies.oneStopHandlingType })
-      .from(studies)
-      .where(eq(studies.id, studyId))
-      .limit(1);
-    oneStopHandlingType = studyRow[0]?.oneStop ?? null;
-  }
-  const scVisible =
-    data.classification === 'failure'
-    || (!isDemand && data.classification === 'sequence')
-    || (
-      isDemand
-      && data.classification === 'value'
-      && !!data.handlingTypeId
-      && data.handlingTypeId !== (oneStopHandlingType || '')
-    );
+  const scVisible = !!data.classification && data.classification !== 'unknown';
   if (scVisible && scs.length > 0) {
     for (const sc of scs) {
       await db.insert(demandEntrySystemConditions).values({

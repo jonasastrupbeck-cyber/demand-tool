@@ -378,12 +378,14 @@ export default function CapturePage() {
       body.workTypeId = study?.workTypesEnabled ? (workTypeId || undefined) : undefined;
     }
 
-    // System conditions + Thinking visible on failure (all entries) and on sequence (work only).
-    const isWork = entryType === 'work';
-    const scVisible = study?.systemConditionsEnabled && (
-      effectiveClassification === 'failure' ||
-      (isWork && effectiveClassification === 'sequence')
-    );
+    // System conditions + Thinking are visible on every classified entry.
+    // Per Ali feedback 2026-04-16: failure work can be hidden inside any
+    // outcome — including value demands handled one-stop, and value work —
+    // so SC + Thinking must be available wherever failure work might be
+    // captured in the Flow. Only hide when classification is unset or '?'.
+    const scVisible = study?.systemConditionsEnabled
+      && !!effectiveClassification
+      && effectiveClassification !== 'unknown';
     if (scVisible && systemConditions.length > 0) {
       body.systemConditions = systemConditions;
     }
@@ -484,20 +486,12 @@ export default function CapturePage() {
 
   const isDemand = entryType === 'demand';
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
-  // System conditions + Thinking are visible on:
-  //   - any failure entry
-  //   - work + sequence
-  //   - demand + value when capability is selected and is NOT the one-stop handling type
-  //     (the "why not one stop?" question)
-  const scVisible =
-    classification === 'failure'
-    || (!isDemand && classification === 'sequence')
-    || (
-      isDemand
-      && classification === 'value'
-      && !!handlingTypeId
-      && handlingTypeId !== (study.oneStopHandlingType || '')
-    );
+  // System conditions + Thinking are visible on every classified entry.
+  // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY
+  // outcome — including value demands handled one-stop, and value work —
+  // so SC + Thinking must be available wherever the Flow might contain
+  // failure-work steps. Only hide when classification is unset or '?'.
+  const scVisible = !!classification && classification !== 'unknown';
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24">

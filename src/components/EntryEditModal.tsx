@@ -133,19 +133,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
   const isDemand = entry?.entryType === 'demand';
   const isFailure = entry?.classification === 'failure';
-  // System conditions + Thinking visible on:
-  //   - any failure entry
-  //   - work + sequence
-  //   - demand + value when a non-one-stop Capability is selected ("why not one stop?")
-  const scVisible =
-    entry?.classification === 'failure'
-    || (entry?.entryType === 'work' && entry?.classification === 'sequence')
-    || (
-      entry?.entryType === 'demand'
-      && entry?.classification === 'value'
-      && !!entry?.handlingTypeId
-      && entry?.handlingTypeId !== (study.oneStopHandlingType || '')
-    );
+  // System conditions + Thinking are visible on every classified entry.
+  // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY
+  // outcome — including value demands handled one-stop, and value work —
+  // so SC + Thinking must be available wherever the Flow might contain
+  // failure-work steps. Only hide when classification is unset or '?'.
+  const scVisible = !!entry?.classification && entry?.classification !== 'unknown';
 
   return (
     <div
