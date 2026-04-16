@@ -192,58 +192,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               ) : null}
             </div>
 
-            {/* Work tab: repeating Value/Failure blocks (replaces verbatim) */}
-            {!isDemand && (
-              <div>
-                <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
-                <div className="space-y-2">
-                  {workBlocks.map((b, idx) => (
-                    <div key={idx} className="p-3 rounded-lg border border-gray-200 bg-gray-50 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <SegmentedToggle
-                          options={[
-                            { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
-                            { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
-                          ]}
-                          value={b.tag}
-                          onChange={(v) => {
-                            const tag = v === 'value' ? 'value' : 'failure';
-                            setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
-                          }}
-                          ariaLabel={t('capture.workBlocksLabel')}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                          aria-label="Remove"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                      <textarea
-                        value={b.text}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
-                        }}
-                        placeholder={t('capture.workBlockPlaceholder')}
-                        rows={2}
-                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '' }])}
-                    className="w-full py-2 rounded-lg text-sm font-medium text-gray-700 border border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50"
-                  >
-                    {t('capture.addWorkBlockButton')}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip */}
             {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
               <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
@@ -526,6 +474,63 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     compact
                   />
                 )}
+              </div>
+            )}
+
+            {/* Flow — Work tab only. Horizontal sequence of Value/Failure steps
+                describing the work behind the Capability of Response. Matches the
+                Capture form's Flow section (Ali mockup 2026-04-16). */}
+            {!isDemand && (
+              <div>
+                <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
+                <div className="overflow-x-auto -mx-1 px-1 pb-2">
+                  <div className="flex gap-2 items-stretch min-w-min">
+                    {workBlocks.map((b, idx) => (
+                      <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between gap-1">
+                          <SegmentedToggle
+                            options={[
+                              { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                              { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                            ]}
+                            value={b.tag}
+                            onChange={(v) => {
+                              const tag = v === 'value' ? 'value' : 'failure';
+                              setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
+                            }}
+                            ariaLabel={t('capture.workBlocksLabel')}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                            aria-label="Remove"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        <textarea
+                          value={b.text}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
+                          }}
+                          placeholder={t('capture.workBlockPlaceholder')}
+                          rows={4}
+                          className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none resize-none flex-1"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '' }])}
+                      aria-label={t('capture.addWorkBlockButton')}
+                      className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

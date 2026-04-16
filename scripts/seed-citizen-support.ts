@@ -64,8 +64,11 @@ async function main() {
   console.log(`   Access code: ${code}`);
 
   // 2. Set purpose + enable the capture toggles we need (classification, handling,
-  //    value-linking, system conditions, lifecycle). The legacy "activate-layer"
-  //    endpoint was replaced by these boolean flags.
+  //    value-linking, system conditions, lifecycle, work tracking). The legacy
+  //    "activate-layer" endpoint was replaced by these boolean flags. Enabling
+  //    workTrackingEnabled also auto-seeds 3 default Work Types via the API's
+  //    side-effect, so Work capture is immediately usable without the user
+  //    having to add types manually.
   await api(`/api/studies/${code}`, 'PUT', {
     purpose: data.STUDY_CONFIG.purpose,
     systemConditionsEnabled: true,
@@ -73,6 +76,8 @@ async function main() {
     classificationEnabled: true,
     handlingEnabled: true,
     valueLinkingEnabled: true,
+    workTrackingEnabled: true,
+    workTypesEnabled: true,
   });
 
   // 3. Clear defaults (we want our own taxonomy)

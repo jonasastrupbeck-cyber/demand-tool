@@ -734,10 +734,10 @@ const translations = {
     de: 'Fehler',
   },
   'capture.workBlockPlaceholder': {
-    en: 'Describe this piece of work...',
-    da: 'Beskriv denne del af arbejdet...',
-    sv: 'Beskriv detta arbetsmoment...',
-    de: 'Beschreibe diesen Arbeitsschritt...',
+    en: 'Describe this step...',
+    da: 'Beskriv dette trin...',
+    sv: 'Beskriv detta steg...',
+    de: 'Beschreibe diesen Schritt...',
   },
   'capture.legacyVerbatimNotice': {
     en: 'Legacy entry — original description (read-only). Adding a block below will replace this.',
@@ -746,10 +746,10 @@ const translations = {
     de: 'Alter Eintrag — urspr\u00fcngliche Beschreibung (schreibgesch\u00fctzt). Ein neuer Block unten ersetzt sie.',
   },
   'capture.workBlocksLabel': {
-    en: 'What happened during this work?',
-    da: 'Hvad skete der under dette arbejde?',
-    sv: 'Vad h\u00e4nde under detta arbete?',
-    de: 'Was geschah bei dieser Arbeit?',
+    en: 'Flow (value work + failure work)',
+    da: 'Forl\u00f8b (v\u00e6rdiskabende arbejde + fejlarbejde)',
+    sv: 'Fl\u00f6de (v\u00e4rdeskapande arbete + felarbete)',
+    de: 'Ablauf (Wertarbeit + Fehlerarbeit)',
   },
   'settings.language': {
     en: 'Language',
