@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import InlineTypeAdder from './InlineTypeAdder';
+import CapabilityRadioGroup from './CapabilityRadioGroup';
 
-interface HandlingType { id: string; label: string }
+interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
 interface ContactMethod { id: string; label: string }
 interface PointOfTransaction { id: string; label: string }
@@ -170,7 +171,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip */}
             {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
               <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
-                <p className="text-xs text-gray-500 mb-2">{t('capture.sessionContext')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {study.pointsOfTransaction.length > 0 && (
                     <div>
@@ -325,8 +325,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* What matters multi-select (demand only) — moved up */}
-            {isDemand && (
+            {/* What matters multi-select (Value Demand only — per Vanguard Method, What Matters is captured against the original Value Demand). Stored values are preserved when hidden so reclassifying back restores them. */}
+            {isDemand && entry.classification === 'value' && (
               <div>
                 <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -362,8 +362,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* What matters note (demand only) — collapsed by default, auto-opens if field has text */}
-            {isDemand && (
+            {/* What matters note (Value Demand only) — collapsed by default, auto-opens if field has text */}
+            {isDemand && entry.classification === 'value' && (
               (whatMattersNoteOpen || (entry.whatMatters && entry.whatMatters.trim())) ? (
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -395,21 +395,27 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               )
             )}
 
-            {/* Handling type / Capability of response */}
+            {/* Capability of Response (formerly "Handling type") */}
             {study.handlingEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.handlingLabel')}</label>
-                <div className="flex gap-2">
-                  <select
+                {study.handlingTypes.length > 0 ? (
+                  <CapabilityRadioGroup
+                    code={code}
+                    options={study.handlingTypes}
                     value={entry.handlingTypeId || ''}
-                    onChange={(e) => setEntry({ ...entry, handlingTypeId: e.target.value || null })}
-                    className={inputCls}
-                  >
-                    <option value="">{t('capture.selectHandling')}</option>
-                    {study.handlingTypes.map((ht) => (
-                      <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
-                    ))}
-                  </select>
+                    onChange={(id) => setEntry({ ...entry, handlingTypeId: id || null })}
+                    trailing={
+                      <InlineTypeAdder
+                        code={code}
+                        apiPath="handling-types"
+                        onRefresh={onStudyRefresh}
+                        onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
+                        compact
+                      />
+                    }
+                  />
+                ) : (
                   <InlineTypeAdder
                     code={code}
                     apiPath="handling-types"
@@ -417,7 +423,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
                     compact
                   />
-                </div>
+                )}
               </div>
             )}
 

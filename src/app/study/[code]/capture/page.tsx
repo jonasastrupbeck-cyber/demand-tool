@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import EntryEditModal from '@/components/EntryEditModal';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
+import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
 
 interface HandlingType {
   id: string;
@@ -534,9 +535,11 @@ export default function CapturePage() {
               {t('capture.work')}
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500 italic">
-            {isDemand ? t('capture.demandHelp') : t('capture.workHelp')}
-          </p>
+          {!isDemand && (
+            <p className="mt-2 text-xs text-gray-500 italic">
+              {t('capture.workHelp')}
+            </p>
+          )}
         </div>
       )}
 
@@ -577,7 +580,6 @@ export default function CapturePage() {
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session. */}
       {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
         <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
-          <p className="text-xs text-gray-500 mb-2">{t('capture.sessionContext')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {study.pointsOfTransaction.length > 0 && (
               <div>
@@ -790,8 +792,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters multi-select pills (demand only) */}
-        {isDemand && study.whatMattersTypes.length > 0 && (
+        {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is captured against the original Value Demand) */}
+        {isDemand && classification === 'value' && study.whatMattersTypes.length > 0 && (
           <div>
             <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
             <div className="flex flex-wrap gap-2">
@@ -822,8 +824,8 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters note — collapsed by default. Auto-opens if the field already has text. */}
-        {isDemand && (
+        {/* What matters note — collapsed by default. Auto-opens if the field already has text. (Value Demand only) */}
+        {isDemand && classification === 'value' && (
           (whatMattersNoteOpen || whatMatters.trim()) ? (
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -853,19 +855,18 @@ export default function CapturePage() {
         {study.handlingEnabled && (
           <div>
             <label className={labelCls}>{t('capture.handlingLabel')}</label>
-            <div className="flex gap-2">
-              <select value={handlingTypeId} onChange={(e) => setHandlingTypeId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.selectHandling')}</option>
-                {study.handlingTypes.map((ht) => (
-                  <option key={ht.id} value={ht.id}>{tl(ht.label)}</option>
-                ))}
-              </select>
-              {addBtn('handling')}
-            </div>
-            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id))}
-            {handlingTypeId && study.handlingTypes.find(h => h.id === handlingTypeId)?.operationalDefinition && (
-              <p className="mt-1 text-xs text-gray-400 italic">{study.handlingTypes.find(h => h.id === handlingTypeId)!.operationalDefinition}</p>
+            {study.handlingTypes.length > 0 ? (
+              <CapabilityRadioGroup
+                code={code}
+                options={study.handlingTypes}
+                value={handlingTypeId}
+                onChange={(id) => setHandlingTypeId(id)}
+                trailing={addBtn('handling')}
+              />
+            ) : (
+              <div className="flex gap-2">{addBtn('handling')}</div>
             )}
+            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id))}
           </div>
         )}
 
@@ -1157,7 +1158,7 @@ export default function CapturePage() {
             workTypesEnabled: study.workTypesEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
             oneStopHandlingType: study.oneStopHandlingType,
-            handlingTypes: study.handlingTypes.map(h => ({ id: h.id, label: h.label })),
+            handlingTypes: study.handlingTypes.map(h => ({ id: h.id, label: h.label, operationalDefinition: h.operationalDefinition })),
             demandTypes: study.demandTypes.map(d => ({ id: d.id, category: d.category, label: d.label })),
             contactMethods: study.contactMethods,
             pointsOfTransaction: study.pointsOfTransaction,

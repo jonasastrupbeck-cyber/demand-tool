@@ -63,6 +63,7 @@ export const pointsOfTransaction = pgTable('points_of_transaction', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
   label: text('label').notNull(),
+  customerFacing: boolean('customer_facing').notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
 });
 

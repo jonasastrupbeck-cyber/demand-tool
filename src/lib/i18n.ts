@@ -254,10 +254,28 @@ const translations = {
     de: 'Bearbeitung am Transaktionspunkt',
   },
   'capture.selectHandling': {
-    en: 'Select handling...',
-    da: 'V\u00e6lg h\u00e5ndtering...',
-    sv: 'V\u00e4lj hantering...',
-    de: 'Bearbeitung ausw\u00e4hlen...',
+    en: 'Select capability of response...',
+    da: 'V\u00e6lg reaktionskapacitet...',
+    sv: 'V\u00e4lj reaktionsf\u00f6rm\u00e5ga...',
+    de: 'Reaktionsf\u00e4higkeit ausw\u00e4hlen...',
+  },
+  'capture.capabilityNoDefinition': {
+    en: 'No definition yet — add one in Settings.',
+    da: 'Ingen definition endnu — tilf\u00f8j en i indstillinger.',
+    sv: 'Ingen definition \u00e4nnu — l\u00e4gg till en i inst\u00e4llningar.',
+    de: 'Noch keine Definition — in Einstellungen hinzuf\u00fcgen.',
+  },
+  'capture.capabilityExampleHeader': {
+    en: 'Example demand',
+    da: 'Eksempel p\u00e5 eftersp\u00f8rgsel',
+    sv: 'Exempel p\u00e5 efterfr\u00e5gan',
+    de: 'Beispielnachfrage',
+  },
+  'capture.capabilityNoExample': {
+    en: 'No example yet.',
+    da: 'Ingen eksempler endnu.',
+    sv: 'Inga exempel \u00e4nnu.',
+    de: 'Noch kein Beispiel.',
   },
   'capture.originalValueDemandLabel': {
     en: 'What was the original value demand?',
@@ -478,16 +496,16 @@ const translations = {
     de: 'Kopiert!',
   },
   'settings.handlingTypes': {
-    en: 'Handling Types',
-    da: 'H\u00e5ndteringstyper',
-    sv: 'Hanteringstyper',
-    de: 'Bearbeitungsarten',
+    en: 'Capability of Response',
+    da: 'Reaktionskapacitet',
+    sv: 'Reaktionsf\u00f6rm\u00e5ga',
+    de: 'Reaktionsf\u00e4higkeit',
   },
   'settings.handlingDesc': {
-    en: 'How demand is handled at the point of transaction. Mark one as "one-stop" for the Perfect metric.',
-    da: 'Hvordan eftersp\u00f8rgsel h\u00e5ndteres ved transaktionspunktet. Mark\u00e9r \u00e9n som "one-stop" for Perfect-m\u00e5lingen.',
-    sv: 'Hur efterfr\u00e5gan hanteras vid transaktionspunkten. Markera en som "one-stop" f\u00f6r Perfect-m\u00e5ttet.',
-    de: 'Wie Nachfrage am Transaktionspunkt bearbeitet wird. Markieren Sie eine als "One-Stop" f\u00fcr die Perfect-Metrik.',
+    en: 'How the system is able to respond to demand at the point of transaction. Mark one as "one-stop" for the Perfect metric.',
+    da: 'Hvordan systemet kan reagere p\u00e5 eftersp\u00f8rgsel ved transaktionspunktet. Mark\u00e9r \u00e9n som "one-stop" for Perfect-m\u00e5lingen.',
+    sv: 'Hur systemet kan svara p\u00e5 efterfr\u00e5gan vid transaktionspunkten. Markera en som "one-stop" f\u00f6r Perfect-m\u00e5ttet.',
+    de: 'Wie das System auf Nachfrage am Transaktionspunkt reagieren kann. Markieren Sie eine als "One-Stop" f\u00fcr die Perfect-Metrik.',
   },
   'settings.oneStop': {
     en: 'one-stop',
@@ -526,10 +544,10 @@ const translations = {
     de: 'Gespeichert',
   },
   'settings.addHandling': {
-    en: 'Add handling type...',
-    da: 'Tilf\u00f8j h\u00e5ndteringstype...',
-    sv: 'L\u00e4gg till hanteringstyp...',
-    de: 'Bearbeitungsart hinzuf\u00fcgen...',
+    en: 'Add capability of response...',
+    da: 'Tilf\u00f8j reaktionskapacitet...',
+    sv: 'L\u00e4gg till reaktionsf\u00f6rm\u00e5ga...',
+    de: 'Reaktionsf\u00e4higkeit hinzuf\u00fcgen...',
   },
   'settings.valueDemandTypes': {
     en: 'Value Demand Types',
@@ -750,10 +768,10 @@ const translations = {
     de: 'Was Kunden nachfragen — Typen, Muster und Wert- vs. Fehler-Aufteilung',
   },
   'dashboard.workTabHelp': {
-    en: 'How work flows through the system — handling, capability, and flow analysis',
-    da: 'Hvordan arbejdet flyder gennem systemet — håndtering, kapabilitet og flowanalyse',
-    sv: 'Hur arbetet flödar genom systemet — hantering, kapabilitet och flödesanalys',
-    de: 'Wie Arbeit durch das System fließt — Bearbeitung, Fähigkeit und Flussanalyse',
+    en: 'How work flows through the system — capability of response, and flow analysis',
+    da: 'Hvordan arbejdet flyder gennem systemet — reaktionskapacitet og flowanalyse',
+    sv: 'Hur arbetet flödar genom systemet — reaktionsförmåga och flödesanalys',
+    de: 'Wie Arbeit durch das System fließt — Reaktionsfähigkeit und Flussanalyse',
   },
   'dashboard.overviewTabHelp': {
     en: 'The full picture — all demand data, system conditions, and what matters to customers',
@@ -780,16 +798,16 @@ const translations = {
     de: 'Top 10 Nachfragearten',
   },
   'dashboard.handlingTitle': {
-    en: 'Handling at Point of Transaction',
-    da: 'H\u00e5ndtering ved transaktionspunktet',
-    sv: 'Hantering vid transaktionspunkten',
-    de: 'Bearbeitung am Transaktionspunkt',
+    en: 'Capability of Response at Point of Transaction',
+    da: 'Reaktionskapacitet ved transaktionspunktet',
+    sv: 'Reaktionsf\u00f6rm\u00e5ga vid transaktionspunkten',
+    de: 'Reaktionsf\u00e4higkeit am Transaktionspunkt',
   },
   'dashboard.handlingByClass': {
-    en: 'Handling: Value vs Failure',
-    da: 'H\u00e5ndtering: V\u00e6rdiskabende vs. ikke-v\u00e6rdiskabende',
-    sv: 'Hantering: V\u00e4rdeskapande vs. icke-v\u00e4rdeskapande',
-    de: 'Bearbeitung: Wert vs. Fehler',
+    en: 'Capability of Response: Value vs Failure',
+    da: 'Reaktionskapacitet: V\u00e6rdiskabende vs. ikke-v\u00e6rdiskabende',
+    sv: 'Reaktionsf\u00f6rm\u00e5ga: V\u00e4rdeskapande vs. icke-v\u00e4rdeskapande',
+    de: 'Reaktionsf\u00e4higkeit: Wert vs. Fehler',
   },
   'dashboard.contactMethods': {
     en: 'Contact Methods',
@@ -988,6 +1006,12 @@ const translations = {
     da: 'Tilføj transaktionspunkt...',
     sv: 'Lägg till transaktionspunkt...',
     de: 'Transaktionspunkt hinzufügen...',
+  },
+  'settings.customerFacing': {
+    en: 'Customer-facing',
+    da: 'Kundevendt',
+    sv: 'Kundvänd',
+    de: 'Kundenkontakt',
   },
   'capture.whoAreYou': {
     en: 'Who are you?',
@@ -1440,10 +1464,10 @@ const translations = {
     de: 'Bereit zur Aktivierung: Mitarbeiter werden jede Nachfrage als Wert oder Fehler klassifizieren',
   },
   'layers.prereq3': {
-    en: 'Before activating: define at least one handling type below',
-    da: 'Før aktivering: definer mindst én håndteringstype nedenfor',
-    sv: 'Före aktivering: definiera minst en hanteringstyp nedan',
-    de: 'Vor Aktivierung: definieren Sie mindestens eine Bearbeitungsart unten',
+    en: 'Before activating: define at least one capability of response below',
+    da: 'Før aktivering: definer mindst én reaktionskapacitet nedenfor',
+    sv: 'Före aktivering: definiera minst en reaktionsförmåga nedan',
+    de: 'Vor Aktivierung: definieren Sie mindestens eine Reaktionsfähigkeit unten',
   },
   'layers.prereq4': {
     en: 'Before activating: ensure failure demand types are configured with original value demand links',
@@ -1500,10 +1524,10 @@ const translations = {
     de: 'Wert-/Fehlerklassifizierung',
   },
   'layers.description3': {
-    en: 'Handling (how demand is dealt with)',
-    da: 'Håndtering (hvordan efterspørgsel behandles)',
-    sv: 'Hantering (hur efterfrågan hanteras)',
-    de: 'Bearbeitung (wie Nachfrage behandelt wird)',
+    en: 'Capability of response (how the system can respond to demand)',
+    da: 'Reaktionskapacitet (hvordan systemet kan reagere på efterspørgsel)',
+    sv: 'Reaktionsförmåga (hur systemet kan svara på efterfrågan)',
+    de: 'Reaktionsfähigkeit (wie das System auf Nachfrage reagieren kann)',
   },
   'layers.description4': {
     en: 'Linked demands (failure to value)',
@@ -1594,10 +1618,10 @@ const translations = {
     de: 'Klassifizieren Sie diese Nachfrage als Wert oder Fehler:',
   },
   'reclassify.selectHandling': {
-    en: 'How was this demand handled?',
-    da: 'Hvordan blev denne efterspørgsel håndteret?',
-    sv: 'Hur hanterades denna efterfrågan?',
-    de: 'Wie wurde diese Nachfrage bearbeitet?',
+    en: 'What was the capability of response to this demand?',
+    da: 'Hvad var reaktionskapaciteten over for denne efterspørgsel?',
+    sv: 'Vad var reaktionsförmågan på denna efterfrågan?',
+    de: 'Was war die Reaktionsfähigkeit auf diese Nachfrage?',
   },
   'reclassify.linkToValue': {
     en: 'Which value demand did this failure originate from?',
@@ -1684,10 +1708,10 @@ const translations = {
     de: 'Klassifizierung fehlt',
   },
   'capture.filterNeedsHandling': {
-    en: 'Needs handling',
-    da: 'Mangler håndtering',
-    sv: 'Behöver hantering',
-    de: 'Bearbeitung fehlt',
+    en: 'Needs capability of response',
+    da: 'Mangler reaktionskapacitet',
+    sv: 'Behöver reaktionsförmåga',
+    de: 'Reaktionsfähigkeit fehlt',
   },
   'capture.filterNeedsValueLink': {
     en: 'Needs value link',
@@ -1733,9 +1757,9 @@ const translations = {
   },
   'capture.toggles.handling': {
     en: 'Capture capability of response',
-    da: 'Registrer håndteringstype',
-    sv: 'Registrera hanteringstyp',
-    de: 'Bearbeitungstyp erfassen',
+    da: 'Registrer reaktionskapacitet',
+    sv: 'Registrera reaktionsförmåga',
+    de: 'Reaktionsfähigkeit erfassen',
   },
   'capture.toggles.valueLinking': {
     en: 'Link failure demand to underlying value demand',
@@ -1922,11 +1946,11 @@ export function t(key: TranslationKey, locale: Locale, params?: Record<string, s
 // Known default labels with translations across all languages.
 // Each inner array contains [en, da, sv, de] variants of the same label.
 const DEFAULT_LABEL_GROUPS: string[][] = [
-  // Handling types
+  // Capability of response (formerly "Handling Types")
   ['One Stop', 'One Stop', 'One Stop', 'One Stop'],
   ['Pass-on', 'Sendt videre', 'Skickat vidare', 'Weitergeleitet'],
   ['Pass-back', 'Sendt tilbage', 'Skickat tillbaka', 'Zurückgeleitet'],
-  // Legacy handling types (from older studies)
+  // Legacy capability-of-response options (from older studies)
   ['Resolved at first contact', 'Løst ved første kontakt', 'Löst vid första kontakt', 'Beim ersten Kontakt gelöst'],
   ['Transferred to another team', 'Overført til et andet team', 'Överfört till ett annat team', 'An anderes Team weitergeleitet'],
   ['Callback required', 'Tilbagekald påkrævet', 'Återuppringning krävs', 'Rückruf erforderlich'],

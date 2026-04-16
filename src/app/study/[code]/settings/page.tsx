@@ -35,6 +35,7 @@ interface ContactMethod {
 interface PointOfTransaction {
   id: string;
   label: string;
+  customerFacing: boolean;
 }
 
 interface WorkType {
@@ -278,6 +279,15 @@ export default function SettingsPage() {
 
   async function removePointOfTransaction(id: string) {
     await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function togglePointOfTransactionCustomerFacing(id: string, customerFacing: boolean) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerFacing }),
+    });
     loadStudy();
   }
 
@@ -684,7 +694,18 @@ export default function SettingsPage() {
             {(study.pointsOfTransaction || []).map((pot) => (
               <li key={pot.id} className={itemCls}>
                 <span className="text-sm text-gray-800">{tl(pot.label)}</span>
-                <button onClick={() => removePointOfTransaction(pot.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pot.customerFacing}
+                      onChange={(e) => togglePointOfTransactionCustomerFacing(pot.id, e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-[#ac2c2d] focus:ring-[#ac2c2d]"
+                    />
+                    {t('settings.customerFacing')}
+                  </label>
+                  <button onClick={() => removePointOfTransaction(pot.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                </div>
               </li>
             ))}
           </ul>

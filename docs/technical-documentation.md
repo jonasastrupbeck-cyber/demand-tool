@@ -91,7 +91,7 @@ drizzle/
 | purpose | text | Study purpose statement |
 | activeLayer | integer | Legacy; retained for backward compat and used to auto-seed new booleans on first read. No longer read by features. |
 | classificationEnabled | boolean | Default false. When on, capture form/list expose classification, demand type, failure cause. |
-| handlingEnabled | boolean | Default false. Enables handling dropdown + Perfect % metric. |
+| handlingEnabled | boolean | Default false. Enables Capability of Response capture + Perfect % metric. (Column name retained from earlier "Handling Type" terminology — UI now labels this "Capability of Response".) |
 | valueLinkingEnabled | boolean | Default false. Enables failure→value linking + Failure Flow Sankey. |
 | whatMattersEnabled | boolean | Default false. Enables what-matters category capture. |
 | systemConditionsEnabled | boolean | Default false. Enables free-text failure cause capture. |

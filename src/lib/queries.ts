@@ -398,6 +398,10 @@ export async function deletePointOfTransaction(id: string) {
   await db.delete(pointsOfTransaction).where(eq(pointsOfTransaction.id, id));
 }
 
+export async function updatePointOfTransaction(id: string, data: { label?: string; customerFacing?: boolean }) {
+  await db.update(pointsOfTransaction).set(data).where(eq(pointsOfTransaction.id, id));
+}
+
 export async function getWorkTypes(studyId: string) {
   return db.select().from(workTypes).where(eq(workTypes.studyId, studyId)).orderBy(asc(workTypes.sortOrder));
 }
@@ -856,7 +860,7 @@ export async function getPendingCounts(studyId: string) {
   };
 }
 
-export async function searchEntries(studyId: string, options: { query?: string; typeId?: string; limit?: number }) {
+export async function searchEntries(studyId: string, options: { query?: string; typeId?: string; handlingTypeId?: string; limit?: number }) {
   const limit = options.limit || 10;
   const conditions: ReturnType<typeof eq>[] = [eq(demandEntries.studyId, studyId)];
 
@@ -865,6 +869,9 @@ export async function searchEntries(studyId: string, options: { query?: string; 
   }
   if (options.typeId) {
     conditions.push(sql`(${demandEntries.demandTypeId} = ${options.typeId} OR ${demandEntries.workTypeId} = ${options.typeId})` as ReturnType<typeof eq>);
+  }
+  if (options.handlingTypeId) {
+    conditions.push(eq(demandEntries.handlingTypeId, options.handlingTypeId));
   }
 
   return db.select({

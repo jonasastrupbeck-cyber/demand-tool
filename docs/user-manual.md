@@ -45,14 +45,14 @@ Understanding Demand lets you decide what to capture on each study, one dimensio
 - Which filter chips are visible (e.g. "Needs classification")
 - Which metrics appear on the Dashboard and in exports
 
-**This is important:** You don't need everything on from day one. Many studies start with verbatim only, switch on classification once the team has a shared definition of value/failure, and layer in handling later. The tool bends to the team's rhythm, not the other way around.
+**This is important:** You don't need everything on from day one. Many studies start with verbatim only, switch on classification once the team has a shared definition of value/failure, and layer in capability of response later. The tool bends to the team's rhythm, not the other way around.
 
 ### The available toggles
 
 | Toggle | What it unlocks |
 |---|---|
 | **Classification** | Mark each entry as Value / Failure / Unknown, assign demand types, record system conditions. Enables the Value vs Failure split on the dashboard. |
-| **Handling** | Record how each demand was dealt with (One Stop, Pass-on, Pass-back). Unlocks the **Perfect %** metric — value demand handled in one stop. |
+| **Capability of Response** | Record what the system was able to do when each demand arrived (One Stop, Pass-on, Pass-back). Unlocks the **Perfect %** metric — value demand handled in one stop. |
 | **Failure → Value linking** | Link each failure demand back to the original value demand it stems from. Drives the **Failure Flow** Sankey diagram. |
 | **What Matters** | Categorise what matters to the customer with predefined categories (on top of free-text notes). |
 | **System conditions** | Capture free-text causes on failure demand. These feed the Failure Causes chart. |
@@ -64,7 +64,7 @@ Understanding Demand lets you decide what to capture on each study, one dimensio
 1. Go to **Settings**
 2. Find the **What are we capturing?** panel
 3. Tick the toggles you want on (or off)
-4. Make sure the prerequisite lookup data exists — e.g. to use Classification you'll want at least one value and one failure demand type; to use Handling you'll want at least one handling type. You can add these right from Settings (or inline from the entry Edit modal during capture).
+4. Make sure the prerequisite lookup data exists — e.g. to use Classification you'll want at least one value and one failure demand type; to use Capability of Response you'll want at least one capability defined. You can add these right from Settings (or inline from the entry Edit modal during capture).
 
 Any entries you captured before switching on a dimension stay as they are — you can fill in the new field later by clicking **Edit** on the entry in the Capture list.
 
@@ -87,8 +87,8 @@ These are the categories of demand your team will classify entries into. You nee
 
 **Tip:** Start with a few types based on your initial listening. You can always add more as patterns emerge. Each type can have an **operational definition** — a short description to help collectors classify consistently.
 
-### Handling Types (when Handling is on)
-How demand gets dealt with:
+### Capability of Response (when Capability of Response is on)
+What the system was able to do when the demand arrived (formerly called "Handling Types"):
 - **One Stop** — resolved completely in one interaction (mark this as your "one-stop" type using the star button)
 - **Pass-on** — handed to someone else
 - **Pass-back** — customer told to call back / come again
@@ -112,7 +112,7 @@ If you toggle on **Work Tracking**, you can also capture what work the organisat
 This is the page your team uses day-to-day. It has three zones:
 
 1. **Verbatim form at the top** — where you record new interactions.
-2. **Filter chips in the middle** — `All | Needs classification (N) | Needs handling (N) | Needs value link (N)` — jump straight to entries that are missing information.
+2. **Filter chips in the middle** — `All | Needs classification (N) | Needs capability of response (N) | Needs value link (N)` — jump straight to entries that are missing information.
 3. **Live entries list at the bottom** — every entry captured so far, newest first, each with an **Edit** button.
 
 ### First Time
@@ -133,7 +133,7 @@ Each collector enters their name when they first open the Capture page. This is 
 
 5. **Original Value Demand** (when Failure → Value linking is on, failure only) — What did the customer originally want? Select the value demand type this failure stems from.
 
-6. **Handling** (when Handling is on) — How was this demand dealt with?
+6. **Capability of Response** (when Capability of Response is on) — What was the system able to do for this demand?
 
 7. **Contact Method** — Defaults to the study's primary method, change if needed.
 
@@ -154,13 +154,13 @@ Made a mistake? After saving, you'll see a brief "Undo" option at the top of the
 If work tracking is on, you'll see a toggle between **Demand** and **Work** at the top. Switch to Work mode to record what work the organisation is doing (rather than what customers are asking for).
 
 ### Editing an Existing Entry — Classify on the Fly
-Every row in the entries list has an **Edit** button. Click it to open the full edit modal covering every field — classification, demand type, handling, failure cause, what matters, the lot. This replaces the old standalone Reclassify page: instead of working through a separate queue, you:
+Every row in the entries list has an **Edit** button. Click it to open the full edit modal covering every field — classification, demand type, capability of response, failure cause, what matters, the lot. This replaces the old standalone Reclassify page: instead of working through a separate queue, you:
 
 - Pick the filter chip that matches what you're looking for (e.g. *"Needs classification"*)
 - Click **Edit** on any row in the filtered list
 - Fill the missing fields and save
 
-If a demand type, handling type, contact method, point of transaction, what-matters category, system condition, or work type is missing, there's a **+ Add new** button right inside the modal. You don't need to detour to Settings mid-session.
+If a demand type, capability of response, contact method, point of transaction, what-matters category, system condition, or work type is missing, there's a **+ Add new** button right inside the modal. You don't need to detour to Settings mid-session.
 
 ---
 
@@ -176,7 +176,7 @@ At the top you'll see key metrics:
 - **Total Entries** — How many interactions have been captured
 - **Value Demand %** — Proportion that is genuine value demand
 - **Failure Demand %** — Proportion caused by system failure
-- **Perfect %** (when Handling is on) — Value demand handled in one stop. This is the headline measure of system capability.
+- **Perfect %** (when Capability of Response is on) — Value demand handled in one stop. This is the headline measure of system capability.
 
 ### Charts & Visualisations
 
@@ -195,7 +195,7 @@ This is one of the most powerful visualisations. It shows how original value dem
 **Failure Causes / System Conditions** (bar chart, when Classification is on)
 The top 10 system conditions causing failure demand, ranked by frequency. These are the things to fix.
 
-**Handling Breakdown** (pie chart, when Handling is on)
+**Capability of Response Breakdown** (pie chart, when Capability of Response is on)
 Shows how demand is being dealt with — one-stop vs pass-on vs pass-back.
 
 **Point of Transaction** (stacked bar chart)
@@ -228,7 +228,7 @@ Click **"Download Template"** on the dashboard to get an empty XLSX spreadsheet 
 
 ### Upload XLSX
 Click the upload button to import data from a spreadsheet. The column headers must match:
-- Date, Entry Type, Demand (Verbatim), Classification, Demand Type, Work Type, Handling, Contact Method, Point of Transaction, What Matters Category, Original Value Demand, Failure Cause (System Condition), What Matters (Notes), Collector
+- Date, Entry Type, Demand (Verbatim), Classification, Demand Type, Work Type, Capability of Response, Contact Method, Point of Transaction, What Matters Category, Original Value Demand, Failure Cause (System Condition), What Matters (Notes), Collector
 
 **Classification values:** Use "Value", "Failure", or "?" (also supports Danish: "Værdi" / "Ikke-værdiskabende", Swedish: "Värde" / "Icke-värdeskapande", German: "Wert" / "Fehlernachfrage")
 
@@ -245,7 +245,7 @@ Creates a presentation-ready slide deck with:
 3. **Key Metrics** — Visual cards with the headline numbers
 4. **Top Demand Types** — Bar chart
 5. **Failure Flows** — Which value demands create which failures
-6. Additional slides for handling, contact methods, and what matters
+6. Additional slides for capability of response, contact methods, and what matters
 
 This is designed to be shared directly with leadership teams and stakeholders.
 
@@ -278,8 +278,8 @@ Switch language using the dropdown in the top navigation. The language choice is
 - [ ] Monitor the dashboard daily for emerging patterns
 - [ ] Add new demand types as new patterns appear (inline from the Capture form or Edit modal)
 - [ ] Check the Data Collection Coverage table to ensure consistent collection
-- [ ] Switch on **Handling** once the team is comfortable with classification
-- [ ] Use the filter chips on Capture ("Needs classification", "Needs handling") and click **Edit** on rows to fill in missing fields
+- [ ] Switch on **Capability of Response** once the team is comfortable with classification
+- [ ] Use the filter chips on Capture ("Needs classification", "Needs capability of response") and click **Edit** on rows to fill in missing fields
 
 ### Analysis & Reporting
 - [ ] Switch on **Failure → Value linking** to trace failure flows
@@ -309,10 +309,10 @@ Switch language using the dropdown in the top navigation. The language choice is
 → The study has a consultant PIN. Enter the PIN to unlock.
 
 **A capture field I expected is missing**
-→ Check Settings → *What are we capturing?* and turn on the matching toggle (Classification, Handling, Value linking, etc.). The field will appear on the Capture form, the columns on the entries list, and the matching filter chip.
+→ Check Settings → *What are we capturing?* and turn on the matching toggle (Classification, Capability of Response, Value linking, etc.). The field will appear on the Capture form, the columns on the entries list, and the matching filter chip.
 
 **XLSX import errors**
-→ Make sure column headers match exactly. Classification must be "Value", "Failure", or "?" (or the equivalent in your study's language). Demand type and handling labels must match what's configured in Settings.
+→ Make sure column headers match exactly. Classification must be "Value", "Failure", or "?" (or the equivalent in your study's language). Demand type and capability of response labels must match what's configured in Settings.
 
 **Dashboard shows no data**
 → Check the date filter — you may have a narrow range selected. Try "All Time".
