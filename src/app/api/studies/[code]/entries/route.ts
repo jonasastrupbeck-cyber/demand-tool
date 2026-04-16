@@ -36,15 +36,22 @@ export async function POST(
 
   const body = await request.json();
 
-  if (!study.volumeMode && (!body.verbatim || typeof body.verbatim !== 'string')) {
+  // Work entries can supply workBlocks instead of verbatim — Phase 2 / Item 4.
+  const entryType = body.entryType === 'work' ? 'work' : 'demand';
+  const workBlocksValid = Array.isArray(body.workBlocks) && body.workBlocks.every((b: unknown) =>
+    b && typeof b === 'object'
+    && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'failure')
+    && typeof (b as { text?: unknown }).text === 'string'
+  );
+  const hasWorkBlockText = workBlocksValid && body.workBlocks.some((b: { text: string }) => b.text.trim().length > 0);
+  const hasVerbatim = typeof body.verbatim === 'string' && body.verbatim.trim().length > 0;
+  if (!study.volumeMode && !hasVerbatim && !(entryType === 'work' && hasWorkBlockText)) {
     return NextResponse.json({ error: 'Demand verbatim is required' }, { status: 400 });
   }
 
   if (!body.classification || !['value', 'failure', 'unknown', 'sequence'].includes(body.classification)) {
     return NextResponse.json({ error: 'Classification must be "value", "failure", "unknown", or "sequence"' }, { status: 400 });
   }
-
-  const entryType = body.entryType === 'work' ? 'work' : 'demand';
 
   const id = await createEntry(study.id, {
     verbatim: (body.verbatim || '').trim(),
@@ -56,14 +63,35 @@ export async function POST(
     pointOfTransactionId: body.pointOfTransactionId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     whatMattersTypeIds: Array.isArray(body.whatMattersTypeIds) ? body.whatMattersTypeIds : undefined,
-    systemConditionIds: Array.isArray(body.systemConditionIds) ? body.systemConditionIds : undefined,
-    thinkingIds: Array.isArray(body.thinkingIds) ? body.thinkingIds : undefined,
+    systemConditions: Array.isArray(body.systemConditions) && body.systemConditions.every((s: unknown) =>
+      s && typeof s === 'object' && typeof (s as { id?: unknown }).id === 'string'
+    )
+      ? body.systemConditions.map((s: { id: string; dimension?: string }) => ({
+          id: s.id,
+          dimension: s.dimension === 'helps' ? 'helps' as const : 'hinders' as const,
+        }))
+      : undefined,
+    thinkings: Array.isArray(body.thinkings) && body.thinkings.every((t: unknown) =>
+      t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string'
+    )
+      ? body.thinkings.map((t: { id: string; logic?: string }) => ({
+          id: t.id,
+          logic: typeof t.logic === 'string' ? t.logic : '',
+        }))
+      : undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     workTypeId: body.workTypeId || undefined,
     linkedValueDemandEntryId: body.linkedValueDemandEntryId || undefined,
     failureCause: body.failureCause?.trim() || undefined,
     whatMatters: body.whatMatters?.trim() || undefined,
     collectorName: body.collectorName?.trim() || undefined,
+    lifeProblemId: body.lifeProblemId || undefined,
+    workBlocks: entryType === 'work' && workBlocksValid
+      ? body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string }) => ({
+          tag: b.tag,
+          text: b.text,
+        }))
+      : undefined,
   });
 
   return NextResponse.json({ id }, { status: 201 });

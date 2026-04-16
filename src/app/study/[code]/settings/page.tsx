@@ -74,6 +74,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
+  lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   systemConditions: SystemConditionType[];
   thinkings: SystemConditionType[];
@@ -114,13 +115,14 @@ export default function SettingsPage() {
   const [newWorkType, setNewWorkType] = useState('');
   const [newSystemCondition, setNewSystemCondition] = useState('');
   const [newThinking, setNewThinking] = useState('');
+  const [newLifeProblem, setNewLifeProblem] = useState('');
   const [newLifecycleStage, setNewLifecycleStage] = useState('');
   const [classifyingAll, setClassifyingAll] = useState(false);
 
   // Operational definition editing
   const [editingDefId, setEditingDefId] = useState<string | null>(null);
   const [editingDefValue, setEditingDefValue] = useState('');
-  const [editingDefType, setEditingDefType] = useState<'handling' | 'demand' | 'whatMatters' | 'systemCondition'>('handling');
+  const [editingDefType, setEditingDefType] = useState<'handling' | 'demand' | 'whatMatters' | 'systemCondition' | 'lifeProblem'>('handling');
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -262,6 +264,23 @@ export default function SettingsPage() {
 
   async function removeWhatMattersType(id: string) {
     await fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function addLifeProblemHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newLifeProblem.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/life-problems`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newLifeProblem.trim() }),
+    });
+    setNewLifeProblem('');
+    loadStudy();
+  }
+
+  async function removeLifeProblem(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/life-problems/${id}`, { method: 'DELETE' });
     loadStudy();
   }
 
@@ -466,7 +485,7 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  function startEditDef(id: string, currentDef: string | null, type: 'handling' | 'demand' | 'whatMatters' | 'systemCondition') {
+  function startEditDef(id: string, currentDef: string | null, type: 'handling' | 'demand' | 'whatMatters' | 'systemCondition' | 'lifeProblem') {
     setEditingDefId(id);
     setEditingDefValue(currentDef || '');
     setEditingDefType(type);
@@ -474,7 +493,7 @@ export default function SettingsPage() {
 
   async function saveOperationalDefinition() {
     if (!editingDefId) return;
-    const typePathMap = { handling: 'handling-types', demand: 'demand-types', whatMatters: 'what-matters-types', systemCondition: 'system-conditions' };
+    const typePathMap = { handling: 'handling-types', demand: 'demand-types', whatMatters: 'what-matters-types', systemCondition: 'system-conditions', lifeProblem: 'life-problems' };
     await fetch(`/api/studies/${encodeURIComponent(code)}/${typePathMap[editingDefType]}/${editingDefId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -929,6 +948,48 @@ export default function SettingsPage() {
           <form onSubmit={addWhatMattersTypeHandler} className="flex gap-2">
             <input type="text" value={newWhatMattersType} onChange={(e) => setNewWhatMattersType(e.target.value)} placeholder={t('settings.addWhatMattersType')} className={inputCls} />
             <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+          </form>
+        </div>
+
+        {/* Life Problem To Be Solved (Phase 2 item 1) */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.lifeProblems')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.lifeProblemsDesc')}</p>
+          <ul className="space-y-2 mb-4">
+            {study.lifeProblems.map((lp) => (
+              <li key={lp.id} className="py-2 px-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-800">{tl(lp.label)}</span>
+                  <button onClick={() => removeLifeProblem(lp.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                </div>
+                {editingDefId === lp.id ? (
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      value={editingDefValue}
+                      onChange={(e) => setEditingDefValue(e.target.value)}
+                      placeholder={t('settings.operationalDefinitionPlaceholder')}
+                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
+                    />
+                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                    <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startEditDef(lp.id, lp.operationalDefinition, 'lifeProblem')}
+                    className="mt-1 text-xs text-gray-400 hover:text-gray-600 italic"
+                  >
+                    {lp.operationalDefinition || t('settings.operationalDefinition') + '...'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <form onSubmit={addLifeProblemHandler} className="flex gap-2">
+            <input type="text" value={newLifeProblem} onChange={(e) => setNewLifeProblem(e.target.value)} placeholder={t('settings.addLifeProblem')} className={inputCls} />
+            <button type="submit" disabled={!newLifeProblem.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
           </form>
         </div>
 

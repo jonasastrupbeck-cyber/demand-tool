@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, thTypes, lcStages] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -22,6 +22,7 @@ export async function GET(
     getSystemConditions(study.id),
     getThinkings(study.id),
     getLifecycleStages(study.id),
+    getLifeProblems(study.id),
   ]);
 
   // Auto-seed new boolean toggles from legacy activeLayer on first read after upgrade.
@@ -52,6 +53,7 @@ export async function GET(
     systemConditions: scTypes,
     thinkings: thTypes,
     lifecycleStages: lcStages,
+    lifeProblems: lpTypes,
   });
 }
 

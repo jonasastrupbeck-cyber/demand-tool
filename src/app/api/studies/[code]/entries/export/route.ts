@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStudyByCode, getEntries, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getWhatMattersForEntries } from '@/lib/queries';
+import { getStudyByCode, getEntries, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getWhatMattersForEntries, getLifeProblems, getSystemConditions, getSystemConditionsForEntries, getThinkings, getThinkingsForEntries } from '@/lib/queries';
 import { getDashboardData } from '@/lib/dashboard-aggregations';
 import * as XLSX from 'xlsx';
 
@@ -63,6 +63,39 @@ export async function GET(
     wmByEntry.set(j.demandEntryId, existing);
   }
 
+  // Phase 2/3 backfill: lookups for Life Problem, System Conditions (with dimension), Thinkings (with logic)
+  const [lProblems, scTypes, thTypes] = await Promise.all([
+    getLifeProblems(study.id),
+    getSystemConditions(study.id),
+    getThinkings(study.id),
+  ]);
+  const lpMap = new Map(lProblems.map(l => [l.id, l.label]));
+  const scTypeMap = new Map(scTypes.map(s => [s.id, s.label]));
+  const thTypeMap = new Map(thTypes.map(t => [t.id, t.label]));
+
+  const scJunctions = entryIds.length > 0 ? await getSystemConditionsForEntries(entryIds) : [];
+  const scByEntry = new Map<string, { helps: string[]; hinders: string[] }>();
+  for (const j of scJunctions) {
+    const existing = scByEntry.get(j.demandEntryId) || { helps: [], hinders: [] };
+    const label = scTypeMap.get(j.systemConditionId);
+    if (label) {
+      if (j.dimension === 'helps') existing.helps.push(label);
+      else existing.hinders.push(label);
+    }
+    scByEntry.set(j.demandEntryId, existing);
+  }
+
+  const thJunctions = entryIds.length > 0 ? await getThinkingsForEntries(entryIds) : [];
+  const thByEntry = new Map<string, string[]>();
+  for (const j of thJunctions) {
+    const label = thTypeMap.get(j.thinkingId);
+    if (!label) continue;
+    const existing = thByEntry.get(j.demandEntryId) || [];
+    // Format: "Label: logic" — or just "Label" if logic is empty
+    existing.push(j.logic && j.logic.trim() ? `${label}: ${j.logic.trim()}` : label);
+    thByEntry.set(j.demandEntryId, existing);
+  }
+
   // Build linked value demand verbatim lookup
   const linkedEntryIds = entries.filter(e => e.linkedValueDemandEntryId).map(e => e.linkedValueDemandEntryId!);
   const linkedVerbatimMap = new Map<string, string>();
@@ -110,6 +143,14 @@ export async function GET(
 
     row['What Matters Categories'] = whatMattersLabel;
     row['What Matters (Notes)'] = e.whatMatters || '';
+
+    // Phase 2/3 backfill columns. Always included so import can round-trip them.
+    row['Life Problem'] = e.lifeProblemId ? lpMap.get(e.lifeProblemId) || '' : '';
+    const sc = scByEntry.get(e.id);
+    row['System Conditions (Hinders)'] = sc ? sc.hinders.join('; ') : '';
+    row['System Conditions (Helps)'] = sc ? sc.helps.join('; ') : '';
+    row['Thinkings'] = (thByEntry.get(e.id) || []).join('; ');
+
     row['Collector'] = e.collectorName || '';
 
     return row;

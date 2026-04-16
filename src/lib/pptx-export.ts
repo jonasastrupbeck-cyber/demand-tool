@@ -4,17 +4,6 @@ import type { Locale, TranslationKey } from '@/lib/i18n';
 import { t as translate } from '@/lib/i18n';
 import { VANGUARD_LOGO_BASE64 } from '@/lib/logo-data';
 
-const BRAND = {
-  burgundy: '#ac2c2d',
-  darkBg: '#1a1a2e',
-  white: '#ffffff',
-  green: '#22c55e',
-  red: '#ef4444',
-  blue: '#3b82f6',
-  gray: '#6b7280',
-  lightGray: '#f3f4f6',
-};
-
 // Blue-to-grey shades for non-classification data
 const NEUTRAL_COLORS = ['3b82f6', '60a5fa', '93c5fd', '6b7280', '9ca3af', '475569', '94a3b8', '64748b'];
 

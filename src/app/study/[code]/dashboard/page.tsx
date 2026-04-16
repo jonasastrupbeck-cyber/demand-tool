@@ -107,6 +107,7 @@ export default function DashboardPage() {
   }, [code, getDateRangeParams]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDashboard();
   }, [loadDashboard]);
 
@@ -133,6 +134,7 @@ export default function DashboardPage() {
 
   // Fetch system conditions when a Sankey flow link is clicked
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedFlow) { setFlowCauses(null); return; }
     setFlowCausesLoading(true);
     const qp = new URLSearchParams({
@@ -151,6 +153,7 @@ export default function DashboardPage() {
   // Fetch raw entries and demand type map on demand
   useEffect(() => {
     if (!showEntries) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setEntriesLoading(true);
     Promise.all([
       fetch(`/api/studies/${encodeURIComponent(code)}/entries`).then(r => r.ok ? r.json() : { entries: [] }),
@@ -684,6 +687,31 @@ export default function DashboardPage() {
               )}
             </div>
 
+            {/* Life Problems Being Solved (Phase 3) — demand-only, layer 2+ */}
+            {activeLayer >= 2 && data.lifeProblemCounts.length > 0 && (() => {
+              const translated = data.lifeProblemCounts.map(d => ({ ...d, label: tl(d.label) }));
+              const total = translated.reduce((s, r) => s + r.count, 0);
+              const withPct = translated.map(r => ({
+                ...r,
+                pct: total > 0 ? `${Math.round((r.count / total) * 100)}%` : '0%',
+              }));
+              return (
+                <ChartCard title={t('dashboard.lifeProblems')}>
+                  <ResponsiveContainer width="100%" height={Math.max(250, withPct.length * 40 + 40)}>
+                    <BarChart data={withPct} layout="vertical" margin={{ left: 10, right: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="label" width={180} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 28 ? v.slice(0, 26) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="count" fill="#60a5fa" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              );
+            })()}
+
             {/* What matters by classification (Layer 5+) */}
             {activeLayer >= 5 && translatedWmByClassification.length > 0 && (
               <ChartCard title={t('dashboard.whatMattersByClass')}>
@@ -749,6 +777,31 @@ export default function DashboardPage() {
                       <YAxis type="category" dataKey="cause" width={180} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 28 ? v.slice(0, 26) + '…' : v} />
                       <Tooltip {...tooltipStyle} />
                       <Bar dataKey="count" fill={COLORS.failure} radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              );
+            })()}
+
+            {/* Helping conditions bar chart (Layer 2+) — mirror of Failure Causes filtered to dimension = 'helps' */}
+            {activeLayer >= 2 && data.helpingConditions.length > 0 && (() => {
+              const top10 = data.helpingConditions.slice(0, 10);
+              const total = top10.reduce((s, fc) => s + fc.count, 0);
+              const withPct = top10.map(fc => ({
+                ...fc,
+                pct: total > 0 ? `${Math.round((fc.count / total) * 100)}%` : '0%',
+              }));
+              return (
+                <ChartCard title={t('dashboard.helpingConditions')}>
+                  <ResponsiveContainer width="100%" height={Math.max(250, withPct.length * 40 + 40)}>
+                    <BarChart data={withPct} layout="vertical" margin={{ left: 10, right: 50 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="cause" width={180} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 28 ? v.slice(0, 26) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="count" fill={COLORS.value} radius={[0, 4, 4, 0]}>
                         <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
                       </Bar>
                     </BarChart>

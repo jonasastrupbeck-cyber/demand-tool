@@ -6,6 +6,7 @@ import { useLocale } from '@/lib/locale-context';
 import EntryEditModal from '@/components/EntryEditModal';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
+import SegmentedToggle from '@/components/SegmentedToggle';
 
 interface HandlingType {
   id: string;
@@ -61,6 +62,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: WhatMattersType[];
+  lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
@@ -116,16 +118,22 @@ export default function CapturePage() {
   const [contactMethodId, setContactMethodId] = useState('');
   const [pointOfTransactionId, setPointOfTransactionId] = useState('');
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
+  const [lifeProblemId, setLifeProblemId] = useState('');
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
   const [failureCause, setFailureCause] = useState('');
-  const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
-  const [thinkingIds, setThinkingIds] = useState<string[]>([]);
+  const [systemConditions, setSystemConditions] = useState<{ id: string; dimension: 'helps' | 'hinders' }[]>([]);
+  const [scPickerOpen, setScPickerOpen] = useState(false);
+  const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
+  // Inline picker for "+ Add thinking"
+  const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMatters, setWhatMatters] = useState('');
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   const [workTypeId, setWorkTypeId] = useState('');
+  // Work-description blocks (Work tab only) — Phase 2 / Item 4.
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string }[]>([]);
 
   // Inline type creation state
-  const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'systemCondition'|'thinking'|'originalValue'|null>(null);
+  const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'lifeProblem'|'systemCondition'|'thinking'|'originalValue'|null>(null);
   const [newTypeLabel, setNewTypeLabel] = useState('');
   const [addingTypeLoading, setAddingTypeLoading] = useState(false);
 
@@ -209,6 +217,8 @@ export default function CapturePage() {
   }, [code]);
 
   useEffect(() => {
+    // Fetch-on-mount pattern: each loader fetches and calls setState when data arrives.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStudy();
     loadTodayCount();
     loadSuggestions();
@@ -222,6 +232,7 @@ export default function CapturePage() {
 
   // Debounced search
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!searchOpen || searchQuery.length < 2) { setSearchResults([]); return; }
     setSearchLoading(true);
     const timer = setTimeout(async () => {
@@ -239,13 +250,17 @@ export default function CapturePage() {
     setHandlingTypeId('');
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
+    setLifeProblemId('');
     setOriginalValueDemandTypeId('');
     setFailureCause('');
-    setSystemConditionIds([]);
-    setThinkingIds([]);
+    setSystemConditions([]);
+    setScPickerOpen(false);
+    setThinkings([]);
+    setThinkingPickerOpen(false);
     setWhatMatters('');
     setWhatMattersNoteOpen(false);
     setWorkTypeId('');
+    setWorkBlocks([]);
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -321,7 +336,10 @@ export default function CapturePage() {
     // When classification is off, default to 'unknown' so entries still save.
     const effectiveClassification = !classificationOn ? 'unknown' : classification;
     const isVolumeMode = study?.volumeMode ?? false;
-    if (!isVolumeMode && !verbatim.trim()) return;
+    const isWorkSubmit = entryType === 'work';
+    const validWorkBlocks = workBlocks.filter((b) => b.text.trim().length > 0);
+    const hasWorkBlockText = isWorkSubmit && validWorkBlocks.length > 0;
+    if (!isVolumeMode && !verbatim.trim() && !hasWorkBlockText) return;
     if (!effectiveClassification) return;
 
     setSubmitting(true);
@@ -335,6 +353,11 @@ export default function CapturePage() {
       pointOfTransactionId: pointOfTransactionId || undefined,
       collectorName: collectorName.trim() || undefined,
     };
+
+    // Work tab: send workBlocks; server auto-populates verbatim from them.
+    if (isWorkSubmit && validWorkBlocks.length > 0) {
+      body.workBlocks = validWorkBlocks;
+    }
 
     // Handling — only when the toggle is on.
     if (handlingOn) {
@@ -350,6 +373,7 @@ export default function CapturePage() {
       }
       body.whatMattersTypeIds = whatMattersTypeIds.length > 0 ? whatMattersTypeIds : undefined;
       body.whatMatters = whatMatters.trim() || undefined;
+      body.lifeProblemId = lifeProblemId || undefined;
     } else {
       body.workTypeId = study?.workTypesEnabled ? (workTypeId || undefined) : undefined;
     }
@@ -360,11 +384,11 @@ export default function CapturePage() {
       effectiveClassification === 'failure' ||
       (isWork && effectiveClassification === 'sequence')
     );
-    if (scVisible && systemConditionIds.length > 0) {
-      body.systemConditionIds = systemConditionIds;
+    if (scVisible && systemConditions.length > 0) {
+      body.systemConditions = systemConditions;
     }
-    if (scVisible && thinkingIds.length > 0) {
-      body.thinkingIds = thinkingIds;
+    if (scVisible && thinkings.length > 0) {
+      body.thinkings = thinkings;
     }
 
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
@@ -381,7 +405,10 @@ export default function CapturePage() {
     }
 
     const saved = await res.json();
-    setLastEntry({ id: saved.id, verbatim: verbatim.trim() });
+    const lastVerbatim = isWorkSubmit && validWorkBlocks.length > 0
+      ? validWorkBlocks.map((b) => `[${b.tag}] ${b.text}`).join(' · ')
+      : verbatim.trim();
+    setLastEntry({ id: saved.id, verbatim: lastVerbatim });
     setSuccess(true);
     setTodayCount((c) => c + 1);
     resetForm();
@@ -616,21 +643,69 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Verbatim — the customer's words (hidden in volume mode) */}
-        {!study.volumeMode && (
+        {/* Verbatim — demand tab or volume-off work without blocks yet */}
+        {!study.volumeMode && isDemand && (
           <div>
             <label className={labelCls}>
-              {isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}{req}
+              {t('capture.verbatimLabel')}{req}
             </label>
             <textarea
               value={verbatim}
               onChange={(e) => setVerbatim(e.target.value)}
-              placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
+              placeholder={t('capture.verbatimPlaceholder')}
               rows={3}
               className={inputCls}
               autoFocus
               required
             />
+          </div>
+        )}
+
+        {/* Work-description blocks — Work tab only. Replaces single verbatim textarea with
+            tagged Value/Failure blocks so one observation can capture both aspects. */}
+        {!study.volumeMode && !isDemand && (
+          <div>
+            <label className={labelCls}>
+              {t('capture.workBlocksLabel')}{req}
+            </label>
+            <div className="space-y-2">
+              {workBlocks.map((block, idx) => (
+                <div key={idx} className="p-3 rounded-lg border border-gray-200 bg-gray-50 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <SegmentedToggle
+                      value={block.tag}
+                      onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'failure' } : b))}
+                      options={[
+                        { value: 'value', label: t('capture.workBlockTagValue') },
+                        { value: 'failure', label: t('capture.workBlockTagFailure') },
+                      ]}
+                    />
+                    <button
+                      type="button"
+                      aria-label="Remove"
+                      onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                      className="text-gray-400 hover:text-gray-600 text-lg leading-none px-2"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <textarea
+                    value={block.text}
+                    onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, text: e.target.value } : b))}
+                    placeholder={t('capture.workBlockPlaceholder')}
+                    rows={2}
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '' }])}
+                className="w-full px-3 py-2 rounded-lg text-sm font-medium text-[#ac2c2d] border border-dashed border-[#ac2c2d] hover:bg-red-50"
+              >
+                {t('capture.addWorkBlockButton')}
+              </button>
+            </div>
           </div>
         )}
 
@@ -851,6 +926,23 @@ export default function CapturePage() {
           )
         )}
 
+        {/* Life problem to be solved — demand only, single-select dropdown */}
+        {isDemand && (
+          <div>
+            <label className={labelCls}>{t('capture.lifeProblemLabel')}</label>
+            <div className="flex gap-2">
+              <select value={lifeProblemId} onChange={(e) => setLifeProblemId(e.target.value)} className={inputCls}>
+                <option value="">{t('capture.lifeProblemPlaceholder')}</option>
+                {study.lifeProblems.map((lp) => (
+                  <option key={lp.id} value={lp.id}>{tl(lp.label)}</option>
+                ))}
+              </select>
+              {addBtn('lifeProblem')}
+            </div>
+            {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id))}
+          </div>
+        )}
+
         {/* Capability of response (formerly "Handling") — renders for demand AND work */}
         {study.handlingEnabled && (
           <div>
@@ -870,36 +962,91 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability */}
+        {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
+            Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension. */}
         {study.classificationEnabled && scVisible && (
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
               <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-              <div className="flex flex-wrap gap-2">
-                {(study.systemConditions || []).map((sc) => {
-                  const isSelected = systemConditionIds.includes(sc.id);
+              <div className="space-y-2">
+                {systemConditions.map((entry, idx) => {
+                  const sc = (study.systemConditions || []).find(s => s.id === entry.id);
+                  if (!sc) return null;
                   return (
-                    <button
-                      key={sc.id}
-                      type="button"
-                      onClick={() => {
-                        setSystemConditionIds(prev =>
-                          isSelected ? prev.filter(id => id !== sc.id) : [...prev, sc.id]
-                        );
-                      }}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        isSelected
-                          ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
-                          : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                      }`}
-                    >
-                      {tl(sc.label)}
-                    </button>
+                    <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="px-2.5 py-1 rounded-full text-sm font-medium bg-red-600 text-white">{tl(sc.label)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSystemConditions(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-xs text-red-700 hover:text-red-900"
+                          aria-label="Remove"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <SegmentedToggle
+                        options={[
+                          { value: 'hinders', label: t('capture.scHinders') },
+                          { value: 'helps', label: t('capture.scHelps') },
+                        ]}
+                        value={entry.dimension}
+                        onChange={(v) => {
+                          const dim = v === 'helps' ? 'helps' : 'hinders';
+                          setSystemConditions(prev => prev.map((p, i) => i === idx ? { ...p, dimension: dim } : p));
+                        }}
+                        ariaLabel={t('capture.systemConditionsLabel')}
+                      />
+                    </div>
                   );
                 })}
-                {addBtn('systemCondition')}
+                {(() => {
+                  const available = (study.systemConditions || []).filter(sc => !systemConditions.some(p => p.id === sc.id));
+                  if (scPickerOpen) {
+                    return (
+                      <div className="flex gap-2 items-center">
+                        <select
+                          autoFocus
+                          defaultValue=""
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            if (!id) return;
+                            setSystemConditions(prev => [...prev, { id, dimension: 'hinders' }]);
+                            setScPickerOpen(false);
+                          }}
+                          className={inputCls}
+                        >
+                          <option value="">{t('capture.selectSystemCondition')}</option>
+                          {available.map(sc => (
+                            <option key={sc.id} value={sc.id}>{tl(sc.label)}</option>
+                          ))}
+                        </select>
+                        {addBtn('systemCondition')}
+                        <button
+                          type="button"
+                          onClick={() => setScPickerOpen(false)}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {t('reclassify.skip')}
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setScPickerOpen(true)}
+                      className="text-sm text-red-700 hover:text-red-900 font-medium"
+                    >
+                      {t('capture.addSystemConditionButton')}
+                    </button>
+                  );
+                })()}
               </div>
-              {renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => setSystemConditionIds(prev => [...prev, id]))}
+              {renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => {
+                setSystemConditions(prev => prev.some(p => p.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]);
+                setScPickerOpen(false);
+              })}
             </div>
           ) : (
             <div className="relative">
@@ -928,35 +1075,85 @@ export default function CapturePage() {
           )
         )}
 
-        {/* Thinking — mirrors system conditions visibility. Study-scoped library + add on the fly. */}
+        {/* Thinking + per-pair logic — mirrors system conditions visibility.
+             Phase 2 / Item 2: each selected Thinking gets a free-text "logic" textarea
+             so we capture *why* this thinking shows up in this specific demand. */}
         {study.classificationEnabled && study.systemConditionsEnabled && scVisible && (
           <div>
             <label className={labelCls}>{t('capture.thinkingLabel')}</label>
-            <div className="flex flex-wrap gap-2">
-              {(study.thinkings || []).map((th) => {
-                const isSelected = thinkingIds.includes(th.id);
+            <div className="space-y-2">
+              {thinkings.map((entry, idx) => {
+                const th = (study.thinkings || []).find(t => t.id === entry.id);
+                if (!th) return null;
                 return (
-                  <button
-                    key={th.id}
-                    type="button"
-                    onClick={() => {
-                      setThinkingIds(prev =>
-                        isSelected ? prev.filter(id => id !== th.id) : [...prev, th.id]
-                      );
-                    }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      isSelected
-                        ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
-                        : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                    }`}
-                  >
-                    {tl(th.label)}
-                  </button>
+                  <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-sm font-medium bg-red-600 text-white">{tl(th.label)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setThinkings(prev => prev.filter((_, i) => i !== idx))}
+                        className="text-xs text-red-700 hover:text-red-900"
+                        aria-label="Remove"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                    <textarea
+                      value={entry.logic}
+                      onChange={(e) => {
+                        const next = e.target.value;
+                        setThinkings(prev => prev.map((p, i) => i === idx ? { ...p, logic: next } : p));
+                      }}
+                      placeholder={t('capture.thinkingLogicPlaceholder')}
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                    />
+                  </div>
                 );
               })}
-              {addBtn('thinking')}
+              {/* "+ Add thinking" picker */}
+              {(() => {
+                const available = (study.thinkings || []).filter(th => !thinkings.some(p => p.id === th.id));
+                if (thinkingPickerOpen) {
+                  return (
+                    <div className="flex gap-2 items-center">
+                      <select
+                        autoFocus
+                        defaultValue=""
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (!id) return;
+                          setThinkings(prev => [...prev, { id, logic: '' }]);
+                          setThinkingPickerOpen(false);
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                      >
+                        <option value="">{t('capture.selectThinking')}</option>
+                        {available.map((th) => (
+                          <option key={th.id} value={th.id}>{tl(th.label)}</option>
+                        ))}
+                      </select>
+                      {addBtn('thinking')}
+                      <button type="button" onClick={() => setThinkingPickerOpen(false)} className="px-2 py-2 text-gray-400 hover:text-gray-600 text-sm">&times;</button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setThinkingPickerOpen(true)}
+                      disabled={available.length === 0 && addingType !== 'thinking'}
+                      className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                    >
+                      {t('capture.addThinkingButton')}
+                    </button>
+                    {available.length === 0 && addBtn('thinking')}
+                  </div>
+                );
+              })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => setThinkingIds(prev => [...prev, id]))}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '' }]); setThinkingPickerOpen(false); })}
           </div>
         )}
 
@@ -968,7 +1165,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || (!study.volumeMode && !verbatim.trim()) || (study.classificationEnabled && !classification)}
+              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && !classification)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
@@ -1163,6 +1360,7 @@ export default function CapturePage() {
             contactMethods: study.contactMethods,
             pointsOfTransaction: study.pointsOfTransaction,
             whatMattersTypes: study.whatMattersTypes.map(w => ({ id: w.id, label: w.label })),
+            lifeProblems: study.lifeProblems.map(lp => ({ id: lp.id, label: lp.label })),
             workTypes: study.workTypes,
             systemConditions: (study.systemConditions || []).map(s => ({ id: s.id, label: s.label })),
             thinkings: (study.thinkings || []).map(t => ({ id: t.id, label: t.label })),

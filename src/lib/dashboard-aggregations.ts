@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData } from '@/types';
@@ -88,6 +88,17 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     .innerJoin(contactMethods, eq(demandEntries.contactMethodId, contactMethods.id))
     .where(demandWhere)
     .groupBy(contactMethods.label)
+    .orderBy(desc(sql`count(*)`));
+
+  // Life problem counts (demand only) — Phase 3
+  const lifeProblemCounts = await db.select({
+    label: lifeProblems.label,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(lifeProblems, eq(demandEntries.lifeProblemId, lifeProblems.id))
+    .where(demandWhere)
+    .groupBy(lifeProblems.label)
     .orderBy(desc(sql`count(*)`));
 
   // What matters type counts (demand only, via junction table)
@@ -192,6 +203,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
       .where(and(
         ...demandConditions,
         eq(demandEntries.classification, 'failure'),
+        eq(demandEntrySystemConditions.dimension, 'hinders'),
       ))
       .groupBy(systemConditions.label)
       .orderBy(desc(sql`count(*)`))
@@ -209,6 +221,29 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
         sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
       ))
       .groupBy(demandEntries.failureCause)
+      .orderBy(desc(sql`count(*)`))
+      .limit(15);
+  }
+
+  // Helping conditions (Phase 3) — system conditions tagged `helps`, aggregated
+  // across all entries (demand + work). Only meaningful when managed system
+  // conditions are enabled; empty array otherwise.
+  let helpingConditionsRaw: Array<{ cause: string | null; count: number }> = [];
+  if (systemConditionsEnabled) {
+    helpingConditionsRaw = await db.select({
+      cause: systemConditions.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntrySystemConditions)
+      .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
+      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+      .where(and(
+        eq(demandEntries.studyId, studyId),
+        ...(from ? [gte(demandEntries.createdAt, from)] : []),
+        ...(to ? [lte(demandEntries.createdAt, to)] : []),
+        eq(demandEntrySystemConditions.dimension, 'helps'),
+      ))
+      .groupBy(systemConditions.label)
       .orderBy(desc(sql`count(*)`))
       .limit(15);
   }
@@ -468,12 +503,14 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     demandTypeCounts,
     handlingTypeCounts,
     contactMethodCounts,
+    lifeProblemCounts,
     whatMattersCounts,
     whatMattersByClassification,
     handlingByClassification,
     pointOfTransactionByClassification,
     demandOverTime: demandOverTimeResult,
     failureCauses: failureCausesRaw.map(r => ({ cause: r.cause!, count: r.count })),
+    helpingConditions: helpingConditionsRaw.map(r => ({ cause: r.cause!, count: r.count })),
     failuresByOriginalValueDemand,
     failureFlowLinks,
     whatMattersNotes: whatMattersNotes.map(r => ({ text: r.text!, date: r.date, demandTypeLabel: r.demandTypeLabel || null, classification: r.classification })),
@@ -527,6 +564,7 @@ export async function getFailureCausesForFlow(
         ...baseConditions,
         eq(originalDT.label, sourceLabel),
         eq(failureDT.label, targetLabel),
+        eq(demandEntrySystemConditions.dimension, 'hinders'),
       ))
       .groupBy(systemConditions.label)
       .orderBy(desc(sql`count(*)`));

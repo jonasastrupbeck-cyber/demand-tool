@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, unique } from 'drizzle-orm/pg-core';
 
 export const studies = pgTable('studies', {
   id: text('id').primaryKey(),
@@ -75,6 +75,14 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+export const lifeProblems = pgTable('life_problems', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  operationalDefinition: text('operational_definition'),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const workTypes = pgTable('work_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -97,6 +105,7 @@ export const demandEntries = pgTable('demand_entries', {
   contactMethodId: text('contact_method_id').references(() => contactMethods.id),
   pointOfTransactionId: text('point_of_transaction_id').references(() => pointsOfTransaction.id),
   whatMattersTypeId: text('what_matters_type_id').references(() => whatMattersTypes.id),
+  lifeProblemId: text('life_problem_id').references(() => lifeProblems.id),
   originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),
   workTypeId: text('work_type_id').references(() => workTypes.id),
   linkedValueDemandEntryId: text('linked_value_demand_entry_id'),
@@ -124,7 +133,10 @@ export const demandEntrySystemConditions = pgTable('demand_entry_system_conditio
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
-});
+  dimension: text('dimension').notNull().default('hinders').$type<'helps' | 'hinders'>(),
+}, (t) => ({
+  uniqEntrySc: unique().on(t.demandEntryId, t.systemConditionId),
+}));
 
 export const thinkings = pgTable('thinkings', {
   id: text('id').primaryKey(),
@@ -138,4 +150,15 @@ export const demandEntryThinkings = pgTable('demand_entry_thinkings', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
+  logic: text('logic').notNull().default(''),
+}, (t) => ({
+  uniqEntryThinking: unique().on(t.demandEntryId, t.thinkingId),
+}));
+
+export const workDescriptionBlocks = pgTable('work_description_blocks', {
+  id: text('id').primaryKey(),
+  demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
+  tag: text('tag').$type<'value' | 'failure'>().notNull(),
+  text: text('text').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
 });

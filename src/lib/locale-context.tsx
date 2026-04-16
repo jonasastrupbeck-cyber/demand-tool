@@ -24,8 +24,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Reading persisted locale from localStorage on mount is a standard pattern;
+    // setLocaleState is only called once per mount when a saved value exists.
     const saved = localStorage.getItem('demand-tool-locale') as Locale | null;
     if (saved && ['en', 'da', 'sv', 'de'].includes(saved)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocaleState(saved);
     }
     setMounted(true);

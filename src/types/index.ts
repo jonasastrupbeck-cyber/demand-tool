@@ -79,14 +79,15 @@ export interface DemandEntry {
   pointOfTransactionId: string | null;
   whatMattersTypeId: string | null;
   whatMattersTypeIds: string[];
-  systemConditionIds: string[];
-  thinkingIds: string[];
+  systemConditions: { id: string; dimension: 'helps' | 'hinders' }[];
+  thinkings: { id: string; logic: string }[];
   originalValueDemandTypeId: string | null;
   workTypeId: string | null;
   linkedValueDemandEntryId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
   collectorName: string | null;
+  workBlocks: { tag: 'value' | 'failure'; text: string }[];
 }
 
 export interface DashboardData {
@@ -98,12 +99,14 @@ export interface DashboardData {
   demandTypeCounts: Array<{ label: string; category: string; count: number }>;
   handlingTypeCounts: Array<{ label: string; count: number }>;
   contactMethodCounts: Array<{ label: string; count: number }>;
+  lifeProblemCounts: Array<{ label: string; count: number }>;
   pointOfTransactionByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   whatMattersCounts: Array<{ label: string; count: number }>;
   whatMattersByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   handlingByClassification: Array<{ label: string; valueCount: number; failureCount: number }>;
   demandOverTime: Array<{ date: string; valueCount: number; failureCount: number }>;
   failureCauses: Array<{ cause: string; count: number }>;
+  helpingConditions: Array<{ cause: string; count: number }>;
   failuresByOriginalValueDemand: Array<{ label: string; count: number }>;
   failureFlowLinks: Array<{ sourceLabel: string; targetLabel: string; count: number }>;
   whatMattersNotes: Array<{ text: string; date: string; demandTypeLabel: string | null; classification: string | null }>;
@@ -132,14 +135,15 @@ export interface CreateEntryInput {
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
-  systemConditionIds?: string[];
-  thinkingIds?: string[];
+  systemConditions?: { id: string; dimension: 'helps' | 'hinders' }[];
+  thinkings?: { id: string; logic: string }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;
+  workBlocks?: { tag: 'value' | 'failure'; text: string }[];
 }
 
 export interface DemandEntryWhatMatters {
@@ -174,4 +178,12 @@ export interface DemandEntryThinking {
   id: string;
   demandEntryId: string;
   thinkingId: string;
+}
+
+export interface WorkDescriptionBlock {
+  id: string;
+  demandEntryId: string;
+  tag: 'value' | 'failure';
+  text: string;
+  sortOrder: number;
 }

@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import InlineTypeAdder from './InlineTypeAdder';
 import CapabilityRadioGroup from './CapabilityRadioGroup';
+import SegmentedToggle from './SegmentedToggle';
 
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
 interface ContactMethod { id: string; label: string }
 interface PointOfTransaction { id: string; label: string }
 interface WhatMattersType { id: string; label: string }
+interface LifeProblem { id: string; label: string }
 interface WorkType { id: string; label: string }
 interface SystemCondition { id: string; label: string }
 interface Thinking { id: string; label: string }
@@ -28,6 +30,7 @@ export interface EntryEditModalStudy {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   whatMattersTypes: WhatMattersType[];
+  lifeProblems: LifeProblem[];
   workTypes: WorkType[];
   systemConditions: SystemCondition[];
   thinkings: Thinking[];
@@ -47,6 +50,7 @@ interface EntryFull {
   linkedValueDemandEntryId: string | null;
   failureCause: string | null;
   whatMatters: string | null;
+  lifeProblemId: string | null;
   collectorName: string | null;
 }
 
@@ -66,9 +70,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [saving, setSaving] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
-  const [systemConditionIds, setSystemConditionIds] = useState<string[]>([]);
-  const [thinkingIds, setThinkingIds] = useState<string[]>([]);
+  const [systemConditions, setSystemConditions] = useState<{ id: string; dimension: 'helps' | 'hinders' }[]>([]);
+  const [scPickerOpen, setScPickerOpen] = useState(false);
+  const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
+  const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,8 +86,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         const data = await res.json();
         setEntry(data.entry);
         setWhatMattersTypeIds(data.whatMattersTypeIds || []);
-        setSystemConditionIds(data.systemConditionIds || []);
-        setThinkingIds(data.thinkingIds || []);
+        setSystemConditions(Array.isArray(data.systemConditions) ? data.systemConditions : []);
+        setThinkings(Array.isArray(data.thinkings) ? data.thinkings : []);
+        setWorkBlocks(Array.isArray(data.workBlocks) ? data.workBlocks : []);
         // Auto-open the note disclosure if the field already has content.
         setWhatMattersNoteOpen(Boolean(data.entry?.whatMatters && data.entry.whatMatters.trim()));
       }
@@ -102,10 +110,14 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       originalValueDemandTypeId: entry.originalValueDemandTypeId || null,
       failureCause: entry.failureCause || null,
       whatMatters: entry.whatMatters || null,
+      lifeProblemId: entry.lifeProblemId || null,
       whatMattersTypeIds,
-      systemConditionIds,
-      thinkingIds,
+      systemConditions,
+      thinkings,
     };
+    if (entry.entryType === 'work') {
+      body.workBlocks = workBlocks.filter((b) => b.text.trim().length > 0);
+    }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -159,14 +171,78 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
           <div className="p-6 text-gray-500">{t('capture.loading')}</div>
         ) : (
           <div className="p-5 space-y-4">
-            {/* Verbatim (read-only) */}
+            {/* Header: date + collector */}
             <div>
               <p className="text-xs text-gray-400 mb-1">
-                {new Date((entry as unknown as { createdAt?: string }).createdAt || Date.now()).toLocaleDateString()}
+                {(() => {
+                  const createdAt = (entry as unknown as { createdAt?: string }).createdAt;
+                  return createdAt ? new Date(createdAt).toLocaleDateString() : '';
+                })()}
                 {entry.collectorName ? ` — ${entry.collectorName}` : ''}
               </p>
-              <p className="text-base text-gray-900 leading-relaxed">&ldquo;{entry.verbatim}&rdquo;</p>
+              {/* Demand: verbatim read-only.
+                  Work: block editor below; show legacy verbatim as read-only notice only when there are no blocks yet. */}
+              {isDemand ? (
+                <p className="text-base text-gray-900 leading-relaxed">&ldquo;{entry.verbatim}&rdquo;</p>
+              ) : workBlocks.length === 0 && entry.verbatim && entry.verbatim.trim() ? (
+                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                  <p className="text-xs text-gray-500 mb-1">{t('capture.legacyVerbatimNotice')}</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">&ldquo;{entry.verbatim}&rdquo;</p>
+                </div>
+              ) : null}
             </div>
+
+            {/* Work tab: repeating Value/Failure blocks (replaces verbatim) */}
+            {!isDemand && (
+              <div>
+                <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
+                <div className="space-y-2">
+                  {workBlocks.map((b, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border border-gray-200 bg-gray-50 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <SegmentedToggle
+                          options={[
+                            { value: 'value', label: t('capture.workBlockTagValue') },
+                            { value: 'failure', label: t('capture.workBlockTagFailure') },
+                          ]}
+                          value={b.tag}
+                          onChange={(v) => {
+                            const tag = v === 'value' ? 'value' : 'failure';
+                            setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
+                          }}
+                          ariaLabel={t('capture.workBlocksLabel')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                          aria-label="Remove"
+                        >
+                          &times;
+                        </button>
+                      </div>
+                      <textarea
+                        value={b.text}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
+                        }}
+                        placeholder={t('capture.workBlockPlaceholder')}
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '' }])}
+                    className="w-full py-2 rounded-lg text-sm font-medium text-gray-700 border border-dashed border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+                  >
+                    {t('capture.addWorkBlockButton')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip */}
             {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
@@ -395,6 +471,32 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               )
             )}
 
+            {/* Life problem to be solved — demand only, single-select dropdown */}
+            {isDemand && (
+              <div>
+                <label className={labelCls}>{t('capture.lifeProblemLabel')}</label>
+                <div className="flex gap-2">
+                  <select
+                    value={entry.lifeProblemId || ''}
+                    onChange={(e) => setEntry({ ...entry, lifeProblemId: e.target.value || null })}
+                    className={inputCls}
+                  >
+                    <option value="">{t('capture.lifeProblemPlaceholder')}</option>
+                    {study.lifeProblems.map((lp) => (
+                      <option key={lp.id} value={lp.id}>{tl(lp.label)}</option>
+                    ))}
+                  </select>
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath="life-problems"
+                    onRefresh={onStudyRefresh}
+                    onCreated={(id) => setEntry({ ...entry, lifeProblemId: id })}
+                    compact
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Capability of Response (formerly "Handling type") */}
             {study.handlingEnabled && (
               <div>
@@ -427,40 +529,92 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* System conditions OR failure-cause textarea — same slot, mirrors Capture */}
+            {/* System conditions OR failure-cause textarea — same slot, mirrors Capture.
+                Phase 2 / Item 3: each SC carries Helps/Hinders dimension. */}
             {scVisible && (
               study.systemConditionsEnabled && study.systemConditions.length > 0 ? (
                 <div>
                   <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                  <div className="flex flex-wrap gap-2 items-center">
-                    {study.systemConditions.map((sc) => {
-                      const selected = systemConditionIds.includes(sc.id);
+                  <div className="space-y-2">
+                    {systemConditions.map((entry, idx) => {
+                      const def = study.systemConditions.find((x) => x.id === entry.id);
                       return (
-                        <button
-                          key={sc.id}
-                          type="button"
-                          onClick={() =>
-                            setSystemConditionIds((prev) =>
-                              selected ? prev.filter((id) => id !== sc.id) : [...prev, sc.id]
-                            )
-                          }
-                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                            selected
-                              ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
-                              : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                          }`}
-                        >
-                          {tl(sc.label)}
-                        </button>
+                        <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-600 text-white">
+                              {def ? tl(def.label) : entry.id}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSystemConditions((prev) => prev.filter((_, i) => i !== idx))}
+                              className="text-xs text-red-700 hover:text-red-900"
+                              aria-label="Remove"
+                            >
+                              &times;
+                            </button>
+                          </div>
+                          <SegmentedToggle
+                            options={[
+                              { value: 'hinders', label: t('capture.scHinders') },
+                              { value: 'helps', label: t('capture.scHelps') },
+                            ]}
+                            value={entry.dimension}
+                            onChange={(v) => {
+                              const dim = v === 'helps' ? 'helps' : 'hinders';
+                              setSystemConditions((prev) => prev.map((p, i) => i === idx ? { ...p, dimension: dim } : p));
+                            }}
+                            ariaLabel={t('capture.systemConditionsLabel')}
+                          />
+                        </div>
                       );
                     })}
-                    <InlineTypeAdder
-                      code={code}
-                      apiPath="system-conditions"
-                      onRefresh={onStudyRefresh}
-                      onCreated={(id) => setSystemConditionIds((prev) => [...prev, id])}
-                      compact
-                    />
+                    {scPickerOpen ? (
+                      <div className="flex gap-2 items-center">
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            if (id) {
+                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]));
+                              setScPickerOpen(false);
+                            }
+                          }}
+                          className={inputCls}
+                        >
+                          <option value="">{t('capture.selectSystemCondition')}</option>
+                          {study.systemConditions
+                            .filter((sc) => !systemConditions.some((x) => x.id === sc.id))
+                            .map((sc) => (
+                              <option key={sc.id} value={sc.id}>{tl(sc.label)}</option>
+                            ))}
+                        </select>
+                        <InlineTypeAdder
+                          code={code}
+                          apiPath="system-conditions"
+                          onRefresh={onStudyRefresh}
+                          onCreated={(id) => {
+                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, dimension: 'hinders' }]));
+                            setScPickerOpen(false);
+                          }}
+                          compact
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setScPickerOpen(false)}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {t('reclassify.skip')}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setScPickerOpen(true)}
+                        className="text-sm text-red-700 hover:text-red-900 font-medium"
+                      >
+                        {t('capture.addSystemConditionButton')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : isFailure && isDemand ? (
@@ -477,39 +631,88 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               ) : null
             )}
 
-            {/* Thinking — mirrors system conditions visibility */}
+            {/* Thinking + Logic — mirrors system conditions visibility */}
             {scVisible && study.systemConditionsEnabled && (
               <div>
                 <label className={labelCls}>{t('capture.thinkingLabel')}</label>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {(study.thinkings || []).map((th) => {
-                    const selected = thinkingIds.includes(th.id);
+                <div className="space-y-2">
+                  {thinkings.map((th, idx) => {
+                    const def = (study.thinkings || []).find((x) => x.id === th.id);
                     return (
-                      <button
-                        key={th.id}
-                        type="button"
-                        onClick={() =>
-                          setThinkingIds((prev) =>
-                            selected ? prev.filter((id) => id !== th.id) : [...prev, th.id]
-                          )
-                        }
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                          selected
-                            ? 'bg-red-600 text-white ring-2 ring-red-600 ring-offset-1'
-                            : 'bg-red-50 text-red-700 border border-red-200 hover:border-red-400'
-                        }`}
-                      >
-                        {tl(th.label)}
-                      </button>
+                      <div key={th.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-600 text-white">
+                            {def ? tl(def.label) : th.id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setThinkings((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-xs text-red-700 hover:text-red-900"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                        <textarea
+                          value={th.logic}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setThinkings((prev) => prev.map((x, i) => (i === idx ? { ...x, logic: v } : x)));
+                          }}
+                          placeholder={t('capture.thinkingLogicPlaceholder')}
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-red-200 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                          aria-label={t('capture.thinkingLogicLabel')}
+                        />
+                      </div>
                     );
                   })}
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="thinkings"
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setThinkingIds((prev) => [...prev, id])}
-                    compact
-                  />
+                  {thinkingPickerOpen ? (
+                    <div className="flex gap-2 items-center">
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          if (id) {
+                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '' }]));
+                            setThinkingPickerOpen(false);
+                          }
+                        }}
+                        className={inputCls}
+                      >
+                        <option value="">{t('capture.selectThinking')}</option>
+                        {(study.thinkings || [])
+                          .filter((th) => !thinkings.some((x) => x.id === th.id))
+                          .map((th) => (
+                            <option key={th.id} value={th.id}>{tl(th.label)}</option>
+                          ))}
+                      </select>
+                      <InlineTypeAdder
+                        code={code}
+                        apiPath="thinkings"
+                        onRefresh={onStudyRefresh}
+                        onCreated={(id) => {
+                          setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '' }]));
+                          setThinkingPickerOpen(false);
+                        }}
+                        compact
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setThinkingPickerOpen(false)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        {t('reclassify.skip')}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setThinkingPickerOpen(true)}
+                      className="text-sm text-red-700 hover:text-red-900 font-medium"
+                    >
+                      {t('capture.addThinkingButton')}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

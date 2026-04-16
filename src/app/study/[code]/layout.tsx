@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
@@ -24,7 +25,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <img src="/vanguard-logo.png" alt="Vanguard" style={{ height: '52px', width: 'auto' }} />
+              <Image src="/vanguard-logo.png" alt="Vanguard" width={48} height={52} priority />
             </Link>
             <div className="flex items-center gap-3">
               <select

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -304,6 +304,32 @@ export async function deleteWhatMattersType(id: string) {
   await db.delete(whatMattersTypes).where(eq(whatMattersTypes.id, id));
 }
 
+// --- Life Problems (Phase 2 item 1: "Life Problem To Be Solved") ---
+
+export async function getLifeProblems(studyId: string) {
+  return db.select().from(lifeProblems).where(eq(lifeProblems.studyId, studyId)).orderBy(asc(lifeProblems.sortOrder));
+}
+
+export async function addLifeProblem(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getLifeProblems(studyId);
+  await db.insert(lifeProblems).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function updateLifeProblem(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+  await db.update(lifeProblems).set(data).where(eq(lifeProblems.id, id));
+}
+
+export async function deleteLifeProblem(id: string) {
+  await db.delete(lifeProblems).where(eq(lifeProblems.id, id));
+}
+
 // --- System Conditions ---
 
 export async function getSystemConditions(studyId: string) {
@@ -436,6 +462,13 @@ export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en
   }
 }
 
+function concatWorkBlocks(blocks: { tag: 'value' | 'failure'; text: string }[]): string {
+  return blocks
+    .filter(b => b.text && b.text.trim().length > 0)
+    .map(b => `[${b.tag}] ${b.text}`)
+    .join('\n\n');
+}
+
 export async function createEntry(studyId: string, data: {
   verbatim: string;
   classification: 'value' | 'failure' | 'unknown' | 'sequence';
@@ -446,23 +479,29 @@ export async function createEntry(studyId: string, data: {
   pointOfTransactionId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
-  systemConditionIds?: string[];
-  thinkingIds?: string[];
+  systemConditions?: { id: string; dimension: 'helps' | 'hinders' }[];
+  thinkings?: { id: string; logic: string }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
   failureCause?: string;
   whatMatters?: string;
   collectorName?: string;
+  lifeProblemId?: string | null;
+  workBlocks?: { tag: 'value' | 'failure'; text: string }[];
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
   const isDemand = entryType === 'demand';
+  // For work entries with blocks, the verbatim column is the concatenated block text
+  // so existing verbatim consumers (search, export, dashboard list, etc.) keep working.
+  const workBlocks = !isDemand ? (data.workBlocks || []) : [];
+  const verbatimToStore = workBlocks.length > 0 ? concatWorkBlocks(workBlocks) : data.verbatim;
   await db.insert(demandEntries).values({
     id,
     studyId,
     createdAt: createdAt || new Date(),
-    verbatim: data.verbatim,
+    verbatim: verbatimToStore,
     classification: data.classification,
     entryType,
     handlingTypeId: data.handlingTypeId || null,
@@ -470,6 +509,7 @@ export async function createEntry(studyId: string, data: {
     contactMethodId: data.contactMethodId || null,
     pointOfTransactionId: data.pointOfTransactionId || null,
     whatMattersTypeId: isDemand ? (data.whatMattersTypeId || null) : null,
+    lifeProblemId: isDemand ? (data.lifeProblemId || null) : null,
     originalValueDemandTypeId: isDemand && data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     workTypeId: !isDemand ? (data.workTypeId || null) : null,
     linkedValueDemandEntryId: isDemand && data.classification === 'failure' ? (data.linkedValueDemandEntryId || null) : null,
@@ -493,7 +533,8 @@ export async function createEntry(studyId: string, data: {
   // Insert system condition junction records.
   // Visible when: failure demand, sequence work, or value demand routed to a non-one-stop capability
   // (mirrors the UI gate in src/app/study/[code]/capture/page.tsx and EntryEditModal).
-  const scIds = data.systemConditionIds || [];
+  // Each entry carries a "dimension" (helps | hinders) — Phase 2 / Item 3.
+  const scs = data.systemConditions || [];
   let oneStopHandlingType: string | null = null;
   if (data.classification === 'value' && isDemand) {
     const studyRow = await db.select({ oneStop: studies.oneStopHandlingType })
@@ -511,24 +552,41 @@ export async function createEntry(studyId: string, data: {
       && !!data.handlingTypeId
       && data.handlingTypeId !== (oneStopHandlingType || '')
     );
-  if (scVisible && scIds.length > 0) {
-    for (const scId of scIds) {
+  if (scVisible && scs.length > 0) {
+    for (const sc of scs) {
       await db.insert(demandEntrySystemConditions).values({
         id: generateId(),
         demandEntryId: id,
-        systemConditionId: scId,
+        systemConditionId: sc.id,
+        dimension: sc.dimension || 'hinders',
       });
     }
   }
 
-  // Insert thinking junction records (mirrors system conditions visibility)
-  const thIds = data.thinkingIds || [];
-  if (scVisible && thIds.length > 0) {
-    for (const thId of thIds) {
+  // Insert thinking junction records (mirrors system conditions visibility).
+  // Each entry carries a per-pair "logic" (free-text reasoning) — see Phase 2 / Item 2.
+  const ths = data.thinkings || [];
+  if (scVisible && ths.length > 0) {
+    for (const th of ths) {
       await db.insert(demandEntryThinkings).values({
         id: generateId(),
         demandEntryId: id,
-        thinkingId: thId,
+        thinkingId: th.id,
+        logic: th.logic || '',
+      });
+    }
+  }
+
+  // Insert work-description blocks (Work tab only, Phase 2 / Item 4).
+  if (workBlocks.length > 0) {
+    let order = 0;
+    for (const block of workBlocks) {
+      await db.insert(workDescriptionBlocks).values({
+        id: generateId(),
+        demandEntryId: id,
+        tag: block.tag,
+        text: block.text,
+        sortOrder: order++,
       });
     }
   }
@@ -602,10 +660,12 @@ export async function updateEntry(entryId: string, data: {
   workTypeId?: string | null;
   whatMatters?: string | null;
   whatMattersTypeIds?: string[];
-  systemConditionIds?: string[];
-  thinkingIds?: string[];
+  systemConditions?: { id: string; dimension: 'helps' | 'hinders' }[];
+  thinkings?: { id: string; logic: string }[];
+  lifeProblemId?: string | null;
+  workBlocks?: { tag: 'value' | 'failure'; text: string }[];
 }) {
-  const { whatMattersTypeIds, systemConditionIds, thinkingIds, ...entryData } = data;
+  const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
   // Update the entry fields
   const updateFields: Record<string, unknown> = {};
@@ -619,6 +679,12 @@ export async function updateEntry(entryId: string, data: {
   if (data.pointOfTransactionId !== undefined) updateFields.pointOfTransactionId = data.pointOfTransactionId;
   if (data.workTypeId !== undefined) updateFields.workTypeId = data.workTypeId;
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
+  if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
+  // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
+  // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
+  if (workBlocks !== undefined && workBlocks.length > 0) {
+    updateFields.verbatim = concatWorkBlocks(workBlocks);
+  }
 
   if (Object.keys(updateFields).length > 0) {
     await db.update(demandEntries).set(updateFields).where(eq(demandEntries.id, entryId));
@@ -636,35 +702,66 @@ export async function updateEntry(entryId: string, data: {
     }
   }
 
-  // Update system condition junction records if provided
-  if (systemConditionIds !== undefined) {
+  // Update system condition junction records if provided. Carries per-pair dimension.
+  if (systemConditions !== undefined) {
     await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
-    for (const scId of systemConditionIds) {
+    for (const sc of systemConditions) {
       await db.insert(demandEntrySystemConditions).values({
         id: generateId(),
         demandEntryId: entryId,
-        systemConditionId: scId,
+        systemConditionId: sc.id,
+        dimension: sc.dimension || 'hinders',
       });
     }
   }
 
-  // Update thinking junction records if provided
-  if (thinkingIds !== undefined) {
+  // Update thinking junction records if provided. Carries per-pair logic.
+  if (thinkings !== undefined) {
     await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
-    for (const thId of thinkingIds) {
+    for (const th of thinkings) {
       await db.insert(demandEntryThinkings).values({
         id: generateId(),
         demandEntryId: entryId,
-        thinkingId: thId,
+        thinkingId: th.id,
+        logic: th.logic || '',
       });
     }
   }
+
+  // Replace work-description blocks when provided (Work tab only, Phase 2 / Item 4).
+  if (workBlocks !== undefined) {
+    await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
+    let order = 0;
+    for (const block of workBlocks) {
+      await db.insert(workDescriptionBlocks).values({
+        id: generateId(),
+        demandEntryId: entryId,
+        tag: block.tag,
+        text: block.text,
+        sortOrder: order++,
+      });
+    }
+  }
+}
+
+export async function getWorkBlocksForEntry(entryId: string) {
+  return db.select().from(workDescriptionBlocks)
+    .where(eq(workDescriptionBlocks.demandEntryId, entryId))
+    .orderBy(asc(workDescriptionBlocks.sortOrder));
+}
+
+export async function getWorkBlocksForEntries(entryIds: string[]) {
+  if (entryIds.length === 0) return [];
+  return db.select().from(workDescriptionBlocks)
+    .where(inArray(workDescriptionBlocks.demandEntryId, entryIds))
+    .orderBy(asc(workDescriptionBlocks.sortOrder));
 }
 
 export async function deleteEntry(entryId: string) {
   await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
   await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
   await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
+  await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
   await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { LOCALE_LABELS, type Locale } from '@/lib/i18n';
@@ -81,7 +82,7 @@ export default function Home() {
         </div>
 
         <div className="text-center mb-8">
-          <img src="/vanguard-logo.png" alt="Vanguard" style={{ width: '140px', height: 'auto', margin: '0 auto 16px' }} />
+          <Image src="/vanguard-logo.png" alt="Vanguard" width={140} height={153} style={{ margin: '0 auto 16px' }} priority />
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')}</h1>
           <p className="text-gray-600 mb-3">{t('app.subtitle')}</p>
           <p className="text-sm text-gray-400 max-w-sm mx-auto">{t('landing.methodContext')}</p>
