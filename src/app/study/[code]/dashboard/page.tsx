@@ -1031,6 +1031,95 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </ChartCard>
                 )}
+
+                {/* Phase 4C (2026-04-16) — Work Step analysis. Only visible when
+                    workStepTypesEnabled AND real step-tagged data exists. */}
+                {data.workStepTypesEnabled && data.workStepFrequency.length > 0 && (
+                  <>
+                    <h3 className="text-base font-semibold text-gray-900 mt-4">{t('dashboard.workStepAnalysis')}</h3>
+
+                    {/* 1. Top Work Steps — horizontal bar, colored per tag */}
+                    {(() => {
+                      const top = data.workStepFrequency.slice(0, 15).map(s => ({
+                        label: s.label,
+                        count: s.count,
+                        fill: s.tag === 'value' ? COLORS.value : COLORS.failure,
+                      }));
+                      return (
+                        <ChartCard title={t('dashboard.topWorkSteps')}>
+                          <ResponsiveContainer width="100%" height={Math.max(220, top.length * 32 + 40)}>
+                            <BarChart data={top} layout="vertical" margin={{ left: 10, right: 40 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                              <XAxis type="number" allowDecimals={false} tick={tickStyle} domain={[0, 'dataMax']} />
+                              <YAxis type="category" dataKey="label" width={140} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 20) + '…' : v} />
+                              <Tooltip {...tooltipStyle} />
+                              <Bar dataKey="count" fill={COLORS.value} radius={[0, 4, 4, 0]}>
+                                {top.map((d, i) => (<Cell key={i} fill={d.fill} />))}
+                                <LabelList dataKey="count" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                      );
+                    })()}
+
+                    {/* 2. Work Step × Work Type — stacked bar. demandTypeLabel
+                        field carries the work type label in v1 (see
+                        aggregations comment on the demand-type linkage gap). */}
+                    {data.workStepByDemandType.length > 0 && (() => {
+                      // Pivot: rows = work-type labels, columns = work-step labels.
+                      // Stack counts as separate Bar components per step.
+                      const workTypes = [...new Set(data.workStepByDemandType.map(r => r.demandTypeLabel))];
+                      const steps = [...new Map(data.workStepByDemandType.map(r => [r.workStepLabel, r.workStepTag])).entries()];
+                      const pivotData = workTypes.map(wt => {
+                        const row: Record<string, string | number> = { workType: wt };
+                        for (const [step] of steps) {
+                          const match = data.workStepByDemandType.find(r => r.demandTypeLabel === wt && r.workStepLabel === step);
+                          row[step] = match?.count ?? 0;
+                        }
+                        return row;
+                      });
+                      return (
+                        <ChartCard title={t('dashboard.workStepByWorkType')}>
+                          <ResponsiveContainer width="100%" height={Math.max(260, pivotData.length * 60 + 80)}>
+                            <BarChart data={pivotData} margin={{ left: 10, right: 10, bottom: 30 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                              <XAxis dataKey="workType" tick={{ fontSize: 10, fill: THEME.textSecondary }} angle={-15} textAnchor="end" interval={0} height={50} />
+                              <YAxis allowDecimals={false} tick={tickStyle} />
+                              <Tooltip {...tooltipStyle} />
+                              {steps.map(([step, tag]) => (
+                                <Bar key={step} dataKey={step} stackId="a" fill={tag === 'value' ? COLORS.value : COLORS.failure} />
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </ChartCard>
+                      );
+                    })()}
+
+                    {/* 3. Capability by Work Type — horizontal bar with value/failure split + pctValue label */}
+                    {data.capabilityByDemandType.length > 0 && (
+                      <ChartCard title={t('dashboard.capabilityByWorkType')}>
+                        <ResponsiveContainer width="100%" height={Math.max(200, data.capabilityByDemandType.length * 48 + 40)}>
+                          <BarChart data={data.capabilityByDemandType} layout="vertical" margin={{ left: 10, right: 80 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                            <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                            <YAxis type="category" dataKey="demandTypeLabel" width={140} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 20) + '…' : v} />
+                            <Tooltip {...tooltipStyle} />
+                            <Legend wrapperStyle={{ color: THEME.textSecondary, fontSize: 12 }} />
+                            <Bar dataKey="valueBlocks" name={t('capture.value')} stackId="cap" fill={COLORS.value} />
+                            <Bar dataKey="failureBlocks" name={t('capture.failure')} stackId="cap" fill={COLORS.failure}
+                              label={(props) => {
+                                const item = data.capabilityByDemandType[props.index as number];
+                                if (!item) return '';
+                                return `${item.pctValue}% value`;
+                              }}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartCard>
+                    )}
+                  </>
+                )}
               </>
             )}
           </>

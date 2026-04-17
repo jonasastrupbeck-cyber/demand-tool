@@ -136,6 +136,17 @@ export interface DashboardData {
   lifecycleEnabled: boolean;
   lifecycleByStageAndDemandType: Array<{ stageLabel: string; stageSortOrder: number; demandTypeLabel: string; demandTypeCategory: 'value' | 'failure'; count: number }>;
   lifecycleFailureByStage: Array<{ stageLabel: string; stageSortOrder: number; count: number }>;
+  // Phase 4C (2026-04-16) — Work Step analysis on the Work tab.
+  // Only populated when the study has workStepTypesEnabled. The
+  // demandTypeLabel field on cross-cuts currently carries the work type
+  // label instead (see dashboard-aggregations.ts) because work entries
+  // don't link to demand types directly; renaming to workTypeLabel once
+  // that linkage exists on the schema.
+  workStepTypesEnabled: boolean;
+  workStepFrequency: Array<{ label: string; tag: 'value' | 'failure'; count: number }>;
+  workStepByDemandType: Array<{ demandTypeLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }>;
+  workStepByLifeProblem: Array<{ lifeProblemLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }>;
+  capabilityByDemandType: Array<{ demandTypeLabel: string; valueBlocks: number; failureBlocks: number; pctValue: number }>;
 }
 
 export interface CreateEntryInput {

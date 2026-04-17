@@ -1074,6 +1074,31 @@ const translations = {
     sv: 'Livsproblem som l\u00f6ses',
     de: 'Zu l\u00f6sende Lebensprobleme',
   },
+  // Phase 4C (2026-04-16) — Work Step analysis
+  'dashboard.workStepAnalysis': {
+    en: 'Work Step analysis',
+    da: 'Arbejdstrins-analyse',
+    sv: 'Analys av arbetssteg',
+    de: 'Arbeitsschritt-Analyse',
+  },
+  'dashboard.topWorkSteps': {
+    en: 'Top Work Steps',
+    da: 'Mest almindelige arbejdstrin',
+    sv: 'Vanligaste arbetssteg',
+    de: 'Häufigste Arbeitsschritte',
+  },
+  'dashboard.workStepByWorkType': {
+    en: 'Work Steps by Work Type',
+    da: 'Arbejdstrin pr. arbejdstype',
+    sv: 'Arbetssteg per arbetstyp',
+    de: 'Arbeitsschritte nach Arbeitsart',
+  },
+  'dashboard.capabilityByWorkType': {
+    en: 'Value vs Failure work by Work Type',
+    da: 'Værdi- vs fejlarbejde pr. arbejdstype',
+    sv: 'Värde- vs felarbete per arbetstyp',
+    de: 'Wert- vs Fehlerarbeit nach Arbeitsart',
+  },
   'dashboard.whatMatters': {
     en: 'What Matters to the Customer',
     da: 'Hvad betyder noget for kunden',

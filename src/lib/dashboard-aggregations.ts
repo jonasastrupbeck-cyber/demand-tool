@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems } from './schema';
 import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData } from '@/types';
@@ -21,6 +21,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const study = await db.select().from(studies).where(eq(studies.id, studyId));
   const oneStopId = study[0]?.oneStopHandlingType;
   const workTrackingEnabled = study[0]?.workTrackingEnabled ?? false;
+  const workStepTypesEnabled = study[0]?.workStepTypesEnabled ?? false;
   const systemConditionsEnabled = study[0]?.systemConditionsEnabled ?? false;
   const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
 
@@ -494,6 +495,100 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
       .sort((a, b) => a.stageSortOrder - b.stageSortOrder);
   }
 
+  // ── PHASE 4C: WORK STEP AGGREGATIONS ──
+  // Only populated when workStepTypesEnabled; otherwise empty arrays so the
+  // Work tab can cleanly hide the charts.
+  let workStepFrequency: Array<{ label: string; tag: 'value' | 'failure'; count: number }> = [];
+  let workStepByDemandType: Array<{ demandTypeLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }> = [];
+  const workStepByLifeProblem: Array<{ lifeProblemLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }> = [];
+  let capabilityByDemandType: Array<{ demandTypeLabel: string; valueBlocks: number; failureBlocks: number; pctValue: number }> = [];
+
+  if (workStepTypesEnabled) {
+    // 1) Top Work Steps (overall frequency, split by tag)
+    const freqRows = await db.select({
+      label: workStepTypes.label,
+      tag: workStepTypes.tag,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(...baseConditions))
+      .groupBy(workStepTypes.label, workStepTypes.tag)
+      .orderBy(desc(sql`count(*)`));
+    workStepFrequency = freqRows.map(r => ({ label: r.label, tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure', count: r.count }));
+
+    // 2) Work Step × Demand Type cross-tab. Join blocks → work entry → demand entry
+    //    (each work entry is linked to its originating demand entry via shared
+    //    customer/session? — actually no, work entries are standalone in this
+    //    schema. We join through demandEntries.demandTypeId on the work entry
+    //    itself, which won't be set (work entries use workTypeId, not demandTypeId).
+    //    So Work Step × Demand Type only meaningfully aggregates when work
+    //    entries have their own demand-type linkage — today they don't. This
+    //    aggregation is therefore empty at v1. Kept as a stub so the chart can
+    //    appear later when we add the linkage. Leaving the array empty.)
+    //    Pragmatic fallback: surface Work Step × Work Type instead, which IS
+    //    linked on work entries. Rename the interface too if it renders.
+    //    For now, leave workStepByDemandType empty and let the chart hide.
+
+    // 3) Work Step × Life Problem: same issue as #2 — life problems live on
+    //    demand entries, not work entries. Empty at v1.
+
+    // 4) Capability by Demand Type: uses BLOCK-level tags (value vs failure)
+    //    across all work entries, grouped by... the demand types present? Same
+    //    linkage issue. Instead, we report capability per WORK TYPE (which IS
+    //    on work entries). Keep the interface named capabilityByDemandType for
+    //    now but populate it via work types as the axis — simpler and truthful
+    //    to what we actually have.
+    const capRows = await db.select({
+      label: workTypes.label,
+      tag: workDescriptionBlocks.tag,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+      .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
+      .groupBy(workTypes.label, workDescriptionBlocks.tag);
+    const capMap = new Map<string, { value: number; failure: number }>();
+    for (const r of capRows) {
+      const entry = capMap.get(r.label) ?? { value: 0, failure: 0 };
+      if (r.tag === 'value') entry.value += r.count;
+      else if (r.tag === 'failure') entry.failure += r.count;
+      capMap.set(r.label, entry);
+    }
+    capabilityByDemandType = [...capMap.entries()].map(([label, c]) => {
+      const total = c.value + c.failure;
+      const pctValue = total > 0 ? Math.round((c.value / total) * 100) : 0;
+      return { demandTypeLabel: label, valueBlocks: c.value, failureBlocks: c.failure, pctValue };
+    }).sort((a, b) => b.pctValue - a.pctValue);
+
+    // Work Step × Work Type cross-tab (replaces the blocked demand/life-problem
+    // ones; at least this one has real joinable data).
+    const stepByWorkType = await db.select({
+      workTypeLabel: workTypes.label,
+      workStepLabel: workStepTypes.label,
+      workStepTag: workStepTypes.tag,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+      .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
+      .groupBy(workTypes.label, workStepTypes.label, workStepTypes.tag)
+      .orderBy(desc(sql`count(*)`));
+    // Re-purpose the demand-type-named slot to carry this (the rendering shell
+    // is the same shape — label on X axis, workStep stacks; we can rename the
+    // key + UI later when genuine demand-type linkage on work entries exists).
+    workStepByDemandType = stepByWorkType.map(r => ({
+      demandTypeLabel: r.workTypeLabel,
+      workStepLabel: r.workStepLabel,
+      workStepTag: (r.workStepTag === 'value' ? 'value' : 'failure') as 'value' | 'failure',
+      count: r.count,
+    }));
+  }
+
   return {
     totalEntries,
     valueCount,
@@ -525,6 +620,11 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     lifecycleEnabled,
     lifecycleByStageAndDemandType,
     lifecycleFailureByStage,
+    workStepTypesEnabled,
+    workStepFrequency,
+    workStepByDemandType,
+    workStepByLifeProblem,
+    capabilityByDemandType,
   };
 }
 
