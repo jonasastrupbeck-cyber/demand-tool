@@ -41,6 +41,7 @@ export async function GET(
     workBlocks: wbRows.map((r) => ({
       tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure',
       text: r.text,
+      workStepTypeId: r.workStepTypeId ?? null,
     })),
   });
 }
@@ -114,9 +115,10 @@ export async function PATCH(
     )) {
       return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"failure", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
       tag: b.tag,
       text: b.text,
+      workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
     }));
   }
 

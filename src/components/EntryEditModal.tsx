@@ -23,6 +23,7 @@ export interface EntryEditModalStudy {
   valueLinkingEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  workStepTypesEnabled: boolean;
   systemConditionsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -32,6 +33,7 @@ export interface EntryEditModalStudy {
   whatMattersTypes: WhatMattersType[];
   lifeProblems: LifeProblem[];
   workTypes: WorkType[];
+  workStepTypes: { id: string; label: string; tag: 'value' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: SystemCondition[];
   thinkings: Thinking[];
 }
@@ -86,7 +88,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
   const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string }[]>([]);
+  // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +115,16 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
           };
         }) : []);
         setThinkings(Array.isArray(data.thinkings) ? data.thinkings : []);
-        setWorkBlocks(Array.isArray(data.workBlocks) ? data.workBlocks : []);
+        // Normalise on load: workStepTypeId may be missing on older rows; freeText is
+        // UI-only — derive it from whether the block has text but no step reference.
+        setWorkBlocks(Array.isArray(data.workBlocks)
+          ? data.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+              tag: b.tag,
+              text: b.text,
+              workStepTypeId: b.workStepTypeId ?? null,
+              freeText: !b.workStepTypeId && !!b.text,
+            }))
+          : []);
         // Auto-open the note disclosure if the field already has content.
         setWhatMattersNoteOpen(Boolean(data.entry?.whatMatters && data.entry.whatMatters.trim()));
       }
@@ -140,7 +152,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       thinkings,
     };
     if (entry.entryType === 'work') {
-      body.workBlocks = workBlocks.filter((b) => b.text.trim().length > 0);
+      // Strip the UI-only freeText flag before PATCH.
+      body.workBlocks = workBlocks
+        .filter((b) => b.text.trim().length > 0)
+        .map(({ tag, text, workStepTypeId }) => ({ tag, text, workStepTypeId }));
     }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -502,45 +517,109 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
                 <div className="overflow-x-auto -mx-1 px-1 pb-2">
                   <div className="flex gap-2 items-stretch min-w-min">
-                    {workBlocks.map((b, idx) => (
-                      <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
-                        <div className="flex items-center justify-between gap-1">
-                          <SegmentedToggle
-                            options={[
-                              { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
-                              { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
-                            ]}
-                            value={b.tag}
-                            onChange={(v) => {
-                              const tag = v === 'value' ? 'value' : 'failure';
-                              setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
-                            }}
-                            ariaLabel={t('capture.workBlocksLabel')}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
-                            className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
-                            aria-label="Remove"
-                          >
-                            &times;
-                          </button>
+                    {workBlocks.map((b, idx) => {
+                      // Phase 4 — same three-mode decision as in capture/page.tsx.
+                      const pickerOn = study.workStepTypesEnabled && (study.workStepTypes || []).length > 0;
+                      const hasStep = !!b.workStepTypeId;
+                      const step = hasStep ? (study.workStepTypes || []).find(s => s.id === b.workStepTypeId) : null;
+                      const valueSteps = (study.workStepTypes || []).filter(s => s.tag === 'value');
+                      const failureSteps = (study.workStepTypes || []).filter(s => s.tag === 'failure');
+                      const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
+                      const showPicker = pickerOn && !hasStep && !showFreeText;
+                      return (
+                        <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
+                          {hasStep && step && (
+                            <div className="flex items-start justify-between gap-1">
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${step.tag === 'value' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  aria-label={t('capture.workStepClearAria')}
+                                  onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, text: '' } : p))}
+                                  className="text-gray-400 hover:text-gray-600 text-xs"
+                                >&times;</button>
+                              </div>
+                            </div>
+                          )}
+                          {showPicker && (
+                            <div className="flex items-center justify-between gap-1">
+                              <select
+                                value=""
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (!val) return;
+                                  if (val === '__free__') {
+                                    setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, tag: 'value', text: '', freeText: true } : p));
+                                  } else {
+                                    const picked = (study.workStepTypes || []).find(s => s.id === val);
+                                    if (picked) {
+                                      setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: picked.id, tag: picked.tag, text: picked.label, freeText: false } : p));
+                                    }
+                                  }
+                                }}
+                                className="flex-1 text-xs px-1 py-1 rounded border border-gray-300 bg-white text-gray-900"
+                              >
+                                <option value="">{t('capture.workStepPickerPlaceholder')}</option>
+                                {valueSteps.length > 0 && (
+                                  <optgroup label={t('capture.workBlockTagValue')}>
+                                    {valueSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
+                                  </optgroup>
+                                )}
+                                {failureSteps.length > 0 && (
+                                  <optgroup label={t('capture.workBlockTagFailure')}>
+                                    {failureSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
+                                  </optgroup>
+                                )}
+                                <option value="__free__">{t('capture.workStepPickerFreeText')}</option>
+                              </select>
+                              <button
+                                type="button"
+                                aria-label="Remove"
+                                onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                                className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                              >&times;</button>
+                            </div>
+                          )}
+                          {showFreeText && !hasStep && (
+                            <>
+                              <div className="flex items-center justify-between gap-1">
+                                <SegmentedToggle
+                                  options={[
+                                    { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                                    { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                                  ]}
+                                  value={b.tag}
+                                  onChange={(v) => {
+                                    const tag = v === 'value' ? 'value' : 'failure';
+                                    setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
+                                  }}
+                                  ariaLabel={t('capture.workBlocksLabel')}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                                  aria-label="Remove"
+                                >&times;</button>
+                              </div>
+                              <textarea
+                                value={b.text}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
+                                }}
+                                placeholder={t('capture.workBlockPlaceholder')}
+                                rows={4}
+                                className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none resize-none flex-1"
+                              />
+                            </>
+                          )}
                         </div>
-                        <textarea
-                          value={b.text}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
-                          }}
-                          placeholder={t('capture.workBlockPlaceholder')}
-                          rows={4}
-                          className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none resize-none flex-1"
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '' }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
                     >

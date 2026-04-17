@@ -10,6 +10,8 @@ export interface Study {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  // Phase 4 (2026-04-16) — managed Work Step Type taxonomy toggle
+  workStepTypesEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
   classificationEnabled: boolean;
@@ -63,6 +65,17 @@ export interface WorkType {
   id: string;
   studyId: string;
   label: string;
+  sortOrder: number;
+}
+
+// Phase 4 (2026-04-16) — managed taxonomy for Flow block step descriptions.
+// Tag fixed at taxonomy level (same step is always value or always failure).
+export interface WorkStepType {
+  id: string;
+  studyId: string;
+  label: string;
+  tag: 'value' | 'failure';
+  operationalDefinition: string | null;
   sortOrder: number;
 }
 
@@ -186,4 +199,7 @@ export interface WorkDescriptionBlock {
   tag: 'value' | 'failure';
   text: string;
   sortOrder: number;
+  // Phase 4 (2026-04-16) — optional managed-step reference.
+  // Null = free-text block (current behaviour); non-null = picker choice.
+  workStepTypeId: string | null;
 }

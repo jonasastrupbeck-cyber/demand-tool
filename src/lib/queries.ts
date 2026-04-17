@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -456,6 +456,36 @@ export async function deleteWorkType(id: string) {
   await db.delete(workTypes).where(eq(workTypes.id, id));
 }
 
+// --- Work Step Types (Phase 4 / 2026-04-16) ---
+// Managed taxonomy for Flow block step descriptions. Tag fixed at taxonomy level.
+
+export async function getWorkStepTypes(studyId: string) {
+  return db.select().from(workStepTypes).where(eq(workStepTypes.studyId, studyId)).orderBy(asc(workStepTypes.sortOrder));
+}
+
+export async function addWorkStepType(studyId: string, label: string, tag: 'value' | 'failure') {
+  const id = generateId();
+  const existing = await getWorkStepTypes(studyId);
+  await db.insert(workStepTypes).values({
+    id,
+    studyId,
+    label,
+    tag,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function updateWorkStepType(id: string, data: { label?: string; tag?: 'value' | 'failure'; operationalDefinition?: string | null }) {
+  await db.update(workStepTypes).set(data).where(eq(workStepTypes.id, id));
+}
+
+export async function deleteWorkStepType(id: string) {
+  // FK on work_description_blocks is ON DELETE SET NULL so referencing blocks
+  // revert to free-text automatically (text + tag preserved).
+  await db.delete(workStepTypes).where(eq(workStepTypes.id, id));
+}
+
 export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en') {
   const existing = await getWorkTypes(studyId);
   if (existing.length > 0) return;
@@ -506,7 +536,9 @@ export async function createEntry(studyId: string, data: {
   whatMatters?: string;
   collectorName?: string;
   lifeProblemId?: string | null;
-  workBlocks?: { tag: 'value' | 'failure'; text: string }[];
+  // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
+  // managed Work Step Type. Null/undefined = free-text block (current behaviour).
+  workBlocks?: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }[];
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -600,6 +632,7 @@ export async function createEntry(studyId: string, data: {
         tag: block.tag,
         text: block.text,
         sortOrder: order++,
+        workStepTypeId: block.workStepTypeId ?? null,
       });
     }
   }
@@ -686,7 +719,9 @@ export async function updateEntry(entryId: string, data: {
   }[];
   thinkings?: { id: string; logic: string }[];
   lifeProblemId?: string | null;
-  workBlocks?: { tag: 'value' | 'failure'; text: string }[];
+  // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
+  // managed Work Step Type. Null/undefined = free-text block (current behaviour).
+  workBlocks?: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }[];
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
@@ -768,6 +803,7 @@ export async function updateEntry(entryId: string, data: {
         tag: block.tag,
         text: block.text,
         sortOrder: order++,
+        workStepTypeId: block.workStepTypeId ?? null,
       });
     }
   }

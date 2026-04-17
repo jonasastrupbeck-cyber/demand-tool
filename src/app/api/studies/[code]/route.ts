@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,13 +12,14 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
     getPointsOfTransaction(study.id),
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
+    getWorkStepTypes(study.id),
     getSystemConditions(study.id),
     getThinkings(study.id),
     getLifecycleStages(study.id),
@@ -50,6 +51,7 @@ export async function GET(
     pointsOfTransaction: potTypes,
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
+    workStepTypes: wsTypes,
     systemConditions: scTypes,
     thinkings: thTypes,
     lifecycleStages: lcStages,
@@ -78,6 +80,7 @@ export async function PUT(
   if (body.systemConditionsEnabled !== undefined) updates.systemConditionsEnabled = body.systemConditionsEnabled;
   if (body.demandTypesEnabled !== undefined) updates.demandTypesEnabled = body.demandTypesEnabled;
   if (body.workTypesEnabled !== undefined) updates.workTypesEnabled = body.workTypesEnabled;
+  if (body.workStepTypesEnabled !== undefined) updates.workStepTypesEnabled = body.workStepTypesEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;

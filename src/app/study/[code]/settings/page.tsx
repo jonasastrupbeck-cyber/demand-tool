@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
+import SegmentedToggle from '@/components/SegmentedToggle';
 
 interface HandlingType {
   id: string;
@@ -62,6 +63,7 @@ interface StudyData {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  workStepTypesEnabled: boolean;
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;
@@ -76,6 +78,7 @@ interface StudyData {
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
+  workStepTypes: { id: string; label: string; tag: 'value' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: SystemConditionType[];
   thinkings: SystemConditionType[];
   lifecycleStages: LifecycleStage[];
@@ -113,6 +116,9 @@ export default function SettingsPage() {
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
+  // Phase 4 (2026-04-16) — Work Step Types add-form state.
+  const [newWorkStep, setNewWorkStep] = useState('');
+  const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'failure'>('value');
   const [newSystemCondition, setNewSystemCondition] = useState('');
   const [newThinking, setNewThinking] = useState('');
   const [newLifeProblem, setNewLifeProblem] = useState('');
@@ -128,7 +134,7 @@ export default function SettingsPage() {
   // in a COR title, etc. Previously the only editable field per row was
   // operationalDefinition; the label itself required delete-and-re-add which
   // broke existing references.)
-  type LabelEditType = 'handling' | 'demand' | 'contactMethod' | 'pointOfTransaction' | 'whatMatters' | 'systemCondition' | 'thinking' | 'lifeProblem' | 'workType';
+  type LabelEditType = 'handling' | 'demand' | 'contactMethod' | 'pointOfTransaction' | 'whatMatters' | 'systemCondition' | 'thinking' | 'lifeProblem' | 'workType' | 'workStepType';
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editingLabelValue, setEditingLabelValue] = useState('');
   const [editingLabelType, setEditingLabelType] = useState<LabelEditType>('handling');
@@ -386,6 +392,43 @@ export default function SettingsPage() {
     loadStudy();
   }
 
+  // Phase 4 (2026-04-16) — Work Step Types
+  async function toggleWorkStepTypes() {
+    const newValue = !study?.workStepTypesEnabled;
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workStepTypesEnabled: newValue }),
+    });
+    loadStudy();
+  }
+
+  async function addWorkStepHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newWorkStep.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newWorkStep.trim(), tag: newWorkStepTag }),
+    });
+    setNewWorkStep('');
+    loadStudy();
+  }
+
+  async function removeWorkStep(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function updateWorkStepTag(id: string, tag: 'value' | 'failure') {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag }),
+    });
+    loadStudy();
+  }
+
   async function toggleSystemConditions() {
     const newValue = !study?.systemConditionsEnabled;
     await fetch(`/api/studies/${encodeURIComponent(code)}`, {
@@ -525,6 +568,7 @@ export default function SettingsPage() {
     thinking: 'thinkings',
     lifeProblem: 'life-problems',
     workType: 'work-types',
+    workStepType: 'work-step-types',
   };
 
   function startEditLabel(id: string, currentLabel: string, type: LabelEditType) {
@@ -1124,6 +1168,63 @@ export default function SettingsPage() {
                 <form onSubmit={addWorkTypeHandler} className="flex gap-2">
                   <input type="text" value={newWorkType} onChange={(e) => setNewWorkType(e.target.value)} placeholder={t('settings.addWorkType')} className={inputCls} />
                   <button type="submit" disabled={!newWorkType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-amber-600 hover:bg-amber-700">{t('settings.add')}</button>
+                </form>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Phase 4 (2026-04-16) — Work Steps: managed taxonomy for Flow blocks.
+             Only visible when Work Tracking is on. Mirrors Work Types pattern;
+             each step carries a fixed tag (value/failure). */}
+        {study.workTrackingEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workSteps')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.workStepsDesc')}</p>
+            <label className="flex items-center gap-3 cursor-pointer mb-4">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={study.workStepTypesEnabled}
+                  onChange={toggleWorkStepTypes}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">{t('settings.enableWorkSteps')}</span>
+            </label>
+            {study.workStepTypesEnabled && (
+              <>
+                <ul className="space-y-2 mb-4">
+                  {(study.workStepTypes || []).map((wst) => (
+                    <li key={wst.id} className={`${itemCls} ${wst.tag === 'value' ? 'bg-green-50' : 'bg-red-50'}`}>
+                      <div className="flex items-center gap-2 flex-1">
+                        {renderLabel(wst.id, wst.label, 'workStepType', wst.tag === 'value' ? 'text-sm text-green-700' : 'text-sm text-red-700')}
+                        <SegmentedToggle
+                          options={[
+                            { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                            { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                          ]}
+                          value={wst.tag}
+                          onChange={(v) => updateWorkStepTag(wst.id, v as 'value' | 'failure')}
+                        />
+                      </div>
+                      <button onClick={() => removeWorkStep(wst.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    </li>
+                  ))}
+                </ul>
+                <form onSubmit={addWorkStepHandler} className="flex gap-2 items-center">
+                  <input type="text" value={newWorkStep} onChange={(e) => setNewWorkStep(e.target.value)} placeholder={t('settings.addWorkStep')} className={inputCls} />
+                  <SegmentedToggle
+                    options={[
+                      { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                      { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                    ]}
+                    value={newWorkStepTag}
+                    onChange={(v) => setNewWorkStepTag(v as 'value' | 'failure')}
+                  />
+                  <button type="submit" disabled={!newWorkStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d] hover:bg-[#8a2425]">{t('settings.add')}</button>
                 </form>
               </>
             )}

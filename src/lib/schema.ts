@@ -13,6 +13,10 @@ export const studies = pgTable('studies', {
   systemConditionsEnabled: boolean('system_conditions_enabled').notNull().default(false),
   demandTypesEnabled: boolean('demand_types_enabled').notNull().default(false),
   workTypesEnabled: boolean('work_types_enabled').notNull().default(false),
+  // Phase 4 (2026-04-16): managed taxonomy for Flow step descriptions. When
+  // true, Flow blocks can pick from the study's `workStepTypes` list; free-text
+  // fallback stays available per-block.
+  workStepTypesEnabled: boolean('work_step_types_enabled').notNull().default(false),
   volumeMode: boolean('volume_mode').notNull().default(false),
   lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
@@ -93,6 +97,20 @@ export const workTypes = pgTable('work_types', {
   lifecycleClassifiedAt: timestamp('lifecycle_classified_at', { withTimezone: true }),
 });
 
+// Phase 4 (2026-04-16) — managed taxonomy for Flow block step descriptions.
+// Different granularity from workTypes: workTypes classifies the whole work
+// entry, workStepTypes classifies each step in the Flow. Tag is fixed at
+// the taxonomy level (per Jonas: value vs failure is fundamental, same step
+// is always the same side).
+export const workStepTypes = pgTable('work_step_types', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  tag: text('tag').$type<'value' | 'failure'>().notNull(),
+  operationalDefinition: text('operational_definition'),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const demandEntries = pgTable('demand_entries', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -168,4 +186,8 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   tag: text('tag').$type<'value' | 'failure'>().notNull(),
   text: text('text').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Phase 4 (2026-04-16): optional reference to a managed Work Step Type.
+  // ON DELETE SET NULL means deleting a step reverts the block to free-text
+  // (text + tag are preserved, no data loss).
+  workStepTypeId: text('work_step_type_id').references(() => workStepTypes.id, { onDelete: 'set null' }),
 });

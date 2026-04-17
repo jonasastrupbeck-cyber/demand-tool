@@ -100,9 +100,10 @@ export async function POST(
     collectorName: body.collectorName?.trim() || undefined,
     lifeProblemId: body.lifeProblemId || undefined,
     workBlocks: entryType === 'work' && workBlocksValid
-      ? body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string }) => ({
+      ? body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
           tag: b.tag,
           text: b.text,
+          workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
         }))
       : undefined,
   });

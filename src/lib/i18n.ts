@@ -777,6 +777,25 @@ const translations = {
     sv: 'Beskriv detta steg...',
     de: 'Beschreibe diesen Schritt...',
   },
+  // Phase 4 (2026-04-16) — picker option labels on each Flow block
+  'capture.workStepPickerPlaceholder': {
+    en: 'Select a work step…',
+    da: 'Vælg et arbejdstrin…',
+    sv: 'Välj ett arbetssteg…',
+    de: 'Arbeitsschritt auswählen…',
+  },
+  'capture.workStepPickerFreeText': {
+    en: '— Free-text step',
+    da: '— Fritekst-trin',
+    sv: '— Fritext-steg',
+    de: '— Freitext-Schritt',
+  },
+  'capture.workStepClearAria': {
+    en: 'Clear step',
+    da: 'Ryd trin',
+    sv: 'Rensa steg',
+    de: 'Schritt löschen',
+  },
   'capture.legacyVerbatimNotice': {
     en: 'Legacy entry — original description (read-only). Adding a block below will replace this.',
     da: 'Gammel registrering — oprindelig beskrivelse (skrivebeskyttet). Tilf\u00f8j en blok nedenfor for at erstatte den.',
@@ -1476,6 +1495,31 @@ const translations = {
     da: 'Tilføj arbejdstype...',
     sv: 'Lägg till arbetstyp...',
     de: 'Arbeitsart hinzufügen...',
+  },
+  // Phase 4 (2026-04-16) — Work Step Types taxonomy
+  'settings.workSteps': {
+    en: 'Work Steps',
+    da: 'Arbejdstrin',
+    sv: 'Arbetssteg',
+    de: 'Arbeitsschritte',
+  },
+  'settings.workStepsDesc': {
+    en: 'A managed list of the actual steps inside the Flow — each tagged Value or Failure. When enabled, Flow blocks can pick from this list instead of being free-text, so steps aggregate across entries.',
+    da: 'En styret liste over de faktiske trin i forløbet — hver mærket som Værdi eller Fejl. Når aktiveret kan forløbsblokke vælges fra denne liste i stedet for at være fritekst, så trin kan aggregeres på tværs af registreringer.',
+    sv: 'En hanterad lista över de faktiska stegen i flödet — vart och ett taggat som Värde eller Fel. När aktiverat kan flödesblock väljas från denna lista istället för att vara fritext, så steg kan aggregeras över registreringar.',
+    de: 'Eine gepflegte Liste der tatsächlichen Schritte im Ablauf — jeder als Wert oder Fehler markiert. Bei aktivierter Option können Ablaufblöcke aus dieser Liste gewählt werden statt Freitext, damit Schritte über Einträge aggregiert werden können.',
+  },
+  'settings.enableWorkSteps': {
+    en: 'Enable Work Step taxonomy',
+    da: 'Aktivér taksonomi for arbejdstrin',
+    sv: 'Aktivera taxonomi för arbetssteg',
+    de: 'Arbeitsschritt-Taxonomie aktivieren',
+  },
+  'settings.addWorkStep': {
+    en: 'Add work step...',
+    da: 'Tilføj arbejdstrin...',
+    sv: 'Lägg till arbetssteg...',
+    de: 'Arbeitsschritt hinzufügen...',
   },
   'settings.systemConditions': {
     en: 'System Conditions',
