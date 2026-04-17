@@ -119,6 +119,20 @@ export default function SettingsPage() {
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
   const [newWorkStep, setNewWorkStep] = useState('');
   const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'failure'>('value');
+
+  // Phase 4B (2026-04-16) — Synthesis modal state.
+  type Cluster = {
+    tag: 'value' | 'failure';
+    suggestedLabel: string;
+    blockCount: number;
+    exampleTexts: string[];
+    blockIds: string[];
+  };
+  const [synthesiseOpen, setSynthesiseOpen] = useState(false);
+  const [synthesiseLoading, setSynthesiseLoading] = useState(false);
+  const [synthesiseData, setSynthesiseData] = useState<{ clusters: Cluster[]; totalOrphans: number } | null>(null);
+  const [synthesiseDismissed, setSynthesiseDismissed] = useState<Set<string>>(new Set());
+  const [synthesiseEdits, setSynthesiseEdits] = useState<Record<string, string>>({});
   const [newSystemCondition, setNewSystemCondition] = useState('');
   const [newThinking, setNewThinking] = useState('');
   const [newLifeProblem, setNewLifeProblem] = useState('');
@@ -427,6 +441,58 @@ export default function SettingsPage() {
       body: JSON.stringify({ tag }),
     });
     loadStudy();
+  }
+
+  // Phase 4B — synthesis helper actions.
+  // Fetch clusters from the synthesis endpoint. Called when opening the modal
+  // and after each promote action to refresh the state.
+  const loadSynthesis = useCallback(async () => {
+    setSynthesiseLoading(true);
+    try {
+      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/synthesis`);
+      if (r.ok) {
+        const d = await r.json();
+        setSynthesiseData({ clusters: d.clusters, totalOrphans: d.totalOrphans });
+      }
+    } finally {
+      setSynthesiseLoading(false);
+    }
+  }, [code]);
+
+  function openSynthesiseModal() {
+    setSynthesiseDismissed(new Set());
+    setSynthesiseEdits({});
+    setSynthesiseOpen(true);
+    loadSynthesis();
+  }
+
+  function clusterKey(c: Cluster): string {
+    // Stable-ish key for session state (dismissed set, edited labels).
+    // Block IDs are the most reliable identifier for a cluster across re-fetches.
+    return c.blockIds.slice().sort().join(',');
+  }
+
+  function dismissCluster(c: Cluster) {
+    setSynthesiseDismissed(prev => {
+      const next = new Set(prev);
+      next.add(clusterKey(c));
+      return next;
+    });
+  }
+
+  async function promoteCluster(c: Cluster) {
+    const label = (synthesiseEdits[clusterKey(c)] ?? c.suggestedLabel).trim();
+    if (!label) return;
+    const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/synthesis`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label, tag: c.tag, blockIds: c.blockIds }),
+    });
+    if (r.ok) {
+      // Refresh both the synthesis list and the study payload (new step appears in the taxonomy).
+      await loadSynthesis();
+      loadStudy();
+    }
   }
 
   async function toggleSystemConditions() {
@@ -1226,6 +1292,15 @@ export default function SettingsPage() {
                   />
                   <button type="submit" disabled={!newWorkStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d] hover:bg-[#8a2425]">{t('settings.add')}</button>
                 </form>
+                {/* Phase 4B — synthesis helper entry point. */}
+                <button
+                  type="button"
+                  onClick={openSynthesiseModal}
+                  className="mt-4 text-sm text-[#ac2c2d] hover:underline font-medium"
+                >
+                  {t('settings.synthesiseWorkSteps')} →
+                </button>
+                <p className="text-xs text-gray-500 mt-1">{t('settings.synthesiseDesc')}</p>
               </>
             )}
           </div>
@@ -1339,6 +1414,88 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      {/* Phase 4B (2026-04-16) — Synthesis modal: cluster existing free-text
+          Flow blocks, let user promote a cluster to a new Work Step Type. */}
+      {synthesiseOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center p-4 overflow-y-auto" onClick={() => setSynthesiseOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full my-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+              <h2 className="text-base font-semibold text-gray-900">{t('settings.synthesiseWorkSteps')}</h2>
+              <button type="button" onClick={() => setSynthesiseOpen(false)} className="text-gray-400 hover:text-gray-600" aria-label={t('settings.close')}>&times;</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              {synthesiseLoading && (
+                <p className="text-sm text-gray-500">{t('capture.loading')}</p>
+              )}
+              {!synthesiseLoading && synthesiseData && (
+                <>
+                  {synthesiseData.totalOrphans === 0 ? (
+                    <p className="text-sm text-gray-500">{t('settings.synthesiseEmpty')}</p>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-500">
+                        {t('settings.synthesiseSummary')
+                          .replace('{orphans}', String(synthesiseData.totalOrphans))
+                          .replace('{clusters}', String(synthesiseData.clusters.filter(c => !synthesiseDismissed.has(clusterKey(c))).length))}
+                      </p>
+                      <ul className="space-y-2">
+                        {synthesiseData.clusters
+                          .filter(c => !synthesiseDismissed.has(clusterKey(c)))
+                          .map((c) => {
+                            const key = clusterKey(c);
+                            const labelValue = synthesiseEdits[key] ?? c.suggestedLabel;
+                            return (
+                              <li key={key} className={`p-3 rounded-lg border ${c.tag === 'value' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tag === 'value' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                                    {c.tag === 'value' ? t('capture.workBlockTagValue') : t('capture.workBlockTagFailure')}
+                                  </span>
+                                  <span className="text-xs text-gray-600">
+                                    {t('settings.clusterBlockCount').replace('{count}', String(c.blockCount))}
+                                  </span>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={labelValue}
+                                  onChange={(e) => setSynthesiseEdits(prev => ({ ...prev, [key]: e.target.value }))}
+                                  className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none mb-2"
+                                />
+                                <div className="text-xs text-gray-500 mb-2 space-y-0.5">
+                                  {c.exampleTexts.slice(0, 3).map((ex, i) => (
+                                    <p key={i} className="truncate">&ldquo;{ex}&rdquo;</p>
+                                  ))}
+                                  {c.exampleTexts.length > 3 && <p className="italic">…+{c.exampleTexts.length - 3}</p>}
+                                </div>
+                                <div className="flex items-center gap-2 justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => dismissCluster(c)}
+                                    className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
+                                  >
+                                    {t('settings.dismiss')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => promoteCluster(c)}
+                                    disabled={!labelValue.trim()}
+                                    className="text-xs px-3 py-1 bg-[#ac2c2d] hover:bg-[#8a2425] text-white rounded font-medium disabled:opacity-50"
+                                  >
+                                    {t('settings.promote')}
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                      </ul>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

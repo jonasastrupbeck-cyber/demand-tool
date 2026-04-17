@@ -1521,6 +1521,55 @@ const translations = {
     sv: 'Lägg till arbetssteg...',
     de: 'Arbeitsschritt hinzufügen...',
   },
+  // Phase 4B (2026-04-16) — synthesis helper
+  'settings.synthesiseWorkSteps': {
+    en: 'Synthesise Work Steps from free-text',
+    da: 'Syntetiser arbejdstrin fra fritekst',
+    sv: 'Syntetisera arbetssteg från fritext',
+    de: 'Arbeitsschritte aus Freitext synthetisieren',
+  },
+  'settings.synthesiseDesc': {
+    en: 'Group existing free-text Flow blocks into reusable Work Step Types.',
+    da: 'Grupper eksisterende fritekst-forløbsblokke i genanvendelige arbejdstrin.',
+    sv: 'Gruppera befintliga fritext-flödesblock till återanvändbara arbetsstegstyper.',
+    de: 'Bestehende Freitext-Ablaufblöcke in wiederverwendbare Arbeitsschritte gruppieren.',
+  },
+  'settings.synthesiseSummary': {
+    en: '{orphans} free-text blocks · {clusters} clusters',
+    da: '{orphans} fritekstblokke · {clusters} klynger',
+    sv: '{orphans} fritextblock · {clusters} kluster',
+    de: '{orphans} Freitextblöcke · {clusters} Cluster',
+  },
+  'settings.synthesiseEmpty': {
+    en: 'No free-text blocks to cluster. Great, everything is already using the taxonomy.',
+    da: 'Ingen fritekstblokke at klynge. Alt bruger allerede taksonomien.',
+    sv: 'Inga fritextblock att klustra. Allt använder redan taxonomin.',
+    de: 'Keine Freitextblöcke zum Gruppieren. Alles nutzt bereits die Taxonomie.',
+  },
+  'settings.promote': {
+    en: 'Promote',
+    da: 'Forfrem',
+    sv: 'Befordra',
+    de: 'Übernehmen',
+  },
+  'settings.dismiss': {
+    en: 'Dismiss',
+    da: 'Afvis',
+    sv: 'Avvisa',
+    de: 'Verwerfen',
+  },
+  'settings.clusterBlockCount': {
+    en: '{count} blocks',
+    da: '{count} blokke',
+    sv: '{count} block',
+    de: '{count} Blöcke',
+  },
+  'settings.close': {
+    en: 'Close',
+    da: 'Luk',
+    sv: 'Stäng',
+    de: 'Schließen',
+  },
   'settings.systemConditions': {
     en: 'System Conditions',
     da: 'Systemforhold',

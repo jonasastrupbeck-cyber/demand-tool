@@ -486,6 +486,53 @@ export async function deleteWorkStepType(id: string) {
   await db.delete(workStepTypes).where(eq(workStepTypes.id, id));
 }
 
+// Phase 4B (2026-04-16) — synthesis helper support.
+// Returns all orphan free-text work blocks in a study (those with no step FK
+// and non-empty text) — the input to clusterBlocks().
+export async function getOrphanWorkBlocks(studyId: string) {
+  const rows = await db.select({
+    id: workDescriptionBlocks.id,
+    text: workDescriptionBlocks.text,
+    tag: workDescriptionBlocks.tag,
+  })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(
+      eq(demandEntries.studyId, studyId),
+      isNull(workDescriptionBlocks.workStepTypeId),
+      sql`${workDescriptionBlocks.text} != ''`,
+    ));
+  return rows;
+}
+
+// Promote a cluster to a new Work Step Type and bulk-update the matching
+// blocks. Safe to call against block IDs outside this study — the UPDATE is
+// already scoped to the cluster's own IDs which came from the same study's
+// orphan pool.
+export async function promoteWorkStepFromCluster(studyId: string, payload: {
+  label: string;
+  tag: 'value' | 'failure';
+  operationalDefinition?: string;
+  blockIds: string[];
+}) {
+  const id = generateId();
+  const existing = await getWorkStepTypes(studyId);
+  await db.insert(workStepTypes).values({
+    id,
+    studyId,
+    label: payload.label,
+    tag: payload.tag,
+    operationalDefinition: payload.operationalDefinition ?? null,
+    sortOrder: existing.length,
+  });
+  if (payload.blockIds.length > 0) {
+    await db.update(workDescriptionBlocks)
+      .set({ workStepTypeId: id })
+      .where(inArray(workDescriptionBlocks.id, payload.blockIds));
+  }
+  return id;
+}
+
 export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en') {
   const existing = await getWorkTypes(studyId);
   if (existing.length > 0) return;
