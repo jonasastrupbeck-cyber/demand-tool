@@ -743,12 +743,21 @@ export default function CapturePage() {
 
         {moreDetailsOpen && (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
-        {/* Demand type (moved up — part of the same "what is this" decision) */}
+        {/* Demand type (moved up — part of the same "what is this" decision).
+            Semantic colouring: value context → green ring; failure context → red ring. */}
         {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <div className="flex gap-2">
-              <select value={demandTypeId} onChange={(e) => setDemandTypeId(e.target.value)} className={inputCls}>
+              <select
+                value={demandTypeId}
+                onChange={(e) => setDemandTypeId(e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border outline-none ${
+                  classification === 'value'
+                    ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+                    : 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                }`}
+              >
                 <option value="">{t('capture.selectType')}</option>
                 {filteredDemandTypes.map((dt) => (
                   <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
@@ -826,11 +835,19 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is captured against the original Value Demand) */}
+        {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is
+            captured against the original Value Demand). Header dropped; leading "+ what matters" pill
+            takes its place. Vanguard semantics: value/purpose/what-matters all read green. */}
         {isDemand && classification === 'value' && study.whatMattersTypes.length > 0 && (
           <div>
-            <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => { setAddingType('whatMatters'); setNewTypeLabel(''); }}
+                className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+              >
+                {t('capture.addWhatMatters')}
+              </button>
               {study.whatMattersTypes.map((wm) => {
                 const isSelected = whatMattersTypeIds.includes(wm.id);
                 return (
@@ -842,17 +859,16 @@ export default function CapturePage() {
                         isSelected ? prev.filter(id => id !== wm.id) : [...prev, wm.id]
                       );
                     }}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                       isSelected
-                        ? 'bg-blue-600 text-white ring-2 ring-blue-600 ring-offset-1'
-                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-400'
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
                     }`}
                   >
                     {tl(wm.label)}
                   </button>
                 );
               })}
-              {addBtn('whatMatters')}
             </div>
             {renderAddTypeInput('whatMatters', 'what-matters-types', {}, (id) => setWhatMattersTypeIds(prev => [...prev, id]))}
           </div>

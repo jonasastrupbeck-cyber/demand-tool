@@ -1953,6 +1953,12 @@ const translations = {
     sv: 'Vad är viktigt (välj alla som gäller)',
     de: 'Was wichtig ist (alle zutreffenden auswählen)',
   },
+  'capture.addWhatMatters': {
+    en: '+ What matters',
+    da: '+ Hvad betyder noget',
+    sv: '+ Vad är viktigt',
+    de: '+ Was wichtig ist',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {
