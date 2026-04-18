@@ -1311,12 +1311,6 @@ const translations = {
     sv: '?',
     de: '?',
   },
-  'capture.demandHelp': {
-    en: 'Demand comes from customers — requests, questions, or complaints directed at your organisation',
-    da: 'Efterspørgsel kommer fra kunder — henvendelser, spørgsmål eller klager rettet mod din organisation',
-    sv: 'Efterfrågan kommer från kunder — förfrågningar, frågor eller klagomål riktade till din organisation',
-    de: 'Nachfrage kommt von Kunden — Anfragen, Fragen oder Beschwerden an Ihre Organisation',
-  },
   'capture.workHelp': {
     en: 'Work comes from within the system — internal requests, information questions between colleagues, management reporting',
     da: 'Arbejde kommer indefra systemet — interne henvendelser, informationsspørgsmål mellem kolleger, ledelsesrapportering',
