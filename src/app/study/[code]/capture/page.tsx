@@ -555,17 +555,26 @@ export default function CapturePage() {
       {study.workTrackingEnabled && (
         <div className="mb-4">
           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-200 rounded-lg">
-            <button
-              type="button"
-              onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
-              className={`py-2.5 rounded-md font-medium text-sm transition-all ${
-                isDemand
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t('capture.demand')}
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+                className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
+                  isDemand
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t('capture.demand')}
+              </button>
+              {isDemand && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <InfoPopover label={t('capture.demandHelp')}>
+                    {t('capture.demandHelp')}
+                  </InfoPopover>
+                </div>
+              )}
+            </div>
             <div className="relative">
               <button
                 type="button"

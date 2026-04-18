@@ -1329,6 +1329,12 @@ const translations = {
     sv: 'Värdeskapande arbete levererar syftet direkt. Icke-värdeskapande arbete är allt annat. Osäker → ?',
     de: 'Wertarbeit liefert den Zweck direkt. Fehlerarbeit ist alles andere. Unsicher → ?',
   },
+  'capture.demandHelp': {
+    en: 'Demand is what customers communicate to us when they pull value.',
+    da: 'Efterspørgsel er det, kunder kommunikerer til os, når de trækker værdi.',
+    sv: 'Efterfrågan är det kunderna kommunicerar till oss när de drar värde.',
+    de: 'Nachfrage ist das, was Kunden uns kommunizieren, wenn sie Wert abrufen.',
+  },
   'capture.demandClassificationHelp': {
     en: 'Value demand: demand for what the organisation exists to do — demand we want. Failure demand: demand caused by a failure to do, or to do right, something for the customer.',
     da: 'Værdiskabende efterspørgsel: efterspørgsel efter det, organisationen findes for at gøre — efterspørgsel vi ønsker. Ikke-værdiskabende efterspørgsel: efterspørgsel skabt af en fejl i at gøre — eller at gøre rigtigt — noget for kunden.',
