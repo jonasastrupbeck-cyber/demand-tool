@@ -554,7 +554,7 @@ export default function CapturePage() {
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
           Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
       {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2 justify-center">
           {study.pointsOfTransaction.length > 0 && (
             <PillSelect
               ariaLabel={t('capture.sessionPointOfTransactionLabel')}
@@ -676,7 +676,7 @@ export default function CapturePage() {
         {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option.
             Header removed: the pills (Value / Sequence / Failure / ?) are self-describing. */}
         {study.classificationEnabled && (
-          <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center">
+          <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center justify-center">
             <button
                 type="button"
                 onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
@@ -839,7 +839,7 @@ export default function CapturePage() {
             takes its place. Vanguard semantics: value/purpose/what-matters all read green. */}
         {isDemand && classification === 'value' && study.whatMattersTypes.length > 0 && (
           <div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center">
               <button
                 type="button"
                 onClick={() => { setAddingType('whatMatters'); setNewTypeLabel(''); }}
@@ -1355,35 +1355,37 @@ export default function CapturePage() {
         </div>
       </form>
 
-      {/* Entries tab-box — mirrors the Demand/Work tab styling. Single centered "Entries · N"
-          cell that expands on click to reveal filter pills (All / Needs classification / Needs CoR /
-          Needs value link). Clicking any pill opens the bottom sheet pre-filtered to that bucket. */}
+      {/* Entries tab-box — tab-strip visual, tighter than Demand/Work since reclass is an optional
+          review action (not a per-entry step). The chevron sits inside its own small pill so the
+          click target reads as "open review" rather than "click the whole card". */}
       <div className="mt-8 mb-24">
         <div className="grid grid-cols-1 p-1 bg-gray-200 rounded-lg">
-          <button
-            type="button"
-            onClick={() => setEntriesBoxExpanded((o) => !o)}
-            aria-expanded={entriesBoxExpanded}
-            className="w-full py-2.5 rounded-md font-medium text-sm bg-white text-gray-900 shadow-sm inline-flex items-center justify-center gap-2"
-          >
+          <div className="py-1.5 px-3 rounded-md bg-white text-gray-700 shadow-sm flex items-center justify-center gap-2 text-xs font-medium">
             <span>{t('capture.entriesSheetTrigger')} · {entries.length}</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="text-gray-500"
-              style={{ transform: entriesBoxExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}
+            <button
+              type="button"
+              onClick={() => setEntriesBoxExpanded((o) => !o)}
+              aria-expanded={entriesBoxExpanded}
+              aria-label={t('capture.entriesSheetTrigger')}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
             >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ transform: entriesBoxExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+          </div>
         </div>
         {entriesBoxExpanded && (
           <div className="mt-3 flex flex-wrap gap-2 justify-center">
@@ -1400,7 +1402,7 @@ export default function CapturePage() {
                   setFilter(chip.key as typeof filter);
                   setEntriesSheetOpen(true);
                 }}
-                className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors"
+                className="px-3 py-1.5 rounded-full text-xs font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors"
               >
                 {chip.label}{chip.key !== 'all' && ` · ${chip.count}`}
               </button>
