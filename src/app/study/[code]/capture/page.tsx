@@ -1359,15 +1359,16 @@ export default function CapturePage() {
           review action (not a per-entry step). The chevron sits inside its own small pill so the
           click target reads as "open review" rather than "click the whole card". */}
       <div className="mt-8 mb-24">
-        <div className="grid grid-cols-1 p-1 bg-gray-200 rounded-lg">
-          <div className="py-1.5 px-3 rounded-md bg-white text-gray-700 shadow-sm flex items-center justify-center gap-2 text-xs font-medium">
+        <div className="flex justify-center">
+          <div className="inline-flex p-1 bg-gray-200 rounded-lg">
+          <div className="py-1 px-3 rounded-md bg-white text-gray-500 shadow-sm inline-flex items-center justify-center gap-2 text-xs font-bold">
             <span>{t('capture.entriesSheetTrigger')} · {entries.length}</span>
             <button
               type="button"
               onClick={() => setEntriesBoxExpanded((o) => !o)}
               aria-expanded={entriesBoxExpanded}
               aria-label={t('capture.entriesSheetTrigger')}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -1385,6 +1386,7 @@ export default function CapturePage() {
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
             </button>
+          </div>
           </div>
         </div>
         {entriesBoxExpanded && (
