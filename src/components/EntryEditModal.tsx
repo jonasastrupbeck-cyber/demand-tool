@@ -5,6 +5,7 @@ import { useLocale } from '@/lib/locale-context';
 import InlineTypeAdder from './InlineTypeAdder';
 import CapabilityRadioGroup from './CapabilityRadioGroup';
 import SegmentedToggle from './SegmentedToggle';
+import InfoPopover from './InfoPopover';
 
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
@@ -635,8 +636,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {scVisible && (
               study.systemConditionsEnabled && study.systemConditions.length > 0 ? (
                 <div>
-                  <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                  <p className="text-xs text-gray-500 -mt-1 mb-2">{t('capture.scDimensionHint')}</p>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
+                    <InfoPopover label={t('capture.scDimensionHint')}>
+                      {t('capture.scDimensionHint')}
+                    </InfoPopover>
+                  </div>
                   <div className="space-y-2">
                     {systemConditions.map((entry, idx) => {
                       const def = study.systemConditions.find((x) => x.id === entry.id);

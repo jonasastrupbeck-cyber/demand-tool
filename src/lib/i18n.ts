@@ -218,19 +218,19 @@ const translations = {
     de: 'Fehler',
   },
   'capture.classificationWorkValue': {
-    en: 'Value Work',
+    en: 'Value',
     da: 'V\u00e6rdiskabende',
     sv: 'V\u00e4rdeskapande',
     de: 'Wert',
   },
   'capture.classificationWorkFailure': {
-    en: 'Failure Work',
+    en: 'Failure',
     da: 'Ikke-v\u00e6rdiskabende',
     sv: 'Icke-v\u00e4rdeskapande',
     de: 'Fehler',
   },
   'capture.classificationWorkSequence': {
-    en: 'Sequence Work',
+    en: 'Sequence',
     da: 'Sekvensarbejde',
     sv: 'Sekvensarbete',
     de: 'Sequenzarbeit',

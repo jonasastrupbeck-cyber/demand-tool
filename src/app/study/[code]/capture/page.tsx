@@ -7,6 +7,7 @@ import EntryEditModal from '@/components/EntryEditModal';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
 import SegmentedToggle from '@/components/SegmentedToggle';
+import InfoPopover from '@/components/InfoPopover';
 
 interface HandlingType {
   id: string;
@@ -576,9 +577,11 @@ export default function CapturePage() {
             </button>
           </div>
           {!isDemand && (
-            <p className="mt-2 text-xs text-gray-500 italic">
-              {t('capture.workHelp')}
-            </p>
+            <div className="mt-2 flex justify-end">
+              <InfoPopover label={t('capture.workHelp')}>
+                {t('capture.workHelp')}
+              </InfoPopover>
+            </div>
           )}
         </div>
       )}
@@ -677,20 +680,22 @@ export default function CapturePage() {
         {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option. */}
         {study.classificationEnabled && (
           <div>
-            <label className={`${labelCls} mb-2`}>{t('capture.classification')}{req}</label>
-            {!isDemand && (
-              <p className="mb-2 text-xs text-gray-500 italic">
-                {t('capture.workClassificationHelp')}
-              </p>
-            )}
-            <div className={`grid ${isDemand ? 'grid-cols-3' : 'grid-cols-4'} gap-2`}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <label className={labelCls}>{t('capture.classification')}{req}</label>
+              {!isDemand && (
+                <InfoPopover label={t('capture.workClassificationHelp')}>
+                  {t('capture.workClassificationHelp')}
+                </InfoPopover>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 items-center">
               <button
                 type="button"
                 onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                className={`py-3.5 rounded-lg font-semibold text-sm transition-all ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   classification === 'value'
-                    ? 'bg-green-600 text-white shadow-md ring-2 ring-green-600 ring-offset-2'
-                    : 'bg-gray-200 text-green-700 hover:bg-gray-300'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {isDemand ? t('capture.value') : t('capture.classificationWorkValue')}
@@ -699,10 +704,10 @@ export default function CapturePage() {
                 <button
                   type="button"
                   onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                  className={`py-3.5 rounded-lg font-semibold text-sm transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                     classification === 'sequence'
-                      ? 'bg-green-500 text-white shadow-md ring-2 ring-green-500 ring-offset-2'
-                      : 'bg-gray-200 text-green-700 hover:bg-gray-300'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {t('capture.classificationWorkSequence')}
@@ -711,10 +716,10 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); setMoreDetailsOpen(true); }}
-                className={`py-3.5 rounded-lg font-semibold text-sm transition-all ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   classification === 'failure'
-                    ? 'bg-red-600 text-white shadow-md ring-2 ring-red-600 ring-offset-2'
-                    : 'bg-gray-200 text-red-700 hover:bg-gray-300'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {isDemand ? t('capture.failure') : t('capture.classificationWorkFailure')}
@@ -722,10 +727,10 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                className={`py-3.5 rounded-lg font-semibold text-sm transition-all ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   classification === 'unknown'
-                    ? 'bg-amber-500 text-white shadow-md ring-2 ring-amber-500 ring-offset-2'
-                    : 'bg-gray-200 text-amber-700 hover:bg-gray-300'
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {t('capture.unknown')}
@@ -1070,8 +1075,12 @@ export default function CapturePage() {
         {study.classificationEnabled && scVisible && (
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
-              <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-              <p className="text-xs text-gray-500 -mt-1 mb-2">{t('capture.scDimensionHint')}</p>
+              <div className="flex items-center gap-1.5 mb-2">
+                <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
+                <InfoPopover label={t('capture.scDimensionHint')}>
+                  {t('capture.scDimensionHint')}
+                </InfoPopover>
+              </div>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
                   const sc = (study.systemConditions || []).find(s => s.id === entry.id);
