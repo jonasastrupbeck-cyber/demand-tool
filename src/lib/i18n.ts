@@ -1329,6 +1329,12 @@ const translations = {
     sv: 'Värdeskapande arbete levererar syftet direkt. Icke-värdeskapande arbete är allt annat. Osäker → ?',
     de: 'Wertarbeit liefert den Zweck direkt. Fehlerarbeit ist alles andere. Unsicher → ?',
   },
+  'capture.demandClassificationHelp': {
+    en: 'Value demand: demand for what the organisation exists to do — demand we want. Failure demand: demand caused by a failure to do, or to do right, something for the customer.',
+    da: 'Værdiskabende efterspørgsel: efterspørgsel efter det, organisationen findes for at gøre — efterspørgsel vi ønsker. Ikke-værdiskabende efterspørgsel: efterspørgsel skabt af en fejl i at gøre — eller at gøre rigtigt — noget for kunden.',
+    sv: 'Värdeskapande efterfrågan: efterfrågan på det organisationen finns till för att göra — efterfrågan vi vill ha. Icke-värdeskapande efterfrågan: efterfrågan orsakad av att något inte gjorts, eller inte gjorts rätt, för kunden.',
+    de: 'Wertnachfrage: Nachfrage nach dem, wozu die Organisation existiert — Nachfrage, die wir wollen. Fehlernachfrage: Nachfrage, die dadurch entsteht, dass etwas für den Kunden nicht getan oder nicht richtig getan wurde.',
+  },
   'capture.workTypeLabel': {
     en: 'Work type',
     da: 'Arbejdstype',
