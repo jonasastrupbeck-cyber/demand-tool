@@ -551,6 +551,41 @@ export default function CapturePage() {
         </button>
       </div>
 
+      {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
+          Positioned above the Demand/Work tabs — these are context that apply to every entry. */}
+      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
+        <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {study.pointsOfTransaction.length > 0 && (
+              <select
+                aria-label={t('capture.sessionPointOfTransactionLabel')}
+                value={pointOfTransactionId}
+                onChange={(e) => setPointOfTransactionId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 outline-none"
+              >
+                <option value="">{t('capture.selectPointOfTransaction')}</option>
+                {study.pointsOfTransaction.map((pot) => (
+                  <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+                ))}
+              </select>
+            )}
+            {study.contactMethods.length > 0 && (
+              <select
+                aria-label={t('capture.sessionContactMethodLabel')}
+                value={contactMethodId}
+                onChange={(e) => setContactMethodId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 outline-none"
+              >
+                <option value="">{t('capture.selectContactMethod')}</option>
+                {study.contactMethods.map((cm) => (
+                  <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Demand / Work tabs (only when work tracking is enabled) */}
       {study.workTrackingEnabled && (
         <div className="mb-4">
@@ -630,40 +665,6 @@ export default function CapturePage() {
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
-        </div>
-      )}
-
-      {/* Session-sticky strip: Point of transaction + Contact method, set once per session. */}
-      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
-        <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {study.pointsOfTransaction.length > 0 && (
-              <select
-                aria-label={t('capture.sessionPointOfTransactionLabel')}
-                value={pointOfTransactionId}
-                onChange={(e) => setPointOfTransactionId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-              >
-                <option value="">{t('capture.selectPointOfTransaction')}</option>
-                {study.pointsOfTransaction.map((pot) => (
-                  <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-                ))}
-              </select>
-            )}
-            {study.contactMethods.length > 0 && (
-              <select
-                aria-label={t('capture.sessionContactMethodLabel')}
-                value={contactMethodId}
-                onChange={(e) => setContactMethodId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-              >
-                <option value="">{t('capture.selectContactMethod')}</option>
-                {study.contactMethods.map((cm) => (
-                  <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-                ))}
-              </select>
-            )}
-          </div>
         </div>
       )}
 
