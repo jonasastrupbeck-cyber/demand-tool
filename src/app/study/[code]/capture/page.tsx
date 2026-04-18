@@ -1361,7 +1361,7 @@ export default function CapturePage() {
       <div className="mt-8 mb-24">
         <div className="flex justify-center">
           <div className="inline-flex p-1 bg-gray-200 rounded-lg">
-          <div className="py-1 px-3 rounded-md bg-white text-gray-500 shadow-sm inline-flex items-center justify-center gap-2 text-xs font-bold">
+          <div className="py-1 px-3 rounded-md bg-white text-gray-500 shadow-sm inline-flex items-center justify-center gap-2 text-xs">
             <span>{t('capture.entriesSheetTrigger')} · {entries.length}</span>
             <button
               type="button"
