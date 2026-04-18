@@ -993,7 +993,7 @@ export default function CapturePage() {
                                 }
                               }
                             }}
-                            className="flex-1 text-xs px-1 py-1 rounded border border-gray-300 bg-white text-gray-900"
+                            className="flex-1 min-w-0 text-xs px-1 py-1 rounded border border-gray-300 bg-white text-gray-900"
                           >
                             <option value="">{t('capture.workStepPickerPlaceholder')}</option>
                             {valueSteps.length > 0 && (
