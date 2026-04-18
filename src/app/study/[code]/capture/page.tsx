@@ -885,13 +885,18 @@ export default function CapturePage() {
           )
         )}
 
-        {/* Life problem to be solved — demand only, single-select dropdown */}
+        {/* Life problem to be solved — demand only, single-select dropdown.
+            Header removed: the placeholder carries the "Life problem to be solved" prompt. */}
         {isDemand && (
           <div>
-            <label className={labelCls}>{t('capture.lifeProblemLabel')}</label>
             <div className="flex gap-2">
-              <select value={lifeProblemId} onChange={(e) => setLifeProblemId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.lifeProblemPlaceholder')}</option>
+              <select
+                aria-label={t('capture.lifeProblemLabel')}
+                value={lifeProblemId}
+                onChange={(e) => setLifeProblemId(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">{t('capture.lifeProblemLabel')}</option>
                 {study.lifeProblems.map((lp) => (
                   <option key={lp.id} value={lp.id}>{tl(lp.label)}</option>
                 ))}
