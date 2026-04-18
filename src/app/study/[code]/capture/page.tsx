@@ -738,25 +738,19 @@ export default function CapturePage() {
         {classification && (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
         {/* Demand type (moved up — part of the same "what is this" decision).
-            Semantic colouring: value context → green ring; failure context → red ring. */}
+            Semantic colouring: value context → green pill; failure context → red pill. */}
         {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
           <div>
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
-            <div className="flex gap-2">
-              <select
+            <div className="flex gap-2 items-center">
+              <PillSelect
+                ariaLabel={t('capture.demandTypeLabel', { classification: classificationLabel })}
+                placeholder={t('capture.selectType')}
                 value={demandTypeId}
-                onChange={(e) => setDemandTypeId(e.target.value)}
-                className={`w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border outline-none ${
-                  classification === 'value'
-                    ? 'border-green-300 focus:ring-2 focus:ring-green-500 focus:border-green-500'
-                    : 'border-red-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
-                }`}
-              >
-                <option value="">{t('capture.selectType')}</option>
-                {filteredDemandTypes.map((dt) => (
-                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                ))}
-              </select>
+                onChange={setDemandTypeId}
+                options={filteredDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                variant={classification === 'value' ? 'value' : 'failure'}
+              />
               {addBtn('demand')}
             </div>
             {renderAddTypeInput('demand', 'demand-types', { category: classification }, (id) => setDemandTypeId(id))}
@@ -783,13 +777,14 @@ export default function CapturePage() {
         {study.workTypesEnabled && !isDemand && classification && (
           <div>
             <label className={labelCls}>{t('capture.workTypeLabel')}</label>
-            <div className="flex gap-2">
-              <select value={workTypeId} onChange={(e) => setWorkTypeId(e.target.value)} className={inputCls}>
-                <option value="">{t('capture.selectWorkType')}</option>
-                {study.workTypes.map((wt) => (
-                  <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
-                ))}
-              </select>
+            <div className="flex gap-2 items-center">
+              <PillSelect
+                ariaLabel={t('capture.workTypeLabel')}
+                placeholder={t('capture.selectWorkType')}
+                value={workTypeId}
+                onChange={setWorkTypeId}
+                options={study.workTypes.map((wt) => ({ id: wt.id, label: tl(wt.label) }))}
+              />
               {addBtn('work')}
             </div>
             {renderAddTypeInput('work', 'work-types', {}, (id) => setWorkTypeId(id))}
@@ -813,21 +808,19 @@ export default function CapturePage() {
         )}
 
         {/* Original value demand — failure demand only. Header removed; the "Original value
-            demand" placeholder carries the prompt. */}
+            demand" placeholder carries the prompt. Value variant (green) since this always links
+            to a value demand. */}
         {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
           <div>
-            <div className="flex gap-2">
-              <select
-                aria-label={t('capture.originalValueDemandLabel')}
+            <div className="flex gap-2 items-center">
+              <PillSelect
+                ariaLabel={t('capture.originalValueDemandLabel')}
+                placeholder={t('capture.selectOriginalValueDemand')}
                 value={originalValueDemandTypeId}
-                onChange={(e) => setOriginalValueDemandTypeId(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('capture.selectOriginalValueDemand')}</option>
-                {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
-                  <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                ))}
-              </select>
+                onChange={setOriginalValueDemandTypeId}
+                options={study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                variant="value"
+              />
               {addBtn('originalValue')}
             </div>
             {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id))}
@@ -900,22 +893,18 @@ export default function CapturePage() {
           )
         )}
 
-        {/* Life problem to be solved — demand only, single-select dropdown.
-            Header removed: the placeholder carries the "Life problem to be solved" prompt. */}
+        {/* Life problem to be solved — demand only. Header removed: the placeholder carries
+            the "Life problem to be solved" prompt. */}
         {isDemand && (
           <div>
-            <div className="flex gap-2">
-              <select
-                aria-label={t('capture.lifeProblemLabel')}
+            <div className="flex gap-2 items-center">
+              <PillSelect
+                ariaLabel={t('capture.lifeProblemLabel')}
+                placeholder={t('capture.lifeProblemLabel')}
                 value={lifeProblemId}
-                onChange={(e) => setLifeProblemId(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">{t('capture.lifeProblemLabel')}</option>
-                {study.lifeProblems.map((lp) => (
-                  <option key={lp.id} value={lp.id}>{tl(lp.label)}</option>
-                ))}
-              </select>
+                onChange={setLifeProblemId}
+                options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+              />
               {addBtn('lifeProblem')}
             </div>
             {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id))}

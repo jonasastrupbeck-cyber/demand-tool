@@ -19,6 +19,8 @@ export interface PillSelectOption {
   label: string;
 }
 
+export type PillSelectVariant = 'default' | 'value' | 'failure';
+
 interface Props {
   value: string; // option id, or '' for "not selected"
   onChange: (id: string) => void;
@@ -26,9 +28,27 @@ interface Props {
   placeholder: string;
   ariaLabel?: string;
   className?: string;
+  /** Colour theme. 'value' = green, 'failure' = red, 'default' = neutral grey. */
+  variant?: PillSelectVariant;
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '' }: Props) {
+function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
+  if (variant === 'value') {
+    return hasSelection
+      ? 'bg-white text-gray-900 border-green-300 hover:border-green-400'
+      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+  }
+  if (variant === 'failure') {
+    return hasSelection
+      ? 'bg-white text-gray-900 border-red-300 hover:border-red-400'
+      : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100';
+  }
+  return hasSelection
+    ? 'bg-white text-gray-900 border-gray-300 hover:border-gray-400'
+    : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100';
+}
+
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default' }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.id === value) ?? null;
@@ -70,11 +90,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-          selected
-            ? 'bg-white text-gray-900 border-gray-300 hover:border-gray-400'
-            : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
-        }`}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${pillClasses(variant, Boolean(selected))}`}
       >
         <span>{selected ? selected.label : placeholder}</span>
         <svg
