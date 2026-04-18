@@ -625,71 +625,61 @@ export default function CapturePage() {
         <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {study.pointsOfTransaction.length > 0 && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t('capture.sessionPointOfTransactionLabel')}</label>
-                <select
-                  value={pointOfTransactionId}
-                  onChange={(e) => setPointOfTransactionId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-                >
-                  <option value="">{t('capture.selectPointOfTransaction')}</option>
-                  {study.pointsOfTransaction.map((pot) => (
-                    <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                aria-label={t('capture.sessionPointOfTransactionLabel')}
+                value={pointOfTransactionId}
+                onChange={(e) => setPointOfTransactionId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+              >
+                <option value="">{t('capture.selectPointOfTransaction')}</option>
+                {study.pointsOfTransaction.map((pot) => (
+                  <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
+                ))}
+              </select>
             )}
             {study.contactMethods.length > 0 && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{t('capture.sessionContactMethodLabel')}</label>
-                <select
-                  value={contactMethodId}
-                  onChange={(e) => setContactMethodId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-                >
-                  <option value="">{t('capture.selectContactMethod')}</option>
-                  {study.contactMethods.map((cm) => (
-                    <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-                  ))}
-                </select>
-              </div>
+              <select
+                aria-label={t('capture.sessionContactMethodLabel')}
+                value={contactMethodId}
+                onChange={(e) => setContactMethodId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+              >
+                <option value="">{t('capture.selectContactMethod')}</option>
+                {study.contactMethods.map((cm) => (
+                  <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
+                ))}
+              </select>
             )}
           </div>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Verbatim — demand tab or volume-off work without blocks yet */}
+        {/* Verbatim — demand tab or volume-off work without blocks yet.
+            Header removed: the placeholder ("Write the customer's words…") carries the prompt. */}
         {!study.volumeMode && isDemand && (
-          <div>
-            <label className={labelCls}>
-              {t('capture.verbatimLabel')}{req}
-            </label>
-            <textarea
-              value={verbatim}
-              onChange={(e) => setVerbatim(e.target.value)}
-              placeholder={t('capture.verbatimPlaceholder')}
-              rows={3}
-              className={inputCls}
-              autoFocus
-              required
-            />
-          </div>
+          <textarea
+            aria-label={t('capture.verbatimLabel')}
+            value={verbatim}
+            onChange={(e) => setVerbatim(e.target.value)}
+            placeholder={t('capture.verbatimPlaceholder')}
+            rows={3}
+            className={inputCls}
+            autoFocus
+            required
+          />
         )}
 
-        {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option. */}
+        {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option.
+            Header removed: the pills (Value / Sequence / Failure / ?) are self-describing. */}
         {study.classificationEnabled && (
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <label className={labelCls}>{t('capture.classification')}{req}</label>
-              {!isDemand && (
-                <InfoPopover label={t('capture.workClassificationHelp')}>
-                  {t('capture.workClassificationHelp')}
-                </InfoPopover>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 items-center">
-              <button
+          <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center">
+            {!isDemand && (
+              <InfoPopover label={t('capture.workClassificationHelp')} className="mr-1">
+                {t('capture.workClassificationHelp')}
+              </InfoPopover>
+            )}
+            <button
                 type="button"
                 onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
@@ -735,7 +725,6 @@ export default function CapturePage() {
               >
                 {t('capture.unknown')}
               </button>
-            </div>
           </div>
         )}
 
