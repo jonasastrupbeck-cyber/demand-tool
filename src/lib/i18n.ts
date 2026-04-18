@@ -1324,10 +1324,10 @@ const translations = {
     de: 'Arbeit kommt aus dem System — interne Anfragen, Informationsfragen zwischen Kollegen, Management-Berichterstattung',
   },
   'capture.workClassificationHelp': {
-    en: 'Consequence of something not done right? → Failure. Otherwise, is it value work? If unsure → ?',
-    da: 'Konsekvens af noget der ikke er gjort rigtigt? → Ikke-værdiskabende. Ellers, er det værdiskabende arbejde? Hvis usikker → ?',
-    sv: 'Konsekvens av något som inte gjorts rätt? → Icke-värdeskapande. Annars, är det värdeskapande arbete? Om osäker → ?',
-    de: 'Folge von etwas, das nicht richtig gemacht wurde? → Fehler. Ansonsten, ist es Wertarbeit? Wenn unsicher → ?',
+    en: 'Value work directly delivers purpose. Failure work is everything else. If unsure → ?',
+    da: 'Værdiskabende arbejde leverer formålet direkte. Ikke-værdiskabende arbejde er alt andet. I tvivl → ?',
+    sv: 'Värdeskapande arbete levererar syftet direkt. Icke-värdeskapande arbete är allt annat. Osäker → ?',
+    de: 'Wertarbeit liefert den Zweck direkt. Fehlerarbeit ist alles andere. Unsicher → ?',
   },
   'capture.workTypeLabel': {
     en: 'Work type',

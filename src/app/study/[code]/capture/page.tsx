@@ -692,10 +692,10 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'value'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
                 }`}
               >
                 {isDemand ? t('capture.value') : t('capture.classificationWorkValue')}
@@ -704,10 +704,10 @@ export default function CapturePage() {
                 <button
                   type="button"
                   onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     classification === 'sequence'
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-emerald-500 text-white border-emerald-500'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                   }`}
                 >
                   {t('capture.classificationWorkSequence')}
@@ -716,10 +716,10 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); setMoreDetailsOpen(true); }}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'failure'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
                 }`}
               >
                 {isDemand ? t('capture.failure') : t('capture.classificationWorkFailure')}
@@ -727,10 +727,10 @@ export default function CapturePage() {
               <button
                 type="button"
                 onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'unknown'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-amber-500 text-white border-amber-500'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
                 }`}
               >
                 {t('capture.unknown')}
