@@ -720,6 +720,11 @@ export default function CapturePage() {
               >
                 {t('capture.unknown')}
               </button>
+              {!isDemand && (
+                <InfoPopover label={t('capture.workClassificationHelp')} className="ml-1">
+                  {t('capture.workClassificationHelp')}
+                </InfoPopover>
+              )}
           </div>
         )}
 
