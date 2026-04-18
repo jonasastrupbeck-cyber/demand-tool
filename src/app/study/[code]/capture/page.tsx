@@ -449,7 +449,10 @@ export default function CapturePage() {
     (s) => failureCause && s.toLowerCase().includes(failureCause.toLowerCase()) && s.toLowerCase() !== failureCause.toLowerCase()
   );
 
-  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none';
+  // Neutral focus ring (dark grey) for class-neutral inputs — verbatim, life problem,
+  // work type, notes, etc. Semantic selects (demand type) override with their own
+  // green/red focus. The submit button keeps the brand red as the primary CTA.
+  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none';
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
   const req = <span className="text-red-500 ml-0.5">*</span>;
 
@@ -714,8 +717,8 @@ export default function CapturePage() {
                 onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'unknown'
-                    ? 'bg-amber-500 text-white border-amber-500'
-                    : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                    ? 'bg-gray-600 text-white border-gray-600'
+                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                 }`}
               >
                 {t('capture.unknown')}
