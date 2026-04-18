@@ -566,25 +566,27 @@ export default function CapturePage() {
             >
               {t('capture.demand')}
             </button>
-            <button
-              type="button"
-              onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
-              className={`py-2.5 rounded-md font-medium text-sm transition-all ${
-                !isDemand
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {t('capture.work')}
-            </button>
-          </div>
-          {!isDemand && (
-            <div className="mt-2 flex justify-end">
-              <InfoPopover label={t('capture.workHelp')}>
-                {t('capture.workHelp')}
-              </InfoPopover>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+                className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
+                  !isDemand
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t('capture.work')}
+              </button>
+              {!isDemand && (
+                <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                  <InfoPopover label={t('capture.workHelp')}>
+                    {t('capture.workHelp')}
+                  </InfoPopover>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 
