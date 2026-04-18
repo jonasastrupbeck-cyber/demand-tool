@@ -78,7 +78,6 @@ export default function CapturePage() {
   const { t, tl } = useLocale();
 
   const [study, setStudy] = useState<StudyData | null>(null);
-  const [todayCount, setTodayCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -109,6 +108,7 @@ export default function CapturePage() {
   const [listLimit, setListLimit] = useState(50);
   const [showTogglesModal, setShowTogglesModal] = useState(false);
   const [entriesSheetOpen, setEntriesSheetOpen] = useState(false);
+  const [entriesBoxExpanded, setEntriesBoxExpanded] = useState(false);
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
@@ -210,7 +210,6 @@ export default function CapturePage() {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`);
     if (res.ok) {
       const data = await res.json();
-      setTodayCount(data.todayCount);
       setEntries(data.entries || []);
     }
   }, [code]);
@@ -432,7 +431,6 @@ export default function CapturePage() {
       : verbatim.trim();
     setLastEntry({ id: saved.id, verbatim: lastVerbatim });
     setSuccess(true);
-    setTodayCount((c) => c + 1);
     resetForm();
     loadSuggestions();
     loadTodayCount();
@@ -638,7 +636,6 @@ export default function CapturePage() {
             onClick={async () => {
               await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${lastEntry.id}`, { method: 'DELETE' });
               setLastEntry(null);
-              setTodayCount((c) => Math.max(0, c - 1));
             }}
             className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
           >
@@ -1358,29 +1355,58 @@ export default function CapturePage() {
         </div>
       </form>
 
-      {/* Entries sheet trigger — stays near the bottom of the scroll area, above the sticky Save */}
+      {/* Entries tab-box — mirrors the Demand/Work tab styling. Single centered "Entries · N"
+          cell that expands on click to reveal filter pills (All / Needs classification / Needs CoR /
+          Needs value link). Clicking any pill opens the bottom sheet pre-filtered to that bucket. */}
       <div className="mt-8 mb-24">
-        <button
-          type="button"
-          onClick={() => setEntriesSheetOpen(true)}
-          className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-left"
-        >
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-gray-800">
-              {t('capture.entriesSheetTrigger')} · {entries.length}
-            </div>
-            <div className="text-xs text-gray-500 truncate">
-              {[
-                study.classificationEnabled && pendingCounts.needsClassification > 0 && `${pendingCounts.needsClassification} ${t('capture.filterNeedsClassification').toLowerCase()}`,
-                study.handlingEnabled && pendingCounts.needsHandling > 0 && `${pendingCounts.needsHandling} ${t('capture.filterNeedsHandling').toLowerCase()}`,
-                study.valueLinkingEnabled && pendingCounts.needsValueLink > 0 && `${pendingCounts.needsValueLink} ${t('capture.filterNeedsValueLink').toLowerCase()}`,
-              ].filter(Boolean).join(' · ') || `${t('capture.today')}: ${todayCount}`}
-            </div>
+        <div className="grid grid-cols-1 p-1 bg-gray-200 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setEntriesBoxExpanded((o) => !o)}
+            aria-expanded={entriesBoxExpanded}
+            className="w-full py-2.5 rounded-md font-medium text-sm bg-white text-gray-900 shadow-sm inline-flex items-center justify-center gap-2"
+          >
+            <span>{t('capture.entriesSheetTrigger')} · {entries.length}</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="text-gray-500"
+              style={{ transform: entriesBoxExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+        {entriesBoxExpanded && (
+          <div className="mt-3 flex flex-wrap gap-2 justify-center">
+            {([
+              { key: 'all', label: t('capture.filterAll'), count: entries.length, show: true },
+              { key: 'needsClassification', label: t('capture.filterNeedsClassification'), count: pendingCounts.needsClassification, show: study.classificationEnabled && pendingCounts.needsClassification > 0 },
+              { key: 'needsHandling', label: t('capture.filterNeedsHandling'), count: pendingCounts.needsHandling, show: study.handlingEnabled && pendingCounts.needsHandling > 0 },
+              { key: 'needsValueLink', label: t('capture.filterNeedsValueLink'), count: pendingCounts.needsValueLink, show: study.valueLinkingEnabled && pendingCounts.needsValueLink > 0 },
+            ] as const).filter((c) => c.show).map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => {
+                  setFilter(chip.key as typeof filter);
+                  setEntriesSheetOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors"
+              >
+                {chip.label}{chip.key !== 'all' && ` · ${chip.count}`}
+              </button>
+            ))}
           </div>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-gray-400">
-            <polyline points="18 15 12 9 6 15"></polyline>
-          </svg>
-        </button>
+        )}
       </div>
 
       {/* Entries bottom sheet */}
