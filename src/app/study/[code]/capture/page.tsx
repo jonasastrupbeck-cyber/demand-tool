@@ -674,11 +674,6 @@ export default function CapturePage() {
             Header removed: the pills (Value / Sequence / Failure / ?) are self-describing. */}
         {study.classificationEnabled && (
           <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center">
-            {!isDemand && (
-              <InfoPopover label={t('capture.workClassificationHelp')} className="mr-1">
-                {t('capture.workClassificationHelp')}
-              </InfoPopover>
-            )}
             <button
                 type="button"
                 onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
@@ -928,9 +923,14 @@ export default function CapturePage() {
             auto-populates as `[tag] text\n\n[tag] text` for downstream consumers. */}
         {!study.volumeMode && !isDemand && (
           <div>
-            <label className={labelCls}>
-              {t('capture.workBlocksLabel')}{req}
-            </label>
+            <div className="flex items-center gap-1.5">
+              <label className={labelCls}>
+                {t('capture.workBlocksLabel')}{req}
+              </label>
+              <InfoPopover label={t('capture.workClassificationHelp')}>
+                {t('capture.workClassificationHelp')}
+              </InfoPopover>
+            </div>
             <div className="overflow-x-auto -mx-1 px-1 pb-2">
               <div className="flex gap-2 items-stretch min-w-min">
                 {workBlocks.map((block, idx) => {
