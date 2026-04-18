@@ -364,10 +364,10 @@ const translations = {
     de: 'Kontaktmethode',
   },
   'capture.selectContactMethod': {
-    en: 'Select contact method...',
-    da: 'V\u00e6lg kontaktmetode...',
-    sv: 'V\u00e4lj kontaktmetod...',
-    de: 'Kontaktmethode ausw\u00e4hlen...',
+    en: 'Contact method',
+    da: 'Kontaktmetode',
+    sv: 'Kontaktmetod',
+    de: 'Kontaktmethode',
   },
   'capture.sessionContext': {
     en: 'Session context (applies to every entry)',
@@ -1208,10 +1208,10 @@ const translations = {
     de: 'Transaktionspunkt',
   },
   'capture.selectPointOfTransaction': {
-    en: 'Select point of transaction...',
-    da: 'Vælg transaktionspunkt...',
-    sv: 'Välj transaktionspunkt...',
-    de: 'Transaktionspunkt auswählen...',
+    en: 'Point of transaction',
+    da: 'Transaktionspunkt',
+    sv: 'Transaktionspunkt',
+    de: 'Transaktionspunkt',
   },
   'settings.pointsOfTransaction': {
     en: 'Points of Transaction',

@@ -8,6 +8,7 @@ import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import InfoPopover from '@/components/InfoPopover';
+import PillSelect from '@/components/PillSelect';
 
 interface HandlingType {
   id: string;
@@ -552,37 +553,28 @@ export default function CapturePage() {
       </div>
 
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
-          Positioned above the Demand/Work tabs — these are context that apply to every entry. */}
+          Positioned above the Demand/Work tabs — these are context that apply to every entry.
+          Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
       {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
-        <div className="mb-4 p-3 rounded-lg bg-gray-50 border border-gray-200">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {study.pointsOfTransaction.length > 0 && (
-              <select
-                aria-label={t('capture.sessionPointOfTransactionLabel')}
-                value={pointOfTransactionId}
-                onChange={(e) => setPointOfTransactionId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 outline-none"
-              >
-                <option value="">{t('capture.selectPointOfTransaction')}</option>
-                {study.pointsOfTransaction.map((pot) => (
-                  <option key={pot.id} value={pot.id}>{tl(pot.label)}</option>
-                ))}
-              </select>
-            )}
-            {study.contactMethods.length > 0 && (
-              <select
-                aria-label={t('capture.sessionContactMethodLabel')}
-                value={contactMethodId}
-                onChange={(e) => setContactMethodId(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 outline-none"
-              >
-                <option value="">{t('capture.selectContactMethod')}</option>
-                {study.contactMethods.map((cm) => (
-                  <option key={cm.id} value={cm.id}>{tl(cm.label)}</option>
-                ))}
-              </select>
-            )}
-          </div>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {study.pointsOfTransaction.length > 0 && (
+            <PillSelect
+              ariaLabel={t('capture.sessionPointOfTransactionLabel')}
+              placeholder={t('capture.selectPointOfTransaction')}
+              value={pointOfTransactionId}
+              onChange={setPointOfTransactionId}
+              options={study.pointsOfTransaction.map((pot) => ({ id: pot.id, label: tl(pot.label) }))}
+            />
+          )}
+          {study.contactMethods.length > 0 && (
+            <PillSelect
+              ariaLabel={t('capture.sessionContactMethodLabel')}
+              placeholder={t('capture.selectContactMethod')}
+              value={contactMethodId}
+              onChange={setContactMethodId}
+              options={study.contactMethods.map((cm) => ({ id: cm.id, label: tl(cm.label) }))}
+            />
+          )}
         </div>
       )}
 
