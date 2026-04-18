@@ -811,12 +811,17 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Original value demand — failure demand only. Moved up: it's the natural follow-up to "failure of what?" */}
+        {/* Original value demand — failure demand only. Header removed; the "Original value
+            demand" placeholder carries the prompt. */}
         {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
           <div>
-            <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
             <div className="flex gap-2">
-              <select value={originalValueDemandTypeId} onChange={(e) => setOriginalValueDemandTypeId(e.target.value)} className={inputCls}>
+              <select
+                aria-label={t('capture.originalValueDemandLabel')}
+                value={originalValueDemandTypeId}
+                onChange={(e) => setOriginalValueDemandTypeId(e.target.value)}
+                className={inputCls}
+              >
                 <option value="">{t('capture.selectOriginalValueDemand')}</option>
                 {study.demandTypes.filter(dt => dt.category === 'value').map((dt) => (
                   <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>

@@ -284,10 +284,10 @@ const translations = {
     de: 'Was war die ursprüngliche Wertnachfrage?',
   },
   'capture.selectOriginalValueDemand': {
-    en: 'Select original value demand...',
-    da: 'Vælg oprindelig værdiskabende efterspørgsel...',
-    sv: 'Välj ursprunglig värdeskapande efterfrågan...',
-    de: 'Ursprüngliche Wertnachfrage auswählen...',
+    en: 'Original value demand',
+    da: 'Oprindelig værdiskabende efterspørgsel',
+    sv: 'Ursprunglig värdeskapande efterfrågan',
+    de: 'Ursprüngliche Wertnachfrage',
   },
   'capture.failureCauseLabel': {
     en: 'Cause of failure demand (system condition)',
