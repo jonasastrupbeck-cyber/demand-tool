@@ -452,7 +452,7 @@ export default function CapturePage() {
   // Neutral focus ring (dark grey) for class-neutral inputs — verbatim, life problem,
   // work type, notes, etc. Semantic selects (demand type) override with their own
   // green/red focus. The submit button keeps the brand red as the primary CTA.
-  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-500 focus:border-gray-500 outline-none';
+  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-1 focus:ring-gray-500 focus:border-gray-500 outline-none';
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
   const req = <span className="text-red-500 ml-0.5">*</span>;
 
