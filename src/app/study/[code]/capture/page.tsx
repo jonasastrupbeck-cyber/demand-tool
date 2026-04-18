@@ -897,7 +897,7 @@ export default function CapturePage() {
             <button
               type="button"
               onClick={() => setWhatMattersNoteOpen(true)}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-green-700 hover:underline"
             >
               {t('capture.addNote')}
             </button>
