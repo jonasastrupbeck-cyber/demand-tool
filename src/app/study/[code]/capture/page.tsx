@@ -107,7 +107,6 @@ export default function CapturePage() {
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [listLimit, setListLimit] = useState(50);
   const [showTogglesModal, setShowTogglesModal] = useState(false);
-  const [moreDetailsOpen, setMoreDetailsOpen] = useState(false);
   const [entriesSheetOpen, setEntriesSheetOpen] = useState(false);
 
   // Entry type (demand vs work)
@@ -679,7 +678,7 @@ export default function CapturePage() {
           <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center">
             <button
                 type="button"
-                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
+                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'value'
                     ? 'bg-green-600 text-white border-green-600'
@@ -691,7 +690,7 @@ export default function CapturePage() {
               {!isDemand && (
                 <button
                   type="button"
-                  onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
+                  onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     classification === 'sequence'
                       ? 'bg-emerald-500 text-white border-emerald-500'
@@ -703,7 +702,7 @@ export default function CapturePage() {
               )}
               <button
                 type="button"
-                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); setMoreDetailsOpen(true); }}
+                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'failure'
                     ? 'bg-red-600 text-white border-red-600'
@@ -714,7 +713,7 @@ export default function CapturePage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); setMoreDetailsOpen(true); }}
+                onClick={() => { setClassification('unknown'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'unknown'
                     ? 'bg-gray-600 text-white border-gray-600'
@@ -732,20 +731,10 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* More details disclosure — hides secondary fields by default */}
-        <button
-          type="button"
-          onClick={() => setMoreDetailsOpen((o) => !o)}
-          aria-expanded={moreDetailsOpen}
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 py-1"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: moreDetailsOpen ? 'rotate(90deg)' : 'none', transition: 'transform 120ms' }}>
-            <polyline points="9 18 15 12 9 6"></polyline>
-          </svg>
-          {t('capture.moreDetails')}
-        </button>
-
-        {moreDetailsOpen && (
+        {/* Secondary fields — appear naturally once the user picks a classification.
+            Previously gated behind a "More details" toggle; the toggle was auto-opened
+            on every classification click anyway, so it's been removed. */}
+        {classification && (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
         {/* Demand type (moved up — part of the same "what is this" decision).
             Semantic colouring: value context → green ring; failure context → red ring. */}
