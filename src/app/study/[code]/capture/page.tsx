@@ -947,29 +947,17 @@ export default function CapturePage() {
                 </div>
               );
             })()}
-            {/* Add row — pill always shows "+ Life problem to be solved" so it reads
-                as an action regardless of current selection. */}
+            {/* Add row — pill always goes straight to the inline add-new-type input.
+                No dropdown in between: life problems are typically unique per entry,
+                so picking an existing one is rare. One click, straight to typing. */}
             <div className="flex gap-2 items-center justify-center">
-              {study.lifeProblems.length > 0 ? (
-                <PillSelect
-                  ariaLabel={t('capture.lifeProblemLabel')}
-                  placeholder={t('capture.addLifeProblem')}
-                  value=""
-                  onChange={(id) => setLifeProblemId(id)}
-                  options={study.lifeProblems.filter((lp) => lp.id !== lifeProblemId).map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
-                  variant="valueLight"
-                  onAddNew={() => { setAddingType('lifeProblem'); setNewTypeLabel(''); }}
-                  addNewLabel={t('capture.addNew')}
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => { setAddingType('lifeProblem'); setNewTypeLabel(''); }}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors"
-                >
-                  {t('capture.addLifeProblem')}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => { setAddingType('lifeProblem'); setNewTypeLabel(''); }}
+                className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+              >
+                {t('capture.addLifeProblem')}
+              </button>
             </div>
             {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id), { variant: 'green', placeholder: t('capture.typeInLifeProblemPlaceholder') })}
           </div>
