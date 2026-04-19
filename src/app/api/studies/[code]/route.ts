@@ -26,23 +26,6 @@ export async function GET(
     getLifeProblems(study.id),
   ]);
 
-  // Auto-seed new boolean toggles from legacy activeLayer on first read after upgrade.
-  // Once any toggle is non-default OR is derived, we treat the booleans as authoritative.
-  const needsSeed = study.activeLayer > 1
-    && !study.classificationEnabled
-    && !study.handlingEnabled
-    && !study.valueLinkingEnabled;
-  if (needsSeed) {
-    const seeded: Record<string, boolean> = {};
-    if (study.activeLayer >= 2) seeded.classificationEnabled = true;
-    if (study.activeLayer >= 3) seeded.handlingEnabled = true;
-    if (study.activeLayer >= 4) seeded.valueLinkingEnabled = true;
-    if (Object.keys(seeded).length > 0) {
-      await updateStudy(study.id, seeded);
-      Object.assign(study, seeded);
-    }
-  }
-
   return NextResponse.json({
     ...study,
     handlingTypes: hTypes,
