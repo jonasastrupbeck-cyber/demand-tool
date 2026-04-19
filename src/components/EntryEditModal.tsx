@@ -471,7 +471,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {/* Life problem to be solved — demand only. Light-green pill (positive). */}
             {isDemand && (
               <div>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center justify-center">
                   <PillSelect
                     ariaLabel={t('capture.lifeProblemLabel')}
                     placeholder={t('capture.lifeProblemLabel')}
@@ -649,12 +649,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {scVisible && (
               study.systemConditionsEnabled && study.systemConditions.length > 0 ? (
                 <div>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                    <InfoPopover label={t('capture.scDimensionHint')}>
-                      {t('capture.scDimensionHint')}
-                    </InfoPopover>
-                  </div>
                   <div className="space-y-2">
                     {systemConditions.map((entry, idx) => {
                       const def = study.systemConditions.find((x) => x.id === entry.id);
@@ -725,7 +719,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const available = study.systemConditions.filter((sc) => !systemConditions.some((x) => x.id === sc.id));
                       if (available.length === 0) return null;
                       return (
-                        <div className="flex gap-2 items-center">
+                        <div className="flex gap-2 items-center justify-center">
                           <PillSelect
                             variant="add"
                             placeholder={t('capture.addSystemConditionButton')}
@@ -764,6 +758,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             }}
                             compact
                           />
+                          <InfoPopover label={t('capture.systemConditionsLabel')}>
+                            {t('capture.systemConditionsLabel')}
+                          </InfoPopover>
                         </div>
                       );
                     })()}
@@ -783,10 +780,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               ) : null
             )}
 
-            {/* Thinking + Logic — mirrors system conditions visibility */}
+            {/* Thinking + Logic — mirrors system conditions visibility.
+                 Header dropped; ⓘ next to the "+ Add thinking" pill carries the definition. */}
             {scVisible && study.systemConditionsEnabled && (
               <div>
-                <label className={labelCls}>{t('capture.thinkingLabel')}</label>
                 <div className="space-y-2">
                   {thinkings.map((th, idx) => {
                     const def = (study.thinkings || []).find((x) => x.id === th.id);
@@ -879,7 +876,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     const available = (study.thinkings || []).filter((th) => !thinkings.some((x) => x.id === th.id));
                     if (available.length === 0) return null;
                     return (
-                      <div className="flex gap-2 items-center">
+                      <div className="flex gap-2 items-center justify-center">
                         <PillSelect
                           variant="add"
                           placeholder={t('capture.addThinkingButton')}
@@ -898,6 +895,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           }}
                           compact
                         />
+                        <InfoPopover label={t('capture.thinkingLabel')}>
+                          {t('capture.thinkingLabel')}
+                        </InfoPopover>
                       </div>
                     );
                   })()}

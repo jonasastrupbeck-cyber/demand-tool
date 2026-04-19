@@ -907,7 +907,7 @@ export default function CapturePage() {
             the "Life problem to be solved" prompt. */}
         {isDemand && (
           <div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center justify-center">
               <PillSelect
                 ariaLabel={t('capture.lifeProblemLabel')}
                 placeholder={t('capture.lifeProblemLabel')}
@@ -1085,16 +1085,12 @@ export default function CapturePage() {
         )}
 
         {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
-            Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension. */}
+            Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension.
+            Header dropped — the "+ Add system condition" pill is self-explanatory; an ⓘ
+            next to it carries the definition. */}
         {study.classificationEnabled && scVisible && (
           study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <label className={labelCls}>{t('capture.systemConditionsLabel')}</label>
-                <InfoPopover label={t('capture.scDimensionHint')}>
-                  {t('capture.scDimensionHint')}
-                </InfoPopover>
-              </div>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
                   const sc = (study.systemConditions || []).find(s => s.id === entry.id);
@@ -1168,7 +1164,7 @@ export default function CapturePage() {
                   const available = (study.systemConditions || []).filter(sc => !systemConditions.some(p => p.id === sc.id));
                   if (available.length === 0) return null;
                   return (
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center justify-center">
                       <PillSelect
                         variant="add"
                         placeholder={t('capture.addSystemConditionButton')}
@@ -1189,6 +1185,9 @@ export default function CapturePage() {
                         options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
                       />
                       {addBtn('systemCondition')}
+                      <InfoPopover label={t('capture.systemConditionsLabel')}>
+                        {t('capture.systemConditionsLabel')}
+                      </InfoPopover>
                     </div>
                   );
                 })()}
@@ -1236,10 +1235,11 @@ export default function CapturePage() {
 
         {/* Thinking + per-pair logic — mirrors system conditions visibility.
              Phase 2 / Item 2: each selected Thinking gets a free-text "logic" textarea
-             so we capture *why* this thinking shows up in this specific demand. */}
+             so we capture *why* this thinking shows up in this specific demand.
+             Header dropped — the "+ Add thinking" pill is self-explanatory; an ⓘ next
+             to it carries the definition ("what was the thinking causing the SCs?"). */}
         {study.classificationEnabled && study.systemConditionsEnabled && scVisible && (
           <div>
-            <label className={labelCls}>{t('capture.thinkingLabel')}</label>
             <div className="space-y-2">
               {thinkings.map((entry, idx) => {
                 const th = (study.thinkings || []).find(t => t.id === entry.id);
@@ -1331,10 +1331,17 @@ export default function CapturePage() {
               {(() => {
                 const available = (study.thinkings || []).filter(th => !thinkings.some(p => p.id === th.id));
                 if (available.length === 0 && addingType !== 'thinking') {
-                  return addBtn('thinking');
+                  return (
+                    <div className="flex justify-center gap-2 items-center">
+                      {addBtn('thinking')}
+                      <InfoPopover label={t('capture.thinkingLabel')}>
+                        {t('capture.thinkingLabel')}
+                      </InfoPopover>
+                    </div>
+                  );
                 }
                 return (
-                  <div className="flex gap-2 items-center">
+                  <div className="flex gap-2 items-center justify-center">
                     {available.length > 0 && (
                       <PillSelect
                         variant="add"
@@ -1347,6 +1354,9 @@ export default function CapturePage() {
                       />
                     )}
                     {addBtn('thinking')}
+                    <InfoPopover label={t('capture.thinkingLabel')}>
+                      {t('capture.thinkingLabel')}
+                    </InfoPopover>
                   </div>
                 );
               })()}
