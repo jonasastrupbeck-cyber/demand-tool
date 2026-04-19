@@ -432,6 +432,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     onRefresh={onStudyRefresh}
                     onCreated={(id) => setWhatMattersTypeIds((prev) => [...prev, id])}
                     compact
+                    inputVariant="green"
+                    inputPlaceholder={t('capture.typeInWhatMattersPlaceholder')}
                   />
                 </div>
               </div>
@@ -495,6 +497,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     compact={study.lifeProblems.length > 0}
                     pillLabel={study.lifeProblems.length === 0 ? t('capture.addLifeProblem') : undefined}
                     pillVariant="green"
+                    inputVariant="green"
+                    inputPlaceholder={t('capture.typeInLifeProblemPlaceholder')}
                   />
                 </div>
               </div>
@@ -769,6 +773,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             }}
                             compact={hasAnyTypes}
                             pillLabel={hasAnyTypes ? undefined : t('capture.addSystemConditionButton')}
+                            inputVariant="blue"
+                            inputPlaceholder={t('capture.typeInSystemConditionPlaceholder')}
                           />
                           <InfoPopover label={t('capture.systemConditionsLabel')}>
                             {t('capture.systemConditionsLabel')}
@@ -909,6 +915,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           }}
                           compact={hasAnyTypes}
                           pillLabel={hasAnyTypes ? undefined : t('capture.addThinkingButton')}
+                          inputVariant="blue"
+                          inputPlaceholder={t('capture.typeInThinkingPlaceholder')}
                         />
                         <InfoPopover label={t('capture.thinkingLabel')}>
                           {t('capture.thinkingLabel')}

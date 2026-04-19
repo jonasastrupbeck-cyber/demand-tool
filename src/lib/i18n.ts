@@ -1977,6 +1977,30 @@ const translations = {
     sv: '+ Livsproblem som ska lösas',
     de: '+ Zu lösendes Lebensproblem',
   },
+  'capture.typeInWhatMattersPlaceholder': {
+    en: 'Type in what matters',
+    da: 'Skriv hvad der betyder noget',
+    sv: 'Skriv vad som är viktigt',
+    de: 'Was wichtig ist eingeben',
+  },
+  'capture.typeInLifeProblemPlaceholder': {
+    en: 'Type in life problem to be solved',
+    da: 'Skriv livsproblem der skal løses',
+    sv: 'Skriv livsproblem som ska lösas',
+    de: 'Zu lösendes Lebensproblem eingeben',
+  },
+  'capture.typeInSystemConditionPlaceholder': {
+    en: 'Type in new system condition',
+    da: 'Skriv nyt systemforhold',
+    sv: 'Skriv nytt systemvillkor',
+    de: 'Neue Systembedingung eingeben',
+  },
+  'capture.typeInThinkingPlaceholder': {
+    en: 'Type in thinking that explains the system conditions',
+    da: 'Skriv tænkning der forklarer systemforholdene',
+    sv: 'Skriv tänkande som förklarar systemvillkoren',
+    de: 'Denken eingeben, das die Systembedingungen erklärt',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {

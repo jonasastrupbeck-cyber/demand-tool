@@ -315,21 +315,36 @@ export default function CapturePage() {
     setAddingTypeLoading(false);
   }
 
-  function renderAddTypeInput(type: typeof addingType, apiPath: string, extraBody: Record<string, string>, onCreated: (id: string) => void) {
+  function renderAddTypeInput(
+    type: typeof addingType,
+    apiPath: string,
+    extraBody: Record<string, string>,
+    onCreated: (id: string) => void,
+    options?: { variant?: 'red' | 'green' | 'blue'; placeholder?: string },
+  ) {
     if (addingType !== type) return null;
+    const variant = options?.variant ?? 'red';
+    const inputClass =
+      variant === 'green' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+      variant === 'blue'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+                            'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+    const addBtnClass =
+      variant === 'green' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
+      variant === 'blue'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
+                            'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
     return (
       <div className="flex gap-2 mt-2">
         <input
           type="text"
           value={newTypeLabel}
           onChange={(e) => setNewTypeLabel(e.target.value)}
-          placeholder={t('capture.newTypePlaceholder')}
-          className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+          placeholder={options?.placeholder ?? t('capture.newTypePlaceholder')}
+          className={inputClass}
           autoFocus
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddType(apiPath, extraBody, onCreated); } if (e.key === 'Escape') setAddingType(null); }}
           disabled={addingTypeLoading}
         />
-        <button type="button" onClick={() => handleAddType(apiPath, extraBody, onCreated)} disabled={!newTypeLabel.trim() || addingTypeLoading} className="px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">
+        <button type="button" onClick={() => handleAddType(apiPath, extraBody, onCreated)} disabled={!newTypeLabel.trim() || addingTypeLoading} className={addBtnClass}>
           {addingTypeLoading ? '...' : t('settings.add')}
         </button>
         <button type="button" onClick={() => { setAddingType(null); setNewTypeLabel(''); }} className="px-2 py-2 text-gray-400 hover:text-gray-600 text-sm">&times;</button>
@@ -874,7 +889,7 @@ export default function CapturePage() {
                 );
               })}
             </div>
-            {renderAddTypeInput('whatMatters', 'what-matters-types', {}, (id) => setWhatMattersTypeIds(prev => [...prev, id]))}
+            {renderAddTypeInput('whatMatters', 'what-matters-types', {}, (id) => setWhatMattersTypeIds(prev => [...prev, id]), { variant: 'green', placeholder: t('capture.typeInWhatMattersPlaceholder') })}
           </div>
         )}
 
@@ -936,7 +951,7 @@ export default function CapturePage() {
                 </button>
               )}
             </div>
-            {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id))}
+            {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id), { variant: 'green', placeholder: t('capture.typeInLifeProblemPlaceholder') })}
           </div>
         )}
 
@@ -1236,7 +1251,7 @@ export default function CapturePage() {
                   attachesToCor: false,
                   attachesToWork: isWork,
                 }]);
-              })}
+              }, { variant: 'blue', placeholder: t('capture.typeInSystemConditionPlaceholder') })}
             </div>
           ) : (
             <div className="relative">
@@ -1394,7 +1409,7 @@ export default function CapturePage() {
                 );
               })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); })}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); }, { variant: 'blue', placeholder: t('capture.typeInThinkingPlaceholder') })}
           </div>
         )}
 

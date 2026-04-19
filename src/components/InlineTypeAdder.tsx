@@ -23,9 +23,16 @@ interface Props {
   // Colour theme for the pill trigger. Default 'blue' (matches system condition /
   // thinking). Use 'green' to match the What Matters / Life Problem positive style.
   pillVariant?: 'blue' | 'green';
+  // Colour theme for the expanded-state input + Add button. Default 'red' (brand).
+  // 'green' for WM/LP, 'blue' for SC/Thinking so the theme is consistent from
+  // pill trigger through to input + confirmation.
+  inputVariant?: 'red' | 'green' | 'blue';
+  // Custom placeholder for the expanded-state input. Falls back to
+  // t('capture.newTypePlaceholder') when not provided.
+  inputPlaceholder?: string;
 }
 
-export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'blue' }: Props) {
+export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'blue', inputVariant = 'red', inputPlaceholder }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -85,14 +92,22 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
     );
   }
 
+  const inputClass =
+    inputVariant === 'green' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+    inputVariant === 'blue'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+                               'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+  const addBtnClass =
+    inputVariant === 'green' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
+    inputVariant === 'blue'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
+                               'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
   return (
     <div className="flex gap-2 mt-2">
       <input
         type="text"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
-        placeholder={t('capture.newTypePlaceholder')}
-        className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+        placeholder={inputPlaceholder ?? t('capture.newTypePlaceholder')}
+        className={inputClass}
         autoFocus
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); submit(); }
@@ -104,7 +119,7 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
         type="button"
         onClick={submit}
         disabled={!label.trim() || saving}
-        className="px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]"
+        className={addBtnClass}
       >
         {saving ? '...' : t('settings.add')}
       </button>
