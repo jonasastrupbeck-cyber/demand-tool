@@ -344,22 +344,20 @@ export default function CapturePage() {
     apiPath: string,
     extraBody: Record<string, string>,
     onCreated: (id: string) => void,
-    options?: { variant?: 'red' | 'green' | 'blue' | 'indigo'; placeholder?: string },
+    options?: { variant?: 'red' | 'green' | 'sky' | 'thinking'; placeholder?: string },
   ) {
     if (addingType !== type) return null;
     const variant = options?.variant ?? 'red';
-    // 'indigo' uses Tailwind blue-* (true blue, not purple) — kept as 'indigo'
-    // in the option name for API stability across call sites.
     const inputClass =
-      variant === 'green'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
-      variant === 'blue'   ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
-      variant === 'indigo' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
-                             'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+      variant === 'green'    ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+      variant === 'sky'      ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+      variant === 'thinking' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
+                               'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
     const addBtnClass =
-      variant === 'green'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
-      variant === 'blue'   ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
-      variant === 'indigo' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
-                             'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
+      variant === 'green'    ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
+      variant === 'sky'      ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
+      variant === 'thinking' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
+                               'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
     return (
       <div className="flex gap-2 mt-2">
         <input
@@ -1168,7 +1166,7 @@ export default function CapturePage() {
                   {capabilityAddPill}
                 </div>
               )}
-              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'blue', placeholder: t('capture.typeInHandlingPlaceholder') })}
+              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
             </div>
           );
         })()}
@@ -1308,7 +1306,7 @@ export default function CapturePage() {
                   attachesToCor: false,
                   attachesToWork: isWork,
                 }]);
-              }, { variant: 'blue', placeholder: t('capture.typeInSystemConditionPlaceholder') })}
+              }, { variant: 'sky', placeholder: t('capture.typeInSystemConditionPlaceholder') })}
             </div>
           ) : (
             <div className="relative">
@@ -1441,7 +1439,7 @@ export default function CapturePage() {
                       // the bottom (no separate grey + button). Indigo variant so
                       // Thinking is visually distinct from the sky-blue SC add pill.
                       <PillSelect
-                        variant="indigo"
+                        variant="thinking"
                         placeholder={t('capture.addThinkingButton')}
                         value=""
                         onChange={(id) => {
@@ -1468,7 +1466,7 @@ export default function CapturePage() {
                 );
               })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); }, { variant: 'indigo', placeholder: t('capture.typeInThinkingPlaceholder') })}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); }, { variant: 'thinking', placeholder: t('capture.typeInThinkingPlaceholder') })}
           </div>
         )}
 

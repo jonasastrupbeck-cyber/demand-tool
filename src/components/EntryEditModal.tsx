@@ -519,8 +519,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         onRefresh={onStudyRefresh}
                         onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
                         pillLabel={t('capture.addHandlingButton')}
-                        pillVariant="blue"
-                        inputVariant="blue"
+                        pillVariant="sky"
+                        inputVariant="sky"
                         inputPlaceholder={t('capture.typeInHandlingPlaceholder')}
                       />
                     }
@@ -533,8 +533,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       onRefresh={onStudyRefresh}
                       onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
                       pillLabel={t('capture.addHandlingButton')}
-                      pillVariant="blue"
-                      inputVariant="blue"
+                      pillVariant="sky"
+                      inputVariant="sky"
                       inputPlaceholder={t('capture.typeInHandlingPlaceholder')}
                     />
                   </div>
@@ -779,7 +779,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             }}
                             compact={hasAnyTypes}
                             pillLabel={hasAnyTypes ? undefined : t('capture.addSystemConditionButton')}
-                            inputVariant="blue"
+                            inputVariant="sky"
                             inputPlaceholder={t('capture.typeInSystemConditionPlaceholder')}
                           />
                           <InfoPopover label={t('capture.systemConditionsLabel')}>
@@ -903,7 +903,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       <div className="flex gap-2 items-center justify-center">
                         {available.length > 0 && (
                           <PillSelect
-                            variant="indigo"
+                            variant="thinking"
                             placeholder={t('capture.addThinkingButton')}
                             value=""
                             onChange={(id) => {
@@ -921,8 +921,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           }}
                           compact={hasAnyTypes}
                           pillLabel={hasAnyTypes ? undefined : t('capture.addThinkingButton')}
-                          pillVariant="indigo"
-                          inputVariant="indigo"
+                          pillVariant="thinking"
+                          inputVariant="thinking"
                           inputPlaceholder={t('capture.typeInThinkingPlaceholder')}
                         />
                         <InfoPopover label={t('capture.thinkingLabel')}>

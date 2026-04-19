@@ -20,18 +20,23 @@ interface Props {
   // Used on the capture form in empty-state when a typed add is needed but the
   // dropdown has nothing to pick.
   pillLabel?: string;
-  // Colour theme for the pill trigger. 'blue' = sky (system condition), 'indigo'
-  // = darker blue (thinking), 'green' = positive (WM / Life Problem).
-  pillVariant?: 'blue' | 'indigo' | 'green';
-  // Colour theme for the expanded-state input + Add button. Default 'red' (brand).
-  // 'green' for WM/LP, 'blue' for SC (sky), 'indigo' for Thinking.
-  inputVariant?: 'red' | 'green' | 'blue' | 'indigo';
+  // Colour theme for the pill trigger:
+  //   'sky'      — system condition / capability of response (Tailwind sky-*)
+  //   'thinking' — thinking strand (Tailwind blue-*, visually deeper than sky)
+  //   'green'    — positive strand (What Matters, Life Problem)
+  pillVariant?: 'sky' | 'thinking' | 'green';
+  // Colour theme for the expanded-state input + Add button.
+  //   'red' (default) — brand-red (#ac2c2d), used for generic / failure-side types
+  //   'green'         — positive strand
+  //   'sky'           — system condition / CoR
+  //   'thinking'      — thinking strand
+  inputVariant?: 'red' | 'green' | 'sky' | 'thinking';
   // Custom placeholder for the expanded-state input. Falls back to
   // t('capture.newTypePlaceholder') when not provided.
   inputPlaceholder?: string;
 }
 
-export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'blue', inputVariant = 'red', inputPlaceholder }: Props) {
+export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'sky', inputVariant = 'red', inputPlaceholder }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -65,12 +70,10 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
       //   green  = WM / Life Problem (dashed, positive)
       //   blue   = System Condition (sky)
       //   indigo = Thinking (deeper blue, visually distinct from SC)
-      // Variant name 'indigo' kept for API stability but uses Tailwind blue-* —
-      // a true darker blue, not purple.
       const pillClass =
         pillVariant === 'green'
           ? 'px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors'
-        : pillVariant === 'indigo'
+        : pillVariant === 'thinking'
           ? 'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors'
         :   'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors';
       return (
@@ -98,18 +101,16 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
     );
   }
 
-  // inputVariant 'indigo' uses Tailwind blue-* (true blue), not indigo. Kept as
-  // 'indigo' for API stability across call sites.
   const inputClass =
-    inputVariant === 'green'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
-    inputVariant === 'blue'   ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
-    inputVariant === 'indigo' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
-                                'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+    inputVariant === 'green'    ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+    inputVariant === 'sky'      ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+    inputVariant === 'thinking' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
+                                  'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
   const addBtnClass =
-    inputVariant === 'green'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
-    inputVariant === 'blue'   ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
-    inputVariant === 'indigo' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
-                                'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
+    inputVariant === 'green'    ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
+    inputVariant === 'sky'      ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
+    inputVariant === 'thinking' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
+                                  'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
   return (
     <div className="flex gap-2 mt-2">
       <input

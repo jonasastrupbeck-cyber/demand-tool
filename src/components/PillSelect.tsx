@@ -19,7 +19,7 @@ export interface PillSelectOption {
   label: string;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add' | 'indigo';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add' | 'thinking';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -43,11 +43,10 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     // "+ Add ..." style — solid light-blue (sky) outline. Used for system condition.
     return 'bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50';
   }
-  if (variant === 'indigo') {
-    // Darker-blue twin of the 'add' variant. Used for thinking so it's visually
-    // distinct from system condition at a glance.
-    // (Variant name kept for API stability; uses Tailwind blue-* — a true blue,
-    // not purple — so the "+ Add thinking" pill reads as deep blue rather than indigo.)
+  if (variant === 'thinking') {
+    // Deeper-blue twin of the 'add' variant, used for the Thinking strand so
+    // it's visually distinct from System Condition's sky 'add' pill. Uses
+    // Tailwind blue-* tokens (true blue, not purple).
     return 'bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50';
   }
   if (variant === 'value') {
