@@ -502,8 +502,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* Capability of Response (formerly "Handling type") */}
-            {/* Capability of response — header dropped; zero-state uses blue
-                "+ Add capability of response" pill (InlineTypeAdder pillLabel). */}
+            {/* Capability of response — header dropped; '+ Capability of response'
+                blue pill both trailing the radio group and standing alone in zero-state. */}
             {study.handlingEnabled && (
               <div>
                 {study.handlingTypes.length > 0 ? (
@@ -518,7 +518,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         apiPath="handling-types"
                         onRefresh={onStudyRefresh}
                         onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
-                        compact
+                        pillLabel={t('capture.addHandlingButton')}
+                        pillVariant="blue"
                         inputVariant="blue"
                         inputPlaceholder={t('capture.typeInHandlingPlaceholder')}
                       />

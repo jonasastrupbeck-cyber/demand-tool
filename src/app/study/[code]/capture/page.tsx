@@ -958,30 +958,35 @@ export default function CapturePage() {
             Header dropped; zero-state shows a single blue "+ Add capability of response"
             pill (click → inline add input). Populated state uses CapabilityRadioGroup
             so users still get the per-option hover tooltips with operational definitions. */}
-        {study.handlingEnabled && (
-          <div>
-            {study.handlingTypes.length > 0 ? (
-              <CapabilityRadioGroup
-                code={code}
-                options={study.handlingTypes}
-                value={handlingTypeId}
-                onChange={(id) => setHandlingTypeId(id)}
-                trailing={addBtn('handling')}
-              />
-            ) : (
-              <div className="flex gap-2 items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-                  className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
-                >
-                  {t('capture.addHandlingButton')}
-                </button>
-              </div>
-            )}
-            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'blue', placeholder: t('capture.typeInHandlingPlaceholder') })}
-          </div>
-        )}
+        {study.handlingEnabled && (() => {
+          const capabilityAddPill = (
+            <button
+              type="button"
+              onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+              className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+            >
+              {t('capture.addHandlingButton')}
+            </button>
+          );
+          return (
+            <div>
+              {study.handlingTypes.length > 0 ? (
+                <CapabilityRadioGroup
+                  code={code}
+                  options={study.handlingTypes}
+                  value={handlingTypeId}
+                  onChange={(id) => setHandlingTypeId(id)}
+                  trailing={capabilityAddPill}
+                />
+              ) : (
+                <div className="flex gap-2 items-center justify-center">
+                  {capabilityAddPill}
+                </div>
+              )}
+              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'blue', placeholder: t('capture.typeInHandlingPlaceholder') })}
+            </div>
+          );
+        })()}
 
         {/* Flow — Work tab only. A horizontal sequence of small text boxes describing
             the actual steps of the work behind the Capability of Response above.
