@@ -2001,6 +2001,24 @@ const translations = {
     sv: 'Skriv tänkande som förklarar systemvillkoren',
     de: 'Denken eingeben, das die Systembedingungen erklärt',
   },
+  'capture.typeInOriginalValueDemandPlaceholder': {
+    en: 'Type in new value demand',
+    da: 'Skriv ny værdiskabende efterspørgsel',
+    sv: 'Skriv ny värdeskapande efterfrågan',
+    de: 'Neue Wertnachfrage eingeben',
+  },
+  'capture.typeInHandlingPlaceholder': {
+    en: 'Type in new capability of response',
+    da: 'Skriv ny reaktionskapacitet',
+    sv: 'Skriv ny reaktionsförmåga',
+    de: 'Neue Reaktionsfähigkeit eingeben',
+  },
+  'capture.addHandlingButton': {
+    en: '+ Add capability of response',
+    da: '+ Tilføj reaktionskapacitet',
+    sv: '+ Lägg till reaktionsförmåga',
+    de: '+ Reaktionsfähigkeit hinzufügen',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {

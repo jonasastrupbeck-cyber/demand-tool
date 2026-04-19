@@ -320,14 +320,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               );
             })()}
 
-            {/* Demand type (demand entries) */}
+            {/* Demand type (demand entries) — header dropped; PillSelect placeholder carries the prompt. */}
             {isDemand && study.demandTypesEnabled && entry.classification !== 'unknown' && entry.classification !== 'sequence' && (
               <div className="flex flex-col items-center gap-1.5">
-                <label className={labelCls}>{t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}</label>
                 <div className="flex gap-2 items-center">
                   <PillSelect
                     ariaLabel={t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}
-                    placeholder={t('capture.selectType')}
+                    placeholder={t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}
                     value={entry.demandTypeId || ''}
                     onChange={(id) => setEntry({ ...entry, demandTypeId: id || null })}
                     options={study.demandTypes
@@ -373,30 +372,28 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Original value demand (failure demand only) — moved up */}
+            {/* Original value demand (failure demand only) — header dropped; PillSelect
+                placeholder carries the prompt. Green inline-add to match the positive strand. */}
             {isFailure && isDemand && study.valueLinkingEnabled && (
-              <div>
-                <label className={labelCls}>{t('capture.originalValueDemandLabel')}</label>
-                <div className="flex gap-2">
-                  <select
-                    value={entry.originalValueDemandTypeId || ''}
-                    onChange={(e) => setEntry({ ...entry, originalValueDemandTypeId: e.target.value || null })}
-                    className={inputCls}
-                  >
-                    <option value="">{t('capture.selectOriginalValueDemand')}</option>
-                    {study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => (
-                      <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                    ))}
-                  </select>
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="demand-types"
-                    extraBody={{ category: 'value' }}
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setEntry({ ...entry, originalValueDemandTypeId: id })}
-                    compact
-                  />
-                </div>
+              <div className="flex gap-2 items-center justify-center">
+                <PillSelect
+                  ariaLabel={t('capture.originalValueDemandLabel')}
+                  placeholder={t('capture.selectOriginalValueDemand')}
+                  value={entry.originalValueDemandTypeId || ''}
+                  onChange={(id) => setEntry({ ...entry, originalValueDemandTypeId: id || null })}
+                  options={study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                  variant="value"
+                />
+                <InlineTypeAdder
+                  code={code}
+                  apiPath="demand-types"
+                  extraBody={{ category: 'value' }}
+                  onRefresh={onStudyRefresh}
+                  onCreated={(id) => setEntry({ ...entry, originalValueDemandTypeId: id })}
+                  compact
+                  inputVariant="green"
+                  inputPlaceholder={t('capture.typeInOriginalValueDemandPlaceholder')}
+                />
               </div>
             )}
 
@@ -505,9 +502,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* Capability of Response (formerly "Handling type") */}
+            {/* Capability of response — header dropped; zero-state uses blue
+                "+ Add capability of response" pill (InlineTypeAdder pillLabel). */}
             {study.handlingEnabled && (
               <div>
-                <label className={labelCls}>{t('capture.handlingLabel')}</label>
                 {study.handlingTypes.length > 0 ? (
                   <CapabilityRadioGroup
                     code={code}
@@ -521,17 +519,24 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         onRefresh={onStudyRefresh}
                         onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
                         compact
+                        inputVariant="blue"
+                        inputPlaceholder={t('capture.typeInHandlingPlaceholder')}
                       />
                     }
                   />
                 ) : (
-                  <InlineTypeAdder
-                    code={code}
-                    apiPath="handling-types"
-                    onRefresh={onStudyRefresh}
-                    onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
-                    compact
-                  />
+                  <div className="flex justify-center">
+                    <InlineTypeAdder
+                      code={code}
+                      apiPath="handling-types"
+                      onRefresh={onStudyRefresh}
+                      onCreated={(id) => setEntry({ ...entry, handlingTypeId: id })}
+                      pillLabel={t('capture.addHandlingButton')}
+                      pillVariant="blue"
+                      inputVariant="blue"
+                      inputPlaceholder={t('capture.typeInHandlingPlaceholder')}
+                    />
+                  </div>
                 )}
               </div>
             )}

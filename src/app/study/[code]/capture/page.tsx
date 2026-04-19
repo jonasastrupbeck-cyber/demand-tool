@@ -764,15 +764,14 @@ export default function CapturePage() {
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
         {/* Demand type (moved up — part of the same "what is this" decision).
             Semantic colouring: value context → green pill; failure context → red pill.
-            Centered so the label visually anchors to the pill below, separating this
-            classification block from the lighter "What matters" pills that follow. */}
+            Header dropped; the PillSelect placeholder carries the "Type of {classification}
+            demand" prompt. */}
         {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
           <div className="flex flex-col items-center gap-1.5">
-            <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <div className="flex gap-2 items-center">
               <PillSelect
                 ariaLabel={t('capture.demandTypeLabel', { classification: classificationLabel })}
-                placeholder={t('capture.selectType')}
+                placeholder={t('capture.demandTypeLabel', { classification: classificationLabel })}
                 value={demandTypeId}
                 onChange={setDemandTypeId}
                 options={filteredDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
@@ -850,7 +849,7 @@ export default function CapturePage() {
               />
               {addBtn('originalValue')}
             </div>
-            {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id))}
+            {renderAddTypeInput('originalValue', 'demand-types', { category: 'value' }, (id) => setOriginalValueDemandTypeId(id), { variant: 'green', placeholder: t('capture.typeInOriginalValueDemandPlaceholder') })}
           </div>
         )}
 
@@ -955,10 +954,12 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Capability of response (formerly "Handling") — renders for demand AND work */}
+        {/* Capability of response (formerly "Handling") — renders for demand AND work.
+            Header dropped; zero-state shows a single blue "+ Add capability of response"
+            pill (click → inline add input). Populated state uses CapabilityRadioGroup
+            so users still get the per-option hover tooltips with operational definitions. */}
         {study.handlingEnabled && (
           <div>
-            <label className={labelCls}>{t('capture.handlingLabel')}</label>
             {study.handlingTypes.length > 0 ? (
               <CapabilityRadioGroup
                 code={code}
@@ -968,9 +969,17 @@ export default function CapturePage() {
                 trailing={addBtn('handling')}
               />
             ) : (
-              <div className="flex gap-2">{addBtn('handling')}</div>
+              <div className="flex gap-2 items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+                  className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+                >
+                  {t('capture.addHandlingButton')}
+                </button>
+              </div>
             )}
-            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id))}
+            {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'blue', placeholder: t('capture.typeInHandlingPlaceholder') })}
           </div>
         )}
 
