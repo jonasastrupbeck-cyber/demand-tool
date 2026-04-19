@@ -6,6 +6,7 @@ import InlineTypeAdder from './InlineTypeAdder';
 import CapabilityRadioGroup from './CapabilityRadioGroup';
 import SegmentedToggle from './SegmentedToggle';
 import InfoPopover from './InfoPopover';
+import PillSelect from './PillSelect';
 
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
@@ -85,10 +86,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
     attachesToWork: boolean;
   };
   const [systemConditions, setSystemConditions] = useState<ScAttachment[]>([]);
-  const [scPickerOpen, setScPickerOpen] = useState(false);
-  type ThinkingScAttachment = { systemConditionId: string; dimension: 'helps' | 'hinders' };
-  const [thinkings, setThinkings] = useState<{ id: string; logic: string; scAttachments: ThinkingScAttachment[] }[]>([]);
-  const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
+  // Per-migration-0012: dimension lives on the thinking, attachment is just a link.
+  const [thinkings, setThinkings] = useState<{
+    id: string;
+    logic: string;
+    dimension: 'helps' | 'hinders';
+    scAttachments: { systemConditionId: string }[];
+  }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
   const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
@@ -116,16 +120,15 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             attachesToWork:        !!sc.attachesToWork,
           };
         }) : []);
-        // Normalise loaded thinkings: older rows may lack scAttachments, default to [].
+        // Normalise loaded thinkings: older rows may lack dimension (default hinders)
+        // or scAttachments (default []).
         setThinkings(Array.isArray(data.thinkings)
-          ? data.thinkings.map((t: { id: string; logic?: string; scAttachments?: ThinkingScAttachment[] }) => ({
+          ? data.thinkings.map((t: { id: string; logic?: string; dimension?: string; scAttachments?: { systemConditionId: string }[] }) => ({
               id: t.id,
               logic: t.logic ?? '',
+              dimension: t.dimension === 'helps' ? 'helps' as const : 'hinders' as const,
               scAttachments: Array.isArray(t.scAttachments)
-                ? t.scAttachments.map((a) => ({
-                    systemConditionId: a.systemConditionId,
-                    dimension: a.dimension === 'helps' ? 'helps' as const : 'hinders' as const,
-                  }))
+                ? t.scAttachments.map((a) => ({ systemConditionId: a.systemConditionId }))
                 : [],
             }))
           : []);
@@ -315,21 +318,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
             {/* Demand type (demand entries) */}
             {isDemand && study.demandTypesEnabled && entry.classification !== 'unknown' && entry.classification !== 'sequence' && (
-              <div>
+              <div className="flex flex-col items-center gap-1.5">
                 <label className={labelCls}>{t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}</label>
-                <div className="flex gap-2">
-                  <select
+                <div className="flex gap-2 items-center">
+                  <PillSelect
+                    ariaLabel={t('capture.demandTypeLabel', { classification: entry.classification === 'value' ? t('capture.value') : t('capture.failure') })}
+                    placeholder={t('capture.selectType')}
                     value={entry.demandTypeId || ''}
-                    onChange={(e) => setEntry({ ...entry, demandTypeId: e.target.value || null })}
-                    className={inputCls}
-                  >
-                    <option value="">{t('capture.selectType')}</option>
-                    {study.demandTypes
+                    onChange={(id) => setEntry({ ...entry, demandTypeId: id || null })}
+                    options={study.demandTypes
                       .filter((dt) => dt.category === entry.classification)
-                      .map((dt) => (
-                        <option key={dt.id} value={dt.id}>{tl(dt.label)}</option>
-                      ))}
-                  </select>
+                      .map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                    variant={entry.classification === 'value' ? 'value' : 'failure'}
+                  />
                   <InlineTypeAdder
                     code={code}
                     apiPath="demand-types"
@@ -718,15 +719,18 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         </div>
                       );
                     })}
-                    {scPickerOpen ? (
-                      <div className="flex gap-2 items-center">
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const id = e.target.value;
-                            if (id) {
-                              // Dynamic default dimension (value → helps, else → hinders)
-                              // and default attachment (Work on work entries, Demand otherwise).
+                    {/* One-click add: PillSelect in add variant. Click pill → popover
+                        with available SCs drops immediately. Picking appends to the list. */}
+                    {(() => {
+                      const available = study.systemConditions.filter((sc) => !systemConditions.some((x) => x.id === sc.id));
+                      if (available.length === 0) return null;
+                      return (
+                        <div className="flex gap-2 items-center">
+                          <PillSelect
+                            variant="add"
+                            placeholder={t('capture.addSystemConditionButton')}
+                            value=""
+                            onChange={(id) => {
                               const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
                               const isWork = entry?.entryType === 'work';
                               setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
@@ -738,55 +742,31 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                 attachesToCor: false,
                                 attachesToWork: isWork,
                               }]));
-                              setScPickerOpen(false);
-                            }
-                          }}
-                          className={inputCls}
-                        >
-                          <option value="">{t('capture.selectSystemCondition')}</option>
-                          {study.systemConditions
-                            .filter((sc) => !systemConditions.some((x) => x.id === sc.id))
-                            .map((sc) => (
-                              <option key={sc.id} value={sc.id}>{tl(sc.label)}</option>
-                            ))}
-                        </select>
-                        <InlineTypeAdder
-                          code={code}
-                          apiPath="system-conditions"
-                          onRefresh={onStudyRefresh}
-                          onCreated={(id) => {
-                            const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
-                            const isWork = entry?.entryType === 'work';
-                            setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
-                              id,
-                              dimension: defaultDim,
-                              attachesToLifeProblem: false,
-                              attachesToDemand: !isWork,
-                              attachesToWhatMatters: false,
-                              attachesToCor: false,
-                              attachesToWork: isWork,
-                            }]));
-                            setScPickerOpen(false);
-                          }}
-                          compact
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setScPickerOpen(false)}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          {t('reclassify.skip')}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setScPickerOpen(true)}
-                        className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
-                      >
-                        {t('capture.addSystemConditionButton')}
-                      </button>
-                    )}
+                            }}
+                            options={available.map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
+                          />
+                          <InlineTypeAdder
+                            code={code}
+                            apiPath="system-conditions"
+                            onRefresh={onStudyRefresh}
+                            onCreated={(id) => {
+                              const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
+                              const isWork = entry?.entryType === 'work';
+                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
+                                id,
+                                dimension: defaultDim,
+                                attachesToLifeProblem: false,
+                                attachesToDemand: !isWork,
+                                attachesToWhatMatters: false,
+                                attachesToCor: false,
+                                attachesToWork: isWork,
+                              }]));
+                            }}
+                            compact
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ) : isFailure && isDemand ? (
@@ -835,8 +815,21 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-red-200 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
                           aria-label={t('capture.thinkingLogicLabel')}
                         />
-                        {/* SC attachment chips — migration 0011. Three-state click cycle:
-                            unattached → hinders (red) → helps (green) → unattached. */}
+                        {/* Helps/Hinders toggle for the whole thinking (migration 0012). */}
+                        <SegmentedToggle
+                          options={[
+                            { value: 'hinders', label: t('capture.scHinders'), activeColor: 'red' },
+                            { value: 'helps',   label: t('capture.scHelps'),   activeColor: 'green' },
+                          ]}
+                          value={th.dimension}
+                          onChange={(v) => {
+                            const dim: 'helps' | 'hinders' = v === 'helps' ? 'helps' : 'hinders';
+                            setThinkings((prev) => prev.map((p, i) => i === idx ? { ...p, dimension: dim } : p));
+                          }}
+                          ariaLabel={t('capture.thinkingLabel')}
+                        />
+                        {/* SC attachment chips — migration 0011/0012. Simple on/off toggle;
+                            the helps/hinders dimension lives on the thinking, not the chip. */}
                         {systemConditions.length > 0 && (
                           <div className="space-y-1">
                             <p className="text-xs text-gray-500">{t('capture.thinkingScAttachLabel')}</p>
@@ -844,12 +837,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               {systemConditions.map((scEntry) => {
                                 const sc = study.systemConditions.find((s) => s.id === scEntry.id);
                                 if (!sc) return null;
-                                const current = th.scAttachments.find((a) => a.systemConditionId === scEntry.id);
-                                const state: 'off' | 'hinders' | 'helps' = !current ? 'off' : current.dimension;
-                                const classes =
-                                  state === 'hinders' ? 'bg-red-50 text-red-700 border-red-200' :
-                                  state === 'helps'   ? 'bg-green-50 text-green-700 border-green-200' :
-                                                        'bg-white text-gray-500 border-dashed border-gray-300 hover:border-gray-400';
+                                const attached = th.scAttachments.some((a) => a.systemConditionId === scEntry.id);
                                 return (
                                   <button
                                     key={scEntry.id}
@@ -857,19 +845,18 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     onClick={() => {
                                       setThinkings((prev) => prev.map((p, i) => {
                                         if (i !== idx) return p;
-                                        const existing = p.scAttachments.find((a) => a.systemConditionId === scEntry.id);
-                                        if (!existing) {
-                                          return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id, dimension: 'hinders' as const }] };
+                                        if (p.scAttachments.some((a) => a.systemConditionId === scEntry.id)) {
+                                          return { ...p, scAttachments: p.scAttachments.filter((a) => a.systemConditionId !== scEntry.id) };
                                         }
-                                        if (existing.dimension === 'hinders') {
-                                          return { ...p, scAttachments: p.scAttachments.map((a) => a.systemConditionId === scEntry.id ? { ...a, dimension: 'helps' as const } : a) };
-                                        }
-                                        return { ...p, scAttachments: p.scAttachments.filter((a) => a.systemConditionId !== scEntry.id) };
+                                        return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id }] };
                                       }));
                                     }}
-                                    aria-pressed={state !== 'off'}
-                                    title={state === 'off' ? t('capture.scDimensionHint') : state === 'hinders' ? t('capture.scHinders') : t('capture.scHelps')}
-                                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${classes}`}
+                                    aria-pressed={attached}
+                                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                      attached
+                                        ? 'bg-red-600 text-white border-red-600'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                    }`}
                                   >
                                     {tl(sc.label)}
                                   </button>
@@ -881,53 +868,34 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       </div>
                     );
                   })}
-                  {thinkingPickerOpen ? (
-                    <div className="flex gap-2 items-center">
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          if (id) {
-                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [] }]));
-                            setThinkingPickerOpen(false);
-                          }
-                        }}
-                        className={inputCls}
-                      >
-                        <option value="">{t('capture.selectThinking')}</option>
-                        {(study.thinkings || [])
-                          .filter((th) => !thinkings.some((x) => x.id === th.id))
-                          .map((th) => (
-                            <option key={th.id} value={th.id}>{tl(th.label)}</option>
-                          ))}
-                      </select>
-                      <InlineTypeAdder
-                        code={code}
-                        apiPath="thinkings"
-                        onRefresh={onStudyRefresh}
-                        onCreated={(id) => {
-                          setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [] }]));
-                          setThinkingPickerOpen(false);
-                        }}
-                        compact
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setThinkingPickerOpen(false)}
-                        className="text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        {t('reclassify.skip')}
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setThinkingPickerOpen(true)}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
-                    >
-                      {t('capture.addThinkingButton')}
-                    </button>
-                  )}
+                  {/* One-click add: PillSelect in add variant. Click pill → popover
+                      with available thinkings drops immediately. Picking appends to the list. */}
+                  {(() => {
+                    const available = (study.thinkings || []).filter((th) => !thinkings.some((x) => x.id === th.id));
+                    if (available.length === 0) return null;
+                    return (
+                      <div className="flex gap-2 items-center">
+                        <PillSelect
+                          variant="add"
+                          placeholder={t('capture.addThinkingButton')}
+                          value=""
+                          onChange={(id) => {
+                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]));
+                          }}
+                          options={available.map((th) => ({ id: th.id, label: tl(th.label) }))}
+                        />
+                        <InlineTypeAdder
+                          code={code}
+                          apiPath="thinkings"
+                          onRefresh={onStudyRefresh}
+                          onCreated={(id) => {
+                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]));
+                          }}
+                          compact
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

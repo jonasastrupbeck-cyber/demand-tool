@@ -19,7 +19,7 @@ export interface PillSelectOption {
   label: string;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'failure';
+export type PillSelectVariant = 'default' | 'value' | 'failure' | 'add';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -33,14 +33,20 @@ interface Props {
 }
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
+  if (variant === 'add') {
+    // "+ Add ..." style — always dashed light-blue, regardless of the (usually empty) value.
+    return 'bg-white text-sky-700 border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50';
+  }
   if (variant === 'value') {
+    // Darker green so the value-demand pill visually separates from the lighter
+    // "What matters" pills (bg-green-50) that sit below in the same form.
     return hasSelection
-      ? 'bg-white text-gray-900 border-green-300 hover:border-green-400'
-      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+      ? 'bg-green-200 text-green-900 border-green-500 hover:border-green-600'
+      : 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
   }
   if (variant === 'failure') {
     return hasSelection
-      ? 'bg-white text-gray-900 border-red-300 hover:border-red-400'
+      ? 'bg-red-100 text-red-800 border-red-400 hover:border-red-500'
       : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100';
   }
   return hasSelection

@@ -588,7 +588,7 @@ export async function createEntry(studyId: string, data: {
     attachesToCor?: boolean;
     attachesToWork?: boolean;
   }[];
-  thinkings?: { id: string; logic: string; scAttachments?: { systemConditionId: string; dimension: 'helps' | 'hinders' }[] }[];
+  thinkings?: { id: string; logic: string; dimension?: 'helps' | 'hinders'; scAttachments?: { systemConditionId: string }[] }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -669,9 +669,9 @@ export async function createEntry(studyId: string, data: {
   }
 
   // Insert thinking junction records (mirrors system conditions visibility).
-  // Each entry carries a per-pair "logic" (free-text reasoning) — see Phase 2 / Item 2.
-  // Each thinking can also attach to zero or more SCs on the same entry with a
-  // helps/hinders dimension (migration 0011).
+  // Each entry carries a per-pair "logic" (free-text reasoning), a per-thinking
+  // helps/hinders dimension (migration 0012), and zero or more SC attachments
+  // (migration 0011 — dimension later removed in 0012).
   const ths = data.thinkings || [];
   if (scVisible && ths.length > 0) {
     const scIdsOnEntry = new Set(scs.map((s) => s.id));
@@ -681,6 +681,7 @@ export async function createEntry(studyId: string, data: {
         demandEntryId: id,
         thinkingId: th.id,
         logic: th.logic || '',
+        dimension: th.dimension === 'helps' ? 'helps' : 'hinders',
       });
       const attachments = th.scAttachments || [];
       for (const att of attachments) {
@@ -691,7 +692,6 @@ export async function createEntry(studyId: string, data: {
           demandEntryId: id,
           thinkingId: th.id,
           systemConditionId: att.systemConditionId,
-          dimension: att.dimension === 'helps' ? 'helps' : 'hinders',
         });
       }
     }
@@ -792,7 +792,7 @@ export async function updateEntry(entryId: string, data: {
     attachesToCor?: boolean;
     attachesToWork?: boolean;
   }[];
-  thinkings?: { id: string; logic: string; scAttachments?: { systemConditionId: string; dimension: 'helps' | 'hinders' }[] }[];
+  thinkings?: { id: string; logic: string; dimension?: 'helps' | 'hinders'; scAttachments?: { systemConditionId: string }[] }[];
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
@@ -854,15 +854,13 @@ export async function updateEntry(entryId: string, data: {
     }
   }
 
-  // Update thinking junction records if provided. Carries per-pair logic and, per
-  // migration 0011, per-thinking SC attachments with helps/hinders dimension.
+  // Update thinking junction records if provided. Carries per-pair logic, a
+  // per-thinking dimension (migration 0012), and SC attachments (migration 0011).
   if (thinkings !== undefined) {
-    // Always clear attachments first - they cascade from thinkings via FK, but
-    // with an ON DELETE no-op on this side we need to clean them explicitly.
+    // Clear attachments first - the junction has no cascade on this side, so
+    // we need to clean explicitly before re-inserting.
     await db.delete(demandEntryThinkingScs).where(eq(demandEntryThinkingScs.demandEntryId, entryId));
     await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
-    // Figure out which SCs are currently on this entry (either just updated above in
-    // this transaction, or still persisted if the caller didn't pass systemConditions).
     const currentScs = await db.select({ id: demandEntrySystemConditions.systemConditionId })
       .from(demandEntrySystemConditions)
       .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
@@ -873,6 +871,7 @@ export async function updateEntry(entryId: string, data: {
         demandEntryId: entryId,
         thinkingId: th.id,
         logic: th.logic || '',
+        dimension: th.dimension === 'helps' ? 'helps' : 'hinders',
       });
       const attachments = th.scAttachments || [];
       for (const att of attachments) {
@@ -882,7 +881,6 @@ export async function updateEntry(entryId: string, data: {
           demandEntryId: entryId,
           thinkingId: th.id,
           systemConditionId: att.systemConditionId,
-          dimension: att.dimension === 'helps' ? 'helps' : 'hinders',
         });
       }
     }

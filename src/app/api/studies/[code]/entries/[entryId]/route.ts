@@ -41,12 +41,10 @@ export async function GET(
     thinkings: thRows.map((r) => ({
       id: r.thinkingId,
       logic: r.logic ?? '',
+      dimension: (r.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
       scAttachments: thScRows
         .filter((a) => a.thinkingId === r.thinkingId)
-        .map((a) => ({
-          systemConditionId: a.systemConditionId,
-          dimension: (a.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
-        })),
+        .map((a) => ({ systemConditionId: a.systemConditionId })),
     })),
     workBlocks: wbRows.map((r) => ({
       tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure',
@@ -110,17 +108,16 @@ export async function PATCH(
     updates.thinkings = body.thinkings.map((t: {
       id: string;
       logic?: string;
-      scAttachments?: { systemConditionId?: string; dimension?: string }[];
+      dimension?: string;
+      scAttachments?: { systemConditionId?: string }[];
     }) => ({
       id: t.id,
       logic: typeof t.logic === 'string' ? t.logic : '',
+      dimension: (t.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
       scAttachments: Array.isArray(t.scAttachments)
         ? t.scAttachments
             .filter((a) => typeof a.systemConditionId === 'string')
-            .map((a) => ({
-              systemConditionId: a.systemConditionId as string,
-              dimension: (a.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
-            }))
+            .map((a) => ({ systemConditionId: a.systemConditionId as string }))
         : [],
     }));
   }

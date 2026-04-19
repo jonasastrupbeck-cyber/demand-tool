@@ -136,16 +136,18 @@ export default function CapturePage() {
     attachesToWork: boolean;
   };
   const [systemConditions, setSystemConditions] = useState<ScAttachment[]>([]);
-  const [scPickerOpen, setScPickerOpen] = useState(false);
-  // Each thinking carries logic + zero-or-more SC attachments (migration 0011).
-  // Each attachment references a system condition already on this entry and has
-  // its own helps/hinders dimension. Stale attachments (SC removed from entry)
-  // stop rendering because the chip guard `if (!sc) return null` hides them,
-  // and they're pruned on the next save by the server-side filter.
-  type ThinkingScAttachment = { systemConditionId: string; dimension: 'helps' | 'hinders' };
-  const [thinkings, setThinkings] = useState<{ id: string; logic: string; scAttachments: ThinkingScAttachment[] }[]>([]);
+  // Each thinking carries logic + a single helps/hinders dimension (migration 0012)
+  // + zero-or-more SC attachments (migration 0011). Attachments are now just a
+  // presence link — no per-attachment dimension. Stale attachments (SC removed
+  // from entry) stop rendering via the `if (!sc) return null` guard and are
+  // pruned on the next save by the server-side filter.
+  const [thinkings, setThinkings] = useState<{
+    id: string;
+    logic: string;
+    dimension: 'helps' | 'hinders';
+    scAttachments: { systemConditionId: string }[];
+  }[]>([]);
   // Inline picker for "+ Add thinking"
-  const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMatters, setWhatMatters] = useState('');
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   const [workTypeId, setWorkTypeId] = useState('');
@@ -278,9 +280,7 @@ export default function CapturePage() {
     setOriginalValueDemandTypeId('');
     setFailureCause('');
     setSystemConditions([]);
-    setScPickerOpen(false);
     setThinkings([]);
-    setThinkingPickerOpen(false);
     setWhatMatters('');
     setWhatMattersNoteOpen(false);
     setWorkTypeId('');
@@ -744,9 +744,11 @@ export default function CapturePage() {
         {classification && (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
         {/* Demand type (moved up — part of the same "what is this" decision).
-            Semantic colouring: value context → green pill; failure context → red pill. */}
+            Semantic colouring: value context → green pill; failure context → red pill.
+            Centered so the label visually anchors to the pill below, separating this
+            classification block from the lighter "What matters" pills that follow. */}
         {study.demandTypesEnabled && isDemand && classification && classification !== 'unknown' && classification !== 'sequence' && (
-          <div>
+          <div className="flex flex-col items-center gap-1.5">
             <label className={labelCls}>{t('capture.demandTypeLabel', { classification: classificationLabel })}</label>
             <div className="flex gap-2 items-center">
               <PillSelect
@@ -1153,59 +1155,35 @@ export default function CapturePage() {
                     </div>
                   );
                 })}
+                {/* One-click add: PillSelect in add variant. Click the pill → popover
+                    with available SCs drops in immediately. Picking one appends it to
+                    the list with dynamic default dimension + attachment (Ali 2026-04-16). */}
                 {(() => {
                   const available = (study.systemConditions || []).filter(sc => !systemConditions.some(p => p.id === sc.id));
-                  if (scPickerOpen) {
-                    return (
-                      <div className="flex gap-2 items-center">
-                        <select
-                          autoFocus
-                          defaultValue=""
-                          onChange={(e) => {
-                            const id = e.target.value;
-                            if (!id) return;
-                            // Dynamic default dimension: on value classification, default to
-                            // "helps"; otherwise "hinders" (Jonas 2026-04-16).
-                            // Default attachment: Work on work entries, Demand otherwise (Ali).
-                            const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
-                            const isWork = entryType === 'work';
-                            setSystemConditions(prev => [...prev, {
-                              id,
-                              dimension: defaultDim,
-                              attachesToLifeProblem: false,
-                              attachesToDemand: !isWork,
-                              attachesToWhatMatters: false,
-                              attachesToCor: false,
-                              attachesToWork: isWork,
-                            }]);
-                            setScPickerOpen(false);
-                          }}
-                          className={inputCls}
-                        >
-                          <option value="">{t('capture.selectSystemCondition')}</option>
-                          {available.map(sc => (
-                            <option key={sc.id} value={sc.id}>{tl(sc.label)}</option>
-                          ))}
-                        </select>
-                        {addBtn('systemCondition')}
-                        <button
-                          type="button"
-                          onClick={() => setScPickerOpen(false)}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          {t('reclassify.skip')}
-                        </button>
-                      </div>
-                    );
-                  }
+                  if (available.length === 0) return null;
                   return (
-                    <button
-                      type="button"
-                      onClick={() => setScPickerOpen(true)}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
-                    >
-                      {t('capture.addSystemConditionButton')}
-                    </button>
+                    <div className="flex gap-2 items-center">
+                      <PillSelect
+                        variant="add"
+                        placeholder={t('capture.addSystemConditionButton')}
+                        value=""
+                        onChange={(id) => {
+                          const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                          const isWork = entryType === 'work';
+                          setSystemConditions(prev => [...prev, {
+                            id,
+                            dimension: defaultDim,
+                            attachesToLifeProblem: false,
+                            attachesToDemand: !isWork,
+                            attachesToWhatMatters: false,
+                            attachesToCor: false,
+                            attachesToWork: isWork,
+                          }]);
+                        }}
+                        options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
+                      />
+                      {addBtn('systemCondition')}
+                    </div>
                   );
                 })()}
               </div>
@@ -1221,7 +1199,6 @@ export default function CapturePage() {
                   attachesToCor: false,
                   attachesToWork: isWork,
                 }]);
-                setScPickerOpen(false);
               })}
             </div>
           ) : (
@@ -1284,8 +1261,21 @@ export default function CapturePage() {
                       rows={2}
                       className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
                     />
-                    {/* SC attachment chips — migration 0011. One chip per SC on this entry.
-                        Three-state click cycle: unattached → hinders (red) → helps (green) → unattached. */}
+                    {/* Helps/Hinders toggle for the whole thinking (migration 0012). */}
+                    <SegmentedToggle
+                      options={[
+                        { value: 'hinders', label: t('capture.scHinders'), activeColor: 'red' },
+                        { value: 'helps',   label: t('capture.scHelps'),   activeColor: 'green' },
+                      ]}
+                      value={entry.dimension}
+                      onChange={(v) => {
+                        const dim: 'helps' | 'hinders' = v === 'helps' ? 'helps' : 'hinders';
+                        setThinkings(prev => prev.map((p, i) => i === idx ? { ...p, dimension: dim } : p));
+                      }}
+                      ariaLabel={t('capture.thinkingLabel')}
+                    />
+                    {/* SC attachment chips — migration 0011/0012. One chip per SC on this entry.
+                        Simple on/off toggle (no per-chip dimension — it lives on the thinking). */}
                     {systemConditions.length > 0 && (
                       <div className="space-y-1">
                         <p className="text-xs text-gray-500">{t('capture.thinkingScAttachLabel')}</p>
@@ -1293,12 +1283,7 @@ export default function CapturePage() {
                           {systemConditions.map((scEntry) => {
                             const sc = (study.systemConditions || []).find(s => s.id === scEntry.id);
                             if (!sc) return null;
-                            const current = entry.scAttachments.find(a => a.systemConditionId === scEntry.id);
-                            const state: 'off' | 'hinders' | 'helps' = !current ? 'off' : current.dimension;
-                            const classes =
-                              state === 'hinders' ? 'bg-red-50 text-red-700 border-red-200' :
-                              state === 'helps'   ? 'bg-green-50 text-green-700 border-green-200' :
-                                                    'bg-white text-gray-500 border-dashed border-gray-300 hover:border-gray-400';
+                            const attached = entry.scAttachments.some(a => a.systemConditionId === scEntry.id);
                             return (
                               <button
                                 key={scEntry.id}
@@ -1306,19 +1291,18 @@ export default function CapturePage() {
                                 onClick={() => {
                                   setThinkings(prev => prev.map((p, i) => {
                                     if (i !== idx) return p;
-                                    const existing = p.scAttachments.find(a => a.systemConditionId === scEntry.id);
-                                    if (!existing) {
-                                      return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id, dimension: 'hinders' }] };
+                                    if (p.scAttachments.some(a => a.systemConditionId === scEntry.id)) {
+                                      return { ...p, scAttachments: p.scAttachments.filter(a => a.systemConditionId !== scEntry.id) };
                                     }
-                                    if (existing.dimension === 'hinders') {
-                                      return { ...p, scAttachments: p.scAttachments.map(a => a.systemConditionId === scEntry.id ? { ...a, dimension: 'helps' } : a) };
-                                    }
-                                    return { ...p, scAttachments: p.scAttachments.filter(a => a.systemConditionId !== scEntry.id) };
+                                    return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id }] };
                                   }));
                                 }}
-                                aria-pressed={state !== 'off'}
-                                title={state === 'off' ? t('capture.scDimensionHint') : state === 'hinders' ? t('capture.scHinders') : t('capture.scHelps')}
-                                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${classes}`}
+                                aria-pressed={attached}
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                  attached
+                                    ? 'bg-red-600 text-white border-red-600'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
+                                }`}
                               >
                                 {tl(sc.label)}
                               </button>
@@ -1330,49 +1314,32 @@ export default function CapturePage() {
                   </div>
                 );
               })}
-              {/* "+ Add thinking" picker */}
+              {/* One-click add: PillSelect in add variant. Click pill → popover with
+                  available thinkings drops in immediately. Picking appends to the list. */}
               {(() => {
                 const available = (study.thinkings || []).filter(th => !thinkings.some(p => p.id === th.id));
-                if (thinkingPickerOpen) {
-                  return (
-                    <div className="flex gap-2 items-center">
-                      <select
-                        autoFocus
-                        defaultValue=""
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          if (!id) return;
-                          setThinkings(prev => [...prev, { id, logic: '', scAttachments: [] }]);
-                          setThinkingPickerOpen(false);
-                        }}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
-                      >
-                        <option value="">{t('capture.selectThinking')}</option>
-                        {available.map((th) => (
-                          <option key={th.id} value={th.id}>{tl(th.label)}</option>
-                        ))}
-                      </select>
-                      {addBtn('thinking')}
-                      <button type="button" onClick={() => setThinkingPickerOpen(false)} className="px-2 py-2 text-gray-400 hover:text-gray-600 text-sm">&times;</button>
-                    </div>
-                  );
+                if (available.length === 0 && addingType !== 'thinking') {
+                  return addBtn('thinking');
                 }
                 return (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setThinkingPickerOpen(true)}
-                      disabled={available.length === 0 && addingType !== 'thinking'}
-                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {t('capture.addThinkingButton')}
-                    </button>
-                    {available.length === 0 && addBtn('thinking')}
+                  <div className="flex gap-2 items-center">
+                    {available.length > 0 && (
+                      <PillSelect
+                        variant="add"
+                        placeholder={t('capture.addThinkingButton')}
+                        value=""
+                        onChange={(id) => {
+                          setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
+                        }}
+                        options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
+                      />
+                    )}
+                    {addBtn('thinking')}
                   </div>
                 );
               })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [] }]); setThinkingPickerOpen(false); })}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); })}
           </div>
         )}
 

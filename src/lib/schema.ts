@@ -176,19 +176,21 @@ export const demandEntryThinkings = pgTable('demand_entry_thinkings', {
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
   logic: text('logic').notNull().default(''),
+  // Per-thinking-instance helps/hinders, added in migration 0012.
+  dimension: text('dimension').$type<'helps' | 'hinders'>().notNull().default('hinders'),
 }, (t) => ({
   uniqEntryThinking: unique().on(t.demandEntryId, t.thinkingId),
 }));
 
 // Per-entry thinking↔SC attachments. Each thinking on an entry can attach to zero
-// or more SCs on the same entry, each with its own helps/hinders dimension.
-// Mirrors demandEntrySystemConditions' dimension pattern, one step up.
+// or more SCs on the same entry. The helps/hinders dimension lives on the thinking
+// row itself (see demandEntryThinkings.dimension), not on the attachment, so this
+// junction is just a link.
 export const demandEntryThinkingScs = pgTable('demand_entry_thinking_scs', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
   systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
-  dimension: text('dimension').$type<'helps' | 'hinders'>().notNull().default('hinders'),
 }, (t) => ({
   uniqEntryThinkingSc: unique().on(t.demandEntryId, t.thinkingId, t.systemConditionId),
 }));
