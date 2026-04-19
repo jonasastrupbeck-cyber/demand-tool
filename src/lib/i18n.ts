@@ -2001,6 +2001,31 @@ const translations = {
     sv: 'Skriv tänkande som förklarar systemvillkoren',
     de: 'Denken eingeben, das die Systembedingungen erklärt',
   },
+  // Vanguard strand labels — subtle section dividers on the capture form.
+  'capture.strand.demand': {
+    en: 'Demand',
+    da: 'Efterspørgsel',
+    sv: 'Efterfrågan',
+    de: 'Nachfrage',
+  },
+  'capture.strand.work': {
+    en: 'Work',
+    da: 'Arbejde',
+    sv: 'Arbete',
+    de: 'Arbeit',
+  },
+  'capture.strand.response': {
+    en: 'Response',
+    da: 'Reaktion',
+    sv: 'Reaktion',
+    de: 'Reaktion',
+  },
+  'capture.strand.system': {
+    en: 'System',
+    da: 'System',
+    sv: 'System',
+    de: 'System',
+  },
   'capture.typeInOriginalValueDemandPlaceholder': {
     en: 'Type in new value demand',
     da: 'Skriv ny værdiskabende efterspørgsel',

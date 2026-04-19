@@ -805,9 +805,33 @@ export default function CapturePage() {
 
         {/* Secondary fields — appear naturally once the user picks a classification.
             Previously gated behind a "More details" toggle; the toggle was auto-opened
-            on every classification click anyway, so it's been removed. */}
-        {classification && (
+            on every classification click anyway, so it's been removed.
+            Three subtle strand separators inside teach the Vanguard frame each capture:
+            "Demand"/"Work" → "Response" → "System" (S2 / 2026-04-19). */}
+        {classification && (() => {
+          // Strand visibility checks — separator only shows if at least one child renders.
+          const isFailureDemand = isDemand && classification === 'failure';
+          const isValueDemand = isDemand && classification === 'value';
+          const hasDemandStrand =
+            (study.demandTypesEnabled && isDemand && classification !== 'unknown' && classification !== 'sequence') ||
+            (study.workTypesEnabled && !isDemand) ||
+            (study.valueLinkingEnabled && isFailureDemand) ||
+            (study.whatMattersEnabled && isValueDemand) ||
+            (study.lifeProblemsEnabled && isDemand) ||
+            (!study.volumeMode && !isDemand); // Flow — always renders for work
+          const hasResponseStrand = !!study.handlingEnabled;
+          const hasSystemStrand = scVisible && !!(study.systemConditionsEnabled || study.thinkingsEnabled);
+          // Tiny muted horizontal rule with a centered uppercase label.
+          const sep = (label: string) => (
+            <div className="flex items-center gap-3 pt-2 pb-0">
+              <div className="flex-1 h-px bg-gray-100" />
+              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium">{label}</span>
+              <div className="flex-1 h-px bg-gray-100" />
+            </div>
+          );
+          return (
         <div className="space-y-4 pl-3 border-l-2 border-gray-100">
+        {hasDemandStrand && sep(isDemand ? t('capture.strand.demand') : t('capture.strand.work'))}
         {/* Demand type (moved up — part of the same "what is this" decision).
             Semantic colouring: value context → green pill; failure context → red pill.
             Header dropped; the PillSelect placeholder carries the "Type of {classification}
@@ -1154,6 +1178,7 @@ export default function CapturePage() {
           </div>
         )}
 
+        {hasResponseStrand && sep(t('capture.strand.response'))}
         {/* Capability of response (formerly "Handling") — renders for demand AND work.
             On Work entries, sits AFTER Flow: describe the steps first, then classify
             the response pattern. On Demand entries, sits where it naturally falls
@@ -1191,6 +1216,7 @@ export default function CapturePage() {
           );
         })()}
 
+        {hasSystemStrand && sep(t('capture.strand.system'))}
         {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
             Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension.
             Header dropped — the "+ Add system condition" pill is self-explanatory; an ⓘ
@@ -1491,7 +1517,8 @@ export default function CapturePage() {
         )}
 
         </div>
-        )}
+          );
+        })()}
 
         {/* Submit button - sticky at bottom */}
         <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
