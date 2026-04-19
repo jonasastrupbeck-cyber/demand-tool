@@ -1096,14 +1096,17 @@ export default function CapturePage() {
                 {systemConditions.map((entry, idx) => {
                   const sc = (study.systemConditions || []).find(s => s.id === entry.id);
                   if (!sc) return null;
+                  // Colour flips with dimension: green when the SC helps customer purpose,
+                  // red when it hinders. Matches Vanguard's green=value / red=failure discipline.
+                  const isHelps = entry.dimension === 'helps';
                   return (
-                    <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                    <div key={entry.id} className={`p-3 rounded-lg border space-y-2 ${isHelps ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="px-2.5 py-1 rounded-full text-sm font-medium bg-red-600 text-white">{tl(sc.label)}</span>
+                        <span className={`px-2.5 py-1 rounded-full text-sm font-medium text-white ${isHelps ? 'bg-green-600' : 'bg-red-600'}`}>{tl(sc.label)}</span>
                         <button
                           type="button"
                           onClick={() => setSystemConditions(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-xs text-red-700 hover:text-red-900"
+                          className={`text-xs ${isHelps ? 'text-green-700 hover:text-green-900' : 'text-red-700 hover:text-red-900'}`}
                           aria-label="Remove"
                         >
                           &times;
@@ -1238,14 +1241,16 @@ export default function CapturePage() {
               {thinkings.map((entry, idx) => {
                 const th = (study.thinkings || []).find(t => t.id === entry.id);
                 if (!th) return null;
+                // Card colour flips with the thinking's helps/hinders dimension.
+                const isHelps = entry.dimension === 'helps';
                 return (
-                  <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                  <div key={entry.id} className={`p-3 rounded-lg border space-y-2 ${isHelps ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                     <div className="flex items-start justify-between gap-2">
-                      <span className="px-2.5 py-1 rounded-full text-sm font-medium bg-red-600 text-white">{tl(th.label)}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-sm font-medium text-white ${isHelps ? 'bg-green-600' : 'bg-red-600'}`}>{tl(th.label)}</span>
                       <button
                         type="button"
                         onClick={() => setThinkings(prev => prev.filter((_, i) => i !== idx))}
-                        className="text-xs text-red-700 hover:text-red-900"
+                        className={`text-xs ${isHelps ? 'text-green-700 hover:text-green-900' : 'text-red-700 hover:text-red-900'}`}
                         aria-label="Remove"
                       >
                         &times;
@@ -1259,7 +1264,11 @@ export default function CapturePage() {
                       }}
                       placeholder={t('capture.thinkingLogicPlaceholder')}
                       rows={2}
-                      className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                      className={`w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border outline-none ${
+                        isHelps
+                          ? 'border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+                          : 'border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                      }`}
                     />
                     {/* Helps/Hinders toggle for the whole thinking (migration 0012). */}
                     <SegmentedToggle
@@ -1300,7 +1309,7 @@ export default function CapturePage() {
                                 aria-pressed={attached}
                                 className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
                                   attached
-                                    ? 'bg-red-600 text-white border-red-600'
+                                    ? (isHelps ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600')
                                     : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
                                 }`}
                               >

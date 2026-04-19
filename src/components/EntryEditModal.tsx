@@ -659,16 +659,17 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                   <div className="space-y-2">
                     {systemConditions.map((entry, idx) => {
                       const def = study.systemConditions.find((x) => x.id === entry.id);
+                      const isHelps = entry.dimension === 'helps';
                       return (
-                        <div key={entry.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                        <div key={entry.id} className={`p-3 rounded-lg border space-y-2 ${isHelps ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                           <div className="flex items-start justify-between gap-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-600 text-white">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white ${isHelps ? 'bg-green-600' : 'bg-red-600'}`}>
                               {def ? tl(def.label) : entry.id}
                             </span>
                             <button
                               type="button"
                               onClick={() => setSystemConditions((prev) => prev.filter((_, i) => i !== idx))}
-                              className="text-xs text-red-700 hover:text-red-900"
+                              className={`text-xs ${isHelps ? 'text-green-700 hover:text-green-900' : 'text-red-700 hover:text-red-900'}`}
                               aria-label="Remove"
                             >
                               &times;
@@ -790,16 +791,17 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 <div className="space-y-2">
                   {thinkings.map((th, idx) => {
                     const def = (study.thinkings || []).find((x) => x.id === th.id);
+                    const isHelps = th.dimension === 'helps';
                     return (
-                      <div key={th.id} className="p-3 rounded-lg border border-red-200 bg-red-50 space-y-2">
+                      <div key={th.id} className={`p-3 rounded-lg border space-y-2 ${isHelps ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
                         <div className="flex items-start justify-between gap-2">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-600 text-white">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white ${isHelps ? 'bg-green-600' : 'bg-red-600'}`}>
                             {def ? tl(def.label) : th.id}
                           </span>
                           <button
                             type="button"
                             onClick={() => setThinkings((prev) => prev.filter((_, i) => i !== idx))}
-                            className="text-xs text-red-700 hover:text-red-900"
+                            className={`text-xs ${isHelps ? 'text-green-700 hover:text-green-900' : 'text-red-700 hover:text-red-900'}`}
                           >
                             &times;
                           </button>
@@ -812,7 +814,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           }}
                           placeholder={t('capture.thinkingLogicPlaceholder')}
                           rows={2}
-                          className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-red-200 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                          className={`w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border outline-none ${
+                            isHelps
+                              ? 'border-green-200 focus:ring-2 focus:ring-green-500 focus:border-green-500'
+                              : 'border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                          }`}
                           aria-label={t('capture.thinkingLogicLabel')}
                         />
                         {/* Helps/Hinders toggle for the whole thinking (migration 0012). */}
@@ -854,7 +860,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     aria-pressed={attached}
                                     className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${
                                       attached
-                                        ? 'bg-red-600 text-white border-red-600'
+                                        ? (isHelps ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600')
                                         : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'
                                     }`}
                                   >

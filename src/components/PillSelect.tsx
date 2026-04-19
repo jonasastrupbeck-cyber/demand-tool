@@ -34,8 +34,8 @@ interface Props {
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
   if (variant === 'add') {
-    // "+ Add ..." style — always dashed light-blue, regardless of the (usually empty) value.
-    return 'bg-white text-sky-700 border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50';
+    // "+ Add ..." style — solid light-blue outline, regardless of the (usually empty) value.
+    return 'bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50';
   }
   if (variant === 'value') {
     // Darker green so the value-demand pill visually separates from the lighter
