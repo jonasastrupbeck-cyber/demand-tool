@@ -166,6 +166,36 @@ Read `src/lib/schema.ts` before proposing any new migration.
 | i18n | `src/lib/i18n.ts` — en / da / sv / de, natively written |
 | Migrations | `drizzle/NNNN_name.sql` — applied inline via a one-off `tsx` runner using `@neondatabase/serverless` |
 
+## 6a. Vanguard copy rule (non-negotiable)
+
+User-facing text that uses Vanguard Method terminology (demand, value
+demand, failure demand, purpose, system conditions, thinking, capability
+of response, what matters, life problem to be solved, DECAT, P-M-M,
+check-plan-do, etc.) must be sourced from Jonas's Obsidian vault or the
+`anthropic-skills:vanguard-*` skills — never paraphrased from memory.
+
+Before writing or editing any of these i18n keys, consult the vault:
+
+- `capture.demandHelp` / `capture.workHelp`
+- `capture.demandClassificationHelp` / `capture.workClassificationHelp`
+- `capture.systemConditionsLabel` / `capture.thinkingLabel`
+- `capture.lifeProblemLabel` / `capture.originalValueDemandLabel` / `capture.handlingLabel`
+
+Workflow:
+
+1. `mcp__obsidian-mcp-tools__search_vault_smart({ query: "<concept>" })` →
+   find the canonical definition in Jonas's vault.
+2. If the vault is offline, invoke `anthropic-skills:vanguard-teaching`
+   or `anthropic-skills:vanguard-method-coach`.
+3. Use the returned text verbatim in `en`. Write native da/sv/de.
+4. If neither source is reachable during the session, ask Jonas rather
+   than guessing.
+
+Drift examples that happened once and shouldn't happen again: "Demand is
+what customers communicate to us when they pull value" — approximation.
+"Value demand: demand for what the organisation exists to do" — also an
+approximation. Both need to be re-sourced from the vault.
+
 ## 7. Conventions that have stuck
 
 - **i18n copy is native, not translated.** Write Danish in Danish (Jonas's
