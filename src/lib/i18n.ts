@@ -771,8 +771,8 @@ const translations = {
   },
   'capture.workBlockTagFailure': {
     en: 'Failure',
-    da: 'Fejl',
-    sv: 'Fel',
+    da: 'Ikke-værdi',
+    sv: 'Icke-värde',
     de: 'Fehler',
   },
   'capture.workBlockPlaceholder': {
@@ -808,8 +808,8 @@ const translations = {
   },
   'capture.workBlocksLabel': {
     en: 'Flow (value work + failure work)',
-    da: 'Forl\u00f8b (v\u00e6rdiskabende arbejde + fejlarbejde)',
-    sv: 'Fl\u00f6de (v\u00e4rdeskapande arbete + felarbete)',
+    da: 'Forl\u00f8b (v\u00e6rdiskabende arbejde + ikke-v\u00e6rdiskabende arbejde)',
+    sv: 'Fl\u00f6de (v\u00e4rdeskapande arbete + icke-v\u00e4rdeskapande arbete)',
     de: 'Ablauf (Wertarbeit + Fehlerarbeit)',
   },
   'settings.language': {
@@ -1099,8 +1099,8 @@ const translations = {
   },
   'dashboard.capabilityByWorkType': {
     en: 'Value vs Failure work by Work Type',
-    da: 'Værdi- vs fejlarbejde pr. arbejdstype',
-    sv: 'Värde- vs felarbete per arbetstyp',
+    da: 'Værdiskabende vs ikke-værdiskabende arbejde pr. arbejdstype',
+    sv: 'Värdeskapande vs icke-värdeskapande arbete per arbetstyp',
     de: 'Wert- vs Fehlerarbeit nach Arbeitsart',
   },
   'dashboard.whatMatters': {
@@ -1464,8 +1464,8 @@ const translations = {
   },
   'dashboard.failureDemandPct': {
     en: 'Failure Demand',
-    da: 'Fejlefterspørgsel',
-    sv: 'Felefterfrågan',
+    da: 'Ikke-værdiskabende efterspørgsel',
+    sv: 'Icke-värdeskapande efterfrågan',
     de: 'Fehlernachfrage',
   },
   'dashboard.valueWorkPct': {
@@ -1476,8 +1476,8 @@ const translations = {
   },
   'dashboard.failureWorkPct': {
     en: 'Failure Work',
-    da: 'Fejlarbejde',
-    sv: 'Felarbete',
+    da: 'Ikke-værdiskabende arbejde',
+    sv: 'Icke-värdeskapande arbete',
     de: 'Fehlarbeit',
   },
   'dashboard.topFailureCauses': {
@@ -1555,8 +1555,8 @@ const translations = {
   },
   'settings.workStepsDesc': {
     en: 'A managed list of the actual steps inside the Flow — each tagged Value or Failure. When enabled, Flow blocks can pick from this list instead of being free-text, so steps aggregate across entries.',
-    da: 'En styret liste over de faktiske trin i forløbet — hver mærket som Værdi eller Fejl. Når aktiveret kan forløbsblokke vælges fra denne liste i stedet for at være fritekst, så trin kan aggregeres på tværs af registreringer.',
-    sv: 'En hanterad lista över de faktiska stegen i flödet — vart och ett taggat som Värde eller Fel. När aktiverat kan flödesblock väljas från denna lista istället för att vara fritext, så steg kan aggregeras över registreringar.',
+    da: 'En styret liste over de faktiske trin i forløbet — hver mærket som værdiskabende eller ikke-værdiskabende. Når aktiveret kan forløbsblokke vælges fra denne liste i stedet for at være fritekst, så trin kan aggregeres på tværs af registreringer.',
+    sv: 'En hanterad lista över de faktiska stegen i flödet — vart och ett taggat som värdeskapande eller icke-värdeskapande. När aktiverat kan flödesblock väljas från denna lista istället för att vara fritext, så steg kan aggregeras över registreringar.',
     de: 'Eine gepflegte Liste der tatsächlichen Schritte im Ablauf — jeder als Wert oder Fehler markiert. Bei aktivierter Option können Ablaufblöcke aus dieser Liste gewählt werden statt Freitext, damit Schritte über Einträge aggregiert werden können.',
   },
   'settings.enableWorkSteps': {
@@ -1628,8 +1628,8 @@ const translations = {
   },
   'settings.systemConditionsDesc': {
     en: 'Pre-defined system conditions that explain why failure demand occurs. When enabled, collectors select from this list instead of typing free text.',
-    da: 'Foruddefinerede systemforhold der forklarer hvorfor fejlefterspørgsel opstår. Når aktiveret vælger indsamlere fra denne liste i stedet for at skrive fritekst.',
-    sv: 'Fördefinierade systemförhållanden som förklarar varför felefterfrågan uppstår. När aktiverat väljer insamlare från denna lista istället för att skriva fritext.',
+    da: 'Foruddefinerede systemforhold der forklarer hvorfor ikke-værdiskabende efterspørgsel opstår. Når aktiveret vælger indsamlere fra denne liste i stedet for at skrive fritekst.',
+    sv: 'Fördefinierade systemförhållanden som förklarar varför icke-värdeskapande efterfrågan uppstår. När aktiverat väljer insamlare från denna lista istället för att skriva fritext.',
     de: 'Vordefinierte Systembedingungen, die erklären, warum Fehlnachfrage entsteht. Wenn aktiviert, wählen Erfasser aus dieser Liste statt Freitext einzugeben.',
   },
   'settings.enableSystemConditions': {
@@ -1795,7 +1795,7 @@ const translations = {
   'layers.prereq4': {
     en: 'Before activating: ensure failure demand types are configured with original value demand links',
     da: 'Før aktivering: sørg for at ikke-værdiskabende efterspørgselstyper er konfigureret med links til oprindelig værdiskabende efterspørgsel',
-    sv: 'Före aktivering: se till att icke-värdeskapande efterfrågetyper är konfigurerade med länkar till ursprunglig värdeefterfrågan',
+    sv: 'Före aktivering: se till att icke-värdeskapande efterfrågetyper är konfigurerade med länkar till ursprunglig värdeskapande efterfrågan',
     de: 'Vor Aktivierung: stellen Sie sicher, dass Fehler-Nachfragearten mit Links zur ursprünglichen Wert-Nachfrage konfiguriert sind',
   },
   'layers.prereq5': {
@@ -1824,8 +1824,8 @@ const translations = {
   },
   'layers.guidance4': {
     en: 'Failure demands will be linked back to the original value demand they stem from. This reveals which value demands generate the most failure.',
-    da: 'Fejlefterspørgsler kobles tilbage til den oprindelige værdiefterspørgsel de stammer fra. Dette afslører hvilke værdiefterspørgsler der genererer mest fejl.',
-    sv: 'Icke-värdeskapande efterfrågan kopplas tillbaka till den ursprungliga värdeefterfrågan. Detta avslöjar vilka värdeefterfrågor som genererar mest icke-värde.',
+    da: 'Ikke-værdiskabende efterspørgsler kobles tilbage til den oprindelige værdiskabende efterspørgsel, de stammer fra. Dette afslører, hvilke værdiskabende efterspørgsler der genererer mest ikke-værdiskabende efterspørgsel.',
+    sv: 'Icke-värdeskapande efterfrågan kopplas tillbaka till den ursprungliga värdeskapande efterfrågan. Detta avslöjar vilka värdeskapande efterfrågor som genererar mest icke-värdeskapande efterfrågan.',
     de: 'Fehlernachfragen werden mit der ursprünglichen Wertnachfrage verknüpft. Dies zeigt welche Wertnachfragen die meisten Fehler erzeugen.',
   },
   'layers.guidance5': {
@@ -1912,8 +1912,8 @@ const translations = {
   },
   'reclassify.layerGuide2': {
     en: 'Classify each demand as value or failure. Value demand is what customers actually want. Failure demand is caused by a failure to do something or do something right for the customer.',
-    da: 'Klassificér hver efterspørgsel som værdi eller fejl. Værdiefterspørgsel er det kunden faktisk ønsker. Fejlefterspørgsel er forårsaget af en fejl i at gøre noget eller gøre noget rigtigt for kunden.',
-    sv: 'Klassificera varje efterfrågan som värde eller fel. Värdeefterfrågan är det kunden faktiskt vill ha. Felefterfrågan orsakas av ett misslyckande att göra något eller göra något rätt för kunden.',
+    da: 'Klassificér hver efterspørgsel som værdiskabende eller ikke-værdiskabende. Værdiskabende efterspørgsel er det kunden faktisk ønsker. Ikke-værdiskabende efterspørgsel er forårsaget af, at noget ikke er gjort eller ikke er gjort rigtigt for kunden.',
+    sv: 'Klassificera varje efterfrågan som värdeskapande eller icke-värdeskapande. Värdeskapande efterfrågan är det kunden faktiskt vill ha. Icke-värdeskapande efterfrågan orsakas av att något inte har gjorts eller inte har gjorts rätt för kunden.',
     de: 'Klassifizieren Sie jede Nachfrage als Wert oder Fehler. Wertnachfrage ist das, was Kunden tatsächlich wollen. Fehlernachfrage wird durch ein Versagen verursacht, etwas zu tun oder richtig zu tun.',
   },
   'reclassify.layerGuide3': {
@@ -1924,8 +1924,8 @@ const translations = {
   },
   'reclassify.layerGuide4': {
     en: 'Link each failure demand to the original value demand it relates to. This reveals which value demands are generating the most failure.',
-    da: 'Forbind hver fejlefterspørgsel med den oprindelige værdiefterspørgsel den relaterer til. Dette afslører hvilke værdiefterspørgsler der genererer mest fejl.',
-    sv: 'Koppla varje felefterfrågan till den ursprungliga värdeefterfrågan den relaterar till. Detta avslöjar vilka värdeefterfrågor som genererar mest fel.',
+    da: 'Forbind hver ikke-værdiskabende efterspørgsel med den oprindelige værdiskabende efterspørgsel, den relaterer til. Dette afslører, hvilke værdiskabende efterspørgsler der genererer mest ikke-værdiskabende efterspørgsel.',
+    sv: 'Koppla varje icke-värdeskapande efterfrågan till den ursprungliga värdeskapande efterfrågan den relaterar till. Detta avslöjar vilka värdeskapande efterfrågor som genererar mest icke-värdeskapande efterfrågan.',
     de: 'Verknüpfen Sie jede Fehlernachfrage mit der ursprünglichen Wertnachfrage. Dies zeigt, welche Wertnachfragen die meisten Fehler verursachen.',
   },
   'reclassify.layerNotActive': {
@@ -1948,8 +1948,8 @@ const translations = {
   },
   'reclassify.linkToValue': {
     en: 'Which value demand did this failure originate from?',
-    da: 'Hvilken værdiefterspørgsel opstod denne fejl fra?',
-    sv: 'Vilken värdeefterfrågan härstammade detta fel från?',
+    da: 'Hvilken værdiskabende efterspørgsel opstod denne ikke-værdiskabende efterspørgsel fra?',
+    sv: 'Vilken värdeskapande efterfrågan härstammade denna icke-värdeskapande efterfrågan från?',
     de: 'Von welcher Wertnachfrage stammt dieser Fehler?',
   },
   'reclassify.editMoreFields': {
@@ -2067,14 +2067,14 @@ const translations = {
   // Capture form - linked demand
   'capture.linkedValueDemand': {
     en: 'Link to originating value demand',
-    da: 'Kobl til den oprindelige værdiefterspørgsel',
-    sv: 'Länka till ursprunglig värdeefterfrågan',
+    da: 'Kobl til den oprindelige værdiskabende efterspørgsel',
+    sv: 'Länka till ursprunglig värdeskapande efterfrågan',
     de: 'Mit ursprünglicher Wertnachfrage verknüpfen',
   },
   'capture.searchValueDemands': {
     en: 'Search value demands...',
-    da: 'Søg værdiefterspørgsler...',
-    sv: 'Sök värdeefterfrågor...',
+    da: 'Søg værdiskabende efterspørgsler...',
+    sv: 'Sök värdeskapande efterfrågor...',
     de: 'Wertnachfragen suchen...',
   },
 
@@ -2171,8 +2171,8 @@ const translations = {
   },
   'capture.toggles.valueLinking': {
     en: 'Link failure demand to underlying value demand',
-    da: 'Kobl fejlefterspørgsel til underliggende værdiefterspørgsel',
-    sv: 'Koppla felefterfrågan till underliggande värdefrågan',
+    da: 'Kobl ikke-værdiskabende efterspørgsel til underliggende værdiskabende efterspørgsel',
+    sv: 'Koppla icke-värdeskapande efterfrågan till underliggande värdeskapande efterfrågan',
     de: 'Fehlbedarf mit zugrunde liegendem Wertbedarf verknüpfen',
   },
   'capture.toggles.systemConditions': {
@@ -2338,8 +2338,8 @@ const translations = {
   },
   'dashboard.lifecycleByStage': {
     en: 'Failure demand by lifecycle stage',
-    da: 'Fejlefterspørgsel efter livscyklusfase',
-    sv: 'Felefterfrågan efter livscykelfas',
+    da: 'Ikke-værdiskabende efterspørgsel efter livscyklusfase',
+    sv: 'Icke-värdeskapande efterfrågan efter livscykelfas',
     de: 'Fehlnachfrage nach Lebenszyklusphase',
   },
   'dashboard.lifecycleFilter': {
