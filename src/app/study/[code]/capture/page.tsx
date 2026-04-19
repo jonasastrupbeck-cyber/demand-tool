@@ -820,7 +820,7 @@ export default function CapturePage() {
                 placeholder={t('capture.demandTypeLabel', { classification: classificationLabel })}
                 value={demandTypeId}
                 onChange={setDemandTypeId}
-                options={filteredDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                options={filteredDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
                 variant={classification === 'value' ? 'value' : 'failure'}
               />
               {addBtn('demand')}
@@ -890,7 +890,7 @@ export default function CapturePage() {
                 placeholder={t('capture.selectOriginalValueDemand')}
                 value={originalValueDemandTypeId}
                 onChange={setOriginalValueDemandTypeId}
-                options={study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
+                options={study.demandTypes.filter((dt) => dt.category === 'value').map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
                 variant="value"
               />
               {addBtn('originalValue')}
@@ -1292,7 +1292,7 @@ export default function CapturePage() {
                               attachesToWork: isWork,
                             }]);
                           }}
-                          options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
+                          options={available.map(sc => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition }))}
                           onAddNew={() => { setAddingType('systemCondition'); setNewTypeLabel(''); }}
                           addNewLabel={t('capture.addNew')}
                         />
@@ -1465,7 +1465,7 @@ export default function CapturePage() {
                         onChange={(id) => {
                           setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
                         }}
-                        options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
+                        options={available.map(th => ({ id: th.id, label: tl(th.label), operationalDefinition: th.operationalDefinition }))}
                         onAddNew={() => { setAddingType('thinking'); setNewTypeLabel(''); }}
                         addNewLabel={t('capture.addNew')}
                       />

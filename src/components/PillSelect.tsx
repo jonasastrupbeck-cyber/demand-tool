@@ -17,6 +17,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export interface PillSelectOption {
   id: string;
   label: string;
+  /** Optional operational definition, surfaced as a muted subtitle under the
+   *  option's label in the popover — lets users learn what a type means at the
+   *  moment they're choosing it. */
+  operationalDefinition?: string | null;
 }
 
 export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add' | 'thinking';
@@ -142,6 +146,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
             <>
               {options.map((opt) => {
                 const isSelected = opt.id === value;
+                const def = opt.operationalDefinition?.trim();
                 return (
                   <button
                     key={opt.id}
@@ -152,13 +157,18 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                       onChange(opt.id);
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                       isSelected
                         ? 'bg-gray-100 text-gray-900 font-medium'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    {opt.label}
+                    <div className="whitespace-nowrap">{opt.label}</div>
+                    {def && (
+                      <div className="mt-0.5 text-xs text-gray-500 font-normal whitespace-normal leading-snug max-w-xs">
+                        {def}
+                      </div>
+                    )}
                   </button>
                 );
               })}
