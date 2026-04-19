@@ -1018,8 +1018,9 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Thinking — library mirrors System Conditions. Visible whenever SC is enabled. */}
-        {study.systemConditionsEnabled && (
+        {/* Thinking — library mirrors System Conditions. Gated on its own toggle
+            (migration 0013); decoupled from SC so teams can adopt them independently. */}
+        {study.thinkingsEnabled && (
           <div className={cardCls}>
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.thinkings')}</h2>
             <p className="text-sm text-gray-600 mb-3">{t('settings.thinkingsDesc')}</p>
@@ -1128,25 +1129,28 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* What Matters Types */}
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.whatMattersTypes')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.whatMattersTypesDesc')}</p>
-          <ul className="space-y-2 mb-4">
-            {study.whatMattersTypes.map((wm) => (
-              <li key={wm.id} className={`${itemCls} bg-blue-50`}>
-                {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
-                <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-              </li>
-            ))}
-          </ul>
-          <form onSubmit={addWhatMattersTypeHandler} className="flex gap-2">
-            <input type="text" value={newWhatMattersType} onChange={(e) => setNewWhatMattersType(e.target.value)} placeholder={t('settings.addWhatMattersType')} className={inputCls} />
-            <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
-          </form>
-        </div>
+        {/* What Matters Types — hidden unless the "What Matters" capture toggle is on. */}
+        {study.whatMattersEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.whatMattersTypes')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.whatMattersTypesDesc')}</p>
+            <ul className="space-y-2 mb-4">
+              {study.whatMattersTypes.map((wm) => (
+                <li key={wm.id} className={`${itemCls} bg-blue-50`}>
+                  {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
+                  <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                </li>
+              ))}
+            </ul>
+            <form onSubmit={addWhatMattersTypeHandler} className="flex gap-2">
+              <input type="text" value={newWhatMattersType} onChange={(e) => setNewWhatMattersType(e.target.value)} placeholder={t('settings.addWhatMattersType')} className={inputCls} />
+              <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            </form>
+          </div>
+        )}
 
-        {/* Life Problem To Be Solved (Phase 2 item 1) */}
+        {/* Life Problem To Be Solved (Phase 2 item 1) — hidden unless toggle is on. */}
+        {study.lifeProblemsEnabled && (
         <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.lifeProblems')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.lifeProblemsDesc')}</p>
@@ -1187,6 +1191,7 @@ export default function SettingsPage() {
             <button type="submit" disabled={!newLifeProblem.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
           </form>
         </div>
+        )}
 
         {/* Work Tracking */}
         <div className={cardCls}>
