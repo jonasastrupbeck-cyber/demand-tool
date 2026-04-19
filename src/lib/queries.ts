@@ -213,13 +213,15 @@ export async function getHandlingTypes(studyId: string) {
 export async function addHandlingType(studyId: string, label: string) {
   const id = generateId();
   const existing = await getHandlingTypes(studyId);
-  await db.insert(handlingTypes).values({
+  const row = {
     id,
     studyId,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(handlingTypes).values(row);
+  return row;
 }
 
 export async function updateHandlingType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -242,14 +244,16 @@ export async function getDemandTypes(studyId: string, category?: 'value' | 'fail
 export async function addDemandType(studyId: string, category: 'value' | 'failure', label: string) {
   const id = generateId();
   const existing = await getDemandTypes(studyId, category);
-  await db.insert(demandTypes).values({
+  const row = {
     id,
     studyId,
     category,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(demandTypes).values(row);
+  return row;
 }
 
 export async function updateDemandType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -291,13 +295,15 @@ export async function getWhatMattersTypes(studyId: string) {
 export async function addWhatMattersType(studyId: string, label: string) {
   const id = generateId();
   const existing = await getWhatMattersTypes(studyId);
-  await db.insert(whatMattersTypes).values({
+  const row = {
     id,
     studyId,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(whatMattersTypes).values(row);
+  return row;
 }
 
 export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -317,13 +323,15 @@ export async function getLifeProblems(studyId: string) {
 export async function addLifeProblem(studyId: string, label: string) {
   const id = generateId();
   const existing = await getLifeProblems(studyId);
-  await db.insert(lifeProblems).values({
+  const row = {
     id,
     studyId,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(lifeProblems).values(row);
+  return row;
 }
 
 export async function updateLifeProblem(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -343,13 +351,15 @@ export async function getSystemConditions(studyId: string) {
 export async function addSystemCondition(studyId: string, label: string) {
   const id = generateId();
   const existing = await getSystemConditions(studyId);
-  await db.insert(systemConditions).values({
+  const row = {
     id,
     studyId,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(systemConditions).values(row);
+  return row;
 }
 
 export async function updateSystemCondition(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -380,13 +390,15 @@ export async function getThinkings(studyId: string) {
 export async function addThinking(studyId: string, label: string) {
   const id = generateId();
   const existing = await getThinkings(studyId);
-  await db.insert(thinkings).values({
+  const row = {
     id,
     studyId,
     label,
+    operationalDefinition: null as string | null,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(thinkings).values(row);
+  return row;
 }
 
 export async function updateThinking(id: string, data: { label?: string; operationalDefinition?: string | null }) {
@@ -452,13 +464,14 @@ export async function getWorkTypes(studyId: string) {
 export async function addWorkType(studyId: string, label: string) {
   const id = generateId();
   const existing = await getWorkTypes(studyId);
-  await db.insert(workTypes).values({
+  const row = {
     id,
     studyId,
     label,
     sortOrder: existing.length,
-  });
-  return id;
+  };
+  await db.insert(workTypes).values(row);
+  return row;
 }
 
 export async function updateWorkType(id: string, data: { label?: string }) {

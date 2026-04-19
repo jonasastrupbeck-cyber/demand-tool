@@ -293,6 +293,18 @@ export default function CapturePage() {
     // Keep entryType sticky for batch entry
   }
 
+  // apiPath → study.*Types key. Lets us append a newly created type to the
+  // right taxonomy in state without a full study refetch (perf P0, 2026-04-19).
+  const API_PATH_TO_STUDY_KEY: Record<string, keyof StudyData> = {
+    'demand-types': 'demandTypes',
+    'work-types': 'workTypes',
+    'what-matters-types': 'whatMattersTypes',
+    'life-problems': 'lifeProblems',
+    'system-conditions': 'systemConditions',
+    'thinkings': 'thinkings',
+    'handling-types': 'handlingTypes',
+  };
+
   async function handleAddType(
     apiPath: string,
     extraBody: Record<string, string>,
@@ -306,9 +318,21 @@ export default function CapturePage() {
       body: JSON.stringify({ label: newTypeLabel.trim(), ...extraBody }),
     });
     if (res.ok) {
-      const { id } = await res.json();
-      await refreshStudy();
-      onCreated(id);
+      const row = await res.json();
+      // Optimistic append to local study state — no refresh round-trip needed
+      // since the POST response is the full new row.
+      const taxonomyKey = API_PATH_TO_STUDY_KEY[apiPath];
+      if (taxonomyKey) {
+        setStudy((prev) => {
+          if (!prev) return prev;
+          const current = (prev[taxonomyKey] ?? []) as unknown[];
+          return { ...prev, [taxonomyKey]: [...current, row] } as StudyData;
+        });
+      } else {
+        // Unknown apiPath — fall back to refresh so we don't render stale.
+        await refreshStudy();
+      }
+      onCreated(row.id);
     }
     setNewTypeLabel('');
     setAddingType(null);
@@ -1721,6 +1745,9 @@ export default function CapturePage() {
                 study={study}
                 onChange={refreshStudy}
                 showHeader={false}
+                onOptimisticToggle={(field, value) => {
+                  setStudy((s) => s ? { ...s, [field]: value } : s);
+                }}
               />
             </div>
           </div>

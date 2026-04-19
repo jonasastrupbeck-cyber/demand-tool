@@ -811,7 +811,14 @@ export default function SettingsPage() {
 
         {/* What are we capturing? — toggles that replaced layer activation */}
         <div className={cardCls}>
-          <CaptureTogglesPanel code={code} study={study} onChange={loadStudy} />
+          <CaptureTogglesPanel
+            code={code}
+            study={study}
+            onChange={loadStudy}
+            onOptimisticToggle={(field, value) => {
+              setStudy((s) => s ? { ...s, [field]: value } : s);
+            }}
+          />
         </div>
 
         {/* Access code */}

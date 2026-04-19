@@ -31,12 +31,33 @@ interface Props {
   onChange: () => void | Promise<void>;
   /** When true, the outer card chrome (title, description, rounded border) is rendered. Use false when the parent already provides a heading (e.g. in a modal). */
   showHeader?: boolean;
+  /** Optional optimistic update. When provided, the parent updates its local
+   *  study state immediately; the PUT fires in the background. On PUT failure
+   *  the toggle is reverted. When omitted, the panel falls back to firing PUT
+   *  then awaiting onChange() (full refresh) — the pre-perf-pass behaviour. */
+  onOptimisticToggle?: (field: ToggleField, value: boolean) => void;
 }
 
-export default function CaptureTogglesPanel({ code, study, onChange, showHeader = true }: Props) {
+export default function CaptureTogglesPanel({ code, study, onChange, showHeader = true, onOptimisticToggle }: Props) {
   const { t } = useLocale();
 
   async function toggleCapture(field: ToggleField, value: boolean) {
+    if (onOptimisticToggle) {
+      // Optimistic: flip local state immediately, PUT in background, revert on error.
+      onOptimisticToggle(field, value);
+      try {
+        const res = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ [field]: value }),
+        });
+        if (!res.ok) onOptimisticToggle(field, !value);
+      } catch {
+        onOptimisticToggle(field, !value);
+      }
+      return;
+    }
+    // Fallback: PUT then full refresh.
     await fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

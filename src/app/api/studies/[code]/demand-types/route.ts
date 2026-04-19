@@ -29,6 +29,6 @@ export async function POST(
     return NextResponse.json({ error: 'Category must be "value" or "failure"' }, { status: 400 });
   }
 
-  const id = await addDemandType(study.id, body.category, body.label.trim());
-  return NextResponse.json({ id }, { status: 201 });
+  const row = await addDemandType(study.id, body.category, body.label.trim());
+  return NextResponse.json(row, { status: 201 });
 }

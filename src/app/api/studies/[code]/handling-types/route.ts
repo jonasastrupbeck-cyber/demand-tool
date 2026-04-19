@@ -26,6 +26,6 @@ export async function POST(
     return NextResponse.json({ error: 'Label is required' }, { status: 400 });
   }
 
-  const id = await addHandlingType(study.id, body.label.trim());
-  return NextResponse.json({ id }, { status: 201 });
+  const row = await addHandlingType(study.id, body.label.trim());
+  return NextResponse.json(row, { status: 201 });
 }
