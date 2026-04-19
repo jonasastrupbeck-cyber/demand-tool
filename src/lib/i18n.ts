@@ -247,11 +247,15 @@ const translations = {
     sv: 'V\u00e4lj typ...',
     de: 'Typ ausw\u00e4hlen...',
   },
+  // 'Capability of response' is the canonical EN term. Earlier da/sv/de
+  // translations said 'Handling at the transaction point' — a different concept.
+  // Aligned to the capability-of-response translations already used in the
+  // addHandlingButton / strand labels.
   'capture.handlingLabel': {
     en: 'Capability of response',
-    da: 'H\u00e5ndtering ved transaktionspunktet',
-    sv: 'Hantering vid transaktionspunkten',
-    de: 'Bearbeitung am Transaktionspunkt',
+    da: 'Reaktionskapacitet',
+    sv: 'Reaktionsförmåga',
+    de: 'Reaktionsfähigkeit',
   },
   'capture.selectHandling': {
     en: 'Select capability of response...',
@@ -1311,23 +1315,29 @@ const translations = {
     sv: '?',
     de: '?',
   },
+  // Sourced from Vanguard canonical framing (value work = delivers purpose;
+  // failure work = everything else / waste). Previous copy mischaracterised
+  // Work as "internal requests" which is closer to "internal demand".
   'capture.workHelp': {
-    en: 'Work comes from within the system — internal requests, information questions between colleagues, management reporting',
-    da: 'Arbejde kommer indefra systemet — interne henvendelser, informationsspørgsmål mellem kolleger, ledelsesrapportering',
-    sv: 'Arbete kommer inifrån systemet — interna förfrågningar, informationsfrågor mellan kollegor, ledningsrapportering',
-    de: 'Arbeit kommt aus dem System — interne Anfragen, Informationsfragen zwischen Kollegen, Management-Berichterstattung',
+    en: 'Work is the activity the service performs in response to demand. Value work directly delivers the customer\'s purpose; failure work is everything else — waste caused by system conditions.',
+    da: 'Arbejde er den aktivitet, servicen udfører som svar på efterspørgsel. Værdiskabende arbejde leverer kundens formål direkte; ikke-værdiskabende arbejde er alt andet — spild forårsaget af systembetingelser.',
+    sv: 'Arbete är den aktivitet tjänsten utför som svar på efterfrågan. Värdeskapande arbete levererar kundens syfte direkt; icke-värdeskapande arbete är allt annat — slöseri orsakat av systemfaktorer.',
+    de: 'Arbeit ist die Tätigkeit, die der Dienst als Antwort auf Nachfrage ausführt. Wertarbeit liefert direkt den Zweck des Kunden; Fehlerarbeit ist alles andere — Verschwendung, verursacht durch Systembedingungen.',
   },
   'capture.workClassificationHelp': {
-    en: 'Value work directly delivers purpose. Failure work is everything else. If unsure → ?',
-    da: 'Værdiskabende arbejde leverer formålet direkte. Ikke-værdiskabende arbejde er alt andet. I tvivl → ?',
-    sv: 'Värdeskapande arbete levererar syftet direkt. Icke-värdeskapande arbete är allt annat. Osäker → ?',
-    de: 'Wertarbeit liefert den Zweck direkt. Fehlerarbeit ist alles andere. Unsicher → ?',
+    en: 'Value work directly delivers the customer\'s purpose. Failure work is everything else — waste caused by system conditions. If unsure → ?',
+    da: 'Værdiskabende arbejde leverer kundens formål direkte. Ikke-værdiskabende arbejde er alt andet — spild forårsaget af systembetingelser. I tvivl → ?',
+    sv: 'Värdeskapande arbete levererar kundens syfte direkt. Icke-värdeskapande arbete är allt annat — slöseri orsakat av systemfaktorer. Osäker → ?',
+    de: 'Wertarbeit liefert direkt den Zweck des Kunden. Fehlerarbeit ist alles andere — Verschwendung, verursacht durch Systembedingungen. Unsicher → ?',
   },
+  // Sourced from Jonas's Obsidian vault (03-Resources/concepts/value-demand.md,
+  // failure-demand.md) and the Vanguard multilingual glossary. Danish terms are
+  // canonical per "Riv servicefabrikkerne ned"; never use "fejlefterspørgsel".
   'capture.demandHelp': {
-    en: 'Demand is what customers communicate to us when they pull value.',
-    da: 'Efterspørgsel er det, kunder kommunikerer til os, når de trækker værdi.',
-    sv: 'Efterfrågan är det kunderna kommunicerar till oss när de drar värde.',
-    de: 'Nachfrage ist das, was Kunden uns kommunizieren, wenn sie Wert abrufen.',
+    en: 'Demand is what the customer brings to the service — either a genuine need (value demand) or a contact caused by a failure on our part (failure demand).',
+    da: 'Efterspørgsel er det, kunden bringer til servicen — enten et reelt behov (værdiskabende efterspørgsel) eller en henvendelse forårsaget af en fejl fra vores side (ikke-værdiskabende efterspørgsel).',
+    sv: 'Efterfrågan är det kunden tar med till tjänsten — antingen ett verkligt behov (värdeskapande efterfrågan) eller en kontakt orsakad av ett misstag från vår sida (icke-värdeskapande efterfrågan).',
+    de: 'Nachfrage ist das, was der Kunde zum Dienst bringt — entweder ein echtes Bedürfnis (Wertnachfrage) oder ein Kontakt, verursacht durch einen Fehler unsererseits (Fehlernachfrage).',
   },
   'capture.thinkingScAttachLabel': {
     en: 'Attached to system conditions',
@@ -1335,11 +1345,14 @@ const translations = {
     sv: 'Kopplat till systemvillkor',
     de: 'Verknüpft mit Systembedingungen',
   },
+  // Sourced from value-demand.md + failure-demand.md in Jonas's Obsidian vault.
+  // Danish/Swedish wording taken from the multilingual Vanguard glossary
+  // (canonical per Riv servicefabrikkerne ned / Riv servicefabrikerna).
   'capture.demandClassificationHelp': {
-    en: 'Value demand: demand for what the organisation exists to do — demand we want. Failure demand: demand caused by a failure to do, or to do right, something for the customer.',
-    da: 'Værdiskabende efterspørgsel: efterspørgsel efter det, organisationen findes for at gøre — efterspørgsel vi ønsker. Ikke-værdiskabende efterspørgsel: efterspørgsel skabt af en fejl i at gøre — eller at gøre rigtigt — noget for kunden.',
-    sv: 'Värdeskapande efterfrågan: efterfrågan på det organisationen finns till för att göra — efterfrågan vi vill ha. Icke-värdeskapande efterfrågan: efterfrågan orsakad av att något inte gjorts, eller inte gjorts rätt, för kunden.',
-    de: 'Wertnachfrage: Nachfrage nach dem, wozu die Organisation existiert — Nachfrage, die wir wollen. Fehlernachfrage: Nachfrage, die dadurch entsteht, dass etwas für den Kunden nicht getan oder nicht richtig getan wurde.',
+    en: 'Value demand: a genuine customer need — what the organisation exists to serve. Failure demand: demand caused by a failure to do, or to do right, something for the customer.',
+    da: 'Værdiskabende efterspørgsel: et reelt kundebehov — det, organisationen findes for at levere. Ikke-værdiskabende efterspørgsel: efterspørgsel forårsaget af, at noget ikke er gjort eller ikke er gjort rigtigt fra kundens perspektiv.',
+    sv: 'Värdeskapande efterfrågan: ett verkligt kundbehov — det tjänsten finns till för att leverera. Icke-värdeskapande efterfrågan: efterfrågan orsakad av att något inte har gjorts eller inte har gjorts rätt ur kundens perspektiv.',
+    de: 'Wertnachfrage: ein echtes Kundenbedürfnis — das, wofür die Organisation existiert. Fehlernachfrage: Nachfrage, verursacht durch das Versäumnis, etwas für den Kunden zu tun oder es richtig zu tun.',
   },
   'capture.workTypeLabel': {
     en: 'Work type',
