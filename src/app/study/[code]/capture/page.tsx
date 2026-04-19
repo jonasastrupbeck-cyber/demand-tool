@@ -483,9 +483,29 @@ export default function CapturePage() {
     setLastEntry({ id: saved.id, verbatim: lastVerbatim });
     setSuccess(true);
     resetForm();
-    loadSuggestions();
-    loadTodayCount();
-    loadPendingCounts();
+
+    // Perf P1 (2026-04-19): POST response now carries the fresh entries list,
+    // pending counts, and failure-cause suggestions — skip three extra GETs.
+    // Fall back to the old fetches if the server hasn't deployed the new shape yet.
+    if (Array.isArray(saved.entries)) {
+      setEntries(saved.entries);
+    } else {
+      loadTodayCount();
+    }
+    if (saved.pendingCounts) {
+      setPendingCounts({
+        needsClassification: saved.pendingCounts.needsClassification || 0,
+        needsHandling: saved.pendingCounts.needsHandling || 0,
+        needsValueLink: saved.pendingCounts.needsValueLink || 0,
+      });
+    } else {
+      loadPendingCounts();
+    }
+    if (Array.isArray(saved.failureCauseSuggestions)) {
+      setFailureCauseSuggestions(saved.failureCauseSuggestions);
+    } else {
+      loadSuggestions();
+    }
 
     setTimeout(() => setSuccess(false), 4000);
   }

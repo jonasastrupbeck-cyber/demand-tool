@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStudyByCode, createEntry, getEntries, getEntryCountToday } from '@/lib/queries';
+import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions } from '@/lib/queries';
 
 export async function GET(
   request: NextRequest,
@@ -119,5 +119,17 @@ export async function POST(
       : undefined,
   });
 
-  return NextResponse.json({ id }, { status: 201 });
+  // Fold the three post-save refreshes into this response so the client skips
+  // three extra round-trips (entries list, pending counts, failure-cause
+  // suggestions) on every save. Parallel queries — fast server-side, one
+  // network hop for the client. (Perf P1, 2026-04-19.)
+  const [entries, pendingCounts, failureCauseSuggestions] = await Promise.all([
+    getEntries(study.id),
+    getPendingCounts(study.id),
+    getFailureCauseSuggestions(study.id),
+  ]);
+  return NextResponse.json(
+    { id, entries, pendingCounts, failureCauseSuggestions },
+    { status: 201 },
+  );
 }
