@@ -808,15 +808,19 @@ export default function CapturePage() {
             on every classification click anyway, so it's been removed.
             Three subtle strand separators inside teach the Vanguard frame each capture:
             "Demand"/"Work" → "Response" → "System" (S2 / 2026-04-19). */}
-        {classification && (() => {
+        {(classification || !study.classificationEnabled) && (() => {
           // Strand visibility checks — separator only shows if at least one child renders.
+          // When classification is disabled, treat "unclassified" demands as value for the
+          // purpose of rendering what-matters (per Vanguard: what matters sits on value demand;
+          // skipping classification means the tool assumes value).
           const isFailureDemand = isDemand && classification === 'failure';
           const isValueDemand = isDemand && classification === 'value';
+          const whatMattersVisible = isDemand && (isValueDemand || !study.classificationEnabled);
           const hasDemandStrand =
             (study.demandTypesEnabled && isDemand && classification !== 'unknown' && classification !== 'sequence') ||
             (study.workTypesEnabled && !isDemand) ||
             (study.valueLinkingEnabled && isFailureDemand) ||
-            (study.whatMattersEnabled && isValueDemand) ||
+            (study.whatMattersEnabled && whatMattersVisible) ||
             (study.lifeProblemsEnabled && isDemand) ||
             (!study.volumeMode && !isDemand); // Flow — always renders for work
           const hasResponseStrand = !!study.handlingEnabled;
@@ -926,7 +930,7 @@ export default function CapturePage() {
         {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is
             captured against the original Value Demand). Header dropped; leading "+ what matters" pill
             takes its place. Vanguard semantics: value/purpose/what-matters all read green. */}
-        {study.whatMattersEnabled && isDemand && classification === 'value' && (
+        {study.whatMattersEnabled && isDemand && (classification === 'value' || !study.classificationEnabled) && (
           <div>
             <div className="flex flex-wrap gap-2 justify-center">
               <button
@@ -963,7 +967,7 @@ export default function CapturePage() {
         )}
 
         {/* What matters note — collapsed by default. Auto-opens if the field already has text. (Value Demand only) */}
-        {study.whatMattersEnabled && isDemand && classification === 'value' && (
+        {study.whatMattersEnabled && isDemand && (classification === 'value' || !study.classificationEnabled) && (
           (whatMattersNoteOpen || whatMatters.trim()) ? (
             <div>
               <div className="flex items-center justify-between mb-1">

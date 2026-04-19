@@ -398,7 +398,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* What matters multi-select (Value Demand only — per Vanguard Method, What Matters is captured against the original Value Demand). Stored values are preserved when hidden so reclassifying back restores them. */}
-            {study.whatMattersEnabled && isDemand && entry.classification === 'value' && (
+            {study.whatMattersEnabled && isDemand && (entry.classification === 'value' || !study.classificationEnabled) && (
               <div>
                 <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -437,7 +437,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* What matters note (Value Demand only) — collapsed by default, auto-opens if field has text */}
-            {study.whatMattersEnabled && isDemand && entry.classification === 'value' && (
+            {study.whatMattersEnabled && isDemand && (entry.classification === 'value' || !study.classificationEnabled) && (
               (whatMattersNoteOpen || (entry.whatMatters && entry.whatMatters.trim())) ? (
                 <div>
                   <div className="flex items-center justify-between mb-1">
