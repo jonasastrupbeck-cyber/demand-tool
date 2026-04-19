@@ -21,9 +21,10 @@ const THEME = {
 };
 
 const COLORS = {
-  value: '#22c55e',
-  failure: '#ef4444',
-  // Blue-to-grey shades for non-classification data
+  value: '#22c55e',    // Tailwind green-500 — matches capture's value strand
+  failure: '#ef4444',  // Tailwind red-500 — matches capture's failure strand
+  unknown: '#6b7280',  // Tailwind gray-500 — matches capture's "?" unknown pill
+  // Blue-to-grey shades for categorical / non-classification data (PoT, contact method, etc.)
   neutral: ['#3b82f6', '#60a5fa', '#93c5fd', '#6b7280', '#9ca3af', '#475569', '#94a3b8', '#64748b'],
 };
 
@@ -686,7 +687,7 @@ export default function DashboardPage() {
                       <XAxis type="number" allowDecimals={false} tick={tickStyle} />
                       <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} />
                       <Tooltip {...tooltipStyle} />
-                      <Bar dataKey="count" fill="#60a5fa" radius={[0, 4, 4, 0]}>
+                      <Bar dataKey="count" fill={COLORS.value} radius={[0, 4, 4, 0]}>
                         <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 10 }} />
                       </Bar>
                     </BarChart>
@@ -711,7 +712,7 @@ export default function DashboardPage() {
                       <XAxis type="number" allowDecimals={false} tick={tickStyle} />
                       <YAxis type="category" dataKey="label" width={180} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 28 ? v.slice(0, 26) + '…' : v} />
                       <Tooltip {...tooltipStyle} />
-                      <Bar dataKey="count" fill="#60a5fa" radius={[0, 4, 4, 0]}>
+                      <Bar dataKey="count" fill={COLORS.value} radius={[0, 4, 4, 0]}>
                         <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
                       </Bar>
                     </BarChart>
@@ -1164,7 +1165,7 @@ export default function DashboardPage() {
                       >
                         <Cell fill={COLORS.value} />
                         <Cell fill={COLORS.failure} />
-                        {data.unknownCount > 0 && <Cell fill="#f59e0b" />}
+                        {data.unknownCount > 0 && <Cell fill={COLORS.unknown} />}
                       </Pie>
                       <Tooltip {...tooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 11, color: THEME.textSecondary }} />
@@ -1188,7 +1189,7 @@ export default function DashboardPage() {
                       >
                         <Cell fill={COLORS.value} />
                         <Cell fill={COLORS.failure} />
-                        {data.workUnknownCount > 0 && <Cell fill="#f59e0b" />}
+                        {data.workUnknownCount > 0 && <Cell fill={COLORS.unknown} />}
                       </Pie>
                       <Tooltip {...tooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 11, color: THEME.textSecondary }} />
