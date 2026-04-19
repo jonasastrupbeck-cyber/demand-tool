@@ -157,8 +157,8 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, t
               onKeyDown={(e) => handleKeyDown(e, idx)}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                 selected
-                  ? 'bg-[#ac2c2d] text-white ring-2 ring-[#ac2c2d] ring-offset-1'
-                  : 'bg-gray-50 text-gray-700 border border-gray-300 hover:border-[#ac2c2d]'
+                  ? 'bg-sky-500 text-white ring-2 ring-sky-500 ring-offset-1'
+                  : 'bg-gray-50 text-gray-700 border border-gray-300 hover:border-sky-500'
               }`}
             >
               {tl(opt.label)}

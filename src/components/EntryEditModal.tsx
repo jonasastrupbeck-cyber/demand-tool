@@ -769,7 +769,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       <button
                         type="button"
                         onClick={() => setScPickerOpen(true)}
-                        className="text-sm text-red-700 hover:text-red-900 font-medium"
+                        className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
                       >
                         {t('capture.addSystemConditionButton')}
                       </button>
@@ -867,7 +867,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     <button
                       type="button"
                       onClick={() => setThinkingPickerOpen(true)}
-                      className="text-sm text-red-700 hover:text-red-900 font-medium"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
                     >
                       {t('capture.addThinkingButton')}
                     </button>

@@ -1196,7 +1196,7 @@ export default function CapturePage() {
                     <button
                       type="button"
                       onClick={() => setScPickerOpen(true)}
-                      className="text-sm text-red-700 hover:text-red-900 font-medium"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
                     >
                       {t('capture.addSystemConditionButton')}
                     </button>
@@ -1314,7 +1314,7 @@ export default function CapturePage() {
                       type="button"
                       onClick={() => setThinkingPickerOpen(true)}
                       disabled={available.length === 0 && addingType !== 'thinking'}
-                      className="text-sm text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                      className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-sky-700 border border-dashed border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {t('capture.addThinkingButton')}
                     </button>
