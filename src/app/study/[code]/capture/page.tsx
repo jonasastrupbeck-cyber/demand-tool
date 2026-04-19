@@ -1381,11 +1381,14 @@ export default function CapturePage() {
           )
         )}
 
+        {study.classificationEnabled && study.thinkingsEnabled && scVisible && sep(t('capture.strand.thinking'))}
         {/* Thinking + per-pair logic — mirrors system conditions visibility.
              Phase 2 / Item 2: each selected Thinking gets a free-text "logic" textarea
              so we capture *why* this thinking shows up in this specific demand.
-             Header dropped — the "+ Add thinking" pill is self-explanatory; an ⓘ next
-             to it carries the definition ("what was the thinking causing the SCs?"). */}
+             Header dropped earlier — the "+ Add thinking" pill + ⓘ carry the definition.
+             A small "Thinking" sub-separator sits just above (2026-04-19): within
+             the System strand, Thinking is its own distinct concept and deserves the
+             same visual anchoring as SC gets from the SYSTEM separator above. */}
         {study.classificationEnabled && study.thinkingsEnabled && scVisible && (
           <div>
             <div className="space-y-2">

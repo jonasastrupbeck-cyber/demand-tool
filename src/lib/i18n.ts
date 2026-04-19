@@ -2026,6 +2026,12 @@ const translations = {
     sv: 'System',
     de: 'System',
   },
+  'capture.strand.thinking': {
+    en: 'Thinking',
+    da: 'Tænkning',
+    sv: 'Tänkande',
+    de: 'Denken',
+  },
   'capture.typeInOriginalValueDemandPlaceholder': {
     en: 'Type in new value demand',
     da: 'Skriv ny værdiskabende efterspørgsel',
