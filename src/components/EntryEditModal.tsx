@@ -456,31 +456,30 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                   />
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setWhatMattersNoteOpen(true)}
-                  className="text-sm text-blue-600 hover:underline"
-                >
-                  {t('capture.addNote')}
-                </button>
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setWhatMattersNoteOpen(true)}
+                    className="text-sm text-green-700 hover:underline"
+                  >
+                    {t('capture.addNote')}
+                  </button>
+                </div>
               )
             )}
 
-            {/* Life problem to be solved — demand only, single-select dropdown */}
+            {/* Life problem to be solved — demand only. Light-green pill (positive). */}
             {isDemand && (
               <div>
-                <label className={labelCls}>{t('capture.lifeProblemLabel')}</label>
-                <div className="flex gap-2">
-                  <select
+                <div className="flex gap-2 items-center">
+                  <PillSelect
+                    ariaLabel={t('capture.lifeProblemLabel')}
+                    placeholder={t('capture.lifeProblemLabel')}
                     value={entry.lifeProblemId || ''}
-                    onChange={(e) => setEntry({ ...entry, lifeProblemId: e.target.value || null })}
-                    className={inputCls}
-                  >
-                    <option value="">{t('capture.lifeProblemPlaceholder')}</option>
-                    {study.lifeProblems.map((lp) => (
-                      <option key={lp.id} value={lp.id}>{tl(lp.label)}</option>
-                    ))}
-                  </select>
+                    onChange={(id) => setEntry({ ...entry, lifeProblemId: id || null })}
+                    options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+                    variant="valueLight"
+                  />
                   <InlineTypeAdder
                     code={code}
                     apiPath="life-problems"

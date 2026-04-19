@@ -891,13 +891,15 @@ export default function CapturePage() {
               <textarea value={whatMatters} onChange={(e) => setWhatMatters(e.target.value)} placeholder={t('capture.whatMattersPlaceholder')} rows={2} className={inputCls} />
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setWhatMattersNoteOpen(true)}
-              className="text-sm text-green-700 hover:underline"
-            >
-              {t('capture.addNote')}
-            </button>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setWhatMattersNoteOpen(true)}
+                className="text-sm text-green-700 hover:underline"
+              >
+                {t('capture.addNote')}
+              </button>
+            </div>
           )
         )}
 
@@ -912,6 +914,7 @@ export default function CapturePage() {
                 value={lifeProblemId}
                 onChange={setLifeProblemId}
                 options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+                variant="valueLight"
               />
               {addBtn('lifeProblem')}
             </div>

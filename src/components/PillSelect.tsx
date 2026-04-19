@@ -19,7 +19,7 @@ export interface PillSelectOption {
   label: string;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'failure' | 'add';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -38,16 +38,19 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     return 'bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50';
   }
   if (variant === 'value') {
-    // Darker green so the value-demand pill visually separates from the lighter
-    // "What matters" pills (bg-green-50) that sit below in the same form.
-    return hasSelection
-      ? 'bg-green-200 text-green-900 border-green-500 hover:border-green-600'
-      : 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200';
+    // Dark solid green + white text. Matches the Classification "Value" pill when
+    // selected — same format, same weight. Asserts "this is the value demand".
+    return 'bg-green-600 text-white border-green-600 hover:bg-green-700 hover:border-green-700';
+  }
+  if (variant === 'valueLight') {
+    // Light green wash. Matches the "What matters" pills + the unselected Classification
+    // "Value" pill. Used where green = positive but the field is ambient context
+    // (e.g. Life problem to be solved).
+    return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
   }
   if (variant === 'failure') {
-    return hasSelection
-      ? 'bg-red-100 text-red-800 border-red-400 hover:border-red-500'
-      : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100';
+    // Dark solid red + white text — the failure-side twin of the 'value' variant.
+    return 'bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700';
   }
   return hasSelection
     ? 'bg-white text-gray-900 border-gray-300 hover:border-gray-400'
