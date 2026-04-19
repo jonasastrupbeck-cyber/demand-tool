@@ -70,6 +70,10 @@ interface StudyData {
   classificationEnabled: boolean;
   handlingEnabled: boolean;
   valueLinkingEnabled: boolean;
+  // Iterative-build toggles (migration 0013).
+  whatMattersEnabled: boolean;
+  thinkingsEnabled: boolean;
+  lifeProblemsEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];

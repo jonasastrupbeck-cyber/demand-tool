@@ -59,6 +59,10 @@ interface StudyData {
   classificationEnabled: boolean;
   handlingEnabled: boolean;
   valueLinkingEnabled: boolean;
+  // Iterative-build toggles (migration 0013).
+  whatMattersEnabled: boolean;
+  thinkingsEnabled: boolean;
+  lifeProblemsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -838,7 +842,7 @@ export default function CapturePage() {
         {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is
             captured against the original Value Demand). Header dropped; leading "+ what matters" pill
             takes its place. Vanguard semantics: value/purpose/what-matters all read green. */}
-        {isDemand && classification === 'value' && study.whatMattersTypes.length > 0 && (
+        {study.whatMattersEnabled && isDemand && classification === 'value' && (
           <div>
             <div className="flex flex-wrap gap-2 justify-center">
               <button
@@ -875,7 +879,7 @@ export default function CapturePage() {
         )}
 
         {/* What matters note — collapsed by default. Auto-opens if the field already has text. (Value Demand only) */}
-        {isDemand && classification === 'value' && (
+        {study.whatMattersEnabled && isDemand && classification === 'value' && (
           (whatMattersNoteOpen || whatMatters.trim()) ? (
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -904,8 +908,8 @@ export default function CapturePage() {
         )}
 
         {/* Life problem to be solved — demand only. Header removed: the placeholder carries
-            the "Life problem to be solved" prompt. */}
-        {isDemand && (
+            the "Life problem to be solved" prompt. Gated by lifeProblemsEnabled toggle. */}
+        {study.lifeProblemsEnabled && isDemand && (
           <div>
             <div className="flex gap-2 items-center justify-center">
               <PillSelect
@@ -1089,7 +1093,7 @@ export default function CapturePage() {
             Header dropped — the "+ Add system condition" pill is self-explanatory; an ⓘ
             next to it carries the definition. */}
         {study.classificationEnabled && scVisible && (
-          study.systemConditionsEnabled && (study.systemConditions || []).length > 0 ? (
+          study.systemConditionsEnabled ? (
             <div>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
@@ -1162,28 +1166,32 @@ export default function CapturePage() {
                     the list with dynamic default dimension + attachment (Ali 2026-04-16). */}
                 {(() => {
                   const available = (study.systemConditions || []).filter(sc => !systemConditions.some(p => p.id === sc.id));
-                  if (available.length === 0) return null;
+                  // Always render the row when SCs are toggled on: when there are
+                  // types available, show the "+ Add SC" PillSelect; when empty,
+                  // show just the addBtn so the user can seed the first type.
                   return (
                     <div className="flex gap-2 items-center justify-center">
-                      <PillSelect
-                        variant="add"
-                        placeholder={t('capture.addSystemConditionButton')}
-                        value=""
-                        onChange={(id) => {
-                          const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
-                          const isWork = entryType === 'work';
-                          setSystemConditions(prev => [...prev, {
-                            id,
-                            dimension: defaultDim,
-                            attachesToLifeProblem: false,
-                            attachesToDemand: !isWork,
-                            attachesToWhatMatters: false,
-                            attachesToCor: false,
-                            attachesToWork: isWork,
-                          }]);
-                        }}
-                        options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
-                      />
+                      {available.length > 0 && (
+                        <PillSelect
+                          variant="add"
+                          placeholder={t('capture.addSystemConditionButton')}
+                          value=""
+                          onChange={(id) => {
+                            const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                            const isWork = entryType === 'work';
+                            setSystemConditions(prev => [...prev, {
+                              id,
+                              dimension: defaultDim,
+                              attachesToLifeProblem: false,
+                              attachesToDemand: !isWork,
+                              attachesToWhatMatters: false,
+                              attachesToCor: false,
+                              attachesToWork: isWork,
+                            }]);
+                          }}
+                          options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
+                        />
+                      )}
                       {addBtn('systemCondition')}
                       <InfoPopover label={t('capture.systemConditionsLabel')}>
                         {t('capture.systemConditionsLabel')}
@@ -1238,7 +1246,7 @@ export default function CapturePage() {
              so we capture *why* this thinking shows up in this specific demand.
              Header dropped — the "+ Add thinking" pill is self-explanatory; an ⓘ next
              to it carries the definition ("what was the thinking causing the SCs?"). */}
-        {study.classificationEnabled && study.systemConditionsEnabled && scVisible && (
+        {study.classificationEnabled && study.thinkingsEnabled && scVisible && (
           <div>
             <div className="space-y-2">
               {thinkings.map((entry, idx) => {
@@ -1596,6 +1604,9 @@ export default function CapturePage() {
             workTypesEnabled: study.workTypesEnabled,
             workStepTypesEnabled: study.workStepTypesEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
+            whatMattersEnabled: study.whatMattersEnabled,
+            thinkingsEnabled: study.thinkingsEnabled,
+            lifeProblemsEnabled: study.lifeProblemsEnabled,
             oneStopHandlingType: study.oneStopHandlingType,
             handlingTypes: study.handlingTypes.map(h => ({ id: h.id, label: h.label, operationalDefinition: h.operationalDefinition })),
             demandTypes: study.demandTypes.map(d => ({ id: d.id, category: d.category, label: d.label })),

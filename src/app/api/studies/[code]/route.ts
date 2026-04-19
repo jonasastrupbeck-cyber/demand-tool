@@ -86,6 +86,10 @@ export async function PUT(
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;
   if (body.handlingEnabled !== undefined) updates.handlingEnabled = body.handlingEnabled;
   if (body.valueLinkingEnabled !== undefined) updates.valueLinkingEnabled = body.valueLinkingEnabled;
+  // Iterative-build toggles (migration 0013).
+  if (body.whatMattersEnabled !== undefined) updates.whatMattersEnabled = body.whatMattersEnabled;
+  if (body.thinkingsEnabled !== undefined) updates.thinkingsEnabled = body.thinkingsEnabled;
+  if (body.lifeProblemsEnabled !== undefined) updates.lifeProblemsEnabled = body.lifeProblemsEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   await updateStudy(study.id, updates);

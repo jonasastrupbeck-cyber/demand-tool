@@ -23,6 +23,11 @@ export const studies = pgTable('studies', {
   classificationEnabled: boolean('classification_enabled').notNull().default(false),
   handlingEnabled: boolean('handling_enabled').notNull().default(false),
   valueLinkingEnabled: boolean('value_linking_enabled').notNull().default(false),
+  // Iterative-build toggles (migration 0013). Default false so new studies start
+  // minimal; existing studies were backfilled from their implicit behaviour.
+  whatMattersEnabled: boolean('what_matters_enabled').notNull().default(false),
+  thinkingsEnabled: boolean('thinkings_enabled').notNull().default(false),
+  lifeProblemsEnabled: boolean('life_problems_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),

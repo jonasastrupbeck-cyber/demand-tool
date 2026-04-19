@@ -8,7 +8,10 @@ type ToggleField =
   | 'valueLinkingEnabled'
   | 'systemConditionsEnabled'
   | 'demandTypesEnabled'
-  | 'workTypesEnabled';
+  | 'workTypesEnabled'
+  | 'whatMattersEnabled'
+  | 'thinkingsEnabled'
+  | 'lifeProblemsEnabled';
 
 export interface CaptureTogglesPanelStudy {
   classificationEnabled: boolean;
@@ -17,6 +20,9 @@ export interface CaptureTogglesPanelStudy {
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
+  whatMattersEnabled: boolean;
+  thinkingsEnabled: boolean;
+  lifeProblemsEnabled: boolean;
 }
 
 interface Props {
@@ -41,10 +47,13 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
 
   const rows: Array<{ key: ToggleField; label: string; value: boolean }> = [
     { key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
+    { key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
+    { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+    { key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
     { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
     { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
     { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
-    { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+    { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
     { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
   ];
 

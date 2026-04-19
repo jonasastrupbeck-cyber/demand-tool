@@ -26,6 +26,10 @@ export interface EntryEditModalStudy {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   workStepTypesEnabled: boolean;
+  // Iterative-build toggles (migration 0013).
+  whatMattersEnabled: boolean;
+  thinkingsEnabled: boolean;
+  lifeProblemsEnabled: boolean;
   systemConditionsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -397,7 +401,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* What matters multi-select (Value Demand only — per Vanguard Method, What Matters is captured against the original Value Demand). Stored values are preserved when hidden so reclassifying back restores them. */}
-            {isDemand && entry.classification === 'value' && (
+            {study.whatMattersEnabled && isDemand && entry.classification === 'value' && (
               <div>
                 <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -434,7 +438,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* What matters note (Value Demand only) — collapsed by default, auto-opens if field has text */}
-            {isDemand && entry.classification === 'value' && (
+            {study.whatMattersEnabled && isDemand && entry.classification === 'value' && (
               (whatMattersNoteOpen || (entry.whatMatters && entry.whatMatters.trim())) ? (
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -469,7 +473,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             )}
 
             {/* Life problem to be solved — demand only. Light-green pill (positive). */}
-            {isDemand && (
+            {study.lifeProblemsEnabled && isDemand && (
               <div>
                 <div className="flex gap-2 items-center justify-center">
                   <PillSelect
@@ -647,7 +651,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {/* System conditions OR failure-cause textarea — same slot, mirrors Capture.
                 Phase 2 / Item 3: each SC carries Helps/Hinders dimension. */}
             {scVisible && (
-              study.systemConditionsEnabled && study.systemConditions.length > 0 ? (
+              study.systemConditionsEnabled ? (
                 <div>
                   <div className="space-y-2">
                     {systemConditions.map((entry, idx) => {
@@ -717,28 +721,32 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         with available SCs drops immediately. Picking appends to the list. */}
                     {(() => {
                       const available = study.systemConditions.filter((sc) => !systemConditions.some((x) => x.id === sc.id));
-                      if (available.length === 0) return null;
+                      // Always render the row when SCs are toggled on (parent gate). When
+                      // types are available, show the PillSelect; otherwise the InlineTypeAdder
+                      // alone lets the user seed the first type.
                       return (
                         <div className="flex gap-2 items-center justify-center">
-                          <PillSelect
-                            variant="add"
-                            placeholder={t('capture.addSystemConditionButton')}
-                            value=""
-                            onChange={(id) => {
-                              const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
-                              const isWork = entry?.entryType === 'work';
-                              setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
-                                id,
-                                dimension: defaultDim,
-                                attachesToLifeProblem: false,
-                                attachesToDemand: !isWork,
-                                attachesToWhatMatters: false,
-                                attachesToCor: false,
-                                attachesToWork: isWork,
-                              }]));
-                            }}
-                            options={available.map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
-                          />
+                          {available.length > 0 && (
+                            <PillSelect
+                              variant="add"
+                              placeholder={t('capture.addSystemConditionButton')}
+                              value=""
+                              onChange={(id) => {
+                                const defaultDim: 'helps' | 'hinders' = entry?.classification === 'value' ? 'helps' : 'hinders';
+                                const isWork = entry?.entryType === 'work';
+                                setSystemConditions((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, {
+                                  id,
+                                  dimension: defaultDim,
+                                  attachesToLifeProblem: false,
+                                  attachesToDemand: !isWork,
+                                  attachesToWhatMatters: false,
+                                  attachesToCor: false,
+                                  attachesToWork: isWork,
+                                }]));
+                              }}
+                              options={available.map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
+                            />
+                          )}
                           <InlineTypeAdder
                             code={code}
                             apiPath="system-conditions"
@@ -782,7 +790,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
             {/* Thinking + Logic — mirrors system conditions visibility.
                  Header dropped; ⓘ next to the "+ Add thinking" pill carries the definition. */}
-            {scVisible && study.systemConditionsEnabled && (
+            {scVisible && study.thinkingsEnabled && (
               <div>
                 <div className="space-y-2">
                   {thinkings.map((th, idx) => {
@@ -874,18 +882,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       with available thinkings drops immediately. Picking appends to the list. */}
                   {(() => {
                     const available = (study.thinkings || []).filter((th) => !thinkings.some((x) => x.id === th.id));
-                    if (available.length === 0) return null;
                     return (
                       <div className="flex gap-2 items-center justify-center">
-                        <PillSelect
-                          variant="add"
-                          placeholder={t('capture.addThinkingButton')}
-                          value=""
-                          onChange={(id) => {
-                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]));
-                          }}
-                          options={available.map((th) => ({ id: th.id, label: tl(th.label) }))}
-                        />
+                        {available.length > 0 && (
+                          <PillSelect
+                            variant="add"
+                            placeholder={t('capture.addThinkingButton')}
+                            value=""
+                            onChange={(id) => {
+                              setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]));
+                            }}
+                            options={available.map((th) => ({ id: th.id, label: tl(th.label) }))}
+                          />
+                        )}
                         <InlineTypeAdder
                           code={code}
                           apiPath="thinkings"

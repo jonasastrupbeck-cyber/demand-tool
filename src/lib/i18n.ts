@@ -2101,6 +2101,24 @@ const translations = {
     sv: 'Registrera arbetstyper',
     de: 'Arbeitstypen erfassen',
   },
+  'capture.toggles.whatMatters': {
+    en: 'Capture what matters',
+    da: 'Registrer hvad der betyder noget',
+    sv: 'Registrera vad som är viktigt',
+    de: 'Was wichtig ist erfassen',
+  },
+  'capture.toggles.thinkings': {
+    en: 'Capture thinking',
+    da: 'Registrer tænkning',
+    sv: 'Registrera tänkande',
+    de: 'Denken erfassen',
+  },
+  'capture.toggles.lifeProblems': {
+    en: 'Capture life problems',
+    da: 'Registrer livsproblemer',
+    sv: 'Registrera livsproblem',
+    de: 'Lebensprobleme erfassen',
+  },
   'capture.newTypePlaceholder': {
     en: 'New type name...',
     da: 'Nyt typenavn...',
