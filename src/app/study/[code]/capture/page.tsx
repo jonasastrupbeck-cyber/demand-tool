@@ -320,18 +320,20 @@ export default function CapturePage() {
     apiPath: string,
     extraBody: Record<string, string>,
     onCreated: (id: string) => void,
-    options?: { variant?: 'red' | 'green' | 'blue'; placeholder?: string },
+    options?: { variant?: 'red' | 'green' | 'blue' | 'indigo'; placeholder?: string },
   ) {
     if (addingType !== type) return null;
     const variant = options?.variant ?? 'red';
     const inputClass =
-      variant === 'green' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
-      variant === 'blue'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
-                            'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+      variant === 'green'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+      variant === 'blue'   ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+      variant === 'indigo' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none' :
+                             'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
     const addBtnClass =
-      variant === 'green' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
-      variant === 'blue'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
-                            'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
+      variant === 'green'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
+      variant === 'blue'   ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
+      variant === 'indigo' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-indigo-600 hover:bg-indigo-700' :
+                             'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
     return (
       <div className="flex gap-2 mt-2">
         <input
@@ -1405,9 +1407,10 @@ export default function CapturePage() {
                   <div className="flex gap-2 items-center justify-center">
                     {available.length > 0 ? (
                       // Populated: PillSelect dropdown with a "+ Add new" action at
-                      // the bottom (no separate grey + button).
+                      // the bottom (no separate grey + button). Indigo variant so
+                      // Thinking is visually distinct from the sky-blue SC add pill.
                       <PillSelect
-                        variant="add"
+                        variant="indigo"
                         placeholder={t('capture.addThinkingButton')}
                         value=""
                         onChange={(id) => {
@@ -1418,11 +1421,11 @@ export default function CapturePage() {
                         addNewLabel={t('capture.addNew')}
                       />
                     ) : (
-                      // Zero-state: blue pill goes straight to inline add-new-type input.
+                      // Zero-state: indigo pill goes straight to inline add-new-type input.
                       <button
                         type="button"
                         onClick={() => { setAddingType('thinking'); setNewTypeLabel(''); }}
-                        className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+                        className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-indigo-700 border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 transition-colors"
                       >
                         {t('capture.addThinkingButton')}
                       </button>
@@ -1434,7 +1437,7 @@ export default function CapturePage() {
                 );
               })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); }, { variant: 'blue', placeholder: t('capture.typeInThinkingPlaceholder') })}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]); }, { variant: 'indigo', placeholder: t('capture.typeInThinkingPlaceholder') })}
           </div>
         )}
 

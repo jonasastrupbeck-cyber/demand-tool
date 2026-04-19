@@ -19,7 +19,7 @@ export interface PillSelectOption {
   label: string;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add' | 'indigo';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -40,8 +40,13 @@ interface Props {
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
   if (variant === 'add') {
-    // "+ Add ..." style — solid light-blue outline, regardless of the (usually empty) value.
+    // "+ Add ..." style — solid light-blue (sky) outline. Used for system condition.
     return 'bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50';
+  }
+  if (variant === 'indigo') {
+    // Darker-blue twin of the 'add' variant. Used for thinking so it's visually
+    // distinct from system condition at a glance.
+    return 'bg-white text-indigo-700 border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50';
   }
   if (variant === 'value') {
     // Dark solid green + white text. Matches the Classification "Value" pill when
