@@ -908,19 +908,33 @@ export default function CapturePage() {
         )}
 
         {/* Life problem to be solved — demand only. Header removed: the placeholder carries
-            the "Life problem to be solved" prompt. Gated by lifeProblemsEnabled toggle. */}
+            the "Life problem to be solved" prompt. Gated by lifeProblemsEnabled toggle.
+            Zero-state: show a single green dashed "+ Life problem to be solved" pill
+            that opens the inline add-new-type input directly (matches "+ What matters"). */}
         {study.lifeProblemsEnabled && isDemand && (
           <div>
             <div className="flex gap-2 items-center justify-center">
-              <PillSelect
-                ariaLabel={t('capture.lifeProblemLabel')}
-                placeholder={t('capture.lifeProblemLabel')}
-                value={lifeProblemId}
-                onChange={setLifeProblemId}
-                options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
-                variant="valueLight"
-              />
-              {addBtn('lifeProblem')}
+              {study.lifeProblems.length > 0 ? (
+                <>
+                  <PillSelect
+                    ariaLabel={t('capture.lifeProblemLabel')}
+                    placeholder={t('capture.lifeProblemLabel')}
+                    value={lifeProblemId}
+                    onChange={setLifeProblemId}
+                    options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+                    variant="valueLight"
+                  />
+                  {addBtn('lifeProblem')}
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setAddingType('lifeProblem'); setNewTypeLabel(''); }}
+                  className="px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors"
+                >
+                  {t('capture.addLifeProblem')}
+                </button>
+              )}
             </div>
             {renderAddTypeInput('lifeProblem', 'life-problems', {}, (id) => setLifeProblemId(id))}
           </div>

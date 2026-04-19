@@ -472,24 +472,29 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               )
             )}
 
-            {/* Life problem to be solved — demand only. Light-green pill (positive). */}
+            {/* Life problem to be solved — demand only. Light-green pill (positive).
+                Zero-state uses the "+ Life problem to be solved" green dashed pill. */}
             {study.lifeProblemsEnabled && isDemand && (
               <div>
                 <div className="flex gap-2 items-center justify-center">
-                  <PillSelect
-                    ariaLabel={t('capture.lifeProblemLabel')}
-                    placeholder={t('capture.lifeProblemLabel')}
-                    value={entry.lifeProblemId || ''}
-                    onChange={(id) => setEntry({ ...entry, lifeProblemId: id || null })}
-                    options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
-                    variant="valueLight"
-                  />
+                  {study.lifeProblems.length > 0 && (
+                    <PillSelect
+                      ariaLabel={t('capture.lifeProblemLabel')}
+                      placeholder={t('capture.lifeProblemLabel')}
+                      value={entry.lifeProblemId || ''}
+                      onChange={(id) => setEntry({ ...entry, lifeProblemId: id || null })}
+                      options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+                      variant="valueLight"
+                    />
+                  )}
                   <InlineTypeAdder
                     code={code}
                     apiPath="life-problems"
                     onRefresh={onStudyRefresh}
                     onCreated={(id) => setEntry({ ...entry, lifeProblemId: id })}
-                    compact
+                    compact={study.lifeProblems.length > 0}
+                    pillLabel={study.lifeProblems.length === 0 ? t('capture.addLifeProblem') : undefined}
+                    pillVariant="green"
                   />
                 </div>
               </div>

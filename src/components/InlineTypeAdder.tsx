@@ -15,13 +15,17 @@ interface Props {
   onRefresh?: () => Promise<void> | void;
   // Compact button style (used inside modal rows). Default shows "+ Add" dashed button.
   compact?: boolean;
-  // When set, render the closed-state trigger as a solid light-blue "add" pill
-  // with this label text (e.g. "+ Add system condition"). Used on the capture form
-  // in empty-state when a typed add is needed but the dropdown has nothing to pick.
+  // When set, render the closed-state trigger as a coloured "add" pill with this
+  // label text (e.g. "+ Add system condition", "+ Life problem to be solved").
+  // Used on the capture form in empty-state when a typed add is needed but the
+  // dropdown has nothing to pick.
   pillLabel?: string;
+  // Colour theme for the pill trigger. Default 'blue' (matches system condition /
+  // thinking). Use 'green' to match the What Matters / Life Problem positive style.
+  pillVariant?: 'blue' | 'green';
 }
 
-export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel }: Props) {
+export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'blue' }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -51,12 +55,16 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
 
   if (!open) {
     if (pillLabel) {
-      // Blue "add" pill — matches PillSelect's add variant styling.
+      // Pill-style "add" trigger. Blue default (SC/Thinking); green for positive
+      // strands like What Matters / Life Problem.
+      const pillClass = pillVariant === 'green'
+        ? 'px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors'
+        : 'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors';
       return (
         <button
           type="button"
           onClick={() => { setOpen(true); setLabel(''); }}
-          className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+          className={pillClass}
         >
           {pillLabel}
         </button>

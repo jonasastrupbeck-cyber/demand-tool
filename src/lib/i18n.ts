@@ -1971,6 +1971,12 @@ const translations = {
     sv: '+ Vad är viktigt',
     de: '+ Was wichtig ist',
   },
+  'capture.addLifeProblem': {
+    en: '+ Life problem to be solved',
+    da: '+ Livsproblem der skal løses',
+    sv: '+ Livsproblem som ska lösas',
+    de: '+ Zu lösendes Lebensproblem',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {
