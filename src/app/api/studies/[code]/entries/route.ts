@@ -87,9 +87,21 @@ export async function POST(
     thinkings: Array.isArray(body.thinkings) && body.thinkings.every((t: unknown) =>
       t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string'
     )
-      ? body.thinkings.map((t: { id: string; logic?: string }) => ({
+      ? body.thinkings.map((t: {
+          id: string;
+          logic?: string;
+          scAttachments?: { systemConditionId?: string; dimension?: string }[];
+        }) => ({
           id: t.id,
           logic: typeof t.logic === 'string' ? t.logic : '',
+          scAttachments: Array.isArray(t.scAttachments)
+            ? t.scAttachments
+                .filter((a) => typeof a.systemConditionId === 'string')
+                .map((a) => ({
+                  systemConditionId: a.systemConditionId as string,
+                  dimension: (a.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+                }))
+            : [],
         }))
       : undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,

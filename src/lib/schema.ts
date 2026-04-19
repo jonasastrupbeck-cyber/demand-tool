@@ -180,6 +180,19 @@ export const demandEntryThinkings = pgTable('demand_entry_thinkings', {
   uniqEntryThinking: unique().on(t.demandEntryId, t.thinkingId),
 }));
 
+// Per-entry thinking↔SC attachments. Each thinking on an entry can attach to zero
+// or more SCs on the same entry, each with its own helps/hinders dimension.
+// Mirrors demandEntrySystemConditions' dimension pattern, one step up.
+export const demandEntryThinkingScs = pgTable('demand_entry_thinking_scs', {
+  id: text('id').primaryKey(),
+  demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
+  thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
+  systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
+  dimension: text('dimension').$type<'helps' | 'hinders'>().notNull().default('hinders'),
+}, (t) => ({
+  uniqEntryThinkingSc: unique().on(t.demandEntryId, t.thinkingId, t.systemConditionId),
+}));
+
 export const workDescriptionBlocks = pgTable('work_description_blocks', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),

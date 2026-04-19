@@ -86,7 +86,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   };
   const [systemConditions, setSystemConditions] = useState<ScAttachment[]>([]);
   const [scPickerOpen, setScPickerOpen] = useState(false);
-  const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
+  type ThinkingScAttachment = { systemConditionId: string; dimension: 'helps' | 'hinders' };
+  const [thinkings, setThinkings] = useState<{ id: string; logic: string; scAttachments: ThinkingScAttachment[] }[]>([]);
   const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
@@ -115,7 +116,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             attachesToWork:        !!sc.attachesToWork,
           };
         }) : []);
-        setThinkings(Array.isArray(data.thinkings) ? data.thinkings : []);
+        // Normalise loaded thinkings: older rows may lack scAttachments, default to [].
+        setThinkings(Array.isArray(data.thinkings)
+          ? data.thinkings.map((t: { id: string; logic?: string; scAttachments?: ThinkingScAttachment[] }) => ({
+              id: t.id,
+              logic: t.logic ?? '',
+              scAttachments: Array.isArray(t.scAttachments)
+                ? t.scAttachments.map((a) => ({
+                    systemConditionId: a.systemConditionId,
+                    dimension: a.dimension === 'helps' ? 'helps' as const : 'hinders' as const,
+                  }))
+                : [],
+            }))
+          : []);
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
@@ -822,6 +835,49 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-red-200 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
                           aria-label={t('capture.thinkingLogicLabel')}
                         />
+                        {/* SC attachment chips — migration 0011. Three-state click cycle:
+                            unattached → hinders (red) → helps (green) → unattached. */}
+                        {systemConditions.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-gray-500">{t('capture.thinkingScAttachLabel')}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {systemConditions.map((scEntry) => {
+                                const sc = study.systemConditions.find((s) => s.id === scEntry.id);
+                                if (!sc) return null;
+                                const current = th.scAttachments.find((a) => a.systemConditionId === scEntry.id);
+                                const state: 'off' | 'hinders' | 'helps' = !current ? 'off' : current.dimension;
+                                const classes =
+                                  state === 'hinders' ? 'bg-red-50 text-red-700 border-red-200' :
+                                  state === 'helps'   ? 'bg-green-50 text-green-700 border-green-200' :
+                                                        'bg-white text-gray-500 border-dashed border-gray-300 hover:border-gray-400';
+                                return (
+                                  <button
+                                    key={scEntry.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setThinkings((prev) => prev.map((p, i) => {
+                                        if (i !== idx) return p;
+                                        const existing = p.scAttachments.find((a) => a.systemConditionId === scEntry.id);
+                                        if (!existing) {
+                                          return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id, dimension: 'hinders' as const }] };
+                                        }
+                                        if (existing.dimension === 'hinders') {
+                                          return { ...p, scAttachments: p.scAttachments.map((a) => a.systemConditionId === scEntry.id ? { ...a, dimension: 'helps' as const } : a) };
+                                        }
+                                        return { ...p, scAttachments: p.scAttachments.filter((a) => a.systemConditionId !== scEntry.id) };
+                                      }));
+                                    }}
+                                    aria-pressed={state !== 'off'}
+                                    title={state === 'off' ? t('capture.scDimensionHint') : state === 'hinders' ? t('capture.scHinders') : t('capture.scHelps')}
+                                    className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${classes}`}
+                                  >
+                                    {tl(sc.label)}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -832,7 +888,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         onChange={(e) => {
                           const id = e.target.value;
                           if (id) {
-                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '' }]));
+                            setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [] }]));
                             setThinkingPickerOpen(false);
                           }
                         }}
@@ -850,7 +906,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         apiPath="thinkings"
                         onRefresh={onStudyRefresh}
                         onCreated={(id) => {
-                          setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '' }]));
+                          setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [] }]));
                           setThinkingPickerOpen(false);
                         }}
                         compact

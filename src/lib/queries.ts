@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -408,6 +408,19 @@ export async function getThinkingsForEntry(entryId: string) {
     .where(eq(demandEntryThinkings.demandEntryId, entryId));
 }
 
+// Per-migration-0011: attachments from each thinking on an entry to SCs on the
+// same entry, with a helps/hinders dimension.
+export async function getThinkingScAttachmentsForEntry(entryId: string) {
+  return db.select().from(demandEntryThinkingScs)
+    .where(eq(demandEntryThinkingScs.demandEntryId, entryId));
+}
+
+export async function getThinkingScAttachmentsForEntries(entryIds: string[]) {
+  if (entryIds.length === 0) return [];
+  return db.select().from(demandEntryThinkingScs)
+    .where(inArray(demandEntryThinkingScs.demandEntryId, entryIds));
+}
+
 export async function getPointsOfTransaction(studyId: string) {
   return db.select().from(pointsOfTransaction).where(eq(pointsOfTransaction.studyId, studyId)).orderBy(asc(pointsOfTransaction.sortOrder));
 }
@@ -575,7 +588,7 @@ export async function createEntry(studyId: string, data: {
     attachesToCor?: boolean;
     attachesToWork?: boolean;
   }[];
-  thinkings?: { id: string; logic: string }[];
+  thinkings?: { id: string; logic: string; scAttachments?: { systemConditionId: string; dimension: 'helps' | 'hinders' }[] }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
   linkedValueDemandEntryId?: string;
@@ -657,8 +670,11 @@ export async function createEntry(studyId: string, data: {
 
   // Insert thinking junction records (mirrors system conditions visibility).
   // Each entry carries a per-pair "logic" (free-text reasoning) — see Phase 2 / Item 2.
+  // Each thinking can also attach to zero or more SCs on the same entry with a
+  // helps/hinders dimension (migration 0011).
   const ths = data.thinkings || [];
   if (scVisible && ths.length > 0) {
+    const scIdsOnEntry = new Set(scs.map((s) => s.id));
     for (const th of ths) {
       await db.insert(demandEntryThinkings).values({
         id: generateId(),
@@ -666,6 +682,18 @@ export async function createEntry(studyId: string, data: {
         thinkingId: th.id,
         logic: th.logic || '',
       });
+      const attachments = th.scAttachments || [];
+      for (const att of attachments) {
+        // Defensive: only persist attachments for SCs actually on this entry.
+        if (!scIdsOnEntry.has(att.systemConditionId)) continue;
+        await db.insert(demandEntryThinkingScs).values({
+          id: generateId(),
+          demandEntryId: id,
+          thinkingId: th.id,
+          systemConditionId: att.systemConditionId,
+          dimension: att.dimension === 'helps' ? 'helps' : 'hinders',
+        });
+      }
     }
   }
 
@@ -764,7 +792,7 @@ export async function updateEntry(entryId: string, data: {
     attachesToCor?: boolean;
     attachesToWork?: boolean;
   }[];
-  thinkings?: { id: string; logic: string }[];
+  thinkings?: { id: string; logic: string; scAttachments?: { systemConditionId: string; dimension: 'helps' | 'hinders' }[] }[];
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
@@ -826,9 +854,19 @@ export async function updateEntry(entryId: string, data: {
     }
   }
 
-  // Update thinking junction records if provided. Carries per-pair logic.
+  // Update thinking junction records if provided. Carries per-pair logic and, per
+  // migration 0011, per-thinking SC attachments with helps/hinders dimension.
   if (thinkings !== undefined) {
+    // Always clear attachments first - they cascade from thinkings via FK, but
+    // with an ON DELETE no-op on this side we need to clean them explicitly.
+    await db.delete(demandEntryThinkingScs).where(eq(demandEntryThinkingScs.demandEntryId, entryId));
     await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
+    // Figure out which SCs are currently on this entry (either just updated above in
+    // this transaction, or still persisted if the caller didn't pass systemConditions).
+    const currentScs = await db.select({ id: demandEntrySystemConditions.systemConditionId })
+      .from(demandEntrySystemConditions)
+      .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+    const scIdsOnEntry = new Set(currentScs.map((r) => r.id));
     for (const th of thinkings) {
       await db.insert(demandEntryThinkings).values({
         id: generateId(),
@@ -836,6 +874,17 @@ export async function updateEntry(entryId: string, data: {
         thinkingId: th.id,
         logic: th.logic || '',
       });
+      const attachments = th.scAttachments || [];
+      for (const att of attachments) {
+        if (!scIdsOnEntry.has(att.systemConditionId)) continue;
+        await db.insert(demandEntryThinkingScs).values({
+          id: generateId(),
+          demandEntryId: entryId,
+          thinkingId: th.id,
+          systemConditionId: att.systemConditionId,
+          dimension: att.dimension === 'helps' ? 'helps' : 'hinders',
+        });
+      }
     }
   }
 
@@ -871,6 +920,7 @@ export async function getWorkBlocksForEntries(entryIds: string[]) {
 
 export async function deleteEntry(entryId: string) {
   await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+  await db.delete(demandEntryThinkingScs).where(eq(demandEntryThinkingScs.demandEntryId, entryId));
   await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
   await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
   await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));

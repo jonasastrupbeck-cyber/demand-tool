@@ -137,7 +137,13 @@ export default function CapturePage() {
   };
   const [systemConditions, setSystemConditions] = useState<ScAttachment[]>([]);
   const [scPickerOpen, setScPickerOpen] = useState(false);
-  const [thinkings, setThinkings] = useState<{ id: string; logic: string }[]>([]);
+  // Each thinking carries logic + zero-or-more SC attachments (migration 0011).
+  // Each attachment references a system condition already on this entry and has
+  // its own helps/hinders dimension. Stale attachments (SC removed from entry)
+  // stop rendering because the chip guard `if (!sc) return null` hides them,
+  // and they're pruned on the next save by the server-side filter.
+  type ThinkingScAttachment = { systemConditionId: string; dimension: 'helps' | 'hinders' };
+  const [thinkings, setThinkings] = useState<{ id: string; logic: string; scAttachments: ThinkingScAttachment[] }[]>([]);
   // Inline picker for "+ Add thinking"
   const [thinkingPickerOpen, setThinkingPickerOpen] = useState(false);
   const [whatMatters, setWhatMatters] = useState('');
@@ -1278,6 +1284,49 @@ export default function CapturePage() {
                       rows={2}
                       className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
                     />
+                    {/* SC attachment chips — migration 0011. One chip per SC on this entry.
+                        Three-state click cycle: unattached → hinders (red) → helps (green) → unattached. */}
+                    {systemConditions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs text-gray-500">{t('capture.thinkingScAttachLabel')}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {systemConditions.map((scEntry) => {
+                            const sc = (study.systemConditions || []).find(s => s.id === scEntry.id);
+                            if (!sc) return null;
+                            const current = entry.scAttachments.find(a => a.systemConditionId === scEntry.id);
+                            const state: 'off' | 'hinders' | 'helps' = !current ? 'off' : current.dimension;
+                            const classes =
+                              state === 'hinders' ? 'bg-red-50 text-red-700 border-red-200' :
+                              state === 'helps'   ? 'bg-green-50 text-green-700 border-green-200' :
+                                                    'bg-white text-gray-500 border-dashed border-gray-300 hover:border-gray-400';
+                            return (
+                              <button
+                                key={scEntry.id}
+                                type="button"
+                                onClick={() => {
+                                  setThinkings(prev => prev.map((p, i) => {
+                                    if (i !== idx) return p;
+                                    const existing = p.scAttachments.find(a => a.systemConditionId === scEntry.id);
+                                    if (!existing) {
+                                      return { ...p, scAttachments: [...p.scAttachments, { systemConditionId: scEntry.id, dimension: 'hinders' }] };
+                                    }
+                                    if (existing.dimension === 'hinders') {
+                                      return { ...p, scAttachments: p.scAttachments.map(a => a.systemConditionId === scEntry.id ? { ...a, dimension: 'helps' } : a) };
+                                    }
+                                    return { ...p, scAttachments: p.scAttachments.filter(a => a.systemConditionId !== scEntry.id) };
+                                  }));
+                                }}
+                                aria-pressed={state !== 'off'}
+                                title={state === 'off' ? t('capture.scDimensionHint') : state === 'hinders' ? t('capture.scHinders') : t('capture.scHelps')}
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors ${classes}`}
+                              >
+                                {tl(sc.label)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1293,7 +1342,7 @@ export default function CapturePage() {
                         onChange={(e) => {
                           const id = e.target.value;
                           if (!id) return;
-                          setThinkings(prev => [...prev, { id, logic: '' }]);
+                          setThinkings(prev => [...prev, { id, logic: '', scAttachments: [] }]);
                           setThinkingPickerOpen(false);
                         }}
                         className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
@@ -1323,7 +1372,7 @@ export default function CapturePage() {
                 );
               })()}
             </div>
-            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '' }]); setThinkingPickerOpen(false); })}
+            {renderAddTypeInput('thinking', 'thinkings', {}, (id) => { setThinkings(prev => [...prev, { id, logic: '', scAttachments: [] }]); setThinkingPickerOpen(false); })}
           </div>
         )}
 

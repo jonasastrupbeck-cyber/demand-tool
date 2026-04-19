@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getWorkBlocksForEntry } from '@/lib/queries';
+import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry } from '@/lib/queries';
 
 export async function GET(
   _request: Request,
@@ -18,10 +18,11 @@ export async function GET(
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
-  const [wmRows, scRows, thRows, wbRows] = await Promise.all([
+  const [wmRows, scRows, thRows, thScRows, wbRows] = await Promise.all([
     getWhatMattersForEntry(entryId),
     getSystemConditionsForEntry(entryId),
     getThinkingsForEntry(entryId),
+    getThinkingScAttachmentsForEntry(entryId),
     getWorkBlocksForEntry(entryId),
   ]);
 
@@ -37,7 +38,16 @@ export async function GET(
       attachesToCor:         r.attachesToCor,
       attachesToWork:        r.attachesToWork,
     })),
-    thinkings: thRows.map((r) => ({ id: r.thinkingId, logic: r.logic ?? '' })),
+    thinkings: thRows.map((r) => ({
+      id: r.thinkingId,
+      logic: r.logic ?? '',
+      scAttachments: thScRows
+        .filter((a) => a.thinkingId === r.thinkingId)
+        .map((a) => ({
+          systemConditionId: a.systemConditionId,
+          dimension: (a.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+        })),
+    })),
     workBlocks: wbRows.map((r) => ({
       tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure',
       text: r.text,
@@ -95,11 +105,23 @@ export async function PATCH(
     if (!Array.isArray(body.thinkings) || !body.thinkings.every((t: unknown) =>
       t && typeof t === 'object' && typeof (t as { id?: unknown }).id === 'string'
     )) {
-      return NextResponse.json({ error: 'thinkings must be an array of { id, logic? }' }, { status: 400 });
+      return NextResponse.json({ error: 'thinkings must be an array of { id, logic?, scAttachments? }' }, { status: 400 });
     }
-    updates.thinkings = body.thinkings.map((t: { id: string; logic?: string }) => ({
+    updates.thinkings = body.thinkings.map((t: {
+      id: string;
+      logic?: string;
+      scAttachments?: { systemConditionId?: string; dimension?: string }[];
+    }) => ({
       id: t.id,
       logic: typeof t.logic === 'string' ? t.logic : '',
+      scAttachments: Array.isArray(t.scAttachments)
+        ? t.scAttachments
+            .filter((a) => typeof a.systemConditionId === 'string')
+            .map((a) => ({
+              systemConditionId: a.systemConditionId as string,
+              dimension: (a.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+            }))
+        : [],
     }));
   }
   if (body.contactMethodId !== undefined) updates.contactMethodId = body.contactMethodId;
