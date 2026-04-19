@@ -30,6 +30,12 @@ interface Props {
   className?: string;
   /** Colour theme. 'value' = green, 'failure' = red, 'default' = neutral grey. */
   variant?: PillSelectVariant;
+  /** When provided, renders a "+ new" action at the bottom of the popover that
+   *  fires this callback instead of selecting an option. Lets the same pill drive
+   *  both "pick existing" and "create new" flows without a separate "+" button. */
+  onAddNew?: () => void;
+  /** Label for the "+ new" action row in the popover. */
+  addNewLabel?: string;
 }
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
@@ -57,7 +63,7 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100';
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default' }: Props) {
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.id === value) ?? null;
@@ -124,31 +130,48 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
           role="listbox"
           className="absolute z-30 left-0 top-full mt-1.5 min-w-full max-w-[calc(100vw-2rem)] py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
         >
-          {options.length === 0 ? (
+          {options.length === 0 && !onAddNew ? (
             <div className="px-3 py-2 text-sm text-gray-400">—</div>
           ) : (
-            options.map((opt) => {
-              const isSelected = opt.id === value;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => {
-                    onChange(opt.id);
-                    setOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 text-sm whitespace-nowrap transition-colors ${
-                    isSelected
-                      ? 'bg-gray-100 text-gray-900 font-medium'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })
+            <>
+              {options.map((opt) => {
+                const isSelected = opt.id === value;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => {
+                      onChange(opt.id);
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm whitespace-nowrap transition-colors ${
+                      isSelected
+                        ? 'bg-gray-100 text-gray-900 font-medium'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+              {onAddNew && (
+                <>
+                  {options.length > 0 && <div className="border-t border-gray-100 my-1" />}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAddNew();
+                      setOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm whitespace-nowrap text-sky-700 hover:bg-sky-50 transition-colors"
+                  >
+                    + {addNewLabel ?? 'Add new'}
+                  </button>
+                </>
+              )}
+            </>
           )}
         </div>
       )}

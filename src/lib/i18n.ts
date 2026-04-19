@@ -2014,10 +2014,10 @@ const translations = {
     de: 'Neue Reaktionsfähigkeit eingeben',
   },
   'capture.addHandlingButton': {
-    en: '+ Add capability of response',
-    da: '+ Tilføj reaktionskapacitet',
-    sv: '+ Lägg till reaktionsförmåga',
-    de: '+ Reaktionsfähigkeit hinzufügen',
+    en: '+ Capability of response',
+    da: '+ Reaktionskapacitet',
+    sv: '+ Reaktionsförmåga',
+    de: '+ Reaktionsfähigkeit',
   },
 
   // Capture form - linked demand

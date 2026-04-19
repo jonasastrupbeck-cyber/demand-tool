@@ -158,7 +158,7 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, t
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                 selected
                   ? 'bg-sky-500 text-white ring-2 ring-sky-500 ring-offset-1'
-                  : 'bg-gray-50 text-gray-700 border border-gray-300 hover:border-sky-500'
+                  : 'bg-white text-sky-700 border border-sky-300 hover:bg-sky-50 hover:border-sky-500'
               }`}
             >
               {tl(opt.label)}

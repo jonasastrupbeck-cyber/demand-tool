@@ -921,25 +921,46 @@ export default function CapturePage() {
           )
         )}
 
-        {/* Life problem to be solved — demand only. Header removed: the placeholder carries
-            the "Life problem to be solved" prompt. Gated by lifeProblemsEnabled toggle.
-            Zero-state: show a single green dashed "+ Life problem to be solved" pill
-            that opens the inline add-new-type input directly (matches "+ What matters"). */}
+        {/* Life problem to be solved — demand only. Mirrors the SC pattern: the
+            selected life problem renders as a green chip card below, and the
+            "+ Life problem to be solved" pill stays as the add trigger above.
+            Clearer than showing the selection as the pill text itself. */}
         {study.lifeProblemsEnabled && isDemand && (
-          <div>
+          <div className="space-y-2">
+            {/* Selected life problem card */}
+            {lifeProblemId && (() => {
+              const selected = study.lifeProblems.find((lp) => lp.id === lifeProblemId);
+              if (!selected) return null;
+              return (
+                <div className="flex justify-center">
+                  <div className="inline-flex items-center gap-2 p-3 rounded-lg border border-green-200 bg-green-50">
+                    <span className="px-2.5 py-1 rounded-full text-sm font-medium text-white bg-green-600">{tl(selected.label)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLifeProblemId('')}
+                      className="text-xs text-green-700 hover:text-green-900"
+                      aria-label="Remove"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+            {/* Add row — pill always shows "+ Life problem to be solved" so it reads
+                as an action regardless of current selection. */}
             <div className="flex gap-2 items-center justify-center">
               {study.lifeProblems.length > 0 ? (
-                <>
-                  <PillSelect
-                    ariaLabel={t('capture.lifeProblemLabel')}
-                    placeholder={t('capture.lifeProblemLabel')}
-                    value={lifeProblemId}
-                    onChange={setLifeProblemId}
-                    options={study.lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
-                    variant="valueLight"
-                  />
-                  {addBtn('lifeProblem')}
-                </>
+                <PillSelect
+                  ariaLabel={t('capture.lifeProblemLabel')}
+                  placeholder={t('capture.addLifeProblem')}
+                  value=""
+                  onChange={(id) => setLifeProblemId(id)}
+                  options={study.lifeProblems.filter((lp) => lp.id !== lifeProblemId).map((lp) => ({ id: lp.id, label: tl(lp.label) }))}
+                  variant="valueLight"
+                  onAddNew={() => { setAddingType('lifeProblem'); setNewTypeLabel(''); }}
+                  addNewLabel={t('capture.addNew')}
+                />
               ) : (
                 <button
                   type="button"
@@ -1212,32 +1233,33 @@ export default function CapturePage() {
                   return (
                     <div className="flex gap-2 items-center justify-center">
                       {available.length > 0 ? (
-                        <>
-                          <PillSelect
-                            variant="add"
-                            placeholder={t('capture.addSystemConditionButton')}
-                            value=""
-                            onChange={(id) => {
-                              const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
-                              const isWork = entryType === 'work';
-                              setSystemConditions(prev => [...prev, {
-                                id,
-                                dimension: defaultDim,
-                                attachesToLifeProblem: false,
-                                attachesToDemand: !isWork,
-                                attachesToWhatMatters: false,
-                                attachesToCor: false,
-                                attachesToWork: isWork,
-                              }]);
-                            }}
-                            options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
-                          />
-                          {addBtn('systemCondition')}
-                        </>
+                        // Populated: PillSelect dropdown shows existing SCs plus a
+                        // "+ Add new system condition" action at the bottom (no separate
+                        // grey + button needed).
+                        <PillSelect
+                          variant="add"
+                          placeholder={t('capture.addSystemConditionButton')}
+                          value=""
+                          onChange={(id) => {
+                            const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                            const isWork = entryType === 'work';
+                            setSystemConditions(prev => [...prev, {
+                              id,
+                              dimension: defaultDim,
+                              attachesToLifeProblem: false,
+                              attachesToDemand: !isWork,
+                              attachesToWhatMatters: false,
+                              attachesToCor: false,
+                              attachesToWork: isWork,
+                            }]);
+                          }}
+                          options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
+                          onAddNew={() => { setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                          addNewLabel={t('capture.addNew')}
+                        />
                       ) : (
-                        // Zero-state: same blue pill, click goes straight to the
-                        // inline add-new-type input (no dropdown since there's nothing
-                        // to pick yet). Matches PillSelect's add-variant styling.
+                        // Zero-state: blue pill goes straight to the inline add-new-type
+                        // input since there's nothing to pick.
                         <button
                           type="button"
                           onClick={() => { setAddingType('systemCondition'); setNewTypeLabel(''); }}
@@ -1394,18 +1416,19 @@ export default function CapturePage() {
                 return (
                   <div className="flex gap-2 items-center justify-center">
                     {available.length > 0 ? (
-                      <>
-                        <PillSelect
-                          variant="add"
-                          placeholder={t('capture.addThinkingButton')}
-                          value=""
-                          onChange={(id) => {
-                            setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
-                          }}
-                          options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
-                        />
-                        {addBtn('thinking')}
-                      </>
+                      // Populated: PillSelect dropdown with a "+ Add new" action at
+                      // the bottom (no separate grey + button).
+                      <PillSelect
+                        variant="add"
+                        placeholder={t('capture.addThinkingButton')}
+                        value=""
+                        onChange={(id) => {
+                          setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
+                        }}
+                        options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
+                        onAddNew={() => { setAddingType('thinking'); setNewTypeLabel(''); }}
+                        addNewLabel={t('capture.addNew')}
+                      />
                     ) : (
                       // Zero-state: blue pill goes straight to inline add-new-type input.
                       <button
