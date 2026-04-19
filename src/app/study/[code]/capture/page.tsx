@@ -1195,7 +1195,7 @@ export default function CapturePage() {
             <button
               type="button"
               onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-              className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+              className="px-3 py-1.5 rounded-full text-sm font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
             >
               {t('capture.addHandlingButton')}
             </button>
