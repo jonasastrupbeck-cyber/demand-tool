@@ -830,7 +830,7 @@ export default function CapturePage() {
             </div>
           );
           return (
-        <div className="space-y-4 pl-3 border-l-2 border-gray-100">
+        <div className="space-y-4 pl-3 border-l-2 border-gray-100 animate-fade-in-up">
         {hasDemandStrand && sep(isDemand ? t('capture.strand.demand') : t('capture.strand.work'))}
         {/* Demand type (moved up — part of the same "what is this" decision).
             Semantic colouring: value context → green pill; failure context → red pill.

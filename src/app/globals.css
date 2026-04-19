@@ -7,3 +7,21 @@
 html, body {
   background-color: #ffffff !important;
 }
+
+/* Subtle fade + slide-up for secondary-field sections that reveal after
+   classification pick. Reinforces the "fields follow meaning" affordance
+   without feeling animated for animation's sake. */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 180ms ease-out both;
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+  }
+}
