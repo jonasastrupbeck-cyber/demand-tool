@@ -65,11 +65,13 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
       //   green  = WM / Life Problem (dashed, positive)
       //   blue   = System Condition (sky)
       //   indigo = Thinking (deeper blue, visually distinct from SC)
+      // Variant name 'indigo' kept for API stability but uses Tailwind blue-* —
+      // a true darker blue, not purple.
       const pillClass =
         pillVariant === 'green'
           ? 'px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors'
         : pillVariant === 'indigo'
-          ? 'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-indigo-700 border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 transition-colors'
+          ? 'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors'
         :   'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors';
       return (
         <button
@@ -96,15 +98,17 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
     );
   }
 
+  // inputVariant 'indigo' uses Tailwind blue-* (true blue), not indigo. Kept as
+  // 'indigo' for API stability across call sites.
   const inputClass =
     inputVariant === 'green'  ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
     inputVariant === 'blue'   ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
-    inputVariant === 'indigo' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none' :
+    inputVariant === 'indigo' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
                                 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
   const addBtnClass =
     inputVariant === 'green'  ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
     inputVariant === 'blue'   ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
-    inputVariant === 'indigo' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-indigo-600 hover:bg-indigo-700' :
+    inputVariant === 'indigo' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
                                 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
   return (
     <div className="flex gap-2 mt-2">

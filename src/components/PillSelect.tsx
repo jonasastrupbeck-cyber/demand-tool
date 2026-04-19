@@ -46,7 +46,9 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   if (variant === 'indigo') {
     // Darker-blue twin of the 'add' variant. Used for thinking so it's visually
     // distinct from system condition at a glance.
-    return 'bg-white text-indigo-700 border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50';
+    // (Variant name kept for API stability; uses Tailwind blue-* — a true blue,
+    // not purple — so the "+ Add thinking" pill reads as deep blue rather than indigo.)
+    return 'bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50';
   }
   if (variant === 'value') {
     // Dark solid green + white text. Matches the Classification "Value" pill when
