@@ -15,9 +15,13 @@ interface Props {
   onRefresh?: () => Promise<void> | void;
   // Compact button style (used inside modal rows). Default shows "+ Add" dashed button.
   compact?: boolean;
+  // When set, render the closed-state trigger as a solid light-blue "add" pill
+  // with this label text (e.g. "+ Add system condition"). Used on the capture form
+  // in empty-state when a typed add is needed but the dropdown has nothing to pick.
+  pillLabel?: string;
 }
 
-export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact }: Props) {
+export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -46,6 +50,18 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
   }
 
   if (!open) {
+    if (pillLabel) {
+      // Blue "add" pill — matches PillSelect's add variant styling.
+      return (
+        <button
+          type="button"
+          onClick={() => { setOpen(true); setLabel(''); }}
+          className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+        >
+          {pillLabel}
+        </button>
+      );
+    }
     return (
       <button
         type="button"

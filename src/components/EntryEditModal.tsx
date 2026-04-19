@@ -721,9 +721,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         with available SCs drops immediately. Picking appends to the list. */}
                     {(() => {
                       const available = study.systemConditions.filter((sc) => !systemConditions.some((x) => x.id === sc.id));
-                      // Always render the row when SCs are toggled on (parent gate). When
-                      // types are available, show the PillSelect; otherwise the InlineTypeAdder
-                      // alone lets the user seed the first type.
+                      const hasAnyTypes = study.systemConditions.length > 0;
                       return (
                         <div className="flex gap-2 items-center justify-center">
                           {available.length > 0 && (
@@ -764,7 +762,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                 attachesToWork: isWork,
                               }]));
                             }}
-                            compact
+                            compact={hasAnyTypes}
+                            pillLabel={hasAnyTypes ? undefined : t('capture.addSystemConditionButton')}
                           />
                           <InfoPopover label={t('capture.systemConditionsLabel')}>
                             {t('capture.systemConditionsLabel')}
@@ -882,6 +881,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       with available thinkings drops immediately. Picking appends to the list. */}
                   {(() => {
                     const available = (study.thinkings || []).filter((th) => !thinkings.some((x) => x.id === th.id));
+                    const hasAnyTypes = (study.thinkings || []).length > 0;
                     return (
                       <div className="flex gap-2 items-center justify-center">
                         {available.length > 0 && (
@@ -902,7 +902,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           onCreated={(id) => {
                             setThinkings((prev) => (prev.some((x) => x.id === id) ? prev : [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]));
                           }}
-                          compact
+                          compact={hasAnyTypes}
+                          pillLabel={hasAnyTypes ? undefined : t('capture.addThinkingButton')}
                         />
                         <InfoPopover label={t('capture.thinkingLabel')}>
                           {t('capture.thinkingLabel')}

@@ -1166,33 +1166,43 @@ export default function CapturePage() {
                     the list with dynamic default dimension + attachment (Ali 2026-04-16). */}
                 {(() => {
                   const available = (study.systemConditions || []).filter(sc => !systemConditions.some(p => p.id === sc.id));
-                  // Always render the row when SCs are toggled on: when there are
-                  // types available, show the "+ Add SC" PillSelect; when empty,
-                  // show just the addBtn so the user can seed the first type.
                   return (
                     <div className="flex gap-2 items-center justify-center">
-                      {available.length > 0 && (
-                        <PillSelect
-                          variant="add"
-                          placeholder={t('capture.addSystemConditionButton')}
-                          value=""
-                          onChange={(id) => {
-                            const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
-                            const isWork = entryType === 'work';
-                            setSystemConditions(prev => [...prev, {
-                              id,
-                              dimension: defaultDim,
-                              attachesToLifeProblem: false,
-                              attachesToDemand: !isWork,
-                              attachesToWhatMatters: false,
-                              attachesToCor: false,
-                              attachesToWork: isWork,
-                            }]);
-                          }}
-                          options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
-                        />
+                      {available.length > 0 ? (
+                        <>
+                          <PillSelect
+                            variant="add"
+                            placeholder={t('capture.addSystemConditionButton')}
+                            value=""
+                            onChange={(id) => {
+                              const defaultDim: 'helps' | 'hinders' = classification === 'value' ? 'helps' : 'hinders';
+                              const isWork = entryType === 'work';
+                              setSystemConditions(prev => [...prev, {
+                                id,
+                                dimension: defaultDim,
+                                attachesToLifeProblem: false,
+                                attachesToDemand: !isWork,
+                                attachesToWhatMatters: false,
+                                attachesToCor: false,
+                                attachesToWork: isWork,
+                              }]);
+                            }}
+                            options={available.map(sc => ({ id: sc.id, label: tl(sc.label) }))}
+                          />
+                          {addBtn('systemCondition')}
+                        </>
+                      ) : (
+                        // Zero-state: same blue pill, click goes straight to the
+                        // inline add-new-type input (no dropdown since there's nothing
+                        // to pick yet). Matches PillSelect's add-variant styling.
+                        <button
+                          type="button"
+                          onClick={() => { setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+                        >
+                          {t('capture.addSystemConditionButton')}
+                        </button>
                       )}
-                      {addBtn('systemCondition')}
                       <InfoPopover label={t('capture.systemConditionsLabel')}>
                         {t('capture.systemConditionsLabel')}
                       </InfoPopover>
@@ -1338,30 +1348,31 @@ export default function CapturePage() {
                   available thinkings drops in immediately. Picking appends to the list. */}
               {(() => {
                 const available = (study.thinkings || []).filter(th => !thinkings.some(p => p.id === th.id));
-                if (available.length === 0 && addingType !== 'thinking') {
-                  return (
-                    <div className="flex justify-center gap-2 items-center">
-                      {addBtn('thinking')}
-                      <InfoPopover label={t('capture.thinkingLabel')}>
-                        {t('capture.thinkingLabel')}
-                      </InfoPopover>
-                    </div>
-                  );
-                }
                 return (
                   <div className="flex gap-2 items-center justify-center">
-                    {available.length > 0 && (
-                      <PillSelect
-                        variant="add"
-                        placeholder={t('capture.addThinkingButton')}
-                        value=""
-                        onChange={(id) => {
-                          setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
-                        }}
-                        options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
-                      />
+                    {available.length > 0 ? (
+                      <>
+                        <PillSelect
+                          variant="add"
+                          placeholder={t('capture.addThinkingButton')}
+                          value=""
+                          onChange={(id) => {
+                            setThinkings(prev => [...prev, { id, logic: '', scAttachments: [], dimension: 'hinders' }]);
+                          }}
+                          options={available.map(th => ({ id: th.id, label: tl(th.label) }))}
+                        />
+                        {addBtn('thinking')}
+                      </>
+                    ) : (
+                      // Zero-state: blue pill goes straight to inline add-new-type input.
+                      <button
+                        type="button"
+                        onClick={() => { setAddingType('thinking'); setNewTypeLabel(''); }}
+                        className="px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+                      >
+                        {t('capture.addThinkingButton')}
+                      </button>
                     )}
-                    {addBtn('thinking')}
                     <InfoPopover label={t('capture.thinkingLabel')}>
                       {t('capture.thinkingLabel')}
                     </InfoPopover>
