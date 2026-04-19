@@ -78,7 +78,7 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
         <div
           ref={popoverMountRef}
           role="tooltip"
-          className="absolute z-30 left-1/2 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg"
+          className="absolute z-30 left-1/2 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg whitespace-pre-line"
         >
           {children}
           <div
