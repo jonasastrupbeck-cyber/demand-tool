@@ -875,11 +875,12 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Work type (work only) — moved up, sits under classification row */}
+        {/* Work type (work only) — moved up, sits under classification row.
+            Header dropped; the PillSelect placeholder ("Select work type…")
+            is self-explanatory, mirroring the demand-type treatment. */}
         {study.workTypesEnabled && !isDemand && classification && (
           <div>
-            <label className={labelCls}>{t('capture.workTypeLabel')}</label>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center justify-center">
               <PillSelect
                 ariaLabel={t('capture.workTypeLabel')}
                 placeholder={t('capture.selectWorkType')}
