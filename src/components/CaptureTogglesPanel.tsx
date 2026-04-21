@@ -68,17 +68,21 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     await onChange();
   }
 
+  // Ordered to mirror the learning a typical team goes through: start by separating
+  // value from failure demand, then trace failure back to the value it failed to serve,
+  // then understand life problems and demand types, then what matters, capability of
+  // response, work and work types, and finally system conditions and thinking.
   const rows: Array<{ key: ToggleField; label: string; value: boolean }> = [
     { key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
-    { key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
-    { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
-    { key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
-    { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
     { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
-    { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
-    { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
+    { key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
+    { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+    { key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
+    { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
     { key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
     { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
+    { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
+    { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
   ];
 
   const list = (
