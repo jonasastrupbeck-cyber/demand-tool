@@ -1510,24 +1510,6 @@ const translations = {
     sv: 'Arbetsfördelning',
     de: 'Arbeitsaufteilung',
   },
-  'settings.workTracking': {
-    en: 'Work Tracking',
-    da: 'Arbejdssporing',
-    sv: 'Arbetsspårning',
-    de: 'Arbeitsverfolgung',
-  },
-  'settings.workTrackingDesc': {
-    en: 'Track internal work alongside customer demand. Work comes from within the system — internal requests, information questions between colleagues.',
-    da: 'Spor internt arbejde ved siden af kundeefterspørgsel. Arbejde kommer indefra systemet — interne henvendelser, informationsspørgsmål mellem kolleger.',
-    sv: 'Spåra internt arbete vid sidan av kundefterfrågan. Arbete kommer inifrån systemet — interna förfrågningar, informationsfrågor mellan kollegor.',
-    de: 'Verfolgen Sie interne Arbeit neben der Kundennachfrage. Arbeit kommt aus dem System — interne Anfragen, Informationsfragen zwischen Kollegen.',
-  },
-  'settings.enableWorkTracking': {
-    en: 'Enable work tracking',
-    da: 'Aktiver arbejdssporing',
-    sv: 'Aktivera arbetsspårning',
-    de: 'Arbeitsverfolgung aktivieren',
-  },
   'settings.workTypes': {
     en: 'Work Types',
     da: 'Arbejdstyper',
@@ -2186,6 +2168,12 @@ const translations = {
     da: 'Registrer efterspørgselstyper',
     sv: 'Registrera efterfrågetyper',
     de: 'Nachfragetypen erfassen',
+  },
+  'capture.toggles.work': {
+    en: 'Capture work',
+    da: 'Registrer arbejde',
+    sv: 'Registrera arbete',
+    de: 'Arbeit erfassen',
   },
   'capture.toggles.workTypes': {
     en: 'Capture work types',

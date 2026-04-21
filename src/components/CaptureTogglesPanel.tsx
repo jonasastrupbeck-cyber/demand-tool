@@ -8,6 +8,7 @@ type ToggleField =
   | 'valueLinkingEnabled'
   | 'systemConditionsEnabled'
   | 'demandTypesEnabled'
+  | 'workTrackingEnabled'
   | 'workTypesEnabled'
   | 'whatMattersEnabled'
   | 'thinkingsEnabled'
@@ -19,6 +20,7 @@ export interface CaptureTogglesPanelStudy {
   valueLinkingEnabled: boolean;
   systemConditionsEnabled: boolean;
   demandTypesEnabled: boolean;
+  workTrackingEnabled: boolean;
   workTypesEnabled: boolean;
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
@@ -75,6 +77,7 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
     { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
     { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
+    { key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
     { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
   ];
 

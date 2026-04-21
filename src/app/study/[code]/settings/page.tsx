@@ -343,16 +343,6 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  async function toggleWorkTracking() {
-    const newValue = !study?.workTrackingEnabled;
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workTrackingEnabled: newValue }),
-    });
-    loadStudy();
-  }
-
   async function addWorkTypeHandler(e: React.FormEvent) {
     e.preventDefault();
     if (!newWorkType.trim()) return;
@@ -1140,26 +1130,7 @@ export default function SettingsPage() {
         </div>
         )}
 
-        {/* Work Tracking */}
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workTracking')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.workTrackingDesc')}</p>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={study.workTrackingEnabled}
-                onChange={toggleWorkTracking}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
-              <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
-            </div>
-            <span className="text-sm text-gray-700 font-medium">{t('settings.enableWorkTracking')}</span>
-          </label>
-        </div>
-
-        {/* Work Types — gated on workTrackingEnabled + workTypesEnabled (toggle lives in CaptureTogglesPanel above) */}
+        {/* Work Types — gated on workTrackingEnabled + workTypesEnabled (both toggles live in CaptureTogglesPanel above) */}
         {study.workTrackingEnabled && study.workTypesEnabled && (
           <div className={cardCls}>
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workTypes')}</h2>
