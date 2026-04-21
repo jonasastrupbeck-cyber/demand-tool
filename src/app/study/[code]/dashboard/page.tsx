@@ -23,6 +23,7 @@ const THEME = {
 const COLORS = {
   value: '#22c55e',    // Tailwind green-500 — matches capture's value strand
   failure: '#ef4444',  // Tailwind red-500 — matches capture's failure strand
+  sequence: '#10b981', // Tailwind emerald-500 — matches capture's sequence pill (work-only)
   unknown: '#6b7280',  // Tailwind gray-500 — matches capture's "?" unknown pill
   // Blue-to-grey shades for categorical / non-classification data (PoT, contact method, etc.)
   neutral: ['#3b82f6', '#60a5fa', '#93c5fd', '#6b7280', '#9ca3af', '#475569', '#94a3b8', '#64748b'],
@@ -930,6 +931,9 @@ export default function DashboardPage() {
               <Card label={t('dashboard.workEntries')} value={data.workCount} />
               <Card label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
               <Card label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
+              {data.workSequenceCount > 0 && (
+                <Card label={t('capture.classificationWorkSequence')} value={data.workSequenceCount} color={COLORS.sequence} />
+              )}
               {data.workUnknownCount > 0 && (
                 <Card label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
               )}
@@ -941,24 +945,24 @@ export default function DashboardPage() {
               </div>
             ) : (
               <>
-                {/* Work value/failure pie */}
+                {/* Work value/failure/sequence pie */}
                 <ChartCard title={t('dashboard.workAnalysis')}>
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
-                        data={[
-                          { name: t('capture.value'), value: data.workValueCount },
-                          { name: t('capture.failure'), value: data.workFailureCount },
-                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount }] : []),
-                        ]}
+                        data={(() => {
+                          const slices: Array<{ name: string; value: number; fill: string }> = [
+                            { name: t('capture.value'), value: data.workValueCount, fill: COLORS.value },
+                            { name: t('capture.failure'), value: data.workFailureCount, fill: COLORS.failure },
+                          ];
+                          if (data.workSequenceCount > 0) slices.push({ name: t('capture.classificationWorkSequence'), value: data.workSequenceCount, fill: COLORS.sequence });
+                          if (data.workUnknownCount > 0) slices.push({ name: '?', value: data.workUnknownCount, fill: '#f59e0b' });
+                          return slices;
+                        })()}
                         cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
                         label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
                         labelLine={{ strokeWidth: 1 }}
-                      >
-                        {[COLORS.value, COLORS.failure, '#f59e0b'].slice(0, data.workUnknownCount > 0 ? 3 : 2).map((color, i) => (
-                          <Cell key={i} fill={color} />
-                        ))}
-                      </Pie>
+                      />
                       <Tooltip {...tooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
                     </PieChart>
@@ -967,11 +971,13 @@ export default function DashboardPage() {
 
                 {/* Work types by classification — stacked bar */}
                 {data.workTypesByClassification && data.workTypesByClassification.length > 0 && (() => {
+                  const hasSequence = data.workTypesByClassification.some(d => d.sequenceCount > 0);
                   const translated = data.workTypesByClassification.map(d => ({
                     label: tl(d.label),
                     [t('capture.value')]: d.valueCount,
+                    [t('capture.classificationWorkSequence')]: d.sequenceCount,
                     [t('capture.failure')]: d.failureCount,
-                    total: d.valueCount + d.failureCount,
+                    total: d.valueCount + d.failureCount + d.sequenceCount,
                   }));
                   return (
                     <ChartCard title={t('dashboard.workTypesByClass')}>
@@ -983,6 +989,7 @@ export default function DashboardPage() {
                           <Tooltip {...tooltipStyle} />
                           <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
                           <Bar dataKey={t('capture.value')} stackId="a" fill={COLORS.value} radius={[0, 0, 0, 0]} />
+                          {hasSequence && <Bar dataKey={t('capture.classificationWorkSequence')} stackId="a" fill={COLORS.sequence} radius={[0, 0, 0, 0]} />}
                           <Bar dataKey={t('capture.failure')} stackId="a" fill={COLORS.failure} radius={[0, 4, 4, 0]}>
                             <LabelList dataKey="total" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
                           </Bar>
@@ -1027,6 +1034,9 @@ export default function DashboardPage() {
                         <Tooltip {...tooltipStyle} />
                         <Legend wrapperStyle={{ color: THEME.textSecondary }} />
                         <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
+                        {data.workOverTime.some(d => d.sequenceCount > 0) && (
+                          <Line type="monotone" dataKey="sequenceCount" name={t('capture.classificationWorkSequence')} stroke={COLORS.sequence} strokeWidth={2} dot={{ r: 4 }} />
+                        )}
                         <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -1178,19 +1188,19 @@ export default function DashboardPage() {
                   <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
                       <Pie
-                        data={[
-                          { name: t('capture.value'), value: data.workValueCount },
-                          { name: t('capture.failure'), value: data.workFailureCount },
-                          ...(data.workUnknownCount > 0 ? [{ name: '?', value: data.workUnknownCount }] : []),
-                        ]}
+                        data={(() => {
+                          const slices: Array<{ name: string; value: number; fill: string }> = [
+                            { name: t('capture.value'), value: data.workValueCount, fill: COLORS.value },
+                            { name: t('capture.failure'), value: data.workFailureCount, fill: COLORS.failure },
+                          ];
+                          if (data.workSequenceCount > 0) slices.push({ name: t('capture.classificationWorkSequence'), value: data.workSequenceCount, fill: COLORS.sequence });
+                          if (data.workUnknownCount > 0) slices.push({ name: '?', value: data.workUnknownCount, fill: COLORS.unknown });
+                          return slices;
+                        })()}
                         cx="50%" cy="50%" outerRadius={60} innerRadius={25} dataKey="value"
                         label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
                         labelLine={{ strokeWidth: 1 }}
-                      >
-                        <Cell fill={COLORS.value} />
-                        <Cell fill={COLORS.failure} />
-                        {data.workUnknownCount > 0 && <Cell fill={COLORS.unknown} />}
-                      </Pie>
+                      />
                       <Tooltip {...tooltipStyle} />
                       <Legend wrapperStyle={{ fontSize: 11, color: THEME.textSecondary }} />
                     </PieChart>

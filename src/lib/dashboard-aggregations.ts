@@ -26,22 +26,108 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
+  //
+  // Perf (2026-04-21): the ~10 independent demand queries are parallelised via
+  // Promise.all. Previously each awaited sequentially — dashboard load was
+  // ~1.4 s on a ~120-entry study. Running them in parallel cuts that to roughly
+  // the slowest-single-query time. Post-processing (map reductions) stays
+  // sequential but is purely in-memory and fast.
+  const [
+    classificationCounts,
+    demandTypeCounts,
+    handlingTypeCounts,
+    contactMethodCounts,
+    lifeProblemCounts,
+    whatMattersCounts,
+    wmByClass,
+  ] = await Promise.all([
+    // Total counts by classification (demand only)
+    db.select({
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .where(demandWhere)
+      .groupBy(demandEntries.classification),
 
-  // Total counts by classification (demand only)
-  const classificationCounts = await db.select({
-    classification: demandEntries.classification,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .where(demandWhere)
-    .groupBy(demandEntries.classification);
+    // Demand type counts (top 10)
+    db.select({
+      label: demandTypes.label,
+      category: demandTypes.category,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
+      .where(demandWhere)
+      .groupBy(demandTypes.label, demandTypes.category)
+      .orderBy(desc(sql`count(*)`))
+      .limit(10),
+
+    // Handling type counts (demand only)
+    db.select({
+      label: handlingTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
+      .where(demandWhere)
+      .groupBy(handlingTypes.label)
+      .orderBy(desc(sql`count(*)`)),
+
+    // Contact method counts (demand only)
+    db.select({
+      label: contactMethods.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(contactMethods, eq(demandEntries.contactMethodId, contactMethods.id))
+      .where(demandWhere)
+      .groupBy(contactMethods.label)
+      .orderBy(desc(sql`count(*)`)),
+
+    // Life problem counts (demand only) — Phase 3
+    db.select({
+      label: lifeProblems.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(lifeProblems, eq(demandEntries.lifeProblemId, lifeProblems.id))
+      .where(demandWhere)
+      .groupBy(lifeProblems.label)
+      .orderBy(desc(sql`count(*)`)),
+
+    // What matters type counts (demand only, via junction table)
+    db.select({
+      label: whatMattersTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntryWhatMatters)
+      .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
+      .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
+      .where(demandWhere)
+      .groupBy(whatMattersTypes.label)
+      .orderBy(desc(sql`count(*)`)),
+
+    // What matters by classification (demand only, for Layer 5)
+    db.select({
+      label: whatMattersTypes.label,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntryWhatMatters)
+      .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
+      .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
+      .where(demandWhere)
+      .groupBy(whatMattersTypes.label, demandEntries.classification),
+  ]);
 
   const valueCount = classificationCounts.find(c => c.classification === 'value')?.count || 0;
   const failureCount = classificationCounts.find(c => c.classification === 'failure')?.count || 0;
   const unknownCount = classificationCounts.find(c => c.classification === 'unknown')?.count || 0;
   const totalEntries = valueCount + failureCount + unknownCount;
 
-  // Perfect percentage: value demand with one-stop handling as % of total demand
+  // Perfect percentage: value demand with one-stop handling as % of total demand.
+  // Depends on totalEntries from classificationCounts above, so stays sequential.
   let perfectPercentage = 0;
   if (oneStopId && totalEntries > 0) {
     const perfectCount = await db.select({
@@ -55,76 +141,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
       ));
     perfectPercentage = Math.round((perfectCount[0].count / totalEntries) * 100);
   }
-
-  // Demand type counts (top 10)
-  const demandTypeCounts = await db.select({
-    label: demandTypes.label,
-    category: demandTypes.category,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
-    .where(demandWhere)
-    .groupBy(demandTypes.label, demandTypes.category)
-    .orderBy(desc(sql`count(*)`))
-    .limit(10);
-
-  // Handling type counts (demand only)
-  const handlingTypeCounts = await db.select({
-    label: handlingTypes.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
-    .where(demandWhere)
-    .groupBy(handlingTypes.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // Contact method counts (demand only)
-  const contactMethodCounts = await db.select({
-    label: contactMethods.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(contactMethods, eq(demandEntries.contactMethodId, contactMethods.id))
-    .where(demandWhere)
-    .groupBy(contactMethods.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // Life problem counts (demand only) — Phase 3
-  const lifeProblemCounts = await db.select({
-    label: lifeProblems.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(lifeProblems, eq(demandEntries.lifeProblemId, lifeProblems.id))
-    .where(demandWhere)
-    .groupBy(lifeProblems.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // What matters type counts (demand only, via junction table)
-  const whatMattersCounts = await db.select({
-    label: whatMattersTypes.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntryWhatMatters)
-    .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
-    .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
-    .where(demandWhere)
-    .groupBy(whatMattersTypes.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // What matters by classification (demand only, for Layer 5)
-  const wmByClass = await db.select({
-    label: whatMattersTypes.label,
-    classification: demandEntries.classification,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntryWhatMatters)
-    .innerJoin(whatMattersTypes, eq(demandEntryWhatMatters.whatMattersTypeId, whatMattersTypes.id))
-    .innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
-    .where(demandWhere)
-    .groupBy(whatMattersTypes.label, demandEntries.classification);
 
   const wmClassMap = new Map<string, { valueCount: number; failureCount: number }>();
   for (const row of wmByClass) {
@@ -140,16 +156,170 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     ...counts,
   }));
 
-  // Handling by classification (demand only)
-  const handlingByClass = await db.select({
-    label: handlingTypes.label,
-    classification: demandEntries.classification,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
-    .where(demandWhere)
-    .groupBy(handlingTypes.label, demandEntries.classification);
+  // Second parallel batch — all independent of each other and of the first batch
+  // (apart from the `perfectPercentage` sequence above, which had to run first).
+  const allWhere = and(...baseConditions);
+  const [
+    handlingByClass,
+    demandOverTime,
+    failureCausesRaw,
+    helpingConditionsRaw,
+    failuresByOriginalValueDemand,
+    failureFlowLinksRaw,
+    potByClass,
+    whatMattersNotesRaw,
+    collectorStats,
+  ] = await Promise.all([
+    // Handling by classification (demand only)
+    db.select({
+      label: handlingTypes.label,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
+      .where(demandWhere)
+      .groupBy(handlingTypes.label, demandEntries.classification),
+
+    // Demand over time (demand only)
+    db.select({
+      date: sql<string>`${demandEntries.createdAt}::date`,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .where(demandWhere)
+      .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
+      .orderBy(sql`${demandEntries.createdAt}::date`),
+
+    // Failure causes / system conditions (demand only).
+    // Managed-SC branch or free-text branch, decided once up front.
+    systemConditionsEnabled
+      ? db.select({
+          cause: systemConditions.label,
+          count: sql<number>`count(*)::int`,
+        })
+          .from(demandEntrySystemConditions)
+          .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
+          .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+          .where(and(
+            ...demandConditions,
+            eq(demandEntries.classification, 'failure'),
+            eq(demandEntrySystemConditions.dimension, 'hinders'),
+          ))
+          .groupBy(systemConditions.label)
+          .orderBy(desc(sql`count(*)`))
+          .limit(15)
+      : db.select({
+          cause: demandEntries.failureCause,
+          count: sql<number>`count(*)::int`,
+        })
+          .from(demandEntries)
+          .where(and(
+            ...demandConditions,
+            eq(demandEntries.classification, 'failure'),
+            sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
+          ))
+          .groupBy(demandEntries.failureCause)
+          .orderBy(desc(sql`count(*)`))
+          .limit(15),
+
+    // Helping conditions (Phase 3) — empty array when managed SC is disabled.
+    systemConditionsEnabled
+      ? db.select({
+          cause: systemConditions.label,
+          count: sql<number>`count(*)::int`,
+        })
+          .from(demandEntrySystemConditions)
+          .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
+          .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+          .where(and(
+            eq(demandEntries.studyId, studyId),
+            ...(from ? [gte(demandEntries.createdAt, from)] : []),
+            ...(to ? [lte(demandEntries.createdAt, to)] : []),
+            eq(demandEntrySystemConditions.dimension, 'helps'),
+          ))
+          .groupBy(systemConditions.label)
+          .orderBy(desc(sql`count(*)`))
+          .limit(15)
+      : Promise.resolve([] as Array<{ cause: string | null; count: number }>),
+
+    // Failures by original value demand type (demand only)
+    db.select({
+      label: demandTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(demandTypes, eq(demandEntries.originalValueDemandTypeId, demandTypes.id))
+      .where(and(
+        ...demandConditions,
+        eq(demandEntries.classification, 'failure'),
+      ))
+      .groupBy(demandTypes.label)
+      .orderBy(desc(sql`count(*)`)),
+
+    // Failure flow: value demand type → failure demand type cross-tabulation
+    (() => {
+      const originalDemandType = alias(demandTypes, 'originalDemandType');
+      const failureDemandType = alias(demandTypes, 'failureDemandType');
+      return db.select({
+        sourceLabel: originalDemandType.label,
+        targetLabel: failureDemandType.label,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .innerJoin(originalDemandType, eq(demandEntries.originalValueDemandTypeId, originalDemandType.id))
+        .innerJoin(failureDemandType, eq(demandEntries.demandTypeId, failureDemandType.id))
+        .where(and(
+          ...demandConditions,
+          eq(demandEntries.classification, 'failure'),
+        ))
+        .groupBy(originalDemandType.label, failureDemandType.label)
+        .orderBy(desc(sql`count(*)`));
+    })(),
+
+    // Point of transaction by classification (demand only)
+    db.select({
+      label: pointsOfTransaction.label,
+      classification: demandEntries.classification,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(pointsOfTransaction, eq(demandEntries.pointOfTransactionId, pointsOfTransaction.id))
+      .where(demandWhere)
+      .groupBy(pointsOfTransaction.label, demandEntries.classification),
+
+    // What matters free-text notes (demand only)
+    db.select({
+      text: demandEntries.whatMatters,
+      date: sql<string>`${demandEntries.createdAt}::date`,
+      demandTypeLabel: demandTypes.label,
+      classification: demandEntries.classification,
+    })
+      .from(demandEntries)
+      .leftJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
+      .where(and(
+        ...demandConditions,
+        sql`${demandEntries.whatMatters} IS NOT NULL AND ${demandEntries.whatMatters} != ''`
+      ))
+      .orderBy(desc(demandEntries.createdAt)),
+
+    // Collector stats (all entries — demand + work)
+    db.select({
+      name: demandEntries.collectorName,
+      count: sql<number>`count(*)::int`,
+      lastActive: sql<string>`max(${demandEntries.createdAt})::date`,
+    })
+      .from(demandEntries)
+      .where(and(
+        allWhere,
+        sql`${demandEntries.collectorName} IS NOT NULL AND ${demandEntries.collectorName} != ''`
+      ))
+      .groupBy(demandEntries.collectorName)
+      .orderBy(desc(sql`count(*)`)),
+  ]);
+  const failureFlowLinks = failureFlowLinksRaw;
+  const whatMattersNotes = whatMattersNotesRaw;
 
   const handlingMap = new Map<string, { valueCount: number; failureCount: number }>();
   for (const row of handlingByClass) {
@@ -165,17 +335,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     ...counts,
   }));
 
-  // Demand over time (demand only)
-  const demandOverTime = await db.select({
-    date: sql<string>`${demandEntries.createdAt}::date`,
-    classification: demandEntries.classification,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .where(demandWhere)
-    .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
-    .orderBy(sql`${demandEntries.createdAt}::date`);
-
   const timeMap = new Map<string, { valueCount: number; failureCount: number }>();
   for (const row of demandOverTime) {
     if (!timeMap.has(row.date)) {
@@ -189,108 +348,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     date,
     ...counts,
   }));
-
-  // Failure causes / system conditions (demand only)
-  let failureCausesRaw: Array<{ cause: string | null; count: number }>;
-  if (systemConditionsEnabled) {
-    // Use junction table when managed system conditions are enabled
-    failureCausesRaw = await db.select({
-      cause: systemConditions.label,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntrySystemConditions)
-      .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
-      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
-      .where(and(
-        ...demandConditions,
-        eq(demandEntries.classification, 'failure'),
-        eq(demandEntrySystemConditions.dimension, 'hinders'),
-      ))
-      .groupBy(systemConditions.label)
-      .orderBy(desc(sql`count(*)`))
-      .limit(15);
-  } else {
-    // Fall back to free-text grouping
-    failureCausesRaw = await db.select({
-      cause: demandEntries.failureCause,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntries)
-      .where(and(
-        ...demandConditions,
-        eq(demandEntries.classification, 'failure'),
-        sql`${demandEntries.failureCause} IS NOT NULL AND ${demandEntries.failureCause} != ''`
-      ))
-      .groupBy(demandEntries.failureCause)
-      .orderBy(desc(sql`count(*)`))
-      .limit(15);
-  }
-
-  // Helping conditions (Phase 3) — system conditions tagged `helps`, aggregated
-  // across all entries (demand + work). Only meaningful when managed system
-  // conditions are enabled; empty array otherwise.
-  let helpingConditionsRaw: Array<{ cause: string | null; count: number }> = [];
-  if (systemConditionsEnabled) {
-    helpingConditionsRaw = await db.select({
-      cause: systemConditions.label,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntrySystemConditions)
-      .innerJoin(systemConditions, eq(demandEntrySystemConditions.systemConditionId, systemConditions.id))
-      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
-      .where(and(
-        eq(demandEntries.studyId, studyId),
-        ...(from ? [gte(demandEntries.createdAt, from)] : []),
-        ...(to ? [lte(demandEntries.createdAt, to)] : []),
-        eq(demandEntrySystemConditions.dimension, 'helps'),
-      ))
-      .groupBy(systemConditions.label)
-      .orderBy(desc(sql`count(*)`))
-      .limit(15);
-  }
-
-  // Failures by original value demand type (demand only)
-  const failuresByOriginalValueDemand = await db.select({
-    label: demandTypes.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(demandTypes, eq(demandEntries.originalValueDemandTypeId, demandTypes.id))
-    .where(and(
-      ...demandConditions,
-      eq(demandEntries.classification, 'failure'),
-    ))
-    .groupBy(demandTypes.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // Failure flow: value demand type → failure demand type cross-tabulation
-  const originalDemandType = alias(demandTypes, 'originalDemandType');
-  const failureDemandType = alias(demandTypes, 'failureDemandType');
-  const failureFlowLinks = await db.select({
-    sourceLabel: originalDemandType.label,
-    targetLabel: failureDemandType.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(originalDemandType, eq(demandEntries.originalValueDemandTypeId, originalDemandType.id))
-    .innerJoin(failureDemandType, eq(demandEntries.demandTypeId, failureDemandType.id))
-    .where(and(
-      ...demandConditions,
-      eq(demandEntries.classification, 'failure'),
-    ))
-    .groupBy(originalDemandType.label, failureDemandType.label)
-    .orderBy(desc(sql`count(*)`));
-
-  // Point of transaction by classification (demand only)
-  const potByClass = await db.select({
-    label: pointsOfTransaction.label,
-    classification: demandEntries.classification,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(pointsOfTransaction, eq(demandEntries.pointOfTransactionId, pointsOfTransaction.id))
-    .where(demandWhere)
-    .groupBy(pointsOfTransaction.label, demandEntries.classification);
 
   const potMap = new Map<string, { valueCount: number; failureCount: number }>();
   for (const row of potByClass) {
@@ -306,36 +363,6 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     ...counts,
   }));
 
-  // What matters free-text notes (demand only)
-  const whatMattersNotes = await db.select({
-    text: demandEntries.whatMatters,
-    date: sql<string>`${demandEntries.createdAt}::date`,
-    demandTypeLabel: demandTypes.label,
-    classification: demandEntries.classification,
-  })
-    .from(demandEntries)
-    .leftJoin(demandTypes, eq(demandEntries.demandTypeId, demandTypes.id))
-    .where(and(
-      ...demandConditions,
-      sql`${demandEntries.whatMatters} IS NOT NULL AND ${demandEntries.whatMatters} != ''`
-    ))
-    .orderBy(desc(demandEntries.createdAt));
-
-  // Collector stats (all entries — demand + work)
-  const allWhere = and(...baseConditions);
-  const collectorStats = await db.select({
-    name: demandEntries.collectorName,
-    count: sql<number>`count(*)::int`,
-    lastActive: sql<string>`max(${demandEntries.createdAt})::date`,
-  })
-    .from(demandEntries)
-    .where(and(
-      allWhere,
-      sql`${demandEntries.collectorName} IS NOT NULL AND ${demandEntries.collectorName} != ''`
-    ))
-    .groupBy(demandEntries.collectorName)
-    .orderBy(desc(sql`count(*)`));
-
   const collectorCounts = collectorStats.map(r => ({ name: r.name!, count: r.count, lastActive: r.lastActive }));
 
   // ── WORK AGGREGATIONS ──
@@ -343,80 +370,88 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
   let workCount = 0;
   let workValueCount = 0;
   let workFailureCount = 0;
+  let workSequenceCount = 0;
   let workUnknownCount = 0;
   let workTypeCounts: Array<{ label: string; count: number }> = [];
-  let workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number }> = [];
-  let workOverTime: Array<{ date: string; valueCount: number; failureCount: number; unknownCount: number }> = [];
+  let workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number; sequenceCount: number }> = [];
+  let workOverTime: Array<{ date: string; valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }> = [];
 
   if (workTrackingEnabled) {
-    const workClassCounts = await db.select({
-      classification: demandEntries.classification,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntries)
-      .where(workWhere)
-      .groupBy(demandEntries.classification);
+    // Work section — all three queries are independent. Parallelise.
+    const [workClassCounts, wtCountsRaw, workTypeByClass, workOT] = await Promise.all([
+      db.select({
+        classification: demandEntries.classification,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .where(workWhere)
+        .groupBy(demandEntries.classification),
+
+      // Work type counts
+      db.select({
+        label: workTypes.label,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+        .where(workWhere)
+        .groupBy(workTypes.label)
+        .orderBy(desc(sql`count(*)`)),
+
+      // Work types by classification
+      db.select({
+        label: workTypes.label,
+        classification: demandEntries.classification,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+        .where(workWhere)
+        .groupBy(workTypes.label, demandEntries.classification),
+
+      // Work over time
+      db.select({
+        date: sql<string>`${demandEntries.createdAt}::date`,
+        classification: demandEntries.classification,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .where(workWhere)
+        .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
+        .orderBy(sql`${demandEntries.createdAt}::date`),
+    ]);
+    workTypeCounts = wtCountsRaw;
 
     workValueCount = workClassCounts.find(c => c.classification === 'value')?.count || 0;
     workFailureCount = workClassCounts.find(c => c.classification === 'failure')?.count || 0;
+    workSequenceCount = workClassCounts.find(c => c.classification === 'sequence')?.count || 0;
     workUnknownCount = workClassCounts.find(c => c.classification === 'unknown')?.count || 0;
-    workCount = workValueCount + workFailureCount + workUnknownCount;
+    workCount = workValueCount + workFailureCount + workSequenceCount + workUnknownCount;
 
-    // Work type counts
-    workTypeCounts = await db.select({
-      label: workTypes.label,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntries)
-      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
-      .where(workWhere)
-      .groupBy(workTypes.label)
-      .orderBy(desc(sql`count(*)`));
-
-    // Work types by classification
-    const workTypeByClass = await db.select({
-      label: workTypes.label,
-      classification: demandEntries.classification,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntries)
-      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
-      .where(workWhere)
-      .groupBy(workTypes.label, demandEntries.classification);
-
-    const wtClassMap = new Map<string, { valueCount: number; failureCount: number }>();
+    const wtClassMap = new Map<string, { valueCount: number; failureCount: number; sequenceCount: number }>();
     for (const row of workTypeByClass) {
       if (!wtClassMap.has(row.label)) {
-        wtClassMap.set(row.label, { valueCount: 0, failureCount: 0 });
+        wtClassMap.set(row.label, { valueCount: 0, failureCount: 0, sequenceCount: 0 });
       }
       const entry = wtClassMap.get(row.label)!;
       if (row.classification === 'value') entry.valueCount = row.count;
       else if (row.classification === 'failure') entry.failureCount = row.count;
+      else if (row.classification === 'sequence') entry.sequenceCount = row.count;
     }
     workTypesByClassification = Array.from(wtClassMap.entries()).map(([label, counts]) => ({
       label,
       ...counts,
     }));
 
-    // Work over time
-    const workOT = await db.select({
-      date: sql<string>`${demandEntries.createdAt}::date`,
-      classification: demandEntries.classification,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(demandEntries)
-      .where(workWhere)
-      .groupBy(sql`${demandEntries.createdAt}::date`, demandEntries.classification)
-      .orderBy(sql`${demandEntries.createdAt}::date`);
-
-    const workTimeMap = new Map<string, { valueCount: number; failureCount: number; unknownCount: number }>();
+    const workTimeMap = new Map<string, { valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }>();
     for (const row of workOT) {
       if (!workTimeMap.has(row.date)) {
-        workTimeMap.set(row.date, { valueCount: 0, failureCount: 0, unknownCount: 0 });
+        workTimeMap.set(row.date, { valueCount: 0, failureCount: 0, sequenceCount: 0, unknownCount: 0 });
       }
       const entry = workTimeMap.get(row.date)!;
       if (row.classification === 'value') entry.valueCount = row.count;
       else if (row.classification === 'failure') entry.failureCount = row.count;
+      else if (row.classification === 'sequence') entry.sequenceCount = row.count;
       else entry.unknownCount = row.count;
     }
     workOverTime = Array.from(workTimeMap.entries()).map(([date, counts]) => ({
@@ -613,6 +648,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date):
     workCount,
     workValueCount,
     workFailureCount,
+    workSequenceCount,
     workUnknownCount,
     workTypeCounts,
     workTypesByClassification,
