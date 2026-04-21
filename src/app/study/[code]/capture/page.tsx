@@ -647,8 +647,10 @@ export default function CapturePage() {
         </div>
       )}
 
-      {/* Demand / Work tabs (only when work tracking is enabled) */}
-      {study.workTrackingEnabled && (
+      {/* Demand / Work tabs — shown when work tracking is on, OR when the user has
+          enabled "Capture work types" (which cascades workTrackingEnabled on via the
+          API so dashboard aggregations and downstream work features also light up). */}
+      {(study.workTrackingEnabled || study.workTypesEnabled) && (
         <div className="mb-4">
           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-200 rounded-lg">
             <div className="relative">

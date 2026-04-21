@@ -62,7 +62,15 @@ export async function PUT(
   if (body.workTrackingEnabled !== undefined) updates.workTrackingEnabled = body.workTrackingEnabled;
   if (body.systemConditionsEnabled !== undefined) updates.systemConditionsEnabled = body.systemConditionsEnabled;
   if (body.demandTypesEnabled !== undefined) updates.demandTypesEnabled = body.demandTypesEnabled;
-  if (body.workTypesEnabled !== undefined) updates.workTypesEnabled = body.workTypesEnabled;
+  if (body.workTypesEnabled !== undefined) {
+    updates.workTypesEnabled = body.workTypesEnabled;
+    // Cascade: enabling "Capture work types" also turns on Work Tracking so the
+    // Demand/Work tabs render and dashboard aggregations light up. Disabling it
+    // does NOT turn Work Tracking off — that stays user-controlled.
+    if (body.workTypesEnabled === true && body.workTrackingEnabled === undefined && !study.workTrackingEnabled) {
+      updates.workTrackingEnabled = true;
+    }
+  }
   if (body.workStepTypesEnabled !== undefined) updates.workStepTypesEnabled = body.workStepTypesEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
@@ -77,8 +85,10 @@ export async function PUT(
 
   await updateStudy(study.id, updates);
 
-  // Seed default work types when enabling work tracking for the first time
-  if (body.workTrackingEnabled === true) {
+  // Seed default work types when enabling work tracking for the first time —
+  // either via an explicit workTrackingEnabled toggle or via the workTypesEnabled
+  // cascade above.
+  if (updates.workTrackingEnabled === true) {
     await seedDefaultWorkTypes(study.id, body.locale || 'en');
   }
 
