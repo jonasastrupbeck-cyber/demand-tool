@@ -887,7 +887,7 @@ export default function CapturePage() {
                 value={workTypeId}
                 onChange={setWorkTypeId}
                 options={study.workTypes.map((wt) => ({ id: wt.id, label: tl(wt.label) }))}
-                variant={classification === 'value' ? 'value' : classification === 'sequence' ? 'valueLight' : classification === 'failure' ? 'failure' : 'default'}
+                variant={classification === 'value' ? 'value' : classification === 'sequence' ? 'sequence' : classification === 'failure' ? 'failure' : 'default'}
               />
               {addBtn('work')}
             </div>

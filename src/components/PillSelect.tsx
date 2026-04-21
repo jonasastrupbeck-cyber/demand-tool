@@ -23,7 +23,7 @@ export interface PillSelectOption {
   operationalDefinition?: string | null;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'failure' | 'add' | 'thinking';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'sequence' | 'failure' | 'add' | 'thinking';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -63,6 +63,12 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     // "Value" pill. Used where green = positive but the field is ambient context
     // (e.g. Life problem to be solved).
     return 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+  }
+  if (variant === 'sequence') {
+    // Solid emerald. Matches the Classification "Sequence" pill when selected
+    // (bg-emerald-500/border-emerald-500). Used for sequence work entries so
+    // the work-type pill reads the same emerald as the classification above it.
+    return 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 hover:border-emerald-600';
   }
   if (variant === 'failure') {
     // Dark solid red + white text — the failure-side twin of the 'value' variant.
