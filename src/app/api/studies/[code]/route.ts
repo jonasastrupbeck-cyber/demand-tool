@@ -83,7 +83,12 @@ export async function PUT(
   if (body.lifeProblemsEnabled !== undefined) updates.lifeProblemsEnabled = body.lifeProblemsEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
-  await updateStudy(study.id, updates);
+  // Only call the DB update when we actually have something to set — Drizzle's
+  // .set({}) rejects empty objects with "No values to set". A PUT containing
+  // only unrecognised fields should be a no-op, not a 500.
+  if (Object.keys(updates).length > 0) {
+    await updateStudy(study.id, updates);
+  }
 
   // Seed default work types when enabling work tracking for the first time —
   // either via an explicit workTrackingEnabled toggle or via the workTypesEnabled
