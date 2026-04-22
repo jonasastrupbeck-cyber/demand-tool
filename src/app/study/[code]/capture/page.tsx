@@ -1795,14 +1795,14 @@ export default function CapturePage() {
 
       {showTogglesModal && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/10 z-50 flex items-center justify-center p-4"
           onClick={() => setShowTogglesModal(false)}
         >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white/70 backdrop-blur-md rounded-xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-white/40"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
+            <div className="p-5 border-b border-gray-200/60 flex items-center justify-between sticky top-0 bg-white/70 backdrop-blur-md">
               <h3 className="font-bold text-gray-900">{t('capture.toggles.title')}</h3>
               <button
                 onClick={() => setShowTogglesModal(false)}
