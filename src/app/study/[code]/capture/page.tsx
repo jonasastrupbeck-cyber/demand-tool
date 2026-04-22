@@ -59,6 +59,8 @@ interface StudyData {
   flowWorkEnabled: boolean;
   // Work sources toggle (migration 0015).
   workSourcesEnabled: boolean;
+  // Work-tab classification preset (migration 0016).
+  workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
   volumeMode: boolean;
   activeLayer: number;
   classificationEnabled: boolean;
@@ -782,7 +784,7 @@ export default function CapturePage() {
               >
                 {isDemand ? t('capture.value') : t('capture.classificationWorkValue')}
               </button>
-              {!isDemand && (
+              {!isDemand && study.workClassificationMode === 'value-sequence-failure-unknown' && (
                 <button
                   type="button"
                   onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}

@@ -2235,6 +2235,12 @@ const translations = {
     sv: 'Registrera arbetskälla',
     de: 'Arbeitsquelle erfassen',
   },
+  'capture.toggles.sequenceWork': {
+    en: 'Capture sequence work',
+    da: 'Registrer sekvensarbejde',
+    sv: 'Registrera sekvensarbete',
+    de: 'Sequenzarbeit erfassen',
+  },
   'capture.toggles.whatMatters': {
     en: 'Capture what matters',
     da: 'Registrer hvad der betyder noget',

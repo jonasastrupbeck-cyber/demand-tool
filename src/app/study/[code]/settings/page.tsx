@@ -69,6 +69,8 @@ interface StudyData {
   flowWorkEnabled: boolean;
   // Work sources toggle (migration 0015).
   workSourcesEnabled: boolean;
+  // Work-tab classification preset (migration 0016).
+  workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;

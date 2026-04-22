@@ -74,9 +74,12 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     // Dark solid red + white text — the failure-side twin of the 'value' variant.
     return 'bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700';
   }
-  return hasSelection
-    ? 'bg-white text-gray-900 border-gray-300 hover:border-gray-400'
-    : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100';
+  // Default variant — same style regardless of selection state so neighbouring
+  // pills (PoT, Contact method, Work source) read as one consistent row. The
+  // placeholder text previously used a lighter shade, which made the selected
+  // pill next to it look too dark by comparison (Jonas 2026-04-22).
+  void hasSelection;
+  return 'bg-white text-gray-900 border-gray-300 hover:border-gray-400';
 }
 
 export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel }: Props) {

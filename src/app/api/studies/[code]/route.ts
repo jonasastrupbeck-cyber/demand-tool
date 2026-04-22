@@ -79,6 +79,12 @@ export async function PUT(
   if (body.flowWorkEnabled !== undefined) updates.flowWorkEnabled = body.flowWorkEnabled;
   // Work sources toggle (migration 0015) — session-sticky pill on the Work tab.
   if (body.workSourcesEnabled !== undefined) updates.workSourcesEnabled = body.workSourcesEnabled;
+  // Work classification preset (migration 0016).
+  if (typeof body.workClassificationMode === 'string'
+      && (body.workClassificationMode === 'value-sequence-failure-unknown'
+       || body.workClassificationMode === 'value-failure-unknown')) {
+    updates.workClassificationMode = body.workClassificationMode;
+  }
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;

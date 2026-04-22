@@ -17,6 +17,12 @@ type ToggleField =
   | 'thinkingsEnabled'
   | 'lifeProblemsEnabled';
 
+// Virtual toggle — the UI renders it as a plain on/off row, but it writes to
+// studies.workClassificationMode (text enum) rather than a boolean column.
+// Keeping it distinct from ToggleField so the optimistic-update callback keeps
+// its simple boolean shape.
+const SEQUENCE_WORK_VIRTUAL = 'sequenceWorkEnabled' as const;
+
 export interface CaptureTogglesPanelStudy {
   classificationEnabled: boolean;
   handlingEnabled: boolean;
@@ -31,6 +37,9 @@ export interface CaptureTogglesPanelStudy {
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
+  // Work-tab classification preset (migration 0016). Drives the "Capture
+  // sequence work" virtual toggle — derived from this, not a column of its own.
+  workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
 }
 
 interface Props {
@@ -74,24 +83,43 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     await onChange();
   }
 
+  // Sequence-work virtual toggle — maps the on/off UI onto the
+  // workClassificationMode text enum on the server. We bypass the generic
+  // optimistic path because the field key doesn't match the schema column.
+  async function toggleSequenceWork(value: boolean) {
+    const mode = value ? 'value-sequence-failure-unknown' : 'value-failure-unknown';
+    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workClassificationMode: mode }),
+    });
+    await onChange();
+  }
+
   // Ordered to mirror the learning a typical team goes through: start by separating
   // value from failure demand, then trace failure back to the value it failed to serve,
   // then understand life problems and demand types, then what matters, capability of
   // response, work and work types, and finally system conditions and thinking.
-  const rows: Array<{ key: ToggleField; label: string; value: boolean }> = [
-    { key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
-    { key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
-    { key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
-    { key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
-    { key: 'flowDemandEnabled', label: t('capture.toggles.flowDemand'), value: study.flowDemandEnabled },
-    { key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
-    { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
-    { key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
-    { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
-    { key: 'flowWorkEnabled', label: t('capture.toggles.flowWork'), value: study.flowWorkEnabled },
-    { key: 'workSourcesEnabled', label: t('capture.toggles.workSources'), value: study.workSourcesEnabled },
-    { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
-    { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
+  type Row =
+    | { kind: 'toggle'; key: ToggleField; label: string; value: boolean }
+    | { kind: 'virtual'; key: typeof SEQUENCE_WORK_VIRTUAL; label: string; value: boolean };
+
+  const rows: Row[] = [
+    { kind: 'toggle', key: 'classificationEnabled', label: t('capture.toggles.classification'), value: study.classificationEnabled },
+    { kind: 'toggle', key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
+    { kind: 'toggle', key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
+    { kind: 'toggle', key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+    { kind: 'toggle', key: 'flowDemandEnabled', label: t('capture.toggles.flowDemand'), value: study.flowDemandEnabled },
+    { kind: 'toggle', key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
+    { kind: 'toggle', key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
+    { kind: 'toggle', key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
+    { kind: 'toggle', key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
+    // Sequence-work virtual toggle — on = show Sequence pill on Work tab.
+    { kind: 'virtual', key: SEQUENCE_WORK_VIRTUAL, label: t('capture.toggles.sequenceWork'), value: study.workClassificationMode === 'value-sequence-failure-unknown' },
+    { kind: 'toggle', key: 'flowWorkEnabled', label: t('capture.toggles.flowWork'), value: study.flowWorkEnabled },
+    { kind: 'toggle', key: 'workSourcesEnabled', label: t('capture.toggles.workSources'), value: study.workSourcesEnabled },
+    { kind: 'toggle', key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
+    { kind: 'toggle', key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
   ];
 
   const list = (
@@ -105,7 +133,13 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
           <input
             type="checkbox"
             checked={row.value}
-            onChange={(e) => toggleCapture(row.key, e.target.checked)}
+            onChange={(e) => {
+              if (row.kind === 'virtual') {
+                toggleSequenceWork(e.target.checked);
+              } else {
+                toggleCapture(row.key, e.target.checked);
+              }
+            }}
             className="h-4 w-4 accent-[#ac2c2d]"
           />
         </label>

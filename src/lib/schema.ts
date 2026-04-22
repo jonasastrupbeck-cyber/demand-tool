@@ -24,6 +24,15 @@ export const studies = pgTable('studies', {
   // Work sources — opt-in taxonomy: "Where did the work come from?"
   // Renders as a session-sticky pill on the Work tab only (migration 0015).
   workSourcesEnabled: boolean('work_sources_enabled').notNull().default(false),
+  // Work-tab classification preset (migration 0016). Chooses which pills appear
+  // on the Value / Sequence / Failure / ? row for work captures:
+  //   'value-sequence-failure-unknown' (default) — all four
+  //   'value-failure-unknown'                    — drops the Sequence pill
+  // Demand tab is unaffected; it keeps Value / Failure / ? always.
+  workClassificationMode: text('work_classification_mode')
+    .$type<'value-sequence-failure-unknown' | 'value-failure-unknown'>()
+    .notNull()
+    .default('value-sequence-failure-unknown'),
   volumeMode: boolean('volume_mode').notNull().default(false),
   lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
