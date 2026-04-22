@@ -1808,12 +1808,13 @@ export default function CapturePage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Grey pill-shaped header — title centred, close button floated
-                to the right edge so the centring stays true. */}
-            <div className="relative px-3 py-2 mb-3 rounded-full bg-gray-200 shadow-sm sticky top-0">
-              <h3 className="font-semibold text-gray-700 text-sm text-center">{t('capture.toggles.title')}</h3>
+                to the right edge so the centring stays true. Dark outline
+                + larger bold text so it reads clearly as a headline. */}
+            <div className="relative px-4 py-3 mb-3 rounded-full bg-gray-200 border-2 border-gray-700 shadow-sm sticky top-0">
+              <h3 className="font-bold text-gray-800 text-lg text-center">{t('capture.toggles.title')}</h3>
               <button
                 onClick={() => setShowTogglesModal(false)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800 text-xl leading-none"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900 text-2xl leading-none"
                 aria-label="Close"
               >
                 &times;
