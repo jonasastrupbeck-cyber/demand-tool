@@ -33,6 +33,10 @@ export const studies = pgTable('studies', {
     .$type<'value-sequence-failure-unknown' | 'value-failure-unknown'>()
     .notNull()
     .default('value-sequence-failure-unknown'),
+  // Independent gate for the whole Work-tab classification row (migration 0017).
+  // When false, work entries save without asking for a value/failure/? choice;
+  // classification defaults to 'unknown' server-side. Demand tab is unaffected.
+  workClassificationEnabled: boolean('work_classification_enabled').notNull().default(true),
   volumeMode: boolean('volume_mode').notNull().default(false),
   lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),

@@ -61,6 +61,8 @@ interface StudyData {
   workSourcesEnabled: boolean;
   // Work-tab classification preset (migration 0016).
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
+  // Work-tab classification row gate (migration 0017).
+  workClassificationEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
   classificationEnabled: boolean;
@@ -412,8 +414,13 @@ export default function CapturePage() {
     const classificationOn = !!study?.classificationEnabled;
     const handlingOn = !!study?.handlingEnabled;
     const valueLinkingOn = !!study?.valueLinkingEnabled;
-    // When classification is off, default to 'unknown' so entries still save.
-    const effectiveClassification = !classificationOn ? 'unknown' : classification;
+    // Classification row is also hidden on the Work tab when
+    // workClassificationEnabled is off — fall through to 'unknown' the same
+    // way we do when classification is disabled globally.
+    const workClassificationOn = !!study?.workClassificationEnabled;
+    const classificationRowVisible = classificationOn && (entryType === 'demand' || workClassificationOn);
+    // When the classification row isn't visible, default to 'unknown' so entries still save.
+    const effectiveClassification = !classificationRowVisible ? 'unknown' : classification;
     const isVolumeMode = study?.volumeMode ?? false;
     const isWorkSubmit = entryType === 'work';
     const validWorkBlocks = workBlocks.filter((b) => b.text.trim().length > 0);
@@ -771,7 +778,7 @@ export default function CapturePage() {
 
         {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option.
             Header removed: the pills (Value / Sequence / Failure / ?) are self-describing. */}
-        {study.classificationEnabled && (
+        {study.classificationEnabled && (isDemand || study.workClassificationEnabled) && (
           <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center justify-center">
             <button
                 type="button"
@@ -1528,7 +1535,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && !classification)}
+              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}

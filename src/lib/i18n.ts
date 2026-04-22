@@ -2241,6 +2241,12 @@ const translations = {
     sv: 'Registrera sekvensarbete',
     de: 'Sequenzarbeit erfassen',
   },
+  'capture.toggles.workClassification': {
+    en: 'Classify work (value / failure / ?)',
+    da: 'Klassificer arbejde (værdi / ikke-værdi / ?)',
+    sv: 'Klassificera arbete (värde / icke-värde / ?)',
+    de: 'Arbeit klassifizieren (Wert / Fehler / ?)',
+  },
   'capture.toggles.whatMatters': {
     en: 'Capture what matters',
     da: 'Registrer hvad der betyder noget',

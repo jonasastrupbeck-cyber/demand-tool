@@ -71,6 +71,8 @@ interface StudyData {
   workSourcesEnabled: boolean;
   // Work-tab classification preset (migration 0016).
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
+  // Work-tab classification row gate (migration 0017).
+  workClassificationEnabled: boolean;
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;

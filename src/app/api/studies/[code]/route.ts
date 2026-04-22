@@ -85,6 +85,8 @@ export async function PUT(
        || body.workClassificationMode === 'value-failure-unknown')) {
     updates.workClassificationMode = body.workClassificationMode;
   }
+  // Work-tab classification row gate (migration 0017).
+  if (body.workClassificationEnabled !== undefined) updates.workClassificationEnabled = body.workClassificationEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;

@@ -13,6 +13,7 @@ type ToggleField =
   | 'flowDemandEnabled'
   | 'flowWorkEnabled'
   | 'workSourcesEnabled'
+  | 'workClassificationEnabled'
   | 'whatMattersEnabled'
   | 'thinkingsEnabled'
   | 'lifeProblemsEnabled';
@@ -34,6 +35,8 @@ export interface CaptureTogglesPanelStudy {
   flowDemandEnabled: boolean;
   flowWorkEnabled: boolean;
   workSourcesEnabled: boolean;
+  // Work-tab classification row gate (migration 0017).
+  workClassificationEnabled: boolean;
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
@@ -114,6 +117,8 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { kind: 'toggle', key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
     { kind: 'toggle', key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
     { kind: 'toggle', key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
+    // Work-tab classification row gate (on = show Value/Sequence/Failure/? for work).
+    { kind: 'toggle', key: 'workClassificationEnabled', label: t('capture.toggles.workClassification'), value: study.workClassificationEnabled },
     // Sequence-work virtual toggle — on = show Sequence pill on Work tab.
     { kind: 'virtual', key: SEQUENCE_WORK_VIRTUAL, label: t('capture.toggles.sequenceWork'), value: study.workClassificationMode === 'value-sequence-failure-unknown' },
     { kind: 'toggle', key: 'flowWorkEnabled', label: t('capture.toggles.flowWork'), value: study.flowWorkEnabled },
