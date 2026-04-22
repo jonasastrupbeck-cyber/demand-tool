@@ -1044,13 +1044,48 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Flow — Work tab only. A horizontal sequence of small text boxes describing
-            the actual steps of the work. On Work entries, this is the story of what
-            happened (the verbatim-equivalent for work); it comes BEFORE Capability of
-            Response so the user describes the steps first, then classifies how the
-            response felt. Each step is tagged value or failure (Ali mockup 2026-04-16).
-            Data shape unchanged; verbatim auto-populates as `[tag] text\n\n[tag] text`
-            for downstream consumers. */}
+        {hasResponseStrand && sep(t('capture.strand.response'))}
+        {/* Capability of response (formerly "Handling") — renders for demand AND work.
+            Sits BEFORE Flow on both tabs (Jonas 2026-04-22): classify the response
+            pattern first, then lay out the underlying value/failure work steps.
+            Header dropped; zero-state shows a single blue "+ Add capability of response"
+            pill (click → inline add input). Populated state uses CapabilityRadioGroup
+            so users still get the per-option hover tooltips with operational definitions. */}
+        {study.handlingEnabled && (() => {
+          const capabilityAddPill = (
+            <button
+              type="button"
+              onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+              className="px-3 py-1.5 rounded-full text-sm font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+            >
+              {t('capture.addHandlingButton')}
+            </button>
+          );
+          return (
+            <div>
+              {study.handlingTypes.length > 0 ? (
+                <CapabilityRadioGroup
+                  code={code}
+                  options={study.handlingTypes}
+                  value={handlingTypeId}
+                  onChange={(id) => setHandlingTypeId(id)}
+                  leading={capabilityAddPill}
+                />
+              ) : (
+                <div className="flex gap-2 items-center justify-center">
+                  {capabilityAddPill}
+                </div>
+              )}
+              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
+            </div>
+          );
+        })()}
+
+        {/* Flow — sits AFTER Capability of Response on both tabs (Jonas 2026-04-22).
+            A horizontal sequence of small text boxes describing value-work and
+            failure-work steps. Opt-in per entry-type via flowDemandEnabled /
+            flowWorkEnabled (migration 0014). Verbatim auto-populates as
+            `[tag] text\n\n[tag] text` for downstream consumers. */}
         {!study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
           <div>
             {sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
@@ -1181,44 +1216,6 @@ export default function CapturePage() {
             </div>
           </div>
         )}
-
-        {hasResponseStrand && sep(t('capture.strand.response'))}
-        {/* Capability of response (formerly "Handling") — renders for demand AND work.
-            On Work entries, sits AFTER Flow: describe the steps first, then classify
-            the response pattern. On Demand entries, sits where it naturally falls
-            after Life Problem (Flow doesn't render for demand).
-            Header dropped; zero-state shows a single blue "+ Add capability of response"
-            pill (click → inline add input). Populated state uses CapabilityRadioGroup
-            so users still get the per-option hover tooltips with operational definitions. */}
-        {study.handlingEnabled && (() => {
-          const capabilityAddPill = (
-            <button
-              type="button"
-              onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-              className="px-3 py-1.5 rounded-full text-sm font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
-            >
-              {t('capture.addHandlingButton')}
-            </button>
-          );
-          return (
-            <div>
-              {study.handlingTypes.length > 0 ? (
-                <CapabilityRadioGroup
-                  code={code}
-                  options={study.handlingTypes}
-                  value={handlingTypeId}
-                  onChange={(id) => setHandlingTypeId(id)}
-                  leading={capabilityAddPill}
-                />
-              ) : (
-                <div className="flex gap-2 items-center justify-center">
-                  {capabilityAddPill}
-                </div>
-              )}
-              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
-            </div>
-          );
-        })()}
 
         {hasSystemStrand && sep(t('capture.strand.system'))}
         {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
