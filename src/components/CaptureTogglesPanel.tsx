@@ -177,8 +177,8 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
             }}
             className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors text-left ${
               on
-                ? 'bg-[#ac2c2d] text-white border-[#ac2c2d] hover:bg-[#932627]'
-                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                ? 'bg-gray-200 text-gray-900 border-gray-400 hover:bg-gray-300'
+                : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
             }`}
           >
             {row.label}
