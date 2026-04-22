@@ -1798,13 +1798,13 @@ export default function CapturePage() {
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onClick={() => setShowTogglesModal(false)}
         >
-          {/* Fully transparent outer card — only the header pill, description
-              pill, and each toggle row carry their own opaque background so
-              the capture form is clearly visible between them. Narrow
-              max-w-xs so the widest pill (not a full-width box) sets the
-              column width. */}
+          {/* Mostly transparent outer card — a faint 10% white wash plus
+              backdrop-blur so the capture form still reads through but the
+              panel has a gentle frame around it. Header, description, and
+              each toggle row carry their own opaque background on top.
+              Narrow max-w-xs so the widest pill sets the column width. */}
           <div
-            className="max-w-xs w-full max-h-[90vh] overflow-y-auto"
+            className="max-w-xs w-full max-h-[90vh] overflow-y-auto bg-white/10 backdrop-blur-sm rounded-2xl p-3"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-3 py-2 mb-3 rounded-xl bg-white shadow-md flex items-center justify-between sticky top-0">
