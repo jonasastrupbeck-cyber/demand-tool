@@ -10,6 +10,8 @@ type ToggleField =
   | 'demandTypesEnabled'
   | 'workTrackingEnabled'
   | 'workTypesEnabled'
+  | 'flowDemandEnabled'
+  | 'flowWorkEnabled'
   | 'whatMattersEnabled'
   | 'thinkingsEnabled'
   | 'lifeProblemsEnabled';
@@ -22,6 +24,8 @@ export interface CaptureTogglesPanelStudy {
   demandTypesEnabled: boolean;
   workTrackingEnabled: boolean;
   workTypesEnabled: boolean;
+  flowDemandEnabled: boolean;
+  flowWorkEnabled: boolean;
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
@@ -81,6 +85,8 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },
     { key: 'workTrackingEnabled', label: t('capture.toggles.work'), value: study.workTrackingEnabled },
     { key: 'workTypesEnabled', label: t('capture.toggles.workTypes'), value: study.workTypesEnabled },
+    { key: 'flowDemandEnabled', label: t('capture.toggles.flowDemand'), value: study.flowDemandEnabled },
+    { key: 'flowWorkEnabled', label: t('capture.toggles.flowWork'), value: study.flowWorkEnabled },
     { key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
     { key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
   ];

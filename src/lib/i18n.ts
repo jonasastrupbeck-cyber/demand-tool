@@ -2181,6 +2181,18 @@ const translations = {
     sv: 'Registrera arbetstyper',
     de: 'Arbeitstypen erfassen',
   },
+  'capture.toggles.flowDemand': {
+    en: 'Capture flow (demand)',
+    da: 'Registrer flow (efterspørgsel)',
+    sv: 'Registrera flöde (efterfrågan)',
+    de: 'Fluss erfassen (Nachfrage)',
+  },
+  'capture.toggles.flowWork': {
+    en: 'Capture flow (work)',
+    da: 'Registrer flow (arbejde)',
+    sv: 'Registrera flöde (arbete)',
+    de: 'Fluss erfassen (Arbeit)',
+  },
   'capture.toggles.whatMatters': {
     en: 'Capture what matters',
     da: 'Registrer hvad der betyder noget',

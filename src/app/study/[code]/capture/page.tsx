@@ -54,6 +54,9 @@ interface StudyData {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   workStepTypesEnabled: boolean;
+  // Flow toggles (migration 0014).
+  flowDemandEnabled: boolean;
+  flowWorkEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
   classificationEnabled: boolean;
@@ -87,7 +90,6 @@ export default function CapturePage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [failureCauseSuggestions, setFailureCauseSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [collectorName, setCollectorName] = useState('');
   const [nameConfirmed, setNameConfirmed] = useState(false);
   const [lastEntry, setLastEntry] = useState<{ id: string; verbatim: string } | null>(null);
@@ -513,10 +515,6 @@ export default function CapturePage() {
   const filteredDemandTypes = study?.demandTypes.filter(
     (dt) => dt.category === classification
   ) || [];
-
-  const filteredSuggestions = failureCauseSuggestions.filter(
-    (s) => failureCause && s.toLowerCase().includes(failureCause.toLowerCase()) && s.toLowerCase() !== failureCause.toLowerCase()
-  );
 
   // Neutral focus ring (dark grey) for class-neutral inputs — verbatim, life problem,
   // work type, notes, etc. Semantic selects (demand type) override with their own
@@ -1048,7 +1046,7 @@ export default function CapturePage() {
             response felt. Each step is tagged value or failure (Ali mockup 2026-04-16).
             Data shape unchanged; verbatim auto-populates as `[tag] text\n\n[tag] text`
             for downstream consumers. */}
-        {!study.volumeMode && !isDemand && (
+        {!study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
           <div>
             <div className="flex items-center gap-1.5">
               <label className={labelCls}>
@@ -1229,9 +1227,8 @@ export default function CapturePage() {
             Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension.
             Header dropped — the "+ Add system condition" pill is self-explanatory; an ⓘ
             next to it carries the definition. */}
-        {study.classificationEnabled && scVisible && (
-          study.systemConditionsEnabled ? (
-            <div>
+        {study.classificationEnabled && scVisible && study.systemConditionsEnabled && (
+          <div>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
                   const sc = (study.systemConditions || []).find(s => s.id === entry.id);
@@ -1362,31 +1359,6 @@ export default function CapturePage() {
                 }]);
               }, { variant: 'sky', placeholder: t('capture.typeInSystemConditionPlaceholder') })}
             </div>
-          ) : (
-            <div className="relative">
-              <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
-              <textarea
-                value={failureCause}
-                onChange={(e) => { setFailureCause(e.target.value); setShowSuggestions(true); }}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                onFocus={() => setShowSuggestions(true)}
-                placeholder={t('capture.failureCausePlaceholder')}
-                rows={2}
-                className={inputCls}
-              />
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-40 overflow-y-auto bg-white border border-gray-200">
-                  {filteredSuggestions.map((suggestion, i) => (
-                    <button key={i} type="button" className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-                      onMouseDown={() => { setFailureCause(suggestion); setShowSuggestions(false); }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
         )}
 
         {study.classificationEnabled && study.thinkingsEnabled && scVisible && sep(t('capture.strand.thinking'))}
@@ -1758,6 +1730,8 @@ export default function CapturePage() {
             demandTypesEnabled: study.demandTypesEnabled,
             workTypesEnabled: study.workTypesEnabled,
             workStepTypesEnabled: study.workStepTypesEnabled,
+            flowDemandEnabled: study.flowDemandEnabled,
+            flowWorkEnabled: study.flowWorkEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
             whatMattersEnabled: study.whatMattersEnabled,
             thinkingsEnabled: study.thinkingsEnabled,

@@ -26,6 +26,9 @@ export interface EntryEditModalStudy {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   workStepTypesEnabled: boolean;
+  // Flow toggles (migration 0014).
+  flowDemandEnabled: boolean;
+  flowWorkEnabled: boolean;
   // Iterative-build toggles (migration 0013).
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
@@ -542,10 +545,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Flow — Work tab only. Horizontal sequence of Value/Failure steps
+            {/* Flow — opt-in per entry-type via flowDemandEnabled / flowWorkEnabled
+                (migration 0014). Horizontal sequence of Value/Failure steps
                 describing the work behind the Capability of Response. Matches the
                 Capture form's Flow section (Ali mockup 2026-04-16). */}
-            {!isDemand && (
+            {((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
               <div>
                 <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
                 <div className="overflow-x-auto -mx-1 px-1 pb-2">
@@ -663,10 +667,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* System conditions OR failure-cause textarea — same slot, mirrors Capture.
+            {/* System conditions — gated on systemConditionsEnabled. When the toggle
+                is off, nothing SC-related renders (no failure-cause fallback).
                 Phase 2 / Item 3: each SC carries Helps/Hinders dimension. */}
-            {scVisible && (
-              study.systemConditionsEnabled ? (
+            {scVisible && study.systemConditionsEnabled && (
                 <div>
                   <div className="space-y-2">
                     {systemConditions.map((entry, idx) => {
@@ -790,18 +794,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     })()}
                   </div>
                 </div>
-              ) : isFailure && isDemand ? (
-                <div>
-                  <label className={labelCls}>{t('capture.failureCauseLabel')}</label>
-                  <textarea
-                    value={entry.failureCause || ''}
-                    onChange={(e) => setEntry({ ...entry, failureCause: e.target.value })}
-                    placeholder={t('capture.failureCausePlaceholder')}
-                    rows={2}
-                    className={inputCls}
-                  />
-                </div>
-              ) : null
             )}
 
             {/* Thinking + Logic — mirrors system conditions visibility.

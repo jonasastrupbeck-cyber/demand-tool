@@ -17,6 +17,10 @@ export const studies = pgTable('studies', {
   // true, Flow blocks can pick from the study's `workStepTypes` list; free-text
   // fallback stays available per-block.
   workStepTypesEnabled: boolean('work_step_types_enabled').notNull().default(false),
+  // Flow = value work + waste. Opt-in per entry-type so teams can capture Flow
+  // on demand entries, work entries, both, or neither (2026-04-22).
+  flowDemandEnabled: boolean('flow_demand_enabled').notNull().default(false),
+  flowWorkEnabled: boolean('flow_work_enabled').notNull().default(false),
   volumeMode: boolean('volume_mode').notNull().default(false),
   lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),

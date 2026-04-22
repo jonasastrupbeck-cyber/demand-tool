@@ -72,6 +72,9 @@ export async function PUT(
     }
   }
   if (body.workStepTypesEnabled !== undefined) updates.workStepTypesEnabled = body.workStepTypesEnabled;
+  // Flow toggles (migration 0014) — Flow is opt-in per entry-type.
+  if (body.flowDemandEnabled !== undefined) updates.flowDemandEnabled = body.flowDemandEnabled;
+  if (body.flowWorkEnabled !== undefined) updates.flowWorkEnabled = body.flowWorkEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;

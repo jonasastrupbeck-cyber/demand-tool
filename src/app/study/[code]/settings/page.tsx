@@ -64,6 +64,9 @@ interface StudyData {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   workStepTypesEnabled: boolean;
+  // Flow toggles (migration 0014).
+  flowDemandEnabled: boolean;
+  flowWorkEnabled: boolean;
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;
