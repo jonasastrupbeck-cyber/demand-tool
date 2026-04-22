@@ -1809,11 +1809,14 @@ export default function CapturePage() {
             className="max-w-xs w-full max-h-[90vh] overflow-y-auto bg-white/10 backdrop-blur-sm rounded-2xl p-3"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Grey pill-shaped header — title centred, close button floated
-                to the right edge so the centring stays true. Dark outline
-                + larger bold text so it reads clearly as a headline. */}
-            <div className="relative px-4 py-3 mb-3 rounded-full bg-gray-200 border-2 border-gray-700 shadow-sm sticky top-0">
-              <h3 className="font-bold text-gray-800 text-lg text-center">{t('capture.toggles.title')}</h3>
+            {/* Grey pill-shaped header — title centred with the short
+                "Turn on what's useful..." subtitle tucked inside the same
+                pill. Close button floats to the right edge so the centring
+                stays true. Dark outline + bold heading reads clearly as
+                the panel title. */}
+            <div className="relative px-4 py-3 mb-3 rounded-2xl bg-gray-200 border-2 border-gray-700 shadow-sm sticky top-0">
+              <h3 className="font-bold text-gray-800 text-lg text-center leading-tight">{t('capture.toggles.title')}</h3>
+              <p className="text-xs text-gray-600 text-center leading-tight mt-0.5">{t('capture.toggles.desc')}</p>
               <button
                 onClick={() => setShowTogglesModal(false)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-900 text-2xl leading-none"
@@ -1823,7 +1826,6 @@ export default function CapturePage() {
               </button>
             </div>
             <div>
-              <p className="text-sm text-gray-700 mb-3 rounded-xl bg-white shadow-md px-3 py-2">{t('capture.toggles.desc')}</p>
               <CaptureTogglesPanel
                 code={code}
                 study={study}
