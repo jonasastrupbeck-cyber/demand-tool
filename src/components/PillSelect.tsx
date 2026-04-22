@@ -75,11 +75,11 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
     return 'bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700';
   }
   // Default variant — same style regardless of selection state so neighbouring
-  // pills (PoT, Contact method, Work source) read as one consistent row. The
-  // placeholder text previously used a lighter shade, which made the selected
-  // pill next to it look too dark by comparison (Jonas 2026-04-22).
+  // pills (PoT, Contact method, Work source) read as one consistent row.
+  // Lighter grey text per Jonas 2026-04-22 so the session-sticky row feels
+  // ambient rather than pulling the eye away from the capture form below.
   void hasSelection;
-  return 'bg-white text-gray-900 border-gray-300 hover:border-gray-400';
+  return 'bg-white text-gray-500 border-gray-300 hover:border-gray-400';
 }
 
 export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel }: Props) {
