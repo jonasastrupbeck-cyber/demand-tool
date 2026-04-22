@@ -1230,10 +1230,10 @@ const translations = {
     de: 'Transaktionspunkt',
   },
   'capture.selectWorkSource': {
-    en: 'Where did the work come from?',
-    da: 'Hvor kom arbejdet fra?',
-    sv: 'Var kom arbetet ifrån?',
-    de: 'Woher kam die Arbeit?',
+    en: 'Source of work?',
+    da: 'Arbejdskilde?',
+    sv: 'Arbetskälla?',
+    de: 'Arbeitsquelle?',
   },
   'settings.pointsOfTransaction': {
     en: 'Points of Transaction',

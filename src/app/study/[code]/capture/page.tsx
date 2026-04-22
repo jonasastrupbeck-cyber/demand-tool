@@ -662,20 +662,13 @@ export default function CapturePage() {
               options={study.pointsOfTransaction.map((pot) => ({ id: pot.id, label: tl(pot.label) }))}
             />
           )}
-          {study.contactMethods.length > 0 && (
-            <PillSelect
-              ariaLabel={t('capture.sessionContactMethodLabel')}
-              placeholder={t('capture.selectContactMethod')}
-              value={contactMethodId}
-              onChange={setContactMethodId}
-              options={study.contactMethods.map((cm) => ({ id: cm.id, label: tl(cm.label) }))}
-            />
-          )}
           {/* Work source — Work tab only. Session-sticky pill mirroring
               PoT/Contact method, gated on workSourcesEnabled (migration 0015).
-              Renders as soon as the toggle is on, even if the taxonomy is
-              still empty — the empty dropdown signals that items need to be
-              added in Settings. */}
+              Sits between PoT and Contact method so the row reads left-to-
+              right: where the work came from, and how it arrived. Renders as
+              soon as the toggle is on, even if the taxonomy is still empty —
+              the empty dropdown signals that items need to be added in
+              Settings. */}
           {study.workSourcesEnabled && entryType === 'work' && (
             <PillSelect
               ariaLabel={t('capture.sessionWorkSourceLabel')}
@@ -683,6 +676,15 @@ export default function CapturePage() {
               value={workSourceId}
               onChange={setWorkSourceId}
               options={(study.workSources || []).map((ws) => ({ id: ws.id, label: tl(ws.label) }))}
+            />
+          )}
+          {study.contactMethods.length > 0 && (
+            <PillSelect
+              ariaLabel={t('capture.sessionContactMethodLabel')}
+              placeholder={t('capture.selectContactMethod')}
+              value={contactMethodId}
+              onChange={setContactMethodId}
+              options={study.contactMethods.map((cm) => ({ id: cm.id, label: tl(cm.label) }))}
             />
           )}
         </div>
