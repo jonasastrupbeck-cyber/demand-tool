@@ -2176,10 +2176,10 @@ const translations = {
     de: 'Einträge',
   },
   'capture.toggles.desc': {
-    en: 'Turn on only what the team is ready to learn from. You can change this at any time.',
-    da: 'Slå kun det til, som teamet er klar til at lære af. Du kan ændre det når som helst.',
-    sv: 'Slå bara på det teamet är redo att lära sig från. Du kan ändra när som helst.',
-    de: 'Nur aktivieren, was das Team lernen möchte. Jederzeit änderbar.',
+    en: 'Turn on what\u2019s useful. Change anytime.',
+    da: 'Slå til hvad der er nyttigt. Ret når som helst.',
+    sv: 'Slå på det som är användbart. Ändra när som helst.',
+    de: 'Aktiviere, was nützlich ist. Jederzeit änderbar.',
   },
   'capture.toggles.classification': {
     en: 'Classify as value / failure',

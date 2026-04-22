@@ -1807,11 +1807,13 @@ export default function CapturePage() {
             className="max-w-xs w-full max-h-[90vh] overflow-y-auto bg-white/10 backdrop-blur-sm rounded-2xl p-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-3 py-2 mb-3 rounded-xl bg-white shadow-md flex items-center justify-between sticky top-0">
-              <h3 className="font-bold text-gray-900 text-sm">{t('capture.toggles.title')}</h3>
+            {/* Grey pill-shaped header — title centred, close button floated
+                to the right edge so the centring stays true. */}
+            <div className="relative px-3 py-2 mb-3 rounded-full bg-gray-200 shadow-sm sticky top-0">
+              <h3 className="font-semibold text-gray-700 text-sm text-center">{t('capture.toggles.title')}</h3>
               <button
                 onClick={() => setShowTogglesModal(false)}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800 text-xl leading-none"
                 aria-label="Close"
               >
                 &times;
