@@ -133,7 +133,7 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, l
   }
 
   return (
-    <div ref={containerRef} role="radiogroup" aria-labelledby={`${groupId}-label`} className="flex flex-wrap gap-2 items-center">
+    <div ref={containerRef} role="radiogroup" aria-labelledby={`${groupId}-label`} className="flex flex-wrap gap-2 items-center justify-center">
       {leading}
       {options.map((opt, idx) => {
         const selected = value === opt.id;
