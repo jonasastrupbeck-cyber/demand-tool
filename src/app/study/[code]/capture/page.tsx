@@ -631,7 +631,7 @@ export default function CapturePage() {
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
           Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
-      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0 || (study.workSourcesEnabled && entryType === 'work' && (study.workSources || []).length > 0)) && (
+      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0 || (study.workSourcesEnabled && entryType === 'work')) && (
         <div className="mb-4 flex flex-wrap gap-2 justify-center">
           {study.pointsOfTransaction.length > 0 && (
             <PillSelect
@@ -652,8 +652,11 @@ export default function CapturePage() {
             />
           )}
           {/* Work source — Work tab only. Session-sticky pill mirroring
-              PoT/Contact method, gated on workSourcesEnabled (migration 0015). */}
-          {study.workSourcesEnabled && entryType === 'work' && (study.workSources || []).length > 0 && (
+              PoT/Contact method, gated on workSourcesEnabled (migration 0015).
+              Renders as soon as the toggle is on, even if the taxonomy is
+              still empty — the empty dropdown signals that items need to be
+              added in Settings. */}
+          {study.workSourcesEnabled && entryType === 'work' && (
             <PillSelect
               ariaLabel={t('capture.sessionWorkSourceLabel')}
               placeholder={t('capture.selectWorkSource')}
