@@ -64,7 +64,7 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
   }, []);
 
   return (
-    <span ref={wrapperRef} className={`relative inline-flex items-center ${className}`}>
+    <span ref={wrapperRef} className={`relative inline-flex items-center ${open ? 'z-40' : ''} ${className}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -78,7 +78,7 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
         <div
           ref={popoverMountRef}
           role="tooltip"
-          className="absolute z-30 left-1/2 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg whitespace-pre-line"
+          className="absolute z-40 left-1/2 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg whitespace-pre-line"
         >
           {children}
           <div

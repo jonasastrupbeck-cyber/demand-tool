@@ -1319,10 +1319,10 @@ const translations = {
   // failure work = everything else / waste). Previous copy mischaracterised
   // Work as "internal requests" which is closer to "internal demand".
   'capture.workHelp': {
-    en: 'Work is the activity the service performs in response to demand. Value work directly delivers the customer\'s purpose; failure work is everything else — waste caused by system conditions.',
-    da: 'Arbejde er den aktivitet, servicen udfører som svar på efterspørgsel. Værdiskabende arbejde leverer kundens formål direkte; ikke-værdiskabende arbejde er alt andet — spild forårsaget af systembetingelser.',
-    sv: 'Arbete är den aktivitet tjänsten utför som svar på efterfrågan. Värdeskapande arbete levererar kundens syfte direkt; icke-värdeskapande arbete är allt annat — slöseri orsakat av systemfaktorer.',
-    de: 'Arbeit ist die Tätigkeit, die der Dienst als Antwort auf Nachfrage ausführt. Wertarbeit liefert direkt den Zweck des Kunden; Fehlerarbeit ist alles andere — Verschwendung, verursacht durch Systembedingungen.',
+    en: 'Work is the activity the service performs in response to demand.',
+    da: 'Arbejde er den aktivitet, servicen udfører som svar på efterspørgsel.',
+    sv: 'Arbete är den aktivitet tjänsten utför som svar på efterfrågan.',
+    de: 'Arbeit ist die Tätigkeit, die der Dienst als Antwort auf Nachfrage ausführt.',
   },
   'capture.workClassificationHelp': {
     en: 'Value work directly delivers the customer\'s purpose. Failure work is everything else — waste caused by system conditions. If unsure → ?',
