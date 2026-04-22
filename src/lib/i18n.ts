@@ -776,10 +776,10 @@ const translations = {
     de: 'Wert',
   },
   'capture.workBlockTagSequence': {
-    en: 'Sequence',
-    da: 'Sekvens',
-    sv: 'Sekvens',
-    de: 'Sequenz',
+    en: 'SEQ',
+    da: 'SEQ',
+    sv: 'SEQ',
+    de: 'SEQ',
   },
   'capture.workBlockTagFailure': {
     en: 'Failure',
@@ -1361,10 +1361,10 @@ const translations = {
     de: 'Arbeit ist die Tätigkeit, die der Dienst als Antwort auf Nachfrage ausführt.',
   },
   'capture.workClassificationHelp': {
-    en: 'Value work: directly delivers the customer\'s purpose.\n\nSequence work: value in orientation but done at the wrong time or in the wrong way.\n\nFailure work: everything else — waste caused by system conditions. If unsure → ?',
-    da: 'Værdiskabende arbejde: leverer kundens formål direkte.\n\nSekvensarbejde: værdifuldt i retning, men gjort på det forkerte tidspunkt eller på den forkerte måde.\n\nIkke-værdiskabende arbejde: alt andet — spild forårsaget af systembetingelser. I tvivl → ?',
-    sv: 'Värdeskapande arbete: levererar kundens syfte direkt.\n\nSekvensarbete: värdefullt i riktning men gjort vid fel tidpunkt eller på fel sätt.\n\nIcke-värdeskapande arbete: allt annat — slöseri orsakat av systemfaktorer. Osäker → ?',
-    de: 'Wertarbeit: liefert direkt den Zweck des Kunden.\n\nSequenzarbeit: wertvoll in der Ausrichtung, aber zur falschen Zeit oder auf die falsche Weise ausgeführt.\n\nFehlerarbeit: alles andere — Verschwendung, verursacht durch Systembedingungen. Unsicher → ?',
+    en: 'Value work: directly delivers the customer\'s purpose.\n\nSequence work: value in orientation but done at the wrong time or in the wrong way.\n\nFailure work: everything else — waste caused by system conditions.',
+    da: 'Værdiskabende arbejde: leverer kundens formål direkte.\n\nSekvensarbejde: værdifuldt i retning, men gjort på det forkerte tidspunkt eller på den forkerte måde.\n\nIkke-værdiskabende arbejde: alt andet — spild forårsaget af systembetingelser.',
+    sv: 'Värdeskapande arbete: levererar kundens syfte direkt.\n\nSekvensarbete: värdefullt i riktning men gjort vid fel tidpunkt eller på fel sätt.\n\nIcke-värdeskapande arbete: allt annat — slöseri orsakat av systemfaktorer.',
+    de: 'Wertarbeit: liefert direkt den Zweck des Kunden.\n\nSequenzarbeit: wertvoll in der Ausrichtung, aber zur falschen Zeit oder auf die falsche Weise ausgeführt.\n\nFehlerarbeit: alles andere — Verschwendung, verursacht durch Systembedingungen.',
   },
   // Sourced from Jonas's Obsidian vault (03-Resources/concepts/value-demand.md,
   // failure-demand.md) and the Vanguard multilingual glossary. Danish terms are
