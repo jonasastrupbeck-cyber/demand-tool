@@ -654,7 +654,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkBlocks([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -674,7 +674,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); }}
+                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkBlocks([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   !isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
