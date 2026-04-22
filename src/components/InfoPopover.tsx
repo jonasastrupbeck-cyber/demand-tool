@@ -7,10 +7,14 @@
  * with click-to-reveal definitions. Works on pointer and touch; dismisses on
  * click-outside and Escape.
  *
- * Mirrors the tooltip pattern used in CapabilityRadioGroup.
+ * The popover card is rendered via a portal into document.body with
+ * position:fixed, which sidesteps the parent's stacking context entirely — the
+ * card always paints above nearby siblings (e.g., other ⓘ icons further down
+ * the form) regardless of the surrounding CSS.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Props {
   /** aria-label for the trigger — should describe what the popover explains. */
@@ -23,15 +27,21 @@ interface Props {
 
 export default function InfoPopover({ label, children, className = '' }: Props) {
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ cx: number; top: number } | null>(null);
   const wrapperRef = useRef<HTMLSpanElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const caretRef = useRef<HTMLDivElement>(null);
 
-  // Close on outside pointerdown or Escape.
+  // Close on outside pointerdown or Escape. The "inside" check has to include
+  // both the trigger wrapper AND the portaled popover, since they live in
+  // separate subtrees of the DOM.
   useEffect(() => {
     if (!open) return;
     function onDocPointer(e: PointerEvent) {
-      if (!wrapperRef.current) return;
-      if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -44,10 +54,23 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
     };
   }, [open]);
 
-  // Ref callback runs synchronously after the popover mounts. Measures the rect,
-  // then writes the corrected transform directly to the DOM — no state, no effect,
-  // so no cascading renders.
+  function toggleOpen() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const btn = wrapperRef.current?.querySelector('button');
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      setCoords({ cx: r.left + r.width / 2, top: r.bottom + 8 });
+    }
+    setOpen(true);
+  }
+
+  // After the popover mounts, clamp horizontally so it stays inside the
+  // viewport; counter-shift the caret so it still points at the trigger.
   const popoverMountRef = useCallback((el: HTMLDivElement | null) => {
+    popoverRef.current = el;
     if (!el) return;
     el.style.transform = 'translateX(-50%)';
     const rect = el.getBoundingClientRect();
@@ -64,21 +87,22 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
   }, []);
 
   return (
-    <span ref={wrapperRef} className={`relative inline-flex items-center ${open ? 'z-40' : ''} ${className}`}>
+    <span ref={wrapperRef} className={`relative inline-flex items-center ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleOpen}
         aria-label={label}
         aria-expanded={open}
         className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 hover:text-gray-700 text-[10px] font-semibold leading-none transition-colors"
       >
         i
       </button>
-      {open && (
+      {open && coords && typeof document !== 'undefined' && createPortal(
         <div
           ref={popoverMountRef}
           role="tooltip"
-          className="absolute z-40 left-1/2 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg whitespace-pre-line"
+          className="fixed z-50 w-64 max-w-[calc(100vw-2rem)] p-3 rounded-lg bg-gray-900 text-white text-xs leading-snug shadow-lg whitespace-pre-line"
+          style={{ left: coords.cx, top: coords.top }}
         >
           {children}
           <div
@@ -87,7 +111,8 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
             style={{ transform: 'translateX(-50%) rotate(45deg)' }}
             aria-hidden="true"
           />
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
