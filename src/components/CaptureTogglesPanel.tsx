@@ -45,6 +45,9 @@ export interface CaptureTogglesPanelStudy {
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
 }
 
+type OptimisticField = ToggleField | 'workClassificationMode';
+type OptimisticValue = boolean | CaptureTogglesPanelStudy['workClassificationMode'];
+
 interface Props {
   code: string;
   study: CaptureTogglesPanelStudy;
@@ -54,8 +57,13 @@ interface Props {
   /** Optional optimistic update. When provided, the parent updates its local
    *  study state immediately; the PUT fires in the background. On PUT failure
    *  the toggle is reverted. When omitted, the panel falls back to firing PUT
-   *  then awaiting onChange() (full refresh) — the pre-perf-pass behaviour. */
-  onOptimisticToggle?: (field: ToggleField, value: boolean) => void;
+   *  then awaiting onChange() (full refresh) — the pre-perf-pass behaviour.
+   *
+   *  Covers both the boolean toggle columns AND the non-boolean
+   *  `workClassificationMode` enum that the "Capture sequence work" virtual
+   *  toggle writes to — the parent just forwards the (field, value) pair
+   *  into its local study state, so the type can stay a simple pair. */
+  onOptimisticToggle?: (field: OptimisticField, value: OptimisticValue) => void;
 }
 
 export default function CaptureTogglesPanel({ code, study, onChange, showHeader = true, onOptimisticToggle }: Props) {
@@ -87,10 +95,30 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
   }
 
   // Sequence-work virtual toggle — maps the on/off UI onto the
-  // workClassificationMode text enum on the server. We bypass the generic
-  // optimistic path because the field key doesn't match the schema column.
+  // workClassificationMode text enum on the server. Uses the same optimistic
+  // path as the boolean toggles so the checkbox flips instantly.
   async function toggleSequenceWork(value: boolean) {
-    const mode = value ? 'value-sequence-failure-unknown' : 'value-failure-unknown';
+    const mode: CaptureTogglesPanelStudy['workClassificationMode'] = value
+      ? 'value-sequence-failure-unknown'
+      : 'value-failure-unknown';
+    if (onOptimisticToggle) {
+      onOptimisticToggle('workClassificationMode', mode);
+      try {
+        const res = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ workClassificationMode: mode }),
+        });
+        if (!res.ok) {
+          // Revert on error.
+          onOptimisticToggle('workClassificationMode', value ? 'value-failure-unknown' : 'value-sequence-failure-unknown');
+        }
+      } catch {
+        onOptimisticToggle('workClassificationMode', value ? 'value-failure-unknown' : 'value-sequence-failure-unknown');
+      }
+      return;
+    }
+    // Fallback: PUT then full refresh.
     await fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
