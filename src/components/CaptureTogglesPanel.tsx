@@ -157,9 +157,9 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
 
   const list = (
     // Pill-shaped toggles. Each pill IS the switch — no separate checkbox.
-    // items-start + content-sized pills keeps the column as narrow as its
-    // widest label so the capture form behind the modal stays visible.
-    <div className="flex flex-col items-start gap-3">
+    // items-center keeps the pills sized to their own label and centred in
+    // the narrow column so the panel reads as a tidy stack.
+    <div className="flex flex-col items-center gap-3">
       {rows.map((row) => {
         const on = row.value;
         return (
