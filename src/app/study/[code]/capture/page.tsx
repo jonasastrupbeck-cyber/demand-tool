@@ -57,6 +57,8 @@ interface StudyData {
   // Flow toggles (migration 0014).
   flowDemandEnabled: boolean;
   flowWorkEnabled: boolean;
+  // Work sources toggle (migration 0015).
+  workSourcesEnabled: boolean;
   volumeMode: boolean;
   activeLayer: number;
   classificationEnabled: boolean;
@@ -71,6 +73,7 @@ interface StudyData {
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
+  workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   whatMattersTypes: WhatMattersType[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -126,6 +129,7 @@ export default function CapturePage() {
   const [handlingTypeId, setHandlingTypeId] = useState('');
   const [contactMethodId, setContactMethodId] = useState('');
   const [pointOfTransactionId, setPointOfTransactionId] = useState('');
+  const [workSourceId, setWorkSourceId] = useState('');
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   const [lifeProblemId, setLifeProblemId] = useState('');
   const [originalValueDemandTypeId, setOriginalValueDemandTypeId] = useState('');
@@ -188,15 +192,17 @@ export default function CapturePage() {
       const data = await res.json();
       setStudy(data);
       // Session-sticky defaults: localStorage overrides study primary.
-      let savedSession: { contactMethodId?: string; pointOfTransactionId?: string } = {};
+      let savedSession: { contactMethodId?: string; pointOfTransactionId?: string; workSourceId?: string } = {};
       try {
         const raw = localStorage.getItem(`capture-session:${code}`);
         if (raw) savedSession = JSON.parse(raw);
       } catch {}
       const initialCm = savedSession.contactMethodId || data.primaryContactMethodId || '';
       const initialPot = savedSession.pointOfTransactionId || data.primaryPointOfTransactionId || '';
+      const initialWs = savedSession.workSourceId || '';
       if (initialCm) setContactMethodId(initialCm);
       if (initialPot) setPointOfTransactionId(initialPot);
+      if (initialWs) setWorkSourceId(initialWs);
     }
     setLoading(false);
   }, [code]);
@@ -207,10 +213,10 @@ export default function CapturePage() {
     try {
       localStorage.setItem(
         `capture-session:${code}`,
-        JSON.stringify({ contactMethodId, pointOfTransactionId }),
+        JSON.stringify({ contactMethodId, pointOfTransactionId, workSourceId }),
       );
     } catch {}
-  }, [code, loading, contactMethodId, pointOfTransactionId]);
+  }, [code, loading, contactMethodId, pointOfTransactionId, workSourceId]);
 
   const refreshStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -422,6 +428,9 @@ export default function CapturePage() {
       entryType,
       contactMethodId: contactMethodId || undefined,
       pointOfTransactionId: pointOfTransactionId || undefined,
+      // Work source — only relevant for work entries (server also gates on
+      // entryType='work'), but it's cheap to pass through unconditionally.
+      workSourceId: isWorkSubmit ? (workSourceId || undefined) : undefined,
       collectorName: collectorName.trim() || undefined,
     };
 
@@ -622,7 +631,7 @@ export default function CapturePage() {
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
           Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
-      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
+      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0 || (study.workSourcesEnabled && entryType === 'work' && (study.workSources || []).length > 0)) && (
         <div className="mb-4 flex flex-wrap gap-2 justify-center">
           {study.pointsOfTransaction.length > 0 && (
             <PillSelect
@@ -640,6 +649,17 @@ export default function CapturePage() {
               value={contactMethodId}
               onChange={setContactMethodId}
               options={study.contactMethods.map((cm) => ({ id: cm.id, label: tl(cm.label) }))}
+            />
+          )}
+          {/* Work source — Work tab only. Session-sticky pill mirroring
+              PoT/Contact method, gated on workSourcesEnabled (migration 0015). */}
+          {study.workSourcesEnabled && entryType === 'work' && (study.workSources || []).length > 0 && (
+            <PillSelect
+              ariaLabel={t('capture.sessionWorkSourceLabel')}
+              placeholder={t('capture.selectWorkSource')}
+              value={workSourceId}
+              onChange={setWorkSourceId}
+              options={(study.workSources || []).map((ws) => ({ id: ws.id, label: tl(ws.label) }))}
             />
           )}
         </div>

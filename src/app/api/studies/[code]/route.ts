@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,11 +12,12 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
     getPointsOfTransaction(study.id),
+    getWorkSources(study.id),
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
     getWorkStepTypes(study.id),
@@ -32,6 +33,7 @@ export async function GET(
     demandTypes: dTypes,
     contactMethods: cMethods,
     pointsOfTransaction: potTypes,
+    workSources: wSources,
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
     workStepTypes: wsTypes,
@@ -75,6 +77,8 @@ export async function PUT(
   // Flow toggles (migration 0014) — Flow is opt-in per entry-type.
   if (body.flowDemandEnabled !== undefined) updates.flowDemandEnabled = body.flowDemandEnabled;
   if (body.flowWorkEnabled !== undefined) updates.flowWorkEnabled = body.flowWorkEnabled;
+  // Work sources toggle (migration 0015) — session-sticky pill on the Work tab.
+  if (body.workSourcesEnabled !== undefined) updates.workSourcesEnabled = body.workSourcesEnabled;
   if (body.volumeMode !== undefined) updates.volumeMode = body.volumeMode;
   if (body.lifecycleEnabled !== undefined) updates.lifecycleEnabled = body.lifecycleEnabled;
   if (body.classificationEnabled !== undefined) updates.classificationEnabled = body.classificationEnabled;

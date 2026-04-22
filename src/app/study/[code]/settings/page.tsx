@@ -67,6 +67,8 @@ interface StudyData {
   // Flow toggles (migration 0014).
   flowDemandEnabled: boolean;
   flowWorkEnabled: boolean;
+  // Work sources toggle (migration 0015).
+  workSourcesEnabled: boolean;
   volumeMode: boolean;
   lifecycleEnabled: boolean;
   activeLayer: number;
@@ -82,6 +84,7 @@ interface StudyData {
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
+  workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -122,6 +125,7 @@ export default function SettingsPage() {
   const [newContactMethod, setNewContactMethod] = useState('');
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
+  const [newWorkSource, setNewWorkSource] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
   const [newWorkStep, setNewWorkStep] = useState('');
@@ -155,7 +159,7 @@ export default function SettingsPage() {
   // in a COR title, etc. Previously the only editable field per row was
   // operationalDefinition; the label itself required delete-and-re-add which
   // broke existing references.)
-  type LabelEditType = 'handling' | 'demand' | 'contactMethod' | 'pointOfTransaction' | 'whatMatters' | 'systemCondition' | 'thinking' | 'lifeProblem' | 'workType' | 'workStepType';
+  type LabelEditType = 'handling' | 'demand' | 'contactMethod' | 'pointOfTransaction' | 'workSource' | 'whatMatters' | 'systemCondition' | 'thinking' | 'lifeProblem' | 'workType' | 'workStepType';
   const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
   const [editingLabelValue, setEditingLabelValue] = useState('');
   const [editingLabelType, setEditingLabelType] = useState<LabelEditType>('handling');
@@ -339,6 +343,32 @@ export default function SettingsPage() {
 
   async function togglePointOfTransactionCustomerFacing(id: string, customerFacing: boolean) {
     await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerFacing }),
+    });
+    loadStudy();
+  }
+
+  async function addWorkSourceHandler(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newWorkSource.trim()) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: newWorkSource.trim() }),
+    });
+    setNewWorkSource('');
+    loadStudy();
+  }
+
+  async function removeWorkSource(id: string) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, { method: 'DELETE' });
+    loadStudy();
+  }
+
+  async function toggleWorkSourceCustomerFacing(id: string, customerFacing: boolean) {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
@@ -596,6 +626,7 @@ export default function SettingsPage() {
     demand: 'demand-types',
     contactMethod: 'contact-methods',
     pointOfTransaction: 'points-of-transaction',
+    workSource: 'work-sources',
     whatMatters: 'what-matters-types',
     systemCondition: 'system-conditions',
     thinking: 'thinkings',
@@ -898,6 +929,37 @@ export default function SettingsPage() {
             <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
           </form>
         </div>
+
+        {/* Work sources — gated on workSourcesEnabled (toggle lives in CaptureTogglesPanel above). */}
+        {study.workSourcesEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workSources')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.workSourcesDesc')}</p>
+            <ul className="space-y-2 mb-4">
+              {(study.workSources || []).map((ws) => (
+                <li key={ws.id} className={itemCls}>
+                  {renderLabel(ws.id, ws.label, 'workSource')}
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ws.customerFacing}
+                        onChange={(e) => toggleWorkSourceCustomerFacing(ws.id, e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-[#ac2c2d] focus:ring-[#ac2c2d]"
+                      />
+                      {t('settings.customerFacing')}
+                    </label>
+                    <button onClick={() => removeWorkSource(ws.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <form onSubmit={addWorkSourceHandler} className="flex gap-2">
+              <input type="text" value={newWorkSource} onChange={(e) => setNewWorkSource(e.target.value)} placeholder={t('settings.addWorkSource')} className={inputCls} />
+              <button type="submit" disabled={!newWorkSource.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            </form>
+          </div>
+        )}
 
         {/* Demand Types — gated on demandTypesEnabled (toggle lives in CaptureTogglesPanel above) */}
         {study.demandTypesEnabled && (

@@ -61,6 +61,7 @@ export async function POST(
     demandTypeId: body.demandTypeId || undefined,
     contactMethodId: body.contactMethodId || undefined,
     pointOfTransactionId: body.pointOfTransactionId || undefined,
+    workSourceId: body.workSourceId || undefined,
     whatMattersTypeId: body.whatMattersTypeId || undefined,
     whatMattersTypeIds: Array.isArray(body.whatMattersTypeIds) ? body.whatMattersTypeIds : undefined,
     systemConditions: Array.isArray(body.systemConditions) && body.systemConditions.every((s: unknown) =>

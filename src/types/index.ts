@@ -53,6 +53,14 @@ export interface PointOfTransaction {
   sortOrder: number;
 }
 
+export interface WorkSource {
+  id: string;
+  studyId: string;
+  label: string;
+  customerFacing: boolean;
+  sortOrder: number;
+}
+
 export interface WhatMattersType {
   id: string;
   studyId: string;

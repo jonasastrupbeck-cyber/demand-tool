@@ -21,6 +21,9 @@ export const studies = pgTable('studies', {
   // on demand entries, work entries, both, or neither (2026-04-22).
   flowDemandEnabled: boolean('flow_demand_enabled').notNull().default(false),
   flowWorkEnabled: boolean('flow_work_enabled').notNull().default(false),
+  // Work sources — opt-in taxonomy: "Where did the work come from?"
+  // Renders as a session-sticky pill on the Work tab only (migration 0015).
+  workSourcesEnabled: boolean('work_sources_enabled').notNull().default(false),
   volumeMode: boolean('volume_mode').notNull().default(false),
   lifecycleEnabled: boolean('lifecycle_enabled').notNull().default(false),
   activeLayer: integer('active_layer').notNull().default(1),
@@ -80,6 +83,16 @@ export const pointsOfTransaction = pgTable('points_of_transaction', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+// Work sources — "Where did the work come from?". Mirrors pointsOfTransaction
+// but applies only to work captures (migration 0015, 2026-04-22).
+export const workSources = pgTable('work_sources', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  customerFacing: boolean('customer_facing').notNull().default(false),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 export const whatMattersTypes = pgTable('what_matters_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -131,6 +144,7 @@ export const demandEntries = pgTable('demand_entries', {
   demandTypeId: text('demand_type_id').references(() => demandTypes.id),
   contactMethodId: text('contact_method_id').references(() => contactMethods.id),
   pointOfTransactionId: text('point_of_transaction_id').references(() => pointsOfTransaction.id),
+  workSourceId: text('work_source_id').references(() => workSources.id),
   whatMattersTypeId: text('what_matters_type_id').references(() => whatMattersTypes.id),
   lifeProblemId: text('life_problem_id').references(() => lifeProblems.id),
   originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),

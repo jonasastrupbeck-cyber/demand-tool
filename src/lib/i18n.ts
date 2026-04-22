@@ -385,6 +385,12 @@ const translations = {
     sv: 'Transaktionspunkt',
     de: 'Transaktionspunkt',
   },
+  'capture.sessionWorkSourceLabel': {
+    en: 'Work source',
+    da: 'Arbejdskilde',
+    sv: 'Arbetskälla',
+    de: 'Arbeitsquelle',
+  },
   'capture.sessionContactMethodLabel': {
     en: 'Contact method',
     da: 'Kontaktmetode',
@@ -1217,6 +1223,12 @@ const translations = {
     sv: 'Transaktionspunkt',
     de: 'Transaktionspunkt',
   },
+  'capture.selectWorkSource': {
+    en: 'Where did the work come from?',
+    da: 'Hvor kom arbejdet fra?',
+    sv: 'Var kom arbetet ifrån?',
+    de: 'Woher kam die Arbeit?',
+  },
   'settings.pointsOfTransaction': {
     en: 'Points of Transaction',
     da: 'Transaktionspunkter',
@@ -1234,6 +1246,24 @@ const translations = {
     da: 'Tilføj transaktionspunkt...',
     sv: 'Lägg till transaktionspunkt...',
     de: 'Transaktionspunkt hinzufügen...',
+  },
+  'settings.workSources': {
+    en: 'Work sources',
+    da: 'Arbejdskilder',
+    sv: 'Arbetskällor',
+    de: 'Arbeitsquellen',
+  },
+  'settings.workSourcesDesc': {
+    en: 'Where work comes from — e.g. a ticket queue, an internal team, an escalation.',
+    da: 'Hvor arbejdet kommer fra — fx en sagskø, et internt team eller en eskalering.',
+    sv: 'Var arbetet kommer från — t.ex. en ärendekö, ett internt team eller en eskalering.',
+    de: 'Woher die Arbeit kommt — z.\u00a0B. eine Ticket-Warteschlange, ein internes Team oder eine Eskalation.',
+  },
+  'settings.addWorkSource': {
+    en: 'Add work source...',
+    da: 'Tilføj arbejdskilde...',
+    sv: 'Lägg till arbetskälla...',
+    de: 'Arbeitsquelle hinzufügen...',
   },
   'settings.customerFacing': {
     en: 'Customer-facing',
@@ -2198,6 +2228,12 @@ const translations = {
     da: 'Registrer flow (arbejde)',
     sv: 'Registrera flöde (arbete)',
     de: 'Fluss erfassen (Arbeit)',
+  },
+  'capture.toggles.workSources': {
+    en: 'Capture work source',
+    da: 'Registrer arbejdskilde',
+    sv: 'Registrera arbetskälla',
+    de: 'Arbeitsquelle erfassen',
   },
   'capture.toggles.whatMatters': {
     en: 'Capture what matters',

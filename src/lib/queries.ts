@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -457,6 +457,32 @@ export async function updatePointOfTransaction(id: string, data: { label?: strin
   await db.update(pointsOfTransaction).set(data).where(eq(pointsOfTransaction.id, id));
 }
 
+// Work sources — mirrors points-of-transaction queries (migration 0015).
+
+export async function getWorkSources(studyId: string) {
+  return db.select().from(workSources).where(eq(workSources.studyId, studyId)).orderBy(asc(workSources.sortOrder));
+}
+
+export async function addWorkSource(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getWorkSources(studyId);
+  await db.insert(workSources).values({
+    id,
+    studyId,
+    label,
+    sortOrder: existing.length,
+  });
+  return id;
+}
+
+export async function deleteWorkSource(id: string) {
+  await db.delete(workSources).where(eq(workSources.id, id));
+}
+
+export async function updateWorkSource(id: string, data: { label?: string; customerFacing?: boolean }) {
+  await db.update(workSources).set(data).where(eq(workSources.id, id));
+}
+
 export async function getWorkTypes(studyId: string) {
   return db.select().from(workTypes).where(eq(workTypes.studyId, studyId)).orderBy(asc(workTypes.sortOrder));
 }
@@ -588,6 +614,7 @@ export async function createEntry(studyId: string, data: {
   demandTypeId?: string;
   contactMethodId?: string;
   pointOfTransactionId?: string;
+  workSourceId?: string;
   whatMattersTypeId?: string;
   whatMattersTypeIds?: string[];
   systemConditions?: {
@@ -631,6 +658,7 @@ export async function createEntry(studyId: string, data: {
     demandTypeId: isDemand ? (data.demandTypeId || null) : null,
     contactMethodId: data.contactMethodId || null,
     pointOfTransactionId: data.pointOfTransactionId || null,
+    workSourceId: !isDemand ? (data.workSourceId || null) : null,
     whatMattersTypeId: isDemand ? (data.whatMattersTypeId || null) : null,
     lifeProblemId: isDemand ? (data.lifeProblemId || null) : null,
     originalValueDemandTypeId: isDemand && data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
