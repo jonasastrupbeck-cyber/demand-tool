@@ -47,7 +47,7 @@ export async function GET(
         .map((a) => ({ systemConditionId: a.systemConditionId })),
     })),
     workBlocks: wbRows.map((r) => ({
-      tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure',
+      tag: (r.tag === 'value' ? 'value' : r.tag === 'sequence' ? 'sequence' : 'failure') as 'value' | 'sequence' | 'failure',
       text: r.text,
       workStepTypeId: r.workStepTypeId ?? null,
     })),
@@ -129,12 +129,12 @@ export async function PATCH(
   if (body.workBlocks !== undefined) {
     if (!Array.isArray(body.workBlocks) || !body.workBlocks.every((b: unknown) =>
       b && typeof b === 'object'
-      && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'failure')
+      && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure')
       && typeof (b as { text?: unknown }).text === 'string'
     )) {
-      return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"failure", text: string }' }, { status: 400 });
+      return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
       tag: b.tag,
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,

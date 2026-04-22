@@ -102,7 +102,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -142,7 +142,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
@@ -632,11 +632,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                 <SegmentedToggle
                                   options={[
                                     { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                                    { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                                     { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                                   ]}
                                   value={b.tag}
                                   onChange={(v) => {
-                                    const tag = v === 'value' ? 'value' : 'failure';
+                                    const tag: 'value' | 'sequence' | 'failure' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : 'failure';
                                     setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
                                   }}
                                   ariaLabel={t('capture.workBlocksLabel')}

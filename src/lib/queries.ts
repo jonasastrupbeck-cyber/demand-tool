@@ -599,7 +599,7 @@ export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en
   }
 }
 
-function concatWorkBlocks(blocks: { tag: 'value' | 'failure'; text: string }[]): string {
+function concatWorkBlocks(blocks: { tag: 'value' | 'sequence' | 'failure'; text: string }[]): string {
   return blocks
     .filter(b => b.text && b.text.trim().length > 0)
     .map(b => `[${b.tag}] ${b.text}`)
@@ -638,7 +638,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -837,7 +837,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 

@@ -171,7 +171,7 @@ export default function CapturePage() {
   // `freeText` is a UI-only flag that distinguishes "empty new block (show
   // picker)" from "user chose free-text mode (show textarea)" when the picker
   // is on but no step is picked. Not persisted to the DB.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
 
   // Inline type creation state
   const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'lifeProblem'|'systemCondition'|'thinking'|'originalValue'|null>(null);
@@ -221,6 +221,17 @@ export default function CapturePage() {
       );
     } catch {}
   }, [code, loading, contactMethodId, pointOfTransactionId, workSourceId]);
+
+  // When the Work-tab classification row is hidden (workClassificationEnabled
+  // off), implicitly set classification to 'unknown' so downstream gates
+  // (work types, COR, save-button enablement) treat the entry as classified
+  // and the user can continue through the form.
+  useEffect(() => {
+    if (loading || !study) return;
+    if (entryType === 'work' && !study.workClassificationEnabled && classification !== 'unknown') {
+      setClassification('unknown');
+    }
+  }, [loading, study, entryType, classification]);
 
   const refreshStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -1209,9 +1220,10 @@ export default function CapturePage() {
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
-                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'failure' } : b))}
+                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' } : b))}
                               options={[
                                 { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                                { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                                 { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                               ]}
                             />

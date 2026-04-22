@@ -197,11 +197,11 @@ export async function POST(
     // Work blocks: if the verbatim follows the `[tag] text\n\n[tag] text` pattern
     // (produced by the capture form + export concat), parse it back so Work entries
     // round-trip as structured blocks. Otherwise leave verbatim as-is (legacy fallback).
-    let workBlocks: { tag: 'value' | 'failure'; text: string }[] | undefined;
-    if (entryType === 'work' && /^\[(value|failure)\]/i.test(verbatim)) {
-      const matches = [...verbatim.matchAll(/\[(value|failure)\]\s*([\s\S]*?)(?=\n\n\[(?:value|failure)\]|$)/gi)];
+    let workBlocks: { tag: 'value' | 'sequence' | 'failure'; text: string }[] | undefined;
+    if (entryType === 'work' && /^\[(value|sequence|failure)\]/i.test(verbatim)) {
+      const matches = [...verbatim.matchAll(/\[(value|sequence|failure)\]\s*([\s\S]*?)(?=\n\n\[(?:value|sequence|failure)\]|$)/gi)];
       const parsed = matches
-        .map(m => ({ tag: m[1].toLowerCase() as 'value' | 'failure', text: m[2].trim() }))
+        .map(m => ({ tag: m[1].toLowerCase() as 'value' | 'sequence' | 'failure', text: m[2].trim() }))
         .filter(b => b.text.length > 0);
       if (parsed.length > 0) workBlocks = parsed;
     }

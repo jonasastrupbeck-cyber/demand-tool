@@ -40,7 +40,7 @@ export async function POST(
   const entryType = body.entryType === 'work' ? 'work' : 'demand';
   const workBlocksValid = Array.isArray(body.workBlocks) && body.workBlocks.every((b: unknown) =>
     b && typeof b === 'object'
-    && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'failure')
+    && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure')
     && typeof (b as { text?: unknown }).text === 'string'
   );
   const hasWorkBlockText = workBlocksValid && body.workBlocks.some((b: { text: string }) => b.text.trim().length > 0);
@@ -112,7 +112,7 @@ export async function POST(
     collectorName: body.collectorName?.trim() || undefined,
     lifeProblemId: body.lifeProblemId || undefined,
     workBlocks: entryType === 'work' && workBlocksValid
-      ? body.workBlocks.map((b: { tag: 'value' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+      ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
           tag: b.tag,
           text: b.text,
           workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
