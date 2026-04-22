@@ -515,7 +515,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     options={study.handlingTypes}
                     value={entry.handlingTypeId || ''}
                     onChange={(id) => setEntry({ ...entry, handlingTypeId: id || null })}
-                    trailing={
+                    leading={
                       <InlineTypeAdder
                         code={code}
                         apiPath="handling-types"

@@ -30,11 +30,11 @@ interface Props {
   options: CapabilityOption[];
   value: string;
   onChange: (id: string) => void;
-  // Optional slot rendered after the radios (e.g. an InlineTypeAdder "+ add new" button).
-  trailing?: React.ReactNode;
+  // Optional slot rendered before the radios (e.g. an InlineTypeAdder "+ add new" button).
+  leading?: React.ReactNode;
 }
 
-export default function CapabilityRadioGroup({ code, options, value, onChange, trailing }: Props) {
+export default function CapabilityRadioGroup({ code, options, value, onChange, leading }: Props) {
   const { t, tl } = useLocale();
   const groupId = useId();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -134,6 +134,7 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, t
 
   return (
     <div ref={containerRef} role="radiogroup" aria-labelledby={`${groupId}-label`} className="flex flex-wrap gap-2 items-center">
+      {leading}
       {options.map((opt, idx) => {
         const selected = value === opt.id;
         const isOpen = openId === opt.id;
@@ -214,7 +215,6 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, t
           </div>
         );
       })}
-      {trailing}
     </div>
   );
 }

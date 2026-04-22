@@ -2010,10 +2010,10 @@ const translations = {
     de: 'Arbeit',
   },
   'capture.strand.response': {
-    en: 'Response',
-    da: 'Reaktion',
-    sv: 'Reaktion',
-    de: 'Reaktion',
+    en: 'Capability of Response (COR)',
+    da: 'Reaktionskapacitet (COR)',
+    sv: 'Reaktionsförmåga (COR)',
+    de: 'Reaktionsfähigkeit (COR)',
   },
   'capture.strand.system': {
     en: 'System',
@@ -2040,10 +2040,10 @@ const translations = {
     de: 'Neue Reaktionsfähigkeit eingeben',
   },
   'capture.addHandlingButton': {
-    en: '+ Capability of response',
-    da: '+ Reaktionskapacitet',
-    sv: '+ Reaktionsförmåga',
-    de: '+ Reaktionsfähigkeit',
+    en: '+ COR',
+    da: '+ COR',
+    sv: '+ COR',
+    de: '+ COR',
   },
 
   // Capture form - linked demand

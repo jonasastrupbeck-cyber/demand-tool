@@ -1210,7 +1210,7 @@ export default function CapturePage() {
                   options={study.handlingTypes}
                   value={handlingTypeId}
                   onChange={(id) => setHandlingTypeId(id)}
-                  trailing={capabilityAddPill}
+                  leading={capabilityAddPill}
                 />
               ) : (
                 <div className="flex gap-2 items-center justify-center">
