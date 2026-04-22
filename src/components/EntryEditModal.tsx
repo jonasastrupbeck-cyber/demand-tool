@@ -551,7 +551,16 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 Capture form's Flow section (Ali mockup 2026-04-16). */}
             {((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
               <div>
-                <label className={labelCls}>{t('capture.workBlocksLabel')}</label>
+                <div className="flex items-center gap-3 pt-2 pb-0 mb-2">
+                  <div className="flex-1 h-px bg-gray-100" />
+                  <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
+                    {t('capture.strand.flow')}
+                    <InfoPopover label={t('capture.strand.flow')}>
+                      {t('capture.workClassificationHelp')}
+                    </InfoPopover>
+                  </span>
+                  <div className="flex-1 h-px bg-gray-100" />
+                </div>
                 <div className="overflow-x-auto -mx-1 px-1 pb-2">
                   <div className="flex gap-2 items-stretch min-w-min">
                     {workBlocks.map((b, idx) => {

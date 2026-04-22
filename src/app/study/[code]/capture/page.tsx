@@ -826,10 +826,15 @@ export default function CapturePage() {
           const hasResponseStrand = !!study.handlingEnabled;
           const hasSystemStrand = scVisible && !!(study.systemConditionsEnabled || study.thinkingsEnabled);
           // Tiny muted horizontal rule with a centered uppercase label.
-          const sep = (label: string) => (
+          const sep = (label: string, help?: string) => (
             <div className="flex items-center gap-3 pt-2 pb-0">
               <div className="flex-1 h-px bg-gray-100" />
-              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium">{label}</span>
+              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
+                {label}
+                {help && (
+                  <InfoPopover label={label}>{help}</InfoPopover>
+                )}
+              </span>
               <div className="flex-1 h-px bg-gray-100" />
             </div>
           );
@@ -1048,14 +1053,7 @@ export default function CapturePage() {
             for downstream consumers. */}
         {!study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
           <div>
-            <div className="flex items-center gap-1.5">
-              <label className={labelCls}>
-                {t('capture.workBlocksLabel')}{req}
-              </label>
-              <InfoPopover label={t('capture.workClassificationHelp')}>
-                {t('capture.workClassificationHelp')}
-              </InfoPopover>
-            </div>
+            {sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
             <div className="overflow-x-auto -mx-1 px-1 pb-2">
               <div className="flex gap-2 items-stretch min-w-min">
                 {workBlocks.map((block, idx) => {

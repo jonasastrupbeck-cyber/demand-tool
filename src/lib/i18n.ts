@@ -2015,6 +2015,12 @@ const translations = {
     sv: 'Reaktionsförmåga (COR)',
     de: 'Reaktionsfähigkeit (COR)',
   },
+  'capture.strand.flow': {
+    en: 'Flow: Capacity = value work + failure work',
+    da: 'Flow: Kapacitet = værdiskabende arbejde + ikke-værdiskabende arbejde',
+    sv: 'Flöde: Kapacitet = värdeskapande arbete + icke-värdeskapande arbete',
+    de: 'Fluss: Kapazität = Wertarbeit + Fehlerarbeit',
+  },
   'capture.strand.system': {
     en: 'System',
     da: 'System',
