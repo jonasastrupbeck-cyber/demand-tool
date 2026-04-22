@@ -156,27 +156,35 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
   ];
 
   const list = (
-    <div className="space-y-2">
-      {rows.map((row) => (
-        <label
-          key={row.key}
-          className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer"
-        >
-          <span className="text-sm text-gray-700">{row.label}</span>
-          <input
-            type="checkbox"
-            checked={row.value}
-            onChange={(e) => {
+    // Pill-shaped toggles. Each pill IS the switch — no separate checkbox.
+    // items-start + content-sized pills keeps the column as narrow as its
+    // widest label so the capture form behind the modal stays visible.
+    <div className="flex flex-col items-start gap-3">
+      {rows.map((row) => {
+        const on = row.value;
+        return (
+          <button
+            key={row.key}
+            type="button"
+            role="switch"
+            aria-checked={on}
+            onClick={() => {
               if (row.kind === 'virtual') {
-                toggleSequenceWork(e.target.checked);
+                toggleSequenceWork(!on);
               } else {
-                toggleCapture(row.key, e.target.checked);
+                toggleCapture(row.key, !on);
               }
             }}
-            className="h-4 w-4 accent-[#ac2c2d]"
-          />
-        </label>
-      ))}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors text-left ${
+              on
+                ? 'bg-[#ac2c2d] text-white border-[#ac2c2d] hover:bg-[#932627]'
+                : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+            }`}
+          >
+            {row.label}
+          </button>
+        );
+      })}
     </div>
   );
 

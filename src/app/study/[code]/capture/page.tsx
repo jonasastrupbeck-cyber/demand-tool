@@ -1800,13 +1800,15 @@ export default function CapturePage() {
         >
           {/* Fully transparent outer card — only the header pill, description
               pill, and each toggle row carry their own opaque background so
-              the capture form is clearly visible between them. */}
+              the capture form is clearly visible between them. Narrow
+              max-w-xs so the widest pill (not a full-width box) sets the
+              column width. */}
           <div
-            className="max-w-md w-full max-h-[90vh] overflow-y-auto"
+            className="max-w-xs w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 mb-3 rounded-xl bg-white shadow-md flex items-center justify-between sticky top-0">
-              <h3 className="font-bold text-gray-900">{t('capture.toggles.title')}</h3>
+            <div className="px-3 py-2 mb-3 rounded-xl bg-white shadow-md flex items-center justify-between sticky top-0">
+              <h3 className="font-bold text-gray-900 text-sm">{t('capture.toggles.title')}</h3>
               <button
                 onClick={() => setShowTogglesModal(false)}
                 className="text-gray-400 hover:text-gray-600 text-xl leading-none"
@@ -1816,7 +1818,7 @@ export default function CapturePage() {
               </button>
             </div>
             <div>
-              <p className="text-sm text-gray-700 mb-3 rounded-xl bg-white shadow-md px-4 py-3">{t('capture.toggles.desc')}</p>
+              <p className="text-sm text-gray-700 mb-3 rounded-xl bg-white shadow-md px-3 py-2">{t('capture.toggles.desc')}</p>
               <CaptureTogglesPanel
                 code={code}
                 study={study}
