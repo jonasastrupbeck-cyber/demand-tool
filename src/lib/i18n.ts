@@ -1334,10 +1334,10 @@ const translations = {
   // failure-demand.md) and the Vanguard multilingual glossary. Danish terms are
   // canonical per "Riv servicefabrikkerne ned"; never use "fejlefterspørgsel".
   'capture.demandHelp': {
-    en: 'Demand is what the customer brings to the service — either a genuine need (value demand) or a contact caused by a failure on our part (failure demand).',
-    da: 'Efterspørgsel er det, kunden bringer til servicen — enten et reelt behov (værdiskabende efterspørgsel) eller en henvendelse forårsaget af en fejl fra vores side (ikke-værdiskabende efterspørgsel).',
-    sv: 'Efterfrågan är det kunden tar med till tjänsten — antingen ett verkligt behov (värdeskapande efterfrågan) eller en kontakt orsakad av ett misstag från vår sida (icke-värdeskapande efterfrågan).',
-    de: 'Nachfrage ist das, was der Kunde zum Dienst bringt — entweder ein echtes Bedürfnis (Wertnachfrage) oder ein Kontakt, verursacht durch einen Fehler unsererseits (Fehlernachfrage).',
+    en: 'Demand is placed on the system by our customers. If we are talking anyone other than a customer, this will be work.',
+    da: 'Efterspørgsel er det, kunder placerer på systemet. Hvis vi taler om andre end kunden, er det arbejde.',
+    sv: 'Efterfrågan är det kunder placerar på systemet. Om vi talar om någon annan än kunden är det arbete.',
+    de: 'Nachfrage wird vom Kunden an das System gestellt. Wenn wir über jemand anderen als den Kunden sprechen, ist es Arbeit.',
   },
   'capture.thinkingScAttachLabel': {
     en: 'Attached to system conditions',
@@ -1349,10 +1349,10 @@ const translations = {
   // Danish/Swedish wording taken from the multilingual Vanguard glossary
   // (canonical per Riv servicefabrikkerne ned / Riv servicefabrikerna).
   'capture.demandClassificationHelp': {
-    en: 'Value demand: demand the organisation exists to serve — what the customer wants or needs help with ("I need X").\n\nFailure demand: demand caused by a failure to do something, or do something right, for the customer ("Where\'s my…?", "I called last week…").',
-    da: 'Værdiskabende efterspørgsel: efterspørgsel som organisationen findes for at betjene — et reelt behov kunden vil have opfyldt ("jeg har brug for X").\n\nIkke-værdiskabende efterspørgsel: efterspørgsel forårsaget af, at noget ikke er gjort eller ikke er gjort rigtigt fra kundens perspektiv ("hvor er min…?", "jeg ringede i sidste uge…").',
-    sv: 'Värdeskapande efterfrågan: efterfrågan som tjänsten finns till för att betjäna — ett verkligt behov kunden vill få tillgodosett ("jag behöver X").\n\nIcke-värdeskapande efterfrågan: efterfrågan orsakad av att något inte har gjorts eller inte har gjorts rätt ur kundens perspektiv ("var är min…?", "jag ringde förra veckan…").',
-    de: 'Wertnachfrage: Nachfrage, der die Organisation dienen soll — ein echtes Bedürfnis, das der Kunde erfüllt haben möchte ("Ich brauche X").\n\nFehlernachfrage: Nachfrage, verursacht durch das Versäumnis, etwas für den Kunden zu tun oder es richtig zu tun ("Wo ist mein…?", "Ich habe letzte Woche angerufen…").',
+    en: 'Value demand: demand the organisation exists to serve.\n\nFailure demand: demand caused by a failure to do something, or do something right — from the customer\'s perspective.',
+    da: 'Værdiskabende efterspørgsel: efterspørgsel som organisationen findes for at betjene.\n\nIkke-værdiskabende efterspørgsel: efterspørgsel forårsaget af, at noget ikke er gjort, eller ikke er gjort rigtigt — set fra kundens perspektiv.',
+    sv: 'Värdeskapande efterfrågan: efterfrågan som organisationen finns till för att betjäna.\n\nIcke-värdeskapande efterfrågan: efterfrågan orsakad av att något inte har gjorts, eller inte har gjorts rätt — ur kundens perspektiv.',
+    de: 'Wertnachfrage: Nachfrage, der die Organisation dienen soll.\n\nFehlernachfrage: Nachfrage, verursacht durch das Versäumnis, etwas oder etwas richtig zu tun — aus Sicht des Kunden.',
   },
   'capture.workTypeLabel': {
     en: 'Work type',

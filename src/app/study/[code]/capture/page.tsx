@@ -829,7 +829,7 @@ export default function CapturePage() {
           const sep = (label: string, help?: string) => (
             <div className="flex items-center gap-3 pt-2 pb-0">
               <div className="flex-1 h-px bg-gray-100" />
-              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
+              <span className={`text-[10px] tracking-widest text-gray-400 font-medium inline-flex items-center gap-1 ${help ? '' : 'uppercase'}`}>
                 {label}
                 {help && (
                   <InfoPopover label={label}>{help}</InfoPopover>

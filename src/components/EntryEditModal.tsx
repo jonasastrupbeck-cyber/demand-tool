@@ -553,7 +553,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               <div>
                 <div className="flex items-center gap-3 pt-2 pb-0 mb-2">
                   <div className="flex-1 h-px bg-gray-100" />
-                  <span className="text-[10px] uppercase tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
+                  <span className="text-[10px] tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
                     {t('capture.strand.flow')}
                     <InfoPopover label={t('capture.strand.flow')}>
                       {t('capture.workClassificationHelp')}
