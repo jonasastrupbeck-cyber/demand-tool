@@ -46,7 +46,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
                 title={t(settingsTab.labelKey)}
                 className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
                   pathname.startsWith(settingsTab.href)
-                    ? 'text-[#ac2c2d] bg-[#ac2c2d]/10'
+                    ? 'text-green-700 bg-green-700/10'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                 }`}
               >
