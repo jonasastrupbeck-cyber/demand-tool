@@ -574,7 +574,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       return (
-                        <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
+                        <div key={idx} className="flex-none min-w-[12rem] max-w-[18rem] p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
                               <span className={`px-2 py-1 rounded text-xs font-medium ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
@@ -590,20 +590,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           )}
                           {showPicker && (() => {
                             const tagSteps = b.tag === 'value' ? valueSteps : b.tag === 'sequence' ? sequenceSteps : failureSteps;
-                            const pillVariant: 'value' | 'sequence' | 'failure' = b.tag === 'value' ? 'value' : b.tag === 'sequence' ? 'sequence' : 'failure';
+                            const pillClass = (tag: 'value' | 'sequence' | 'failure') => {
+                              const active = b.tag === tag;
+                              const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white';
+                              return `px-2 py-1 text-xs font-medium transition-colors ${active ? activeStyle : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+                            };
                             return (
                               <>
                                 <div className="flex items-center justify-between gap-1">
-                                  <SegmentedToggle
-                                    value={b.tag}
-                                    onChange={(v) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: v as 'value' | 'sequence' | 'failure' } : p))}
-                                    options={[
-                                      { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
-                                      { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
-                                      { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
-                                    ]}
-                                    ariaLabel={t('capture.workBlocksLabel')}
-                                  />
+                                  <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
+                                    <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'value' } : p))}>{t('capture.workBlockTagValue')}</button>
+                                    <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'sequence' } : p))}>{t('capture.workBlockTagSequence')}</button>
+                                    <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure' } : p))}>{t('capture.workBlockTagFailure')}</button>
+                                  </div>
                                   <button
                                     type="button"
                                     aria-label="Remove"
@@ -611,21 +610,34 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
                                   >&times;</button>
                                 </div>
-                                <PillSelect
-                                  value=""
-                                  onChange={(val) => {
-                                    const picked = (study.workStepTypes || []).find(s => s.id === val);
-                                    if (picked) {
-                                      setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: picked.id, tag: picked.tag, text: picked.label, freeText: false } : p));
-                                    }
-                                  }}
-                                  options={tagSteps.map(s => ({ id: s.id, label: tl(s.label), operationalDefinition: s.operationalDefinition }))}
-                                  placeholder={t('capture.workStepPickerPlaceholder')}
-                                  variant={pillVariant}
-                                  onAddNew={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, text: '', freeText: true } : p))}
-                                  addNewLabel={t('capture.workStepPickerFreeText').replace(/^[—-]\s*/, '')}
-                                  className="w-full"
-                                />
+                                <ul className="divide-y divide-gray-100 bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                  {tagSteps.length === 0 && (
+                                    <li className="px-2 py-1.5 text-xs text-gray-400">—</li>
+                                  )}
+                                  {tagSteps.map((s) => (
+                                    <li key={s.id}>
+                                      <button
+                                        type="button"
+                                        onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false } : p))}
+                                        className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <span className="block whitespace-normal leading-snug">{tl(s.label)}</span>
+                                        {s.operationalDefinition && (
+                                          <span className="block text-[10px] text-gray-500 font-normal whitespace-normal leading-snug">{s.operationalDefinition}</span>
+                                        )}
+                                      </button>
+                                    </li>
+                                  ))}
+                                  <li>
+                                    <button
+                                      type="button"
+                                      onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, text: '', freeText: true } : p))}
+                                      className="w-full text-left px-2 py-1.5 text-xs text-sky-700 hover:bg-sky-50 transition-colors"
+                                    >
+                                      + {t('capture.workStepPickerFreeText').replace(/^[—-]\s*/, '')}
+                                    </button>
+                                  </li>
+                                </ul>
                               </>
                             );
                           })()}

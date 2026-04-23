@@ -1155,7 +1155,7 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
+                    <div key={idx} className="flex-none min-w-[12rem] max-w-[18rem] p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
                       {/* Mode B — badge (step picked) */}
                       {hasStep && step && (
                         <div className="flex items-start justify-between gap-1">
@@ -1173,27 +1173,27 @@ export default function CapturePage() {
                         </div>
                       )}
 
-                      {/* Mode A — picker. Three-tag pill row filters the dropdown;
-                           PillSelect matches the demand/work-type picker style and
-                           carries the active tag's variant (green/emerald/red). The
-                           "+ Free text" action in the popover drops the block into
-                           Mode C, preserving the current tag. */}
+                      {/* Mode A — picker. Three tag pills (Value/SEQ/Failure) drive
+                           both the tag selection and which step list is visible
+                           inline below. Clicking a pill is one click to the picker
+                           list — no intermediate dropdown trigger. Rendering inline
+                           (not as an absolute popover) avoids the outer
+                           overflow-x-auto clipping and lets the card grow to fit. */}
                       {showPicker && (() => {
                         const tagSteps = block.tag === 'value' ? valueSteps : block.tag === 'sequence' ? sequenceSteps : failureSteps;
-                        const pillVariant: 'value' | 'sequence' | 'failure' = block.tag === 'value' ? 'value' : block.tag === 'sequence' ? 'sequence' : 'failure';
+                        const pillClass = (tag: 'value' | 'sequence' | 'failure') => {
+                          const active = block.tag === tag;
+                          const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white';
+                          return `px-2 py-1 text-xs font-medium transition-colors ${active ? activeStyle : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+                        };
                         return (
                           <>
                             <div className="flex items-center justify-between gap-1">
-                              <SegmentedToggle
-                                value={block.tag}
-                                onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' } : b))}
-                                options={[
-                                  { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
-                                  { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
-                                  { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
-                                ]}
-                                ariaLabel={t('capture.workBlocksLabel')}
-                              />
+                              <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
+                                <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'value' } : b))}>{t('capture.workBlockTagValue')}</button>
+                                <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'sequence' } : b))}>{t('capture.workBlockTagSequence')}</button>
+                                <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'failure' } : b))}>{t('capture.workBlockTagFailure')}</button>
+                              </div>
                               <button
                                 type="button"
                                 aria-label="Remove"
@@ -1203,21 +1203,34 @@ export default function CapturePage() {
                                 &times;
                               </button>
                             </div>
-                            <PillSelect
-                              value=""
-                              onChange={(val) => {
-                                const picked = (study.workStepTypes || []).find(s => s.id === val);
-                                if (picked) {
-                                  setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: picked.id, tag: picked.tag, text: picked.label, freeText: false } : b));
-                                }
-                              }}
-                              options={tagSteps.map(s => ({ id: s.id, label: tl(s.label), operationalDefinition: s.operationalDefinition }))}
-                              placeholder={t('capture.workStepPickerPlaceholder')}
-                              variant={pillVariant}
-                              onAddNew={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: null, text: '', freeText: true } : b))}
-                              addNewLabel={t('capture.workStepPickerFreeText').replace(/^[—-]\s*/, '')}
-                              className="w-full"
-                            />
+                            <ul className="divide-y divide-gray-100 bg-white border border-gray-200 rounded-lg overflow-hidden">
+                              {tagSteps.length === 0 && (
+                                <li className="px-2 py-1.5 text-xs text-gray-400">—</li>
+                              )}
+                              {tagSteps.map((s) => (
+                                <li key={s.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false } : b))}
+                                    className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <span className="block whitespace-normal leading-snug">{tl(s.label)}</span>
+                                    {s.operationalDefinition && (
+                                      <span className="block text-[10px] text-gray-500 font-normal whitespace-normal leading-snug">{s.operationalDefinition}</span>
+                                    )}
+                                  </button>
+                                </li>
+                              ))}
+                              <li>
+                                <button
+                                  type="button"
+                                  onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: null, text: '', freeText: true } : b))}
+                                  className="w-full text-left px-2 py-1.5 text-xs text-sky-700 hover:bg-sky-50 transition-colors"
+                                >
+                                  + {t('capture.workStepPickerFreeText').replace(/^[—-]\s*/, '')}
+                                </button>
+                              </li>
+                            </ul>
                           </>
                         );
                       })()}
