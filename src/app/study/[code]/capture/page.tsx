@@ -1155,7 +1155,7 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-36' : 'min-w-[12rem] max-w-[18rem]'}`}>
+                    <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}

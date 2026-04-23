@@ -574,7 +574,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       return (
-                        <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-36' : 'min-w-[12rem] max-w-[18rem]'}`}>
+                        <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}>
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
                               <span className={`flex-1 min-w-0 px-2 py-1 rounded text-xs font-medium whitespace-normal break-words leading-snug ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
