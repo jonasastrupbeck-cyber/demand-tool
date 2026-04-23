@@ -182,6 +182,33 @@ export default function SettingsPage() {
     loadStudy();
   }, [loadStudy]);
 
+  // Optimistic-update helpers (Jonas 2026-04-23).
+  // Every mutation used to await the server response AND then re-fetch the
+  // whole study payload before the UI reflected the change — two round-trips
+  // per click, making toggles feel sluggish. These helpers flip the order:
+  // callers update local state first, then use mutate/mutateAdd to fire the
+  // request in the background. loadStudy() is only called on error so the UI
+  // still recovers when a write fails.
+  const mutate = useCallback((api: () => Promise<Response>) => {
+    api().then((r) => { if (!r.ok) loadStudy(); }).catch(() => loadStudy());
+  }, [loadStudy]);
+  // Add is special: the server generates the id, so we must await the POST
+  // to learn it. But we still skip the full re-fetch by splicing the new row
+  // into local state via the caller's onId callback.
+  const mutateAdd = useCallback(async (api: () => Promise<Response>, onId: (id: string) => void) => {
+    try {
+      const r = await api();
+      if (r.ok) {
+        const data = await r.json();
+        if (data?.id) onId(data.id); else loadStudy();
+      } else {
+        loadStudy();
+      }
+    } catch {
+      loadStudy();
+    }
+  }, [loadStudy]);
+
   // Check localStorage for saved PIN on load
   useEffect(() => {
     if (study) {
@@ -208,288 +235,278 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSetPin(e: React.FormEvent) {
+  function handleSetPin(e: React.FormEvent) {
     e.preventDefault();
-    if (!newPinInput.trim() || newPinInput.length < 4) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+    const pin = newPinInput.trim();
+    if (!pin || pin.length < 4) return;
+    setStudy((s) => (s ? { ...s, consultantPin: pin } : s));
+    localStorage.setItem(`consultant_pin_${code}`, pin);
+    setNewPinInput('');
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ consultantPin: newPinInput.trim() }),
-    });
-    localStorage.setItem(`consultant_pin_${code}`, newPinInput.trim());
-    setNewPinInput('');
-    loadStudy();
+      body: JSON.stringify({ consultantPin: pin }),
+    }));
   }
 
-  async function addHandlingType(e: React.FormEvent) {
+  function addHandlingType(e: React.FormEvent) {
     e.preventDefault();
-    if (!newHandling.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/handling-types`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newHandling.trim() }),
-    });
+    const label = newHandling.trim();
+    if (!label) return;
     setNewHandling('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/handling-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, handlingTypes: [...s.handlingTypes, { id, label, operationalDefinition: null }] } : s)),
+    );
   }
 
-  async function removeHandlingType(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/handling-types/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeHandlingType(id: string) {
+    setStudy((s) => (s ? {
+      ...s,
+      handlingTypes: s.handlingTypes.filter((h) => h.id !== id),
+      // Server cascades the one-stop FK to null; mirror it locally.
+      oneStopHandlingType: s.oneStopHandlingType === id ? null : s.oneStopHandlingType,
+    } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/handling-types/${id}`, { method: 'DELETE' }));
   }
 
-  async function setOneStop(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+  function setOneStop(id: string) {
+    setStudy((s) => (s ? { ...s, oneStopHandlingType: id } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ oneStopHandlingType: id }),
-    });
-    loadStudy();
+    }));
   }
 
-  async function addDemandType(e: React.FormEvent, category: 'value' | 'failure') {
+  function addDemandType(e: React.FormEvent, category: 'value' | 'failure') {
     e.preventDefault();
-    const label = category === 'value' ? newValueType : newFailureType;
-    if (!label.trim()) return;
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: label.trim(), category }),
-    });
-    if (category === 'value') setNewValueType('');
-    else setNewFailureType('');
-    // Fire-and-forget AI lifecycle classification if enabled
-    if (study?.lifecycleEnabled && res.ok) {
-      try {
-        const { id: newId } = await res.json();
-        if (newId) {
-          fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${newId}/classify-lifecycle`, { method: 'POST' })
+    const label = (category === 'value' ? newValueType : newFailureType).trim();
+    if (!label) return;
+    if (category === 'value') setNewValueType(''); else setNewFailureType('');
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/demand-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, category }),
+      }),
+      (id) => {
+        setStudy((s) => (s ? { ...s, demandTypes: [...s.demandTypes, { id, label, category, operationalDefinition: null, lifecycleStageId: null, lifecycleAiSuggestion: null }] } : s));
+        // Fire-and-forget AI lifecycle classification if enabled; result reloads
+        // the study so the stage + AI suggestion columns populate.
+        if (study?.lifecycleEnabled) {
+          fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${id}/classify-lifecycle`, { method: 'POST' })
             .then(() => loadStudy())
             .catch(() => {});
         }
-      } catch { /* noop */ }
-    }
-    loadStudy();
+      },
+    );
   }
 
-  async function removeDemandType(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeDemandType(id: string) {
+    setStudy((s) => (s ? { ...s, demandTypes: s.demandTypes.filter((d) => d.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${id}`, { method: 'DELETE' }));
   }
 
-  async function addContactMethodHandler(e: React.FormEvent) {
+  function addContactMethodHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newContactMethod.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/contact-methods`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newContactMethod.trim() }),
-    });
+    const label = newContactMethod.trim();
+    if (!label) return;
     setNewContactMethod('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/contact-methods`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, contactMethods: [...s.contactMethods, { id, label }] } : s)),
+    );
   }
 
-  async function removeContactMethod(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/contact-methods/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeContactMethod(id: string) {
+    setStudy((s) => (s ? { ...s, contactMethods: s.contactMethods.filter((c) => c.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/contact-methods/${id}`, { method: 'DELETE' }));
   }
 
-  async function addWhatMattersTypeHandler(e: React.FormEvent) {
+  function addWhatMattersTypeHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newWhatMattersType.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newWhatMattersType.trim() }),
-    });
+    const label = newWhatMattersType.trim();
+    if (!label) return;
     setNewWhatMattersType('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, whatMattersTypes: [...s.whatMattersTypes, { id, label, operationalDefinition: null }] } : s)),
+    );
   }
 
-  async function removeWhatMattersType(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeWhatMattersType(id: string) {
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.filter((w) => w.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, { method: 'DELETE' }));
   }
 
-  async function addLifeProblemHandler(e: React.FormEvent) {
+  function addLifeProblemHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newLifeProblem.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/life-problems`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newLifeProblem.trim() }),
-    });
+    const label = newLifeProblem.trim();
+    if (!label) return;
     setNewLifeProblem('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/life-problems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, lifeProblems: [...s.lifeProblems, { id, label, operationalDefinition: null }] } : s)),
+    );
   }
 
-  async function removeLifeProblem(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/life-problems/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeLifeProblem(id: string) {
+    setStudy((s) => (s ? { ...s, lifeProblems: s.lifeProblems.filter((l) => l.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/life-problems/${id}`, { method: 'DELETE' }));
   }
 
-  async function addPointOfTransactionHandler(e: React.FormEvent) {
+  function addPointOfTransactionHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newPointOfTransaction.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newPointOfTransaction.trim() }),
-    });
+    const label = newPointOfTransaction.trim();
+    if (!label) return;
     setNewPointOfTransaction('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, pointsOfTransaction: [...s.pointsOfTransaction, { id, label, customerFacing: false }] } : s)),
+    );
   }
 
-  async function removePointOfTransaction(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removePointOfTransaction(id: string) {
+    setStudy((s) => (s ? { ...s, pointsOfTransaction: s.pointsOfTransaction.filter((p) => p.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, { method: 'DELETE' }));
   }
 
-  async function togglePointOfTransactionCustomerFacing(id: string, customerFacing: boolean) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, {
+  function togglePointOfTransactionCustomerFacing(id: string, customerFacing: boolean) {
+    setStudy((s) => (s ? { ...s, pointsOfTransaction: s.pointsOfTransaction.map((p) => (p.id === id ? { ...p, customerFacing } : p)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
-    });
-    loadStudy();
+    }));
   }
 
-  async function addWorkSourceHandler(e: React.FormEvent) {
+  function addWorkSourceHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newWorkSource.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newWorkSource.trim() }),
-    });
+    const label = newWorkSource.trim();
+    if (!label) return;
     setNewWorkSource('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/work-sources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, workSources: [...s.workSources, { id, label, customerFacing: false, sortOrder: s.workSources.length }] } : s)),
+    );
   }
 
-  async function removeWorkSource(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeWorkSource(id: string) {
+    setStudy((s) => (s ? { ...s, workSources: s.workSources.filter((w) => w.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, { method: 'DELETE' }));
   }
 
-  async function toggleWorkSourceCustomerFacing(id: string, customerFacing: boolean) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, {
+  function toggleWorkSourceCustomerFacing(id: string, customerFacing: boolean) {
+    setStudy((s) => (s ? { ...s, workSources: s.workSources.map((w) => (w.id === id ? { ...w, customerFacing } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-sources/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
-    });
-    loadStudy();
+    }));
   }
 
-  async function addWorkTypeHandler(e: React.FormEvent) {
+  function addWorkTypeHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newWorkType.trim()) return;
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/work-types`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newWorkType.trim() }),
-    });
+    const label = newWorkType.trim();
+    if (!label) return;
     setNewWorkType('');
-    if (study?.lifecycleEnabled && res.ok) {
-      try {
-        const { id: newId } = await res.json();
-        if (newId) {
-          fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${newId}/classify-lifecycle`, { method: 'POST' })
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/work-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => {
+        setStudy((s) => (s ? { ...s, workTypes: [...s.workTypes, { id, label, lifecycleStageId: null, lifecycleAiSuggestion: null }] } : s));
+        if (study?.lifecycleEnabled) {
+          fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${id}/classify-lifecycle`, { method: 'POST' })
             .then(() => loadStudy())
             .catch(() => {});
         }
-      } catch { /* noop */ }
-    }
-    loadStudy();
+      },
+    );
   }
 
-  async function removeWorkType(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeWorkType(id: string) {
+    setStudy((s) => (s ? { ...s, workTypes: s.workTypes.filter((w) => w.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${id}`, { method: 'DELETE' }));
   }
 
-  async function toggleVolumeMode() {
+  function toggleVolumeMode() {
     const newValue = !study?.volumeMode;
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+    setStudy((s) => (s ? { ...s, volumeMode: newValue } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ volumeMode: newValue }),
-    });
-    loadStudy();
+    }));
   }
 
-  // Phase 4 (2026-04-16) — Work Step Types.
-  // All four handlers apply the change to local state first and fire the
-  // request in the background. loadStudy() is only called on error so the
-  // UI stays in sync with the server if a write fails. Previously each
-  // click waited for two round-trips (the mutation + a full study refetch)
-  // before the UI reflected the change — this is what made toggles feel
-  // sluggish (Jonas 2026-04-23).
-  async function toggleWorkStepTypes() {
+  // Phase 4 (2026-04-16) — Work Step Types. Uses the shared mutate/mutateAdd
+  // optimistic helpers defined above.
+  function toggleWorkStepTypes() {
     const newValue = !study?.workStepTypesEnabled;
     setStudy((s) => (s ? { ...s, workStepTypesEnabled: newValue } : s));
-    try {
-      const r = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workStepTypesEnabled: newValue }),
-      });
-      if (!r.ok) loadStudy();
-    } catch {
-      loadStudy();
-    }
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workStepTypesEnabled: newValue }),
+    }));
   }
 
-  async function addWorkStepHandler(e: React.FormEvent) {
+  function addWorkStepHandler(e: React.FormEvent) {
     e.preventDefault();
     const label = newWorkStep.trim();
     if (!label) return;
     const tag = newWorkStepTag;
     setNewWorkStep('');
-    // Need the server-generated id, so we await POST but skip the full
-    // loadStudy — splice the new step into local state directly.
-    try {
-      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types`, {
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, tag }),
-      });
-      if (r.ok) {
-        const { id } = await r.json();
-        setStudy((s) => {
-          if (!s) return s;
-          const existing = s.workStepTypes || [];
-          return { ...s, workStepTypes: [...existing, { id, label, tag, operationalDefinition: null, sortOrder: existing.length }] };
-        });
-      } else {
-        loadStudy();
-      }
-    } catch {
-      loadStudy();
-    }
+      }),
+      (id) => setStudy((s) => (s ? { ...s, workStepTypes: [...(s.workStepTypes || []), { id, label, tag, operationalDefinition: null, sortOrder: (s.workStepTypes || []).length }] } : s)),
+    );
   }
 
-  async function removeWorkStep(id: string) {
+  function removeWorkStep(id: string) {
     setStudy((s) => (s ? { ...s, workStepTypes: (s.workStepTypes || []).filter((w) => w.id !== id) } : s));
-    try {
-      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, { method: 'DELETE' });
-      if (!r.ok) loadStudy();
-    } catch {
-      loadStudy();
-    }
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, { method: 'DELETE' }));
   }
 
-  async function updateWorkStepTag(id: string, tag: 'value' | 'sequence' | 'failure') {
+  function updateWorkStepTag(id: string, tag: 'value' | 'sequence' | 'failure') {
     setStudy((s) => (s ? { ...s, workStepTypes: (s.workStepTypes || []).map((w) => (w.id === id ? { ...w, tag } : w)) } : s));
-    try {
-      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tag }),
-      });
-      if (!r.ok) loadStudy();
-    } catch {
-      loadStudy();
-    }
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag }),
+    }));
   }
 
   // Phase 4B — synthesis helper actions.
@@ -544,70 +561,82 @@ export default function SettingsPage() {
     }
   }
 
-  async function addSystemConditionHandler(e: React.FormEvent) {
+  function addSystemConditionHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newSystemCondition.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newSystemCondition.trim() }),
-    });
+    const label = newSystemCondition.trim();
+    if (!label) return;
     setNewSystemCondition('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, systemConditions: [...s.systemConditions, { id, label, operationalDefinition: null }] } : s)),
+    );
   }
 
-  async function removeSystemCondition(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeSystemCondition(id: string) {
+    setStudy((s) => (s ? { ...s, systemConditions: s.systemConditions.filter((sc) => sc.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/system-conditions/${id}`, { method: 'DELETE' }));
   }
 
-  async function addThinkingHandler(e: React.FormEvent) {
+  function addThinkingHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newThinking.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/thinkings`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newThinking.trim() }),
-    });
+    const label = newThinking.trim();
+    if (!label) return;
     setNewThinking('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/thinkings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, thinkings: [...s.thinkings, { id, label, operationalDefinition: null }] } : s)),
+    );
   }
 
-  async function removeThinking(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/thinkings/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeThinking(id: string) {
+    setStudy((s) => (s ? { ...s, thinkings: s.thinkings.filter((th) => th.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/thinkings/${id}`, { method: 'DELETE' }));
   }
 
   // --- Lifecycle ---
-  async function toggleLifecycle() {
+  function toggleLifecycle() {
     const newValue = !study?.lifecycleEnabled;
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+    setStudy((s) => (s ? { ...s, lifecycleEnabled: newValue } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lifecycleEnabled: newValue }),
-    });
-    await loadStudy();
-    // When turning on for the first time, kick off auto-classification of existing types in the background
-    if (newValue) {
-      classifyAllTypes(false);
-    }
+    }));
+    // When turning on for the first time, kick off auto-classification of
+    // existing types in the background. classifyAllTypes still awaits its
+    // own request because it exposes a `classifyingAll` progress flag.
+    if (newValue) classifyAllTypes(false);
   }
 
-  async function addLifecycleStageHandler(e: React.FormEvent) {
+  function addLifecycleStageHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newLifecycleStage.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newLifecycleStage.trim() }),
-    });
+    const label = newLifecycleStage.trim();
+    if (!label) return;
     setNewLifecycleStage('');
-    loadStudy();
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      // The server generates `code` from the label (slug) and assigns sortOrder
+      // from the existing count. Close enough for the optimistic row; the next
+      // server-driven reload (if any) will correct if needed.
+      (id) => setStudy((s) => (s ? { ...s, lifecycleStages: [...s.lifecycleStages, { id, code: label.toLowerCase().replace(/\s+/g, '-'), label, sortOrder: s.lifecycleStages.length }] } : s)),
+    );
   }
 
-  async function removeLifecycleStage(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages/${id}`, { method: 'DELETE' });
-    loadStudy();
+  function removeLifecycleStage(id: string) {
+    setStudy((s) => (s ? { ...s, lifecycleStages: s.lifecycleStages.filter((st) => st.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/lifecycle-stages/${id}`, { method: 'DELETE' }));
   }
 
   async function classifyAllTypes(force: boolean) {
@@ -624,22 +653,22 @@ export default function SettingsPage() {
     }
   }
 
-  async function setDemandTypeStage(typeId: string, stageId: string | null) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${typeId}`, {
+  function setDemandTypeStage(typeId: string, stageId: string | null) {
+    setStudy((s) => (s ? { ...s, demandTypes: s.demandTypes.map((d) => (d.id === typeId ? { ...d, lifecycleStageId: stageId } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/demand-types/${typeId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lifecycleStageId: stageId }),
-    });
-    loadStudy();
+    }));
   }
 
-  async function setWorkTypeStage(typeId: string, stageId: string | null) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${typeId}`, {
+  function setWorkTypeStage(typeId: string, stageId: string | null) {
+    setStudy((s) => (s ? { ...s, workTypes: s.workTypes.map((w) => (w.id === typeId ? { ...w, lifecycleStageId: stageId } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${typeId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lifecycleStageId: stageId }),
-    });
-    loadStudy();
+    }));
   }
 
   function startEditDef(id: string, currentDef: string | null, type: 'handling' | 'demand' | 'whatMatters' | 'systemCondition' | 'lifeProblem') {
@@ -648,17 +677,31 @@ export default function SettingsPage() {
     setEditingDefType(type);
   }
 
-  async function saveOperationalDefinition() {
+  function saveOperationalDefinition() {
     if (!editingDefId) return;
     const typePathMap = { handling: 'handling-types', demand: 'demand-types', whatMatters: 'what-matters-types', systemCondition: 'system-conditions', lifeProblem: 'life-problems' };
-    await fetch(`/api/studies/${encodeURIComponent(code)}/${typePathMap[editingDefType]}/${editingDefId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ operationalDefinition: editingDefValue.trim() }),
-    });
+    const id = editingDefId;
+    const type = editingDefType;
+    const def = editingDefValue.trim();
     setEditingDefId(null);
     setEditingDefValue('');
-    loadStudy();
+    const applyLocal = (s: StudyData): StudyData => {
+      const patch = <T extends { id: string; operationalDefinition: string | null }>(arr: T[]): T[] =>
+        arr.map((row) => (row.id === id ? { ...row, operationalDefinition: def || null } : row));
+      switch (type) {
+        case 'handling': return { ...s, handlingTypes: patch(s.handlingTypes) };
+        case 'demand': return { ...s, demandTypes: patch(s.demandTypes) };
+        case 'whatMatters': return { ...s, whatMattersTypes: patch(s.whatMattersTypes) };
+        case 'systemCondition': return { ...s, systemConditions: patch(s.systemConditions) };
+        case 'lifeProblem': return { ...s, lifeProblems: patch(s.lifeProblems) };
+      }
+    };
+    setStudy((s) => (s ? applyLocal(s) : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/${typePathMap[type]}/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operationalDefinition: def }),
+    }));
   }
 
   // Label editing — same pattern as saveOperationalDefinition, but covers all 9
@@ -683,18 +726,37 @@ export default function SettingsPage() {
     setEditingLabelType(type);
   }
 
-  async function saveLabel() {
+  function saveLabel() {
     if (!editingLabelId) return;
     const trimmed = editingLabelValue.trim();
     if (!trimmed) { setEditingLabelId(null); return; }
-    await fetch(`/api/studies/${encodeURIComponent(code)}/${LABEL_PATH_MAP[editingLabelType]}/${editingLabelId}`, {
+    const id = editingLabelId;
+    const type = editingLabelType;
+    setEditingLabelId(null);
+    setEditingLabelValue('');
+    const applyLocal = (s: StudyData): StudyData => {
+      const patch = <T extends { id: string; label: string }>(arr: T[]): T[] =>
+        arr.map((row) => (row.id === id ? { ...row, label: trimmed } : row));
+      switch (type) {
+        case 'handling': return { ...s, handlingTypes: patch(s.handlingTypes) };
+        case 'demand': return { ...s, demandTypes: patch(s.demandTypes) };
+        case 'contactMethod': return { ...s, contactMethods: patch(s.contactMethods) };
+        case 'pointOfTransaction': return { ...s, pointsOfTransaction: patch(s.pointsOfTransaction) };
+        case 'workSource': return { ...s, workSources: patch(s.workSources) };
+        case 'whatMatters': return { ...s, whatMattersTypes: patch(s.whatMattersTypes) };
+        case 'systemCondition': return { ...s, systemConditions: patch(s.systemConditions) };
+        case 'thinking': return { ...s, thinkings: patch(s.thinkings) };
+        case 'lifeProblem': return { ...s, lifeProblems: patch(s.lifeProblems) };
+        case 'workType': return { ...s, workTypes: patch(s.workTypes) };
+        case 'workStepType': return { ...s, workStepTypes: patch(s.workStepTypes || []) };
+      }
+    };
+    setStudy((s) => (s ? applyLocal(s) : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/${LABEL_PATH_MAP[type]}/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ label: trimmed }),
-    });
-    setEditingLabelId(null);
-    setEditingLabelValue('');
-    loadStudy();
+    }));
   }
 
   // Renders either the label (with a small pencil icon to enter edit mode) or
@@ -735,15 +797,16 @@ export default function SettingsPage() {
     );
   }
 
-  async function savePurpose() {
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ purpose: purposeInput.trim() }),
-    });
+  function savePurpose() {
+    const purpose = purposeInput.trim();
+    setStudy((s) => (s ? { ...s, purpose } : s));
     setPurposeSaved(true);
     setTimeout(() => setPurposeSaved(false), 2000);
-    loadStudy();
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purpose }),
+    }));
   }
 
   function copyCode() {
