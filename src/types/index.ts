@@ -82,7 +82,7 @@ export interface WorkStepType {
   id: string;
   studyId: string;
   label: string;
-  tag: 'value' | 'failure';
+  tag: 'value' | 'sequence' | 'failure';
   operationalDefinition: string | null;
   sortOrder: number;
 }

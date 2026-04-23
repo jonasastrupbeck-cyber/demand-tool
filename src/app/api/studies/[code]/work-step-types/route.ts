@@ -29,8 +29,8 @@ export async function POST(
   if (!body.label || typeof body.label !== 'string') {
     return NextResponse.json({ error: 'Label is required' }, { status: 400 });
   }
-  if (body.tag !== 'value' && body.tag !== 'failure') {
-    return NextResponse.json({ error: "Tag must be 'value' or 'failure'" }, { status: 400 });
+  if (body.tag !== 'value' && body.tag !== 'sequence' && body.tag !== 'failure') {
+    return NextResponse.json({ error: "Tag must be 'value', 'sequence' or 'failure'" }, { status: 400 });
   }
 
   const id = await addWorkStepType(study.id, body.label.trim(), body.tag);

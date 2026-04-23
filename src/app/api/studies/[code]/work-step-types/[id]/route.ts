@@ -10,10 +10,10 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
-  const updates: { label?: string; tag?: 'value' | 'failure'; operationalDefinition?: string | null } = {};
+  const updates: { label?: string; tag?: 'value' | 'sequence' | 'failure'; operationalDefinition?: string | null } = {};
 
   if (typeof body.label === 'string' && body.label.trim()) updates.label = body.label.trim();
-  if (body.tag === 'value' || body.tag === 'failure') updates.tag = body.tag;
+  if (body.tag === 'value' || body.tag === 'sequence' || body.tag === 'failure') updates.tag = body.tag;
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
 
   if (Object.keys(updates).length > 0) {

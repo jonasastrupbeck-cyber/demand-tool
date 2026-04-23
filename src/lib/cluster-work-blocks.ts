@@ -37,11 +37,11 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 export interface BlockForClustering {
   id: string;
   text: string;
-  tag: 'value' | 'failure';
+  tag: 'value' | 'sequence' | 'failure';
 }
 
 export interface WorkBlockCluster {
-  tag: 'value' | 'failure';
+  tag: 'value' | 'sequence' | 'failure';
   suggestedLabel: string;
   blockCount: number;
   exampleTexts: string[];
@@ -54,12 +54,12 @@ export function clusterBlocks(
 ): WorkBlockCluster[] {
   const threshold = opts.jaccardThreshold ?? 0.6;
 
-  const byTag: Record<'value' | 'failure', BlockForClustering[]> = { value: [], failure: [] };
+  const byTag: Record<'value' | 'sequence' | 'failure', BlockForClustering[]> = { value: [], sequence: [], failure: [] };
   for (const b of blocks) byTag[b.tag].push(b);
 
   const result: WorkBlockCluster[] = [];
 
-  for (const tag of ['value', 'failure'] as const) {
+  for (const tag of ['value', 'sequence', 'failure'] as const) {
     // Exact-match bucket by canonical form
     const exactBuckets = new Map<string, BlockForClustering[]>();
     for (const b of byTag[tag]) {

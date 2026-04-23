@@ -42,7 +42,7 @@ export interface EntryEditModalStudy {
   whatMattersTypes: WhatMattersType[];
   lifeProblems: LifeProblem[];
   workTypes: WorkType[];
-  workStepTypes: { id: string; label: string; tag: 'value' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
+  workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: SystemCondition[];
   thinkings: Thinking[];
 }
@@ -569,6 +569,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const hasStep = !!b.workStepTypeId;
                       const step = hasStep ? (study.workStepTypes || []).find(s => s.id === b.workStepTypeId) : null;
                       const valueSteps = (study.workStepTypes || []).filter(s => s.tag === 'value');
+                      const sequenceSteps = (study.workStepTypes || []).filter(s => s.tag === 'sequence');
                       const failureSteps = (study.workStepTypes || []).filter(s => s.tag === 'failure');
                       const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
@@ -576,7 +577,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         <div key={idx} className="flex-none w-48 p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
-                              <span className={`px-2 py-1 rounded text-xs font-medium ${step.tag === 'value' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
                               <div className="flex items-center gap-1">
                                 <button
                                   type="button"
@@ -609,6 +610,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                 {valueSteps.length > 0 && (
                                   <optgroup label={t('capture.workBlockTagValue')}>
                                     {valueSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
+                                  </optgroup>
+                                )}
+                                {sequenceSteps.length > 0 && (
+                                  <optgroup label={t('capture.workBlockTagSequence')}>
+                                    {sequenceSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
                                   </optgroup>
                                 )}
                                 {failureSteps.length > 0 && (

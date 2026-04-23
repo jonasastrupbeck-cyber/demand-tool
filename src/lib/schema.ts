@@ -141,7 +141,10 @@ export const workStepTypes = pgTable('work_step_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
   label: text('label').notNull(),
-  tag: text('tag').$type<'value' | 'failure'>().notNull(),
+  // 'sequence' added 2026-04-23 — mirrors the free-text work-block tag
+  // widening on 2026-04-22 (see work_description_blocks.tag below). No DB
+  // migration needed since `tag` is TEXT.
+  tag: text('tag').$type<'value' | 'sequence' | 'failure'>().notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
 });

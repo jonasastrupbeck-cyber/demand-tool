@@ -515,7 +515,7 @@ export async function getWorkStepTypes(studyId: string) {
   return db.select().from(workStepTypes).where(eq(workStepTypes.studyId, studyId)).orderBy(asc(workStepTypes.sortOrder));
 }
 
-export async function addWorkStepType(studyId: string, label: string, tag: 'value' | 'failure') {
+export async function addWorkStepType(studyId: string, label: string, tag: 'value' | 'sequence' | 'failure') {
   const id = generateId();
   const existing = await getWorkStepTypes(studyId);
   await db.insert(workStepTypes).values({
@@ -528,7 +528,7 @@ export async function addWorkStepType(studyId: string, label: string, tag: 'valu
   return id;
 }
 
-export async function updateWorkStepType(id: string, data: { label?: string; tag?: 'value' | 'failure'; operationalDefinition?: string | null }) {
+export async function updateWorkStepType(id: string, data: { label?: string; tag?: 'value' | 'sequence' | 'failure'; operationalDefinition?: string | null }) {
   await db.update(workStepTypes).set(data).where(eq(workStepTypes.id, id));
 }
 
@@ -563,7 +563,7 @@ export async function getOrphanWorkBlocks(studyId: string) {
 // orphan pool.
 export async function promoteWorkStepFromCluster(studyId: string, payload: {
   label: string;
-  tag: 'value' | 'failure';
+  tag: 'value' | 'sequence' | 'failure';
   operationalDefinition?: string;
   blockIds: string[];
 }) {

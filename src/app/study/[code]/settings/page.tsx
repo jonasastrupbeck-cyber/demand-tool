@@ -92,7 +92,7 @@ interface StudyData {
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
-  workStepTypes: { id: string; label: string; tag: 'value' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
+  workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: SystemConditionType[];
   thinkings: SystemConditionType[];
   lifecycleStages: LifecycleStage[];
@@ -133,11 +133,11 @@ export default function SettingsPage() {
   const [newWorkType, setNewWorkType] = useState('');
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
   const [newWorkStep, setNewWorkStep] = useState('');
-  const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'failure'>('value');
+  const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'sequence' | 'failure'>('value');
 
   // Phase 4B (2026-04-16) — Synthesis modal state.
   type Cluster = {
-    tag: 'value' | 'failure';
+    tag: 'value' | 'sequence' | 'failure';
     suggestedLabel: string;
     blockCount: number;
     exampleTexts: string[];
@@ -445,7 +445,7 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  async function updateWorkStepTag(id: string, tag: 'value' | 'failure') {
+  async function updateWorkStepTag(id: string, tag: 'value' | 'sequence' | 'failure') {
     await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -1243,16 +1243,17 @@ export default function SettingsPage() {
               <>
                 <ul className="space-y-2 mb-4">
                   {(study.workStepTypes || []).map((wst) => (
-                    <li key={wst.id} className={`${itemCls} ${wst.tag === 'value' ? 'bg-green-50' : 'bg-red-50'}`}>
+                    <li key={wst.id} className={`${itemCls} ${wst.tag === 'value' ? 'bg-green-50' : wst.tag === 'sequence' ? 'bg-emerald-50' : 'bg-red-50'}`}>
                       <div className="flex items-center gap-2 flex-1">
-                        {renderLabel(wst.id, wst.label, 'workStepType', wst.tag === 'value' ? 'text-sm text-green-700' : 'text-sm text-red-700')}
+                        {renderLabel(wst.id, wst.label, 'workStepType', wst.tag === 'value' ? 'text-sm text-green-700' : wst.tag === 'sequence' ? 'text-sm text-emerald-700' : 'text-sm text-red-700')}
                         <SegmentedToggle
                           options={[
                             { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                            { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                             { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                           ]}
                           value={wst.tag}
-                          onChange={(v) => updateWorkStepTag(wst.id, v as 'value' | 'failure')}
+                          onChange={(v) => updateWorkStepTag(wst.id, v as 'value' | 'sequence' | 'failure')}
                         />
                       </div>
                       <button onClick={() => removeWorkStep(wst.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
@@ -1264,10 +1265,11 @@ export default function SettingsPage() {
                   <SegmentedToggle
                     options={[
                       { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                      { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                       { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
                     ]}
                     value={newWorkStepTag}
-                    onChange={(v) => setNewWorkStepTag(v as 'value' | 'failure')}
+                    onChange={(v) => setNewWorkStepTag(v as 'value' | 'sequence' | 'failure')}
                   />
                   <button type="submit" disabled={!newWorkStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d] hover:bg-[#8a2425]">{t('settings.add')}</button>
                 </form>
@@ -1425,10 +1427,10 @@ export default function SettingsPage() {
                             const key = clusterKey(c);
                             const labelValue = synthesiseEdits[key] ?? c.suggestedLabel;
                             return (
-                              <li key={key} className={`p-3 rounded-lg border ${c.tag === 'value' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                              <li key={key} className={`p-3 rounded-lg border ${c.tag === 'value' ? 'bg-green-50 border-green-200' : c.tag === 'sequence' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                                 <div className="flex items-center gap-2 mb-2">
-                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tag === 'value' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
-                                    {c.tag === 'value' ? t('capture.workBlockTagValue') : t('capture.workBlockTagFailure')}
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tag === 'value' ? 'bg-green-600 text-white' : c.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>
+                                    {c.tag === 'value' ? t('capture.workBlockTagValue') : c.tag === 'sequence' ? t('capture.workBlockTagSequence') : t('capture.workBlockTagFailure')}
                                   </span>
                                   <span className="text-xs text-gray-600">
                                     {t('settings.clusterBlockCount').replace('{count}', String(c.blockCount))}
