@@ -588,50 +588,47 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               </div>
                             </div>
                           )}
-                          {showPicker && (
-                            <div className="flex items-center justify-between gap-1">
-                              <select
-                                value=""
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (!val) return;
-                                  if (val === '__free__') {
-                                    setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, tag: 'value', text: '', freeText: true } : p));
-                                  } else {
+                          {showPicker && (() => {
+                            const tagSteps = b.tag === 'value' ? valueSteps : b.tag === 'sequence' ? sequenceSteps : failureSteps;
+                            const pillVariant: 'value' | 'sequence' | 'failure' = b.tag === 'value' ? 'value' : b.tag === 'sequence' ? 'sequence' : 'failure';
+                            return (
+                              <>
+                                <div className="flex items-center justify-between gap-1">
+                                  <SegmentedToggle
+                                    value={b.tag}
+                                    onChange={(v) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: v as 'value' | 'sequence' | 'failure' } : p))}
+                                    options={[
+                                      { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
+                                      { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
+                                      { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                                    ]}
+                                    ariaLabel={t('capture.workBlocksLabel')}
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label="Remove"
+                                    onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                                  >&times;</button>
+                                </div>
+                                <PillSelect
+                                  value=""
+                                  onChange={(val) => {
                                     const picked = (study.workStepTypes || []).find(s => s.id === val);
                                     if (picked) {
                                       setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: picked.id, tag: picked.tag, text: picked.label, freeText: false } : p));
                                     }
-                                  }
-                                }}
-                                className="flex-1 min-w-0 text-xs px-1 py-1 rounded border border-gray-300 bg-white text-gray-900"
-                              >
-                                <option value="">{t('capture.workStepPickerPlaceholder')}</option>
-                                {valueSteps.length > 0 && (
-                                  <optgroup label={t('capture.workBlockTagValue')}>
-                                    {valueSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
-                                  </optgroup>
-                                )}
-                                {sequenceSteps.length > 0 && (
-                                  <optgroup label={t('capture.workBlockTagSequence')}>
-                                    {sequenceSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
-                                  </optgroup>
-                                )}
-                                {failureSteps.length > 0 && (
-                                  <optgroup label={t('capture.workBlockTagFailure')}>
-                                    {failureSteps.map(s => <option key={s.id} value={s.id}>{tl(s.label)}</option>)}
-                                  </optgroup>
-                                )}
-                                <option value="__free__">{t('capture.workStepPickerFreeText')}</option>
-                              </select>
-                              <button
-                                type="button"
-                                aria-label="Remove"
-                                onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
-                                className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
-                              >&times;</button>
-                            </div>
-                          )}
+                                  }}
+                                  options={tagSteps.map(s => ({ id: s.id, label: tl(s.label), operationalDefinition: s.operationalDefinition }))}
+                                  placeholder={t('capture.workStepPickerPlaceholder')}
+                                  variant={pillVariant}
+                                  onAddNew={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: null, text: '', freeText: true } : p))}
+                                  addNewLabel={t('capture.workStepPickerFreeText').replace(/^[—-]\s*/, '')}
+                                  className="w-full"
+                                />
+                              </>
+                            );
+                          })()}
                           {showFreeText && !hasStep && (
                             <>
                               <div className="flex items-center justify-between gap-1">
