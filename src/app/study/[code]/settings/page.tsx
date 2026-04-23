@@ -417,41 +417,79 @@ export default function SettingsPage() {
     loadStudy();
   }
 
-  // Phase 4 (2026-04-16) — Work Step Types
+  // Phase 4 (2026-04-16) — Work Step Types.
+  // All four handlers apply the change to local state first and fire the
+  // request in the background. loadStudy() is only called on error so the
+  // UI stays in sync with the server if a write fails. Previously each
+  // click waited for two round-trips (the mutation + a full study refetch)
+  // before the UI reflected the change — this is what made toggles feel
+  // sluggish (Jonas 2026-04-23).
   async function toggleWorkStepTypes() {
     const newValue = !study?.workStepTypesEnabled;
-    await fetch(`/api/studies/${encodeURIComponent(code)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workStepTypesEnabled: newValue }),
-    });
-    loadStudy();
+    setStudy((s) => (s ? { ...s, workStepTypesEnabled: newValue } : s));
+    try {
+      const r = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workStepTypesEnabled: newValue }),
+      });
+      if (!r.ok) loadStudy();
+    } catch {
+      loadStudy();
+    }
   }
 
   async function addWorkStepHandler(e: React.FormEvent) {
     e.preventDefault();
-    if (!newWorkStep.trim()) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newWorkStep.trim(), tag: newWorkStepTag }),
-    });
+    const label = newWorkStep.trim();
+    if (!label) return;
+    const tag = newWorkStepTag;
     setNewWorkStep('');
-    loadStudy();
+    // Need the server-generated id, so we await POST but skip the full
+    // loadStudy — splice the new step into local state directly.
+    try {
+      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, tag }),
+      });
+      if (r.ok) {
+        const { id } = await r.json();
+        setStudy((s) => {
+          if (!s) return s;
+          const existing = s.workStepTypes || [];
+          return { ...s, workStepTypes: [...existing, { id, label, tag, operationalDefinition: null, sortOrder: existing.length }] };
+        });
+      } else {
+        loadStudy();
+      }
+    } catch {
+      loadStudy();
+    }
   }
 
   async function removeWorkStep(id: string) {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, { method: 'DELETE' });
-    loadStudy();
+    setStudy((s) => (s ? { ...s, workStepTypes: (s.workStepTypes || []).filter((w) => w.id !== id) } : s));
+    try {
+      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, { method: 'DELETE' });
+      if (!r.ok) loadStudy();
+    } catch {
+      loadStudy();
+    }
   }
 
   async function updateWorkStepTag(id: string, tag: 'value' | 'sequence' | 'failure') {
-    await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag }),
-    });
-    loadStudy();
+    setStudy((s) => (s ? { ...s, workStepTypes: (s.workStepTypes || []).map((w) => (w.id === id ? { ...w, tag } : w)) } : s));
+    try {
+      const r = await fetch(`/api/studies/${encodeURIComponent(code)}/work-step-types/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      });
+      if (!r.ok) loadStudy();
+    } catch {
+      loadStudy();
+    }
   }
 
   // Phase 4B — synthesis helper actions.
