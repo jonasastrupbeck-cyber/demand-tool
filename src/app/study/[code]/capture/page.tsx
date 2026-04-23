@@ -1155,11 +1155,13 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className="flex-none min-w-[12rem] max-w-[18rem] p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2">
-                      {/* Mode B — badge (step picked) */}
+                    <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-36' : 'min-w-[12rem] max-w-[18rem]'}`}>
+                      {/* Mode B — badge (step picked). Narrower card + wrapping badge
+                           so filled blocks are roughly square and more fit on one row
+                           before horizontal scroll kicks in. */}
                       {hasStep && step && (
                         <div className="flex items-start justify-between gap-1">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
+                          <span className={`flex-1 min-w-0 px-2 py-1 rounded text-xs font-medium whitespace-normal break-words leading-snug ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
