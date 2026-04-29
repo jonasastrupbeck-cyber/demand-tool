@@ -310,7 +310,7 @@ const translations = {
   'capture.scAttachHint': {
     en: 'Attach this system condition to:',
     da: 'Knyt dette systemforhold til:',
-    sv: 'Koppla detta systemförhållande till:',
+    sv: 'Koppla detta systemvillkor till:',
     de: 'Diese Systembedingung anhängen an:',
   },
   'capture.scAttachLifeProblem': {
@@ -961,7 +961,7 @@ const translations = {
   'dashboard.topFailureCause': {
     en: 'Top system condition',
     da: 'Hyppigste systemforhold',
-    sv: 'Vanligaste systemförhållande',
+    sv: 'Vanligaste systemvillkor',
     de: 'Häufigste Systembedingung',
   },
   'dashboard.demandTabHelp': {
@@ -979,7 +979,7 @@ const translations = {
   'dashboard.overviewTabHelp': {
     en: 'The full picture — all demand data, system conditions, and what matters to customers',
     da: 'Det fulde billede — alle efterspørgselsdata, systemforhold og det der betyder noget for kunderne',
-    sv: 'Hela bilden — all efterfrågedata, systemförhållanden och det som betyder något för kunderna',
+    sv: 'Hela bilden — all efterfrågedata, systemvillkor och det som betyder något för kunderna',
     de: 'Das Gesamtbild — alle Nachfragedaten, Systembedingungen und was den Kunden wichtig ist',
   },
   'dashboard.noEntriesHint': {
@@ -1045,19 +1045,19 @@ const translations = {
   'dashboard.flowClickHint': {
     en: 'Click a flow to see system conditions',
     da: 'Klik på et flow for at se systemforhold',
-    sv: 'Klicka på ett flöde för att se systemförhållanden',
+    sv: 'Klicka på ett flöde för att se systemvillkor',
     de: 'Klicken Sie auf einen Fluss, um Systembedingungen zu sehen',
   },
   'dashboard.flowCauses': {
     en: 'System conditions',
     da: 'Systemforhold',
-    sv: 'Systemförhållanden',
+    sv: 'Systemvillkor',
     de: 'Systembedingungen',
   },
   'dashboard.flowCausesEmpty': {
     en: 'No system conditions recorded for this flow',
     da: 'Ingen systemforhold registreret for dette flow',
-    sv: 'Inga systemförhållanden registrerade för detta flöde',
+    sv: 'Inga systemvillkor registrerade för detta flöde',
     de: 'Keine Systembedingungen für diesen Fluss erfasst',
   },
   'dashboard.allTypes': {
@@ -1525,7 +1525,7 @@ const translations = {
   'dashboard.topFailureCauses': {
     en: 'Top System Conditions',
     da: 'Vigtigste systemforhold',
-    sv: 'Viktigaste systemförhållanden',
+    sv: 'Viktigaste systemvillkor',
     de: 'Wichtigste Systembedingungen',
   },
   'dashboard.demandWorkRatio': {
@@ -1647,25 +1647,25 @@ const translations = {
   'settings.systemConditions': {
     en: 'System Conditions',
     da: 'Systemforhold',
-    sv: 'Systemförhållanden',
+    sv: 'Systemvillkor',
     de: 'Systembedingungen',
   },
   'settings.systemConditionsDesc': {
     en: 'Pre-defined system conditions that explain why failure demand occurs. When enabled, collectors select from this list instead of typing free text.',
     da: 'Foruddefinerede systemforhold der forklarer hvorfor ikke-værdiskabende efterspørgsel opstår. Når aktiveret vælger indsamlere fra denne liste i stedet for at skrive fritekst.',
-    sv: 'Fördefinierade systemförhållanden som förklarar varför icke-värdeskapande efterfrågan uppstår. När aktiverat väljer insamlare från denna lista istället för att skriva fritext.',
+    sv: 'Fördefinierade systemvillkor som förklarar varför icke-värdeskapande efterfrågan uppstår. När aktiverat väljer insamlare från denna lista istället för att skriva fritext.',
     de: 'Vordefinierte Systembedingungen, die erklären, warum Fehlnachfrage entsteht. Wenn aktiviert, wählen Erfasser aus dieser Liste statt Freitext einzugeben.',
   },
   'settings.enableSystemConditions': {
     en: 'Enable managed system conditions',
     da: 'Aktiver styrede systemforhold',
-    sv: 'Aktivera hanterade systemförhållanden',
+    sv: 'Aktivera hanterade systemvillkor',
     de: 'Verwaltete Systembedingungen aktivieren',
   },
   'settings.addSystemCondition': {
     en: 'Add system condition...',
     da: 'Tilføj systemforhold...',
-    sv: 'Lägg till systemförhållande...',
+    sv: 'Lägg till systemvillkor...',
     de: 'Systembedingung hinzufügen...',
   },
   'settings.thinkings': {
@@ -2208,7 +2208,7 @@ const translations = {
   'capture.toggles.systemConditions': {
     en: 'Capture system conditions',
     da: 'Registrer systemforhold',
-    sv: 'Registrera systemförhållanden',
+    sv: 'Registrera systemvillkor',
     de: 'Systembedingungen erfassen',
   },
   'capture.toggles.demandTypes': {
