@@ -25,7 +25,10 @@ export async function POST(
   if (!body.label || typeof body.label !== 'string') {
     return NextResponse.json({ error: 'Label is required' }, { status: 400 });
   }
+  if (body.category !== 'value' && body.category !== 'failure' && body.category !== 'sequence') {
+    return NextResponse.json({ error: 'category must be value | failure | sequence' }, { status: 400 });
+  }
 
-  const row = await addWorkType(study.id, body.label.trim());
+  const row = await addWorkType(study.id, body.label.trim(), body.category);
   return NextResponse.json(row, { status: 201 });
 }

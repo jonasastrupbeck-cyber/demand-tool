@@ -42,6 +42,7 @@ interface PointOfTransaction {
 interface WorkType {
   id: string;
   label: string;
+  category: 'value' | 'failure' | 'sequence';
   lifecycleStageId?: string | null;
   lifecycleAiSuggestion?: string | null;
 }
@@ -131,6 +132,7 @@ export default function SettingsPage() {
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkSource, setNewWorkSource] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
+  const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
   const [newWorkStep, setNewWorkStep] = useState('');
   const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'sequence' | 'failure'>('value');
@@ -434,15 +436,16 @@ export default function SettingsPage() {
     e.preventDefault();
     const label = newWorkType.trim();
     if (!label) return;
+    const category = newWorkTypeCategory;
     setNewWorkType('');
     mutateAdd(
       () => fetch(`/api/studies/${encodeURIComponent(code)}/work-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label }),
+        body: JSON.stringify({ label, category }),
       }),
       (id) => {
-        setStudy((s) => (s ? { ...s, workTypes: [...s.workTypes, { id, label, lifecycleStageId: null, lifecycleAiSuggestion: null }] } : s));
+        setStudy((s) => (s ? { ...s, workTypes: [...s.workTypes, { id, label, category, lifecycleStageId: null, lifecycleAiSuggestion: null }] } : s));
         if (study?.lifecycleEnabled) {
           fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${id}/classify-lifecycle`, { method: 'POST' })
             .then(() => loadStudy())
@@ -455,6 +458,15 @@ export default function SettingsPage() {
   function removeWorkType(id: string) {
     setStudy((s) => (s ? { ...s, workTypes: s.workTypes.filter((w) => w.id !== id) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${id}`, { method: 'DELETE' }));
+  }
+
+  function setWorkTypeCategory(typeId: string, category: 'value' | 'failure' | 'sequence') {
+    setStudy((s) => (s ? { ...s, workTypes: s.workTypes.map((w) => (w.id === typeId ? { ...w, category } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/work-types/${typeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category }),
+    }));
   }
 
   function toggleVolumeMode() {
@@ -1307,14 +1319,34 @@ export default function SettingsPage() {
             <p className="text-sm text-gray-600 mb-3">{t('settings.workTypesDesc')}</p>
             <ul className="space-y-2 mb-4">
               {(study.workTypes || []).map((wt) => (
-                <li key={wt.id} className={`${itemCls} bg-amber-50`}>
-                  {renderLabel(wt.id, wt.label, 'workType', 'text-sm text-amber-700')}
+                <li key={wt.id} className={`${itemCls} ${wt.category === 'value' ? 'bg-green-50' : wt.category === 'sequence' ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                  <div className="flex items-center gap-2 flex-1">
+                    {renderLabel(wt.id, wt.label, 'workType', wt.category === 'value' ? 'text-sm text-green-700' : wt.category === 'sequence' ? 'text-sm text-emerald-700' : 'text-sm text-red-700')}
+                    <SegmentedToggle
+                      options={[
+                        { value: 'value', label: t('capture.classificationWorkValue'), activeColor: 'green' },
+                        { value: 'sequence', label: t('capture.classificationWorkSequence'), activeColor: 'emerald' },
+                        { value: 'failure', label: t('capture.classificationWorkFailure'), activeColor: 'red' },
+                      ]}
+                      value={wt.category}
+                      onChange={(v) => setWorkTypeCategory(wt.id, v as 'value' | 'failure' | 'sequence')}
+                    />
+                  </div>
                   <button onClick={() => removeWorkType(wt.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                 </li>
               ))}
             </ul>
-            <form onSubmit={addWorkTypeHandler} className="flex gap-2">
+            <form onSubmit={addWorkTypeHandler} className="flex gap-2 items-center">
               <input type="text" value={newWorkType} onChange={(e) => setNewWorkType(e.target.value)} placeholder={t('settings.addWorkType')} className={inputCls} />
+              <SegmentedToggle
+                options={[
+                  { value: 'value', label: t('capture.classificationWorkValue'), activeColor: 'green' },
+                  { value: 'sequence', label: t('capture.classificationWorkSequence'), activeColor: 'emerald' },
+                  { value: 'failure', label: t('capture.classificationWorkFailure'), activeColor: 'red' },
+                ]}
+                value={newWorkTypeCategory}
+                onChange={(v) => setNewWorkTypeCategory(v as 'value' | 'failure' | 'sequence')}
+              />
               <button type="submit" disabled={!newWorkType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-amber-600 hover:bg-amber-700">{t('settings.add')}</button>
             </form>
           </div>

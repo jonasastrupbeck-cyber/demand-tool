@@ -16,6 +16,12 @@ export async function PATCH(
   if (typeof body.label === 'string' && body.label.trim()) {
     await updateWorkType(id, { label: body.label.trim() });
   }
+  if (body.category !== undefined) {
+    if (body.category !== 'value' && body.category !== 'failure' && body.category !== 'sequence') {
+      return NextResponse.json({ error: 'category must be value | failure | sequence' }, { status: 400 });
+    }
+    await updateWorkType(id, { category: body.category });
+  }
   if (body.lifecycleStageId !== undefined) {
     await db.update(workTypes).set({ lifecycleStageId: body.lifecycleStageId }).where(eq(workTypes.id, id));
   }

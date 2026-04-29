@@ -189,6 +189,7 @@ export async function createStudy(name: string, description: string = '', locale
         id: generateId(),
         studyId: id,
         label: localizedWorkTypes[i],
+        category: 'value',
         sortOrder: i,
       });
     }
@@ -487,20 +488,21 @@ export async function getWorkTypes(studyId: string) {
   return db.select().from(workTypes).where(eq(workTypes.studyId, studyId)).orderBy(asc(workTypes.sortOrder));
 }
 
-export async function addWorkType(studyId: string, label: string) {
+export async function addWorkType(studyId: string, label: string, category: 'value' | 'failure' | 'sequence') {
   const id = generateId();
   const existing = await getWorkTypes(studyId);
   const row = {
     id,
     studyId,
     label,
+    category,
     sortOrder: existing.length,
   };
   await db.insert(workTypes).values(row);
   return row;
 }
 
-export async function updateWorkType(id: string, data: { label?: string }) {
+export async function updateWorkType(id: string, data: { label?: string; category?: 'value' | 'failure' | 'sequence' }) {
   await db.update(workTypes).set(data).where(eq(workTypes.id, id));
 }
 
@@ -594,6 +596,7 @@ export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en
       id: generateId(),
       studyId,
       label: localizedWorkTypes[i],
+      category: 'value',
       sortOrder: i,
     });
   }
@@ -631,6 +634,7 @@ export async function createEntry(studyId: string, data: {
   thinkings?: { id: string; logic: string; dimension?: 'helps' | 'hinders'; scAttachments?: { systemConditionId: string }[] }[];
   originalValueDemandTypeId?: string;
   workTypeId?: string;
+  workTypeFreeText?: string;
   linkedValueDemandEntryId?: string;
   failureCause?: string;
   whatMatters?: string;
@@ -663,6 +667,7 @@ export async function createEntry(studyId: string, data: {
     lifeProblemId: isDemand ? (data.lifeProblemId || null) : null,
     originalValueDemandTypeId: isDemand && data.classification === 'failure' ? (data.originalValueDemandTypeId || null) : null,
     workTypeId: !isDemand ? (data.workTypeId || null) : null,
+    workTypeFreeText: !isDemand && data.classification === 'unknown' ? (data.workTypeFreeText || null) : null,
     linkedValueDemandEntryId: isDemand && data.classification === 'failure' ? (data.linkedValueDemandEntryId || null) : null,
     failureCause: isDemand && data.classification === 'failure' ? (data.failureCause || null) : null,
     whatMatters: isDemand ? (data.whatMatters || null) : null,
@@ -820,6 +825,7 @@ export async function updateEntry(entryId: string, data: {
   contactMethodId?: string | null;
   pointOfTransactionId?: string | null;
   workTypeId?: string | null;
+  workTypeFreeText?: string | null;
   whatMatters?: string | null;
   whatMattersTypeIds?: string[];
   systemConditions?: {
@@ -852,6 +858,7 @@ export async function updateEntry(entryId: string, data: {
   if (data.contactMethodId !== undefined) updateFields.contactMethodId = data.contactMethodId;
   if (data.pointOfTransactionId !== undefined) updateFields.pointOfTransactionId = data.pointOfTransactionId;
   if (data.workTypeId !== undefined) updateFields.workTypeId = data.workTypeId;
+  if (data.workTypeFreeText !== undefined) updateFields.workTypeFreeText = data.workTypeFreeText;
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy

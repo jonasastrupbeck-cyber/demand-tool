@@ -124,6 +124,7 @@ export async function PATCH(
   if (body.contactMethodId !== undefined) updates.contactMethodId = body.contactMethodId;
   if (body.pointOfTransactionId !== undefined) updates.pointOfTransactionId = body.pointOfTransactionId;
   if (body.workTypeId !== undefined) updates.workTypeId = body.workTypeId;
+  if (body.workTypeFreeText !== undefined) updates.workTypeFreeText = body.workTypeFreeText;
   if (body.whatMatters !== undefined) updates.whatMatters = body.whatMatters;
   if (body.lifeProblemId !== undefined) updates.lifeProblemId = body.lifeProblemId;
   if (body.workBlocks !== undefined) {

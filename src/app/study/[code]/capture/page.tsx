@@ -42,6 +42,7 @@ interface WhatMattersType {
 interface WorkType {
   id: string;
   label: string;
+  category: 'value' | 'failure' | 'sequence';
 }
 
 interface StudyData {
@@ -165,6 +166,9 @@ export default function CapturePage() {
   const [whatMatters, setWhatMatters] = useState('');
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   const [workTypeId, setWorkTypeId] = useState('');
+  // Free-form text used when classification is '?' on the Work tab — no
+  // managed work type to attach to. Persists to demand_entries.work_type_free_text.
+  const [workTypeFreeText, setWorkTypeFreeText] = useState('');
   // Work-description blocks (Work tab only) — Phase 2 / Item 4.
   // Phase 4 (2026-04-16) — each Flow block can optionally reference a managed
   // Work Step Type via `workStepTypeId`. Null = free-text block (current UX).
@@ -311,6 +315,7 @@ export default function CapturePage() {
     setWhatMatters('');
     setWhatMattersNoteOpen(false);
     setWorkTypeId('');
+    setWorkTypeFreeText('');
     setWorkBlocks([]);
     setError('');
     // Keep entryType sticky for batch entry
@@ -476,7 +481,8 @@ export default function CapturePage() {
       body.whatMatters = whatMatters.trim() || undefined;
       body.lifeProblemId = lifeProblemId || undefined;
     } else {
-      body.workTypeId = study?.workTypesEnabled ? (workTypeId || undefined) : undefined;
+      body.workTypeId = study?.workTypesEnabled && effectiveClassification !== 'unknown' ? (workTypeId || undefined) : undefined;
+      body.workTypeFreeText = study?.workTypesEnabled && effectiveClassification === 'unknown' ? (workTypeFreeText.trim() || undefined) : undefined;
     }
 
     // System conditions + Thinking are visible on every classified entry.
@@ -699,7 +705,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkBlocks([]); }}
+                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -719,7 +725,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkBlocks([]); }}
+                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   !isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -795,7 +801,7 @@ export default function CapturePage() {
           <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center justify-center">
             <button
                 type="button"
-                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                onClick={() => { setClassification('value'); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'value'
                     ? 'bg-green-600 text-white border-green-600'
@@ -807,7 +813,7 @@ export default function CapturePage() {
               {!isDemand && study.workClassificationMode === 'value-sequence-failure-unknown' && (
                 <button
                   type="button"
-                  onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
+                  onClick={() => { setClassification('sequence'); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setFailureCause(''); setOriginalValueDemandTypeId(''); }}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     classification === 'sequence'
                       ? 'bg-emerald-500 text-white border-emerald-500'
@@ -819,7 +825,7 @@ export default function CapturePage() {
               )}
               <button
                 type="button"
-                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); }}
+                onClick={() => { setClassification('failure'); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); }}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                   classification === 'failure'
                     ? 'bg-red-600 text-white border-red-600'
@@ -926,7 +932,7 @@ export default function CapturePage() {
         {/* Work type (work only) — moved up, sits under classification row.
             Header dropped; the PillSelect placeholder ("Select work type…")
             is self-explanatory, mirroring the demand-type treatment. */}
-        {study.workTypesEnabled && !isDemand && classification && (
+        {study.workTypesEnabled && !isDemand && classification && classification !== 'unknown' && (
           <div>
             <div className="flex gap-2 items-center justify-center">
               <PillSelect
@@ -934,12 +940,14 @@ export default function CapturePage() {
                 placeholder={t('capture.selectWorkType')}
                 value={workTypeId}
                 onChange={setWorkTypeId}
-                options={study.workTypes.map((wt) => ({ id: wt.id, label: tl(wt.label) }))}
-                variant={classification === 'value' ? 'value' : classification === 'sequence' ? 'sequence' : classification === 'failure' ? 'failure' : 'default'}
+                options={study.workTypes
+                  .filter((wt) => wt.category === classification)
+                  .map((wt) => ({ id: wt.id, label: tl(wt.label) }))}
+                variant={classification === 'value' ? 'value' : classification === 'sequence' ? 'sequence' : 'failure'}
               />
               {addBtn('work')}
             </div>
-            {renderAddTypeInput('work', 'work-types', {}, (id) => setWorkTypeId(id))}
+            {renderAddTypeInput('work', 'work-types', { category: classification }, (id) => setWorkTypeId(id))}
             {workTypeId && (
               <div className="mt-1">
                 <button type="button" onClick={() => toggleExamples(workTypeId)} className="text-xs text-gray-400 hover:text-gray-600">
@@ -956,6 +964,22 @@ export default function CapturePage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Work type — '?' (unknown) classification: no managed type list to
+            choose from, so the user types free-form text. Stored on the entry,
+            not the type list. */}
+        {study.workTypesEnabled && !isDemand && classification === 'unknown' && (
+          <div>
+            <input
+              type="text"
+              value={workTypeFreeText}
+              onChange={(e) => setWorkTypeFreeText(e.target.value)}
+              placeholder={t('capture.workTypeFreeTextPlaceholder')}
+              aria-label={t('capture.workTypeLabel')}
+              className={inputCls}
+            />
           </div>
         )}
 

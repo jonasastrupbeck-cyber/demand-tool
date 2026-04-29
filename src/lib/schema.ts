@@ -126,6 +126,9 @@ export const workTypes = pgTable('work_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
   label: text('label').notNull(),
+  // 2026-04-29: a work type is intrinsically value, failure, or sequence —
+  // mirrors workStepTypes.tag. Capture filters the dropdown by this field.
+  category: text('category').$type<'value' | 'failure' | 'sequence'>().notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
   lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
   lifecycleAiSuggestion: text('lifecycle_ai_suggestion'),
@@ -165,6 +168,10 @@ export const demandEntries = pgTable('demand_entries', {
   lifeProblemId: text('life_problem_id').references(() => lifeProblems.id),
   originalValueDemandTypeId: text('original_value_demand_type_id').references(() => demandTypes.id),
   workTypeId: text('work_type_id').references(() => workTypes.id),
+  // 2026-04-29: free-form work-type text used when classification is '?' (unknown).
+  // Mutually exclusive with workTypeId by intent: a "?" capture has no managed
+  // type to attach to.
+  workTypeFreeText: text('work_type_free_text'),
   linkedValueDemandEntryId: text('linked_value_demand_entry_id'),
   failureCause: text('failure_cause'),
   whatMatters: text('what_matters'),

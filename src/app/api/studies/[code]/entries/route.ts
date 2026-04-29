@@ -106,6 +106,7 @@ export async function POST(
       : undefined,
     originalValueDemandTypeId: body.originalValueDemandTypeId || undefined,
     workTypeId: body.workTypeId || undefined,
+    workTypeFreeText: typeof body.workTypeFreeText === 'string' ? body.workTypeFreeText.trim() || undefined : undefined,
     linkedValueDemandEntryId: body.linkedValueDemandEntryId || undefined,
     failureCause: body.failureCause?.trim() || undefined,
     whatMatters: body.whatMatters?.trim() || undefined,

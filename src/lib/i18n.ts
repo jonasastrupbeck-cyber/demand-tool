@@ -1402,6 +1402,12 @@ const translations = {
     sv: 'Välj arbetstyp...',
     de: 'Arbeitsart auswählen...',
   },
+  'capture.workTypeFreeTextPlaceholder': {
+    en: 'Describe the work type...',
+    da: 'Beskriv arbejdstypen...',
+    sv: 'Beskriv arbetstypen...',
+    de: 'Arbeitsart beschreiben...',
+  },
   'capture.workVerbatimLabel': {
     en: 'What was the internal request or question?',
     da: 'Hvad var den interne henvendelse eller spørgsmål?',
