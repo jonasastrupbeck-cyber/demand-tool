@@ -780,14 +780,16 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Verbatim — demand tab or volume-off work without blocks yet.
+        {/* Verbatim — demand tab always; work tab when Flow blocks are off
+            (without a Flow block UI there is no other place to enter the
+            verbatim, so the form would otherwise be unsubmittable).
             Header removed: the placeholder ("Write the customer's words…") carries the prompt. */}
-        {!study.volumeMode && isDemand && (
+        {!study.volumeMode && (isDemand || !study.flowWorkEnabled) && (
           <textarea
-            aria-label={t('capture.verbatimLabel')}
+            aria-label={isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}
             value={verbatim}
             onChange={(e) => setVerbatim(e.target.value)}
-            placeholder={t('capture.verbatimPlaceholder')}
+            placeholder={isDemand ? t('capture.verbatimPlaceholder') : t('capture.workVerbatimPlaceholder')}
             rows={3}
             className={inputCls}
             autoFocus
