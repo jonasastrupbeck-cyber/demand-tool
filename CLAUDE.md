@@ -2,6 +2,31 @@
 
 # Project-specific guidance
 
+## Database environments (hard rule, 2026-06-11)
+
+There are TWO databases in the Neon project `demand-tool` (curly-voice-20295099):
+
+- **production** branch (`ep-tiny-violet-…`) — LIVE data, real users. Its URL
+  lives ONLY in Vercel env vars (Production scope, stored sensitive/write-only).
+- **dev** branch (`ep-super-rain-…`) — safe practice copy. `.env.local` and the
+  Vercel Preview + Development scopes point here.
+
+Rules:
+
+1. `drizzle-kit push` from a dev session goes to **dev only** (that's where
+   `.env.local` points — never paste the production URL into `.env.local`).
+2. Schema changes must be **additive only** (new tables, nullable columns,
+   default-false booleans). Existing studies must behave identically.
+3. Pushing schema to production happens **once per merged increment**, manually
+   agreed with Jonas, outside field-test hours:
+   `DATABASE_URL="$(npx neonctl connection-string production --project-id curly-voice-20295099 --pooled)" npx drizzle-kit push`
+   — review the printed diff before confirming.
+4. Rollback story for bad deploys: Vercel dashboard → Deployments → promote the
+   previous deployment. (DB rollback is not needed if rule 2 is followed.)
+5. The dev branch drifts from production data over time. To refresh it:
+   `npx neonctl branches reset dev --project-id curly-voice-20295099 --parent`
+   (destroys dev-branch test data — fine; never the reverse direction).
+
 Before touching the capture form, settings page, or anything UX-related,
 read **`docs/design-system-and-patterns.md`**. It captures the colour
 vocabulary, component patterns (PillSelect, InfoPopover, InlineTypeAdder,
@@ -65,7 +90,7 @@ canon yet** — the glossary marks DE as "being developed"; existing
 | Failure demand | Failure demand | Ikke-værdiskabende efterspørgsel (IVS) | Icke-värdeskapande efterfrågan (IVS) |
 | Value work | Value work | Værdiskabende arbejde | Värdeskapande arbete |
 | Failure work | Failure work | Ikke-værdiskabende arbejde | Icke-värdeskapande arbete |
-| System conditions | System conditions | Systemforhold | Systemförhållanden |
+| System conditions | System conditions | Systemforhold | Systemvillkor (also accepted: systemförhållande) |
 | Systems thinking | Systems thinking | Systemtænkning | Systemtänkande |
 | Capability | Capability | Kapabilitet | Kapabilitet |
 | Flow | Flow | Flow | Flöde |
@@ -89,6 +114,13 @@ the Danish authoritative note:
   `Icke-värde` to parallel `Værdi` / `Värde` (the short form of the canonical
   `Ikke-værdiskabende` / `Icke-värdeskapande`)
 - `Systemtankegang` (DA) — use `Systemtænkning`
+
+**SV `system conditions` — two-word policy (2026-04-29):** Standardise new
+copy on `systemvillkor` (singular and plural; `villkor` is a zero-plural
+neuter noun). The variant `systemförhållande` is **also accepted** —
+both Swedish words describe the same concept and may appear interchangeably
+in older material. Don't grep-replace one to the other in legacy copy unless
+explicitly asked; for new strings, prefer `systemvillkor`.
 
 Before accepting any DA/SV string through a grep or edit, eyeball for these
 forms. A sweep happened 2026-04-19 (commit `3a9df44`) and the file should be
