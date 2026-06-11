@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions } from '@/lib/queries';
+import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions, getCase } from '@/lib/queries';
 
 export async function GET(
   request: NextRequest,
@@ -51,6 +51,17 @@ export async function POST(
 
   if (!body.classification || !['value', 'failure', 'unknown', 'sequence'].includes(body.classification)) {
     return NextResponse.json({ error: 'Classification must be "value", "failure", "unknown", or "sequence"' }, { status: 400 });
+  }
+
+  // Case stitching (Skipton slice 1): an entry may attach to a case, but only
+  // one that exists and belongs to this study.
+  let validatedCaseId: string | null = null;
+  if (typeof body.caseId === 'string' && body.caseId) {
+    const caseRow = await getCase(body.caseId);
+    if (!caseRow || caseRow.studyId !== study.id) {
+      return NextResponse.json({ error: 'Case not found in this study' }, { status: 400 });
+    }
+    validatedCaseId = caseRow.id;
   }
 
   const id = await createEntry(study.id, {
@@ -112,6 +123,8 @@ export async function POST(
     whatMatters: body.whatMatters?.trim() || undefined,
     collectorName: body.collectorName?.trim() || undefined,
     lifeProblemId: body.lifeProblemId || undefined,
+    // Case stitching (Skipton slice 1): ownership validated below before use.
+    caseId: validatedCaseId,
     workBlocks: entryType === 'work' && workBlocksValid
       ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
           tag: b.tag,

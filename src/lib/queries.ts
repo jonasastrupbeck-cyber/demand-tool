@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -643,6 +643,8 @@ export async function createEntry(studyId: string, data: {
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
   workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  // Case stitching (Skipton slice 1): which case this touch belongs to.
+  caseId?: string | null;
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -672,6 +674,7 @@ export async function createEntry(studyId: string, data: {
     failureCause: isDemand && data.classification === 'failure' ? (data.failureCause || null) : null,
     whatMatters: isDemand ? (data.whatMatters || null) : null,
     collectorName: data.collectorName || null,
+    caseId: data.caseId || null,
   });
 
   // Insert what matters junction records
@@ -761,6 +764,95 @@ export async function createEntry(studyId: string, data: {
   return id;
 }
 
+// --- Case stitching (Skipton slice 1, 2026-06-11) ---
+// A case is a container: one privacy-safe reference number = one customer =
+// one value demand. Entries attach via demandEntries.caseId; the timeline of
+// touches ordered by createdAt is the repeatable Capability-of-Response record.
+
+export async function findOrCreateCase(studyId: string, caseRef: string, opts?: {
+  demandTypeId?: string | null;
+  openedAt?: Date;
+  collectorName?: string | null;
+}) {
+  const ref = caseRef.trim();
+  if (!ref) throw new Error('caseRef is required');
+  // Upsert: two collectors may type the same new ref at the same moment.
+  // ON CONFLICT DO NOTHING + re-select guarantees exactly one case row.
+  await db.insert(cases).values({
+    id: generateId(),
+    studyId,
+    caseRef: ref,
+    demandTypeId: opts?.demandTypeId || null,
+    status: 'open',
+    openedAt: opts?.openedAt || new Date(),
+    createdByCollector: opts?.collectorName || null,
+    createdAt: new Date(),
+  }).onConflictDoNothing();
+  const rows = await db.select().from(cases)
+    .where(and(eq(cases.studyId, studyId), eq(cases.caseRef, ref)));
+  return rows[0];
+}
+
+export async function getCaseByRef(studyId: string, caseRef: string) {
+  const rows = await db.select().from(cases)
+    .where(and(eq(cases.studyId, studyId), eq(cases.caseRef, caseRef.trim())));
+  return rows[0] || null;
+}
+
+export async function getCases(studyId: string) {
+  // List newest-first with a per-case entry count for the settings/dashboard list.
+  return db.select({
+    id: cases.id,
+    caseRef: cases.caseRef,
+    demandTypeId: cases.demandTypeId,
+    status: cases.status,
+    openedAt: cases.openedAt,
+    closedAt: cases.closedAt,
+    note: cases.note,
+    createdByCollector: cases.createdByCollector,
+    createdAt: cases.createdAt,
+    entryCount: sql<number>`(select count(*)::int from ${demandEntries} where ${demandEntries.caseId} = ${cases.id})`,
+  })
+    .from(cases)
+    .where(eq(cases.studyId, studyId))
+    .orderBy(desc(cases.createdAt));
+}
+
+export async function getCase(caseId: string) {
+  const rows = await db.select().from(cases).where(eq(cases.id, caseId));
+  return rows[0] || null;
+}
+
+// Timeline of touches for one case, oldest first — this IS the COR+ sequence.
+export async function getCaseEntries(caseId: string) {
+  return db.select().from(demandEntries)
+    .where(eq(demandEntries.caseId, caseId))
+    .orderBy(asc(demandEntries.createdAt));
+}
+
+export async function updateCase(caseId: string, data: {
+  demandTypeId?: string | null;
+  status?: 'open' | 'closed';
+  openedAt?: Date;
+  closedAt?: Date | null;
+  note?: string | null;
+}) {
+  const updateFields: Record<string, unknown> = {};
+  if (data.demandTypeId !== undefined) updateFields.demandTypeId = data.demandTypeId;
+  if (data.status !== undefined) {
+    updateFields.status = data.status;
+    // Closing stamps closedAt unless the caller supplies one; reopening clears it.
+    if (data.status === 'closed' && data.closedAt === undefined) updateFields.closedAt = new Date();
+    if (data.status === 'open' && data.closedAt === undefined) updateFields.closedAt = null;
+  }
+  if (data.openedAt !== undefined) updateFields.openedAt = data.openedAt;
+  if (data.closedAt !== undefined) updateFields.closedAt = data.closedAt;
+  if (data.note !== undefined) updateFields.note = data.note;
+  if (Object.keys(updateFields).length > 0) {
+    await db.update(cases).set(updateFields).where(eq(cases.id, caseId));
+  }
+}
+
 export async function getEntries(studyId: string, from?: Date, to?: Date) {
   const conditions = [eq(demandEntries.studyId, studyId)];
   if (from) conditions.push(gte(demandEntries.createdAt, from));
@@ -844,6 +936,8 @@ export async function updateEntry(entryId: string, data: {
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
   workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
+  caseId?: string | null;
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
@@ -861,6 +955,7 @@ export async function updateEntry(entryId: string, data: {
   if (data.workTypeFreeText !== undefined) updateFields.workTypeFreeText = data.workTypeFreeText;
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
+  if (data.caseId !== undefined) updateFields.caseId = data.caseId;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
   // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
   if (workBlocks !== undefined && workBlocks.length > 0) {

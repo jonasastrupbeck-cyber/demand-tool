@@ -48,6 +48,11 @@ export const studies = pgTable('studies', {
   whatMattersEnabled: boolean('what_matters_enabled').notNull().default(false),
   thinkingsEnabled: boolean('thinkings_enabled').notNull().default(false),
   lifeProblemsEnabled: boolean('life_problems_enabled').notNull().default(false),
+  // Case stitching (Skipton slice 1, 2026-06-11). When true, the capture form
+  // shows a Case ref input: one privacy-safe reference number = one customer =
+  // one value demand, letting multiple collectors append entries to the same
+  // case across time and handoffs. See docs/ and the Skipton requirements note.
+  caseTrackingEnabled: boolean('case_tracking_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -152,6 +157,29 @@ export const workStepTypes = pgTable('work_step_types', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+// Case stitching (Skipton slice 1, 2026-06-11). A case is a CONTAINER: each
+// pickup/handoff stays an ordinary demandEntry (own createdAt, collectorName,
+// handlingTypeId, flow blocks) attached via demandEntries.caseId. The case
+// timeline ordered by createdAt IS the repeatable Capability-of-Response
+// sequence — no separate COR table needed. caseRef is a privacy-safe number
+// only, never customer data. openedAt starts the end-to-end clock (editable:
+// a case may predate its first capture). Decision points come in a later slice.
+export const cases = pgTable('cases', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  caseRef: text('case_ref').notNull(),
+  // The "big flow" this case belongs to (e.g. Help me buy / Remortgage).
+  demandTypeId: text('demand_type_id').references(() => demandTypes.id),
+  status: text('status').$type<'open' | 'closed'>().notNull().default('open'),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  note: text('note'),
+  createdByCollector: text('created_by_collector'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  uniqStudyCaseRef: unique().on(t.studyId, t.caseRef),
+}));
+
 export const demandEntries = pgTable('demand_entries', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
@@ -177,6 +205,9 @@ export const demandEntries = pgTable('demand_entries', {
   whatMatters: text('what_matters'),
   collectorName: text('collector_name'),
   lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
+  // Case stitching (Skipton slice 1, 2026-06-11): which case this touch belongs
+  // to. Null for all entries in studies without caseTrackingEnabled.
+  caseId: text('case_id').references(() => cases.id),
 });
 
 export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {
@@ -206,7 +237,8 @@ export const demandEntrySystemConditions = pgTable('demand_entry_system_conditio
   attachesToCor:         boolean('attaches_to_cor').notNull().default(false),
   attachesToWork:        boolean('attaches_to_work').notNull().default(false),
 }, (t) => ({
-  uniqEntrySc: unique().on(t.demandEntryId, t.systemConditionId),
+  // Explicit short name (2026-06-11): see demand_entry_thinking_scs_unique note.
+  uniqEntrySc: unique('demand_entry_system_conditions_unique').on(t.demandEntryId, t.systemConditionId),
 }));
 
 export const thinkings = pgTable('thinkings', {
@@ -238,7 +270,9 @@ export const demandEntryThinkingScs = pgTable('demand_entry_thinking_scs', {
   thinkingId: text('thinking_id').notNull().references(() => thinkings.id),
   systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
 }, (t) => ({
-  uniqEntryThinkingSc: unique().on(t.demandEntryId, t.thinkingId, t.systemConditionId),
+  // Explicit short name (2026-06-11): the auto-generated name exceeds Postgres's
+  // 63-char identifier limit, which made drizzle-kit push re-prompt forever.
+  uniqEntryThinkingSc: unique('demand_entry_thinking_scs_unique').on(t.demandEntryId, t.thinkingId, t.systemConditionId),
 }));
 
 export const workDescriptionBlocks = pgTable('work_description_blocks', {

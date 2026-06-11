@@ -84,6 +84,8 @@ interface StudyData {
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
+  // Case stitching (Skipton slice 1, 2026-06-11).
+  caseTrackingEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];

@@ -16,7 +16,9 @@ type ToggleField =
   | 'workClassificationEnabled'
   | 'whatMattersEnabled'
   | 'thinkingsEnabled'
-  | 'lifeProblemsEnabled';
+  | 'lifeProblemsEnabled'
+  // Case stitching (Skipton slice 1, 2026-06-11).
+  | 'caseTrackingEnabled';
 
 // Virtual toggle — the UI renders it as a plain on/off row, but it writes to
 // studies.workClassificationMode (text enum) rather than a boolean column.
@@ -40,6 +42,8 @@ export interface CaptureTogglesPanelStudy {
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
+  // Case stitching (Skipton slice 1, 2026-06-11).
+  caseTrackingEnabled: boolean;
   // Work-tab classification preset (migration 0016). Drives the "Capture
   // sequence work" virtual toggle — derived from this, not a column of its own.
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
@@ -140,6 +144,9 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { kind: 'toggle', key: 'valueLinkingEnabled', label: t('capture.toggles.valueLinking'), value: study.valueLinkingEnabled },
     { kind: 'toggle', key: 'lifeProblemsEnabled', label: t('capture.toggles.lifeProblems'), value: study.lifeProblemsEnabled },
     { kind: 'toggle', key: 'demandTypesEnabled', label: t('capture.toggles.demandTypes'), value: study.demandTypesEnabled },
+    // Case stitching: one case ref = one customer = one value demand, entries
+    // accrete to the case across collectors and time (Skipton slice 1).
+    { kind: 'toggle', key: 'caseTrackingEnabled', label: t('capture.toggles.caseTracking'), value: study.caseTrackingEnabled },
     { kind: 'toggle', key: 'flowDemandEnabled', label: t('capture.toggles.flowDemand'), value: study.flowDemandEnabled },
     { kind: 'toggle', key: 'whatMattersEnabled', label: t('capture.toggles.whatMatters'), value: study.whatMattersEnabled },
     { kind: 'toggle', key: 'handlingEnabled', label: t('capture.toggles.handling'), value: study.handlingEnabled },

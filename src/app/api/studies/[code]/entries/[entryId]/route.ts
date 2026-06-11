@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry } from '@/lib/queries';
+import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry, getCase } from '@/lib/queries';
 
 export async function GET(
   _request: Request,
@@ -140,6 +140,19 @@ export async function PATCH(
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
     }));
+  }
+
+  // Case stitching (Skipton slice 1): re-attach (validated) or detach (null).
+  if (body.caseId !== undefined) {
+    if (body.caseId === null || body.caseId === '') {
+      updates.caseId = null;
+    } else if (typeof body.caseId === 'string') {
+      const caseRow = await getCase(body.caseId);
+      if (!caseRow || caseRow.studyId !== study.id) {
+        return NextResponse.json({ error: 'Case not found in this study' }, { status: 400 });
+      }
+      updates.caseId = caseRow.id;
+    }
   }
 
   await updateEntry(entryId, updates);

@@ -96,6 +96,8 @@ export async function PUT(
   if (body.whatMattersEnabled !== undefined) updates.whatMattersEnabled = body.whatMattersEnabled;
   if (body.thinkingsEnabled !== undefined) updates.thinkingsEnabled = body.thinkingsEnabled;
   if (body.lifeProblemsEnabled !== undefined) updates.lifeProblemsEnabled = body.lifeProblemsEnabled;
+  // Case stitching toggle (Skipton slice 1, 2026-06-11).
+  if (body.caseTrackingEnabled !== undefined) updates.caseTrackingEnabled = body.caseTrackingEnabled;
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   // Only call the DB update when we actually have something to set — Drizzle's

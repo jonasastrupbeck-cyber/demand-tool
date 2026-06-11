@@ -9,6 +9,7 @@ import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import InfoPopover from '@/components/InfoPopover';
 import PillSelect from '@/components/PillSelect';
+import CasePanel from '@/components/CasePanel';
 
 interface HandlingType {
   id: string;
@@ -73,6 +74,8 @@ interface StudyData {
   whatMattersEnabled: boolean;
   thinkingsEnabled: boolean;
   lifeProblemsEnabled: boolean;
+  // Case stitching (Skipton slice 1, 2026-06-11).
+  caseTrackingEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -126,6 +129,12 @@ export default function CapturePage() {
 
   // Entry type (demand vs work)
   const [entryType, setEntryType] = useState<'demand' | 'work'>('demand');
+
+  // Case stitching (Skipton slice 1): the active case every saved entry
+  // attaches to, plus a tick that tells CasePanel to refetch its timeline
+  // after each save. In-memory only — "Set aside" or a reload clears it.
+  const [activeCase, setActiveCase] = useState<{ id: string; caseRef: string } | null>(null);
+  const [caseRefreshTick, setCaseRefreshTick] = useState(0);
 
   // Form state
   const [verbatim, setVerbatim] = useState('');
@@ -457,6 +466,8 @@ export default function CapturePage() {
       // entryType='work'), but it's cheap to pass through unconditionally.
       workSourceId: isWorkSubmit ? (workSourceId || undefined) : undefined,
       collectorName: collectorName.trim() || undefined,
+      // Case stitching (Skipton slice 1): attach to the active case.
+      caseId: study?.caseTrackingEnabled && activeCase ? activeCase.id : undefined,
     };
 
     // Work tab: send workBlocks; server auto-populates verbatim from them.
@@ -520,6 +531,8 @@ export default function CapturePage() {
     setLastEntry({ id: saved.id, verbatim: lastVerbatim });
     setSuccess(true);
     resetForm();
+    // Case stitching: the timeline in CasePanel refetches on this tick.
+    if (activeCase) setCaseRefreshTick((n) => n + 1);
 
     // Perf P1 (2026-04-19): POST response now carries the fresh entries list,
     // pending counts, and failure-cause suggestions — skip three extra GETs.
@@ -653,6 +666,22 @@ export default function CapturePage() {
           </svg>
         </button>
       </div>
+
+      {/* Case stitching (Skipton slice 1): find-or-create a case by its
+          privacy-safe reference number; every entry saved while the case is
+          active attaches to it. Sits above the session strip — a case is the
+          outermost context an entry belongs to. */}
+      {study.caseTrackingEnabled && (
+        <CasePanel
+          code={code}
+          demandTypes={study.demandTypes}
+          handlingTypes={study.handlingTypes}
+          collectorName={collectorName}
+          activeCaseId={activeCase?.id ?? null}
+          onActiveCaseChange={setActiveCase}
+          refreshSignal={caseRefreshTick}
+        />
+      )}
 
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.

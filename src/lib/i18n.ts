@@ -2247,6 +2247,99 @@ const translations = {
     sv: 'Registrera arbetskälla',
     de: 'Arbeitsquelle erfassen',
   },
+  // Case stitching (Skipton slice 1, 2026-06-11). DA/SV value-demand wording
+  // follows the canonical glossary (værdiskabende efterspørgsel /
+  // värdeskapande efterfrågan); DE stays neutral — no DE canon yet.
+  'capture.toggles.caseTracking': {
+    en: 'Capture case reference',
+    da: 'Registrer sagsreference',
+    sv: 'Registrera ärendereferens',
+    de: 'Fallreferenz erfassen',
+  },
+  'capture.caseRefPlaceholder': {
+    en: 'Case ref (number only)',
+    da: 'Sagsreference (kun nummer)',
+    sv: 'Ärendereferens (endast nummer)',
+    de: 'Fallreferenz (nur Nummer)',
+  },
+  'capture.caseRefHelp': {
+    en: 'One case reference = one customer = one value demand. Several collectors can add entries to the same case over time — type the same reference to pick the case up where it left off. Privacy: use the reference number only, never a name.',
+    da: 'Én sagsreference = én kunde = én værdiskabende efterspørgsel. Flere indsamlere kan tilføje registreringer til samme sag over tid — skriv den samme reference for at fortsætte, hvor sagen slap. Privatliv: brug kun referencenummeret, aldrig et navn.',
+    sv: 'En ärendereferens = en kund = en värdeskapande efterfrågan. Flera insamlare kan lägga till registreringar i samma ärende över tid — skriv samma referens för att plocka upp ärendet där det slutade. Integritet: använd endast referensnumret, aldrig ett namn.',
+    de: 'Eine Fallreferenz = ein Kunde = ein Anliegen. Mehrere Personen können demselben Fall über die Zeit Einträge hinzufügen — dieselbe Referenz eingeben, um den Fall weiterzuführen. Datenschutz: nur die Referenznummer verwenden, niemals einen Namen.',
+  },
+  'capture.caseOpenBtn': {
+    en: 'Open case',
+    da: 'Åbn sag',
+    sv: 'Öppna ärende',
+    de: 'Fall öffnen',
+  },
+  'capture.caseStatusOpen': {
+    en: 'Open',
+    da: 'Åben',
+    sv: 'Öppet',
+    de: 'Offen',
+  },
+  'capture.caseStatusClosed': {
+    en: 'Closed',
+    da: 'Lukket',
+    sv: 'Avslutat',
+    de: 'Geschlossen',
+  },
+  'capture.caseCloseBtn': {
+    en: 'Close case',
+    da: 'Luk sag',
+    sv: 'Avsluta ärende',
+    de: 'Fall schließen',
+  },
+  'capture.caseReopenBtn': {
+    en: 'Reopen',
+    da: 'Genåbn',
+    sv: 'Återöppna',
+    de: 'Wieder öffnen',
+  },
+  'capture.caseOpenedAt': {
+    en: 'Opened',
+    da: 'Åbnet',
+    sv: 'Öppnat',
+    de: 'Eröffnet',
+  },
+  'capture.caseDemandTypePlaceholder': {
+    en: 'Which value demand is this case?',
+    da: 'Hvilken værdiskabende efterspørgsel er sagen?',
+    sv: 'Vilken värdeskapande efterfrågan är ärendet?',
+    de: 'Welches Anliegen betrifft dieser Fall?',
+  },
+  'capture.caseTimelineEmpty': {
+    en: 'No touches yet — the first saved entry starts the timeline.',
+    da: 'Ingen berøringer endnu — den første gemte registrering starter tidslinjen.',
+    sv: 'Inga kontakter ännu — den första sparade registreringen startar tidslinjen.',
+    de: 'Noch keine Einträge — der erste gespeicherte Eintrag startet den Verlauf.',
+  },
+  'capture.caseAttachNote': {
+    en: 'New entries attach to this case.',
+    da: 'Nye registreringer knyttes til denne sag.',
+    sv: 'Nya registreringar kopplas till detta ärende.',
+    de: 'Neue Einträge werden diesem Fall zugeordnet.',
+  },
+  'capture.caseSetAside': {
+    en: 'Set aside',
+    da: 'Læg til side',
+    sv: 'Lägg åt sidan',
+    de: 'Zur Seite legen',
+  },
+  'capture.caseNotFound': {
+    en: 'Could not open the case. Try again.',
+    da: 'Sagen kunne ikke åbnes. Prøv igen.',
+    sv: 'Ärendet kunde inte öppnas. Försök igen.',
+    de: 'Der Fall konnte nicht geöffnet werden. Bitte erneut versuchen.',
+  },
+  'reclassify.caseLabel': {
+    en: 'Case',
+    da: 'Sag',
+    sv: 'Ärende',
+    de: 'Fall',
+  },
   'capture.toggles.sequenceWork': {
     en: 'Capture sequence work',
     da: 'Registrer sekvensarbejde',

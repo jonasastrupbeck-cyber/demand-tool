@@ -63,6 +63,8 @@ interface EntryFull {
   whatMatters: string | null;
   lifeProblemId: string | null;
   collectorName: string | null;
+  // Case stitching (Skipton slice 1): read-only display in this modal.
+  caseId: string | null;
 }
 
 interface Props {
@@ -103,6 +105,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
   const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
+  // Case stitching (Skipton slice 1): the case ref this entry belongs to,
+  // looked up from caseId for read-only display. Re-assigning is a later slice.
+  const [caseRef, setCaseRef] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,6 +117,15 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       if (!cancelled && res.ok) {
         const data = await res.json();
         setEntry(data.entry);
+        // Case stitching: resolve caseId → caseRef for the read-only chip.
+        if (data.entry?.caseId) {
+          fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(data.entry.caseId)}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((c) => { if (!cancelled && c) setCaseRef(c.caseRef); })
+            .catch(() => {});
+        } else {
+          setCaseRef(null);
+        }
         setWhatMattersTypeIds(data.whatMattersTypeIds || []);
         // Normalise loaded SCs so callers can always read the 5 attachment
         // booleans. Older rows without attachment data default to attachesToDemand.
@@ -235,6 +249,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                   return createdAt ? new Date(createdAt).toLocaleDateString() : '';
                 })()}
                 {entry.collectorName ? ` — ${entry.collectorName}` : ''}
+                {caseRef ? ` — ${t('reclassify.caseLabel')} #${caseRef}` : ''}
               </p>
               {/* Demand: verbatim read-only.
                   Work: block editor below; show legacy verbatim as read-only notice only when there are no blocks yet. */}
