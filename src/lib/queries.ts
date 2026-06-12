@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -65,6 +65,32 @@ const DEFAULT_CONTACT_METHODS: Record<Locale, string[]> = {
   de: ['Telefon', 'Mail', 'Persönlich'],
 };
 
+// Decision points (Skipton dotted box, 2026-06-12). Seeded for flow studies;
+// labels are DB data per locale, fully editable in settings afterwards.
+// EN verbatim from the Skipton requirements note.
+const DEFAULT_DECISION_POINT_TYPES: Record<Locale, { label: string; positiveLabel: string; negativeLabel: string }[]> = {
+  en: [
+    { label: 'Decision on the person', positiveLabel: 'Accept', negativeLabel: 'Decline' },
+    { label: 'Decision on the property', positiveLabel: 'Accept', negativeLabel: 'Decline' },
+    { label: 'Decision on the value', positiveLabel: '\u00a3 accepted', negativeLabel: '\u00a3 disputed' },
+  ],
+  da: [
+    { label: 'Beslutning om personen', positiveLabel: 'Godkendt', negativeLabel: 'Afvist' },
+    { label: 'Beslutning om ejendommen', positiveLabel: 'Godkendt', negativeLabel: 'Afvist' },
+    { label: 'Beslutning om v\u00e6rdien', positiveLabel: 'V\u00e6rdi godkendt', negativeLabel: 'V\u00e6rdi bestridt' },
+  ],
+  sv: [
+    { label: 'Beslut om personen', positiveLabel: 'Godk\u00e4nd', negativeLabel: 'Avslagen' },
+    { label: 'Beslut om fastigheten', positiveLabel: 'Godk\u00e4nd', negativeLabel: 'Avslagen' },
+    { label: 'Beslut om v\u00e4rdet', positiveLabel: 'V\u00e4rde godk\u00e4nt', negativeLabel: 'V\u00e4rde bestritt' },
+  ],
+  de: [
+    { label: 'Entscheidung zur Person', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt' },
+    { label: 'Entscheidung zur Immobilie', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt' },
+    { label: 'Entscheidung zum Wert', positiveLabel: 'Wert akzeptiert', negativeLabel: 'Wert strittig' },
+  ],
+};
+
 const DEFAULT_WORK_TYPES: Record<Locale, string[]> = {
   en: ['Information request (internal)', 'Management reporting', 'Internal process query'],
   da: ['Informationsforespørgsel (intern)', 'Ledelsesrapportering', 'Intern procesforespørgsel'],
@@ -83,7 +109,13 @@ export const FLOW_PRESET_TOGGLES = {
   lifeProblemsEnabled: true,
   whatMattersEnabled: true,
   workTrackingEnabled: true,
-  flowWorkEnabled: true,
+  // The SC question on failure/sequence actions is integral to flow capture.
+  systemConditionsEnabled: true,
+  // The dotted box (decision points) is part of the flow regime.
+  decisionPointsEnabled: true,
+  // flowWorkEnabled deliberately NOT in the preset (2026-06-12): in flow mode
+  // each action is one step — the case timeline is the flow — so per-entry
+  // flow blocks are hidden by the flowMode render gate regardless.
 } as const;
 
 export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false, consultantPin?: string, systemType: 'transactional' | 'flow' = 'transactional') {
@@ -213,6 +245,11 @@ export async function createStudy(name: string, description: string = '', locale
         sortOrder: i,
       });
     }
+  }
+
+  // Flow studies start with the three decision points seeded (dotted box).
+  if (isFlow) {
+    await seedDefaultDecisionPointTypes(id, locale);
   }
 
   return { id, accessCode };
@@ -897,6 +934,95 @@ export async function updateCase(caseId: string, data: {
 
 export async function getCaseWhatMatters(caseId: string) {
   return db.select().from(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+}
+
+// --- Decision points (Skipton dotted box, 2026-06-12) ---
+
+export async function seedDefaultDecisionPointTypes(studyId: string, locale: Locale = 'en') {
+  const existing = await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId));
+  if (existing.length > 0) return; // seed once, never duplicate
+  const defaults = DEFAULT_DECISION_POINT_TYPES[locale];
+  for (let i = 0; i < defaults.length; i++) {
+    await db.insert(decisionPointTypes).values({
+      id: generateId(),
+      studyId,
+      label: defaults[i].label,
+      positiveLabel: defaults[i].positiveLabel,
+      negativeLabel: defaults[i].negativeLabel,
+      sortOrder: i,
+    });
+  }
+}
+
+export async function getDecisionPointTypes(studyId: string) {
+  return db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId)).orderBy(asc(decisionPointTypes.sortOrder));
+}
+
+export async function addDecisionPointType(studyId: string, label: string, positiveLabel: string, negativeLabel: string) {
+  const id = generateId();
+  const existing = await getDecisionPointTypes(studyId);
+  const row = { id, studyId, label, positiveLabel, negativeLabel, sortOrder: existing.length };
+  await db.insert(decisionPointTypes).values(row);
+  return row;
+}
+
+export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number }) {
+  const updateFields: Record<string, unknown> = {};
+  if (data.label !== undefined) updateFields.label = data.label;
+  if (data.positiveLabel !== undefined) updateFields.positiveLabel = data.positiveLabel;
+  if (data.negativeLabel !== undefined) updateFields.negativeLabel = data.negativeLabel;
+  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  if (Object.keys(updateFields).length > 0) {
+    await db.update(decisionPointTypes).set(updateFields).where(eq(decisionPointTypes.id, id));
+  }
+}
+
+export async function deleteDecisionPointType(id: string) {
+  // case_decision_points rows cascade (deliberate; see schema comment).
+  await db.delete(decisionPointTypes).where(eq(decisionPointTypes.id, id));
+}
+
+export async function getCaseDecisions(caseId: string) {
+  return db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.caseId, caseId));
+}
+
+// Record-or-edit are the same call: upsert on (caseId, decisionPointTypeId).
+export async function upsertCaseDecision(caseId: string, data: {
+  decisionPointTypeId: string;
+  outcome: 'positive' | 'negative';
+  cleanliness: 'clean' | 'dirty';
+  dirtyCause?: string | null;
+  decidedAt?: Date;
+  recordedByCollector?: string | null;
+}) {
+  const values = {
+    id: generateId(),
+    caseId,
+    decisionPointTypeId: data.decisionPointTypeId,
+    outcome: data.outcome,
+    cleanliness: data.cleanliness,
+    // Cause only makes sense for dirty decisions.
+    dirtyCause: data.cleanliness === 'dirty' ? (data.dirtyCause || null) : null,
+    decidedAt: data.decidedAt || new Date(),
+    recordedByCollector: data.recordedByCollector || null,
+  };
+  await db.insert(caseDecisionPoints).values(values).onConflictDoUpdate({
+    target: [caseDecisionPoints.caseId, caseDecisionPoints.decisionPointTypeId],
+    set: {
+      outcome: values.outcome,
+      cleanliness: values.cleanliness,
+      dirtyCause: values.dirtyCause,
+      decidedAt: values.decidedAt,
+      recordedByCollector: values.recordedByCollector,
+    },
+  });
+  const rows = await db.select().from(caseDecisionPoints)
+    .where(and(eq(caseDecisionPoints.caseId, caseId), eq(caseDecisionPoints.decisionPointTypeId, data.decisionPointTypeId)));
+  return rows[0];
+}
+
+export async function deleteCaseDecision(id: string) {
+  await db.delete(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
 }
 
 export async function getEntries(studyId: string, from?: Date, to?: Date) {

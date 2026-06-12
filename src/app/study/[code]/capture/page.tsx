@@ -79,6 +79,8 @@ interface StudyData {
   // System type (2026-06-11): layout regime. 'flow' = case-first, person
   // context on the case, lean touches.
   systemType: 'transactional' | 'flow';
+  // Decision points (Skipton dotted box, 2026-06-12).
+  decisionPointsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -91,6 +93,7 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number }[];
 }
 
 export default function CapturePage() {
@@ -628,6 +631,10 @@ export default function CapturePage() {
   }
 
   const isDemand = entryType === 'demand';
+  // Flow-based system: the capture page reads as ONE case object — the form
+  // renders inside CasePanel, tabs/separators/flow-blocks/full-SC hide, and
+  // failure/sequence actions get the lean system-condition question instead.
+  const flowMode = study.systemType === 'flow';
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
   // System conditions + Thinking are visible on every classified entry.
   // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY
@@ -672,28 +679,6 @@ export default function CapturePage() {
         </button>
       </div>
 
-      {/* Case stitching (Skipton slice 1): find-or-create a case by its
-          privacy-safe reference number; every entry saved while the case is
-          active attaches to it. Sits above the session strip — a case is the
-          outermost context an entry belongs to. */}
-      {study.caseTrackingEnabled && (
-        <CasePanel
-          code={code}
-          demandTypes={study.demandTypes}
-          handlingTypes={study.handlingTypes}
-          collectorName={collectorName}
-          activeCaseId={activeCase?.id ?? null}
-          onActiveCaseChange={setActiveCase}
-          refreshSignal={caseRefreshTick}
-          systemType={study.systemType}
-          lifeProblems={study.lifeProblems}
-          whatMattersTypes={study.whatMattersTypes}
-          onTypesChanged={refreshStudy}
-          unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
-          onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
-        />
-      )}
-
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
           Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
@@ -736,10 +721,35 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* Case stitching: CasePanel is a WRAPPER. Transactional (or case
+          tracking off): it renders the case UI (if any) above its children —
+          identical to the old layout. Flow: the children (the composer form)
+          render INSIDE the case card, between timeline and footer, so the
+          page reads as one case object. */}
+      <CasePanel
+        code={code}
+        enabled={study.caseTrackingEnabled}
+        demandTypes={study.demandTypes}
+        handlingTypes={study.handlingTypes}
+        collectorName={collectorName}
+        activeCaseId={activeCase?.id ?? null}
+        onActiveCaseChange={setActiveCase}
+        refreshSignal={caseRefreshTick}
+        systemType={study.systemType}
+        lifeProblems={study.lifeProblems}
+        whatMattersTypes={study.whatMattersTypes}
+        onTypesChanged={refreshStudy}
+        unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
+        onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
+        decisionPointsEnabled={study.decisionPointsEnabled}
+        decisionPointTypes={study.decisionPointTypes}
+      >
+
       {/* Demand / Work tabs — shown when work tracking is on, OR when the user has
           enabled "Capture work types" (which cascades workTrackingEnabled on via the
-          API so dashboard aggregations and downstream work features also light up). */}
-      {(study.workTrackingEnabled || study.workTypesEnabled) && (
+          API so dashboard aggregations and downstream work features also light up).
+          Hidden in flow mode — replaced by the segmented control inside the form. */}
+      {!flowMode && (study.workTrackingEnabled || study.workTypesEnabled) && (
         <div className="mb-4">
           <div className="grid grid-cols-2 gap-2 p-1 bg-gray-200 rounded-lg">
             <div className="relative">
@@ -820,11 +830,36 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Flow mode: the Demand/Work tabs collapse into one compact control
+            inside the composer — "Work we did" vs "Demand that hit us".
+            Replicates the tab onClick resets so a stale type never leaks
+            into the wrong entry kind. */}
+        {flowMode && (study.workTrackingEnabled || study.workTypesEnabled) && (
+          <div className="flex justify-center">
+            <SegmentedToggle
+              ariaLabel={t('capture.flowEntryKindAria')}
+              value={entryType}
+              onChange={(v) => {
+                setEntryType(v as 'demand' | 'work');
+                setClassification('');
+                setDemandTypeId('');
+                setWorkTypeId('');
+                setWorkTypeFreeText('');
+                setWorkBlocks([]);
+              }}
+              options={[
+                { value: 'work', label: t('capture.flowEntryWork'), activeColor: 'burgundy' },
+                { value: 'demand', label: t('capture.flowEntryDemand'), activeColor: 'burgundy' },
+              ]}
+            />
+          </div>
+        )}
         {/* Verbatim — demand tab always; work tab when Flow blocks are off
             (without a Flow block UI there is no other place to enter the
-            verbatim, so the form would otherwise be unsubmittable).
+            verbatim, so the form would otherwise be unsubmittable). In flow
+            mode each action is one step, so verbatim always renders.
             Header removed: the placeholder ("Write the customer's words…") carries the prompt. */}
-        {!study.volumeMode && (isDemand || !study.flowWorkEnabled) && (
+        {!study.volumeMode && (isDemand || !study.flowWorkEnabled || flowMode) && (
           <textarea
             aria-label={isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}
             value={verbatim}
@@ -896,6 +931,62 @@ export default function CapturePage() {
           </div>
         )}
 
+        {/* Flow mode: the lean system-condition question, directly under the
+            classification row — the moment a failure or sequence action is
+            tagged, ask what drives it, anchored to THIS action. Writes the
+            same entry-level systemConditions state as the full transactional
+            block (single-select, dimension 'hinders', attaches to work or
+            demand per entry kind). */}
+        {flowMode && study.systemConditionsEnabled && (classification === 'failure' || classification === 'sequence') && (
+          <div className={`p-3 rounded-lg border ${classification === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+            <p className="text-sm font-medium text-gray-800 mb-2 text-center">{t('capture.flowScQuestion')}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <PillSelect
+                ariaLabel={t('capture.flowScQuestion')}
+                placeholder={t('capture.selectSystemCondition')}
+                value={systemConditions[0]?.id ?? ''}
+                onChange={(id) => {
+                  if (!id) { setSystemConditions([]); return; }
+                  setSystemConditions([{
+                    id,
+                    dimension: 'hinders',
+                    attachesToLifeProblem: false,
+                    attachesToDemand: isDemand,
+                    attachesToWhatMatters: false,
+                    attachesToCor: false,
+                    attachesToWork: !isDemand,
+                  }]);
+                }}
+                options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
+                variant="add"
+                onAddNew={() => { setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                addNewLabel={t('capture.addNew')}
+              />
+              {systemConditions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSystemConditions([])}
+                  aria-label={t('settings.remove')}
+                  className="text-gray-400 hover:text-gray-600 text-sm"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+            {renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => {
+              setSystemConditions([{
+                id,
+                dimension: 'hinders',
+                attachesToLifeProblem: false,
+                attachesToDemand: isDemand,
+                attachesToWhatMatters: false,
+                attachesToCor: false,
+                attachesToWork: !isDemand,
+              }]);
+            }, { variant: 'sky' })}
+          </div>
+        )}
+
         {/* Secondary fields — appear naturally once the user picks a classification.
             Previously gated behind a "More details" toggle; the toggle was auto-opened
             on every classification click anyway, so it's been removed.
@@ -911,7 +1002,7 @@ export default function CapturePage() {
           // Flow-based system (slice B): the person context (what matters,
           // life problem) lives on the CASE, so the per-entry sections hide
           // and each touch stays lean. Transactional studies are unaffected.
-          const flowMode = study.systemType === 'flow';
+          // (flowMode is defined at component level.)
           const whatMattersVisible = !flowMode && isDemand && (isValueDemand || !study.classificationEnabled);
           const hasDemandStrand =
             (study.demandTypesEnabled && isDemand && classification !== 'unknown' && classification !== 'sequence') ||
@@ -923,7 +1014,8 @@ export default function CapturePage() {
           const hasResponseStrand = !!study.handlingEnabled;
           const hasSystemStrand = scVisible && !!(study.systemConditionsEnabled || study.thinkingsEnabled);
           // Tiny muted horizontal rule with a centered uppercase label.
-          const sep = (label: string, help?: string) => (
+          // Flow mode: no separators — the composer is one compact object.
+          const sep = (label: string, help?: string) => flowMode ? null : (
             <div className="flex items-center gap-3 pt-2 pb-0">
               <div className="flex-1 h-px bg-gray-100" />
               <span className={`text-[10px] tracking-widest text-gray-400 font-medium inline-flex items-center gap-1 ${help ? '' : 'uppercase'}`}>
@@ -1032,7 +1124,7 @@ export default function CapturePage() {
         {/* Original value demand — failure demand only. Header removed; the "Original value
             demand" placeholder carries the prompt. Value variant (green) since this always links
             to a value demand. */}
-        {study.valueLinkingEnabled && isDemand && classification === 'failure' && (
+        {!flowMode && study.valueLinkingEnabled && isDemand && classification === 'failure' && (
           <div>
             <div className="flex gap-2 items-center">
               <PillSelect
@@ -1201,7 +1293,7 @@ export default function CapturePage() {
             failure-work steps. Opt-in per entry-type via flowDemandEnabled /
             flowWorkEnabled (migration 0014). Verbatim auto-populates as
             `[tag] text\n\n[tag] text` for downstream consumers. */}
-        {!study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
+        {!flowMode && !study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
           <div>
             {sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
             <div className="overflow-x-auto -mx-1 px-1 pb-2">
@@ -1359,7 +1451,7 @@ export default function CapturePage() {
             Phase 2 / Item 3: each selected SC carries a Helps/Hinders dimension.
             Header dropped — the "+ Add system condition" pill is self-explanatory; an ⓘ
             next to it carries the definition. */}
-        {study.classificationEnabled && scVisible && study.systemConditionsEnabled && (
+        {!flowMode && study.classificationEnabled && scVisible && study.systemConditionsEnabled && (
           <div>
               <div className="space-y-2">
                 {systemConditions.map((entry, idx) => {
@@ -1648,6 +1740,7 @@ export default function CapturePage() {
           </div>
         </div>
       </form>
+      </CasePanel>
 
       {/* Entries tab-box — tab-strip visual, tighter than Demand/Work since reclass is an optional
           review action (not a per-entry step). The chevron sits inside its own small pill so the

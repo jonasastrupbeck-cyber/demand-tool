@@ -2401,6 +2401,107 @@ const translations = {
     sv: 'Kontext & situation — vad pågår runt personen?',
     de: 'Kontext & Situation — was geht rund um diese Person vor?',
   },
+  // Flow composer (2026-06-12): the Demand/Work tabs collapse into one
+  // segmented control; failure/sequence actions get the lean SC question.
+  // DA systemforhold / SV systemvillkor per canonical glossary; DE neutral.
+  // Decision points â the Skipton dotted box (2026-06-12). "Clean/dirty"
+  // is Skipton-derived Vanguard vocabulary from the requirements note.
+  'capture.toggles.decisionPoints': {
+    en: 'Capture decision points',
+    da: 'Registrer beslutningspunkter',
+    sv: 'Registrera beslutspunkter',
+    de: 'Entscheidungspunkte erfassen',
+  },
+  'capture.dpClean': {
+    en: 'Clean',
+    da: 'Rent',
+    sv: 'Rent',
+    de: 'Sauber',
+  },
+  'capture.dpDirty': {
+    en: 'Dirty',
+    da: 'Urent',
+    sv: 'Orent',
+    de: 'Unsauber',
+  },
+  'capture.dpCleanlinessAria': {
+    en: 'Was this decision reached cleanly or dirtily?',
+    da: 'Blev beslutningen nået rent eller urent?',
+    sv: 'Nåddes beslutet rent eller orent?',
+    de: 'Wurde die Entscheidung sauber oder unsauber erreicht?',
+  },
+  'capture.dpDirtyCausePlaceholder': {
+    en: 'What made it dirty?',
+    da: 'Hvad gjorde den uren?',
+    sv: 'Vad gjorde det orent?',
+    de: 'Was machte sie unsauber?',
+  },
+  'capture.dpDecidedAtLabel': {
+    en: 'Decided',
+    da: 'Besluttet',
+    sv: 'Beslutat',
+    de: 'Entschieden',
+  },
+  'capture.dpOutcomeAria': {
+    en: 'Decision outcome',
+    da: 'Beslutningens udfald',
+    sv: 'Beslutets utfall',
+    de: 'Ergebnis der Entscheidung',
+  },
+  'capture.dpCancel': {
+    en: 'Cancel',
+    da: 'Annullér',
+    sv: 'Avbryt',
+    de: 'Abbrechen',
+  },
+  'settings.decisionPointTypes': {
+    en: 'Decision points',
+    da: 'Beslutningspunkter',
+    sv: 'Beslutspunkter',
+    de: 'Entscheidungspunkte',
+  },
+  'settings.decisionPointTypesDesc': {
+    en: 'The end-to-end decisions a case moves towards. Each has its own outcome wording; end-to-end times are measured to each point.',
+    da: 'De gennemgående beslutninger, en sag bevæger sig imod. Hver har sin egen formulering af udfaldet; end-to-end-tider måles til hvert punkt.',
+    sv: 'De genomgående beslut ett ärende rör sig mot. Varje punkt har sin egen formulering av utfallet; end-to-end-tider mäts till varje punkt.',
+    de: 'Die Entscheidungen, auf die ein Fall zuläuft. Jede hat ihre eigene Ergebnis-Formulierung; End-to-End-Zeiten werden je Punkt gemessen.',
+  },
+  'settings.dpPositiveLabel': {
+    en: 'Positive outcome',
+    da: 'Positivt udfald',
+    sv: 'Positivt utfall',
+    de: 'Positives Ergebnis',
+  },
+  'settings.dpNegativeLabel': {
+    en: 'Negative outcome',
+    da: 'Negativt udfald',
+    sv: 'Negativt utfall',
+    de: 'Negatives Ergebnis',
+  },
+  'capture.flowEntryWork': {
+    en: 'Work we did',
+    da: 'Udført arbejde',
+    sv: 'Utfört arbete',
+    de: 'Geleistete Arbeit',
+  },
+  'capture.flowEntryDemand': {
+    en: 'Demand came in',
+    da: 'Efterspørgsel kom ind',
+    sv: 'Efterfrågan kom in',
+    de: 'Anliegen kam herein',
+  },
+  'capture.flowEntryKindAria': {
+    en: 'Was this work we did, or demand that came in?',
+    da: 'Var dette udført arbejde eller indkommen efterspørgsel?',
+    sv: 'Var detta utfört arbete eller inkommen efterfrågan?',
+    de: 'War dies geleistete Arbeit oder ein eingehendes Anliegen?',
+  },
+  'capture.flowScQuestion': {
+    en: 'Which system condition is driving this?',
+    da: 'Hvilket systemforhold driver dette?',
+    sv: 'Vilket systemvillkor driver detta?',
+    de: 'Welche Systembedingung treibt dies an?',
+  },
   'capture.caseAttachLast': {
     en: 'Attach last entry to this case',
     da: 'Knyt seneste registrering til denne sag',

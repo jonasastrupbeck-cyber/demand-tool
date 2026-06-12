@@ -19,6 +19,7 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection from '@/components/CaseContextSection';
+import CaseDecisionPoints, { type CaseDecision, type DecisionPointType } from '@/components/CaseDecisionPoints';
 
 interface CaseRow {
   id: string;
@@ -62,6 +63,16 @@ interface Props {
    *  saved entry if it has no case yet — renders a one-tap attach chip. */
   unattachedLastEntryId: string | null;
   onAttachedLast?: (caseId: string) => void;
+  // Decision points (Skipton dotted box, 2026-06-12). Empty array hides the box.
+  decisionPointsEnabled: boolean;
+  decisionPointTypes: DecisionPointType[];
+  /** When false, CasePanel is a pure passthrough rendering only children —
+   *  lets the capture page wrap the composer unconditionally. */
+  enabled: boolean;
+  /** The composer (entry form). Flow mode renders it INSIDE the case card,
+   *  between the timeline and the footer, so the page reads as one case
+   *  object; transactional renders it below, exactly as before. */
+  children?: React.ReactNode;
 }
 
 const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
@@ -71,7 +82,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -80,6 +91,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const [caseRow, setCaseRow] = useState<CaseRow | null>(null);
   const [entries, setEntries] = useState<CaseEntry[]>([]);
   const [wmIds, setWmIds] = useState<string[]>([]);
+  const [decisions, setDecisions] = useState<CaseDecision[]>([]);
   const [attaching, setAttaching] = useState(false);
 
   const loadCase = useCallback(async (caseId: string) => {
@@ -89,6 +101,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     setCaseRow(data);
     setEntries(data.entries || []);
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
+    setDecisions(Array.isArray(data.decisions) ? data.decisions : []);
   }, [code]);
 
   // Refetch the timeline when the active case changes or an entry was saved.
@@ -157,9 +170,14 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     return ht ? tl(ht.label) : null;
   };
 
-  // --- Closed state: just the ref input ---
+  // Case tracking off: pure passthrough (transactional studies without the
+  // toggle see exactly the old page).
+  if (!enabled) return <>{children}</>;
+
+  // --- Closed state: ref input, composer below (capture first, stitch later) ---
   if (!activeCaseId || !caseRow) {
     return (
+      <>
       <div className="mb-4">
         <div className="flex items-center justify-center gap-2">
           <input
@@ -186,14 +204,18 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         </div>
         {error && <p className="mt-1 text-xs text-red-600 text-center">{error}</p>}
       </div>
+      {children}
+      </>
     );
   }
 
   // --- Open state: case card with timeline ---
   const valueDemandTypes = demandTypes.filter((d) => d.category === 'value');
   const isOpen = caseRow.status === 'open';
+  const isFlow = systemType === 'flow';
 
   return (
+    <>
     <div className="mb-4 rounded-xl border border-gray-300 bg-gray-50 p-3">
       <div className="flex flex-wrap items-center justify-center gap-2">
         <span className="font-semibold text-gray-900 text-sm">#{caseRow.caseRef}</span>
@@ -243,6 +265,18 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         />
       )}
 
+      {/* Decision points — the dotted box (Skipton, 2026-06-12). Flow only. */}
+      {isFlow && decisionPointsEnabled && (
+        <CaseDecisionPoints
+          code={code}
+          caseId={caseRow.id}
+          decisionPointTypes={decisionPointTypes}
+          decisions={decisions}
+          collectorName={collectorName}
+          onChanged={() => loadCase(caseRow.id)}
+        />
+      )}
+
       {/* "Capture first, stitch when the number arrives": one-tap attach for
           the entry saved before this case existed (slice B3). */}
       {unattachedLastEntryId && (
@@ -282,6 +316,14 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         )}
       </div>
 
+      {/* Flow mode: the composer (next action) lives INSIDE the case object,
+          after the timeline — actions fold in one by one until close. */}
+      {isFlow && children && (
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          {children}
+        </div>
+      )}
+
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="text-xs text-gray-400">{t('capture.caseAttachNote')}</p>
         <div className="flex items-center gap-2">
@@ -302,5 +344,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         </div>
       </div>
     </div>
+    {!isFlow && children}
+    </>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, seedDefaultDecisionPointTypes } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, dpTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -25,6 +25,7 @@ export async function GET(
     getThinkings(study.id),
     getLifecycleStages(study.id),
     getLifeProblems(study.id),
+    getDecisionPointTypes(study.id),
   ]);
 
   return NextResponse.json({
@@ -41,6 +42,7 @@ export async function GET(
     thinkings: thTypes,
     lifecycleStages: lcStages,
     lifeProblems: lpTypes,
+    decisionPointTypes: dpTypes,
   });
 }
 
@@ -98,6 +100,8 @@ export async function PUT(
   if (body.lifeProblemsEnabled !== undefined) updates.lifeProblemsEnabled = body.lifeProblemsEnabled;
   // Case stitching toggle (Skipton slice 1, 2026-06-11).
   if (body.caseTrackingEnabled !== undefined) updates.caseTrackingEnabled = body.caseTrackingEnabled;
+  // Decision points toggle (Skipton dotted box, 2026-06-12).
+  if (body.decisionPointsEnabled !== undefined) updates.decisionPointsEnabled = body.decisionPointsEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.
@@ -130,6 +134,13 @@ export async function PUT(
   // Seed default lifecycle stages when enabling lifecycle for the first time
   if (body.lifecycleEnabled === true) {
     await seedDefaultLifecycleStages(study.id, body.locale || 'en');
+  }
+
+  // Seed the three decision points when the toggle turns on — keyed off
+  // `updates` (not body) so the systemType→flow preset path seeds too.
+  // seedDefaultDecisionPointTypes no-ops if the study already has types.
+  if (updates.decisionPointsEnabled === true) {
+    await seedDefaultDecisionPointTypes(study.id, body.locale || 'en');
   }
 
   return NextResponse.json({ success: true });

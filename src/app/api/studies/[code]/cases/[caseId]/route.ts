@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, getCaseDecisions } from '@/lib/queries';
 
 // Case detail + its timeline of touches (oldest first). The timeline ordered
 // by createdAt IS the repeatable Capability-of-Response sequence.
@@ -16,11 +16,12 @@ export async function GET(
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
 
-  const [entries, wmRows] = await Promise.all([
+  const [entries, wmRows, decisions] = await Promise.all([
     getCaseEntries(caseId),
     getCaseWhatMatters(caseId),
+    getCaseDecisions(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId) });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), decisions });
 }
 
 export async function PATCH(

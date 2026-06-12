@@ -88,12 +88,15 @@ interface StudyData {
   caseTrackingEnabled: boolean;
   // System type (2026-06-11): layout regime — transactional vs flow-based.
   systemType: 'transactional' | 'flow';
+  // Decision points (Skipton dotted box, 2026-06-12).
+  decisionPointsEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -135,6 +138,10 @@ export default function SettingsPage() {
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkSource, setNewWorkSource] = useState('');
+  // Decision points (Skipton dotted box, 2026-06-12): three fields per new type.
+  const [newDpLabel, setNewDpLabel] = useState('');
+  const [newDpPos, setNewDpPos] = useState('');
+  const [newDpNeg, setNewDpNeg] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
@@ -434,6 +441,42 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
     }));
+  }
+
+  // Decision points (Skipton dotted box, 2026-06-12) — optimistic like the
+  // other taxonomy handlers.
+  function addDecisionPointTypeHandler(e: React.FormEvent) {
+    e.preventDefault();
+    const label = newDpLabel.trim();
+    const positiveLabel = newDpPos.trim();
+    const negativeLabel = newDpNeg.trim();
+    if (!label || !positiveLabel || !negativeLabel) return;
+    setNewDpLabel(''); setNewDpPos(''); setNewDpNeg('');
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, positiveLabel, negativeLabel }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, decisionPointTypes: [...s.decisionPointTypes, { id, label, positiveLabel, negativeLabel, sortOrder: s.decisionPointTypes.length }] } : s)),
+    );
+  }
+
+  function patchDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string }) {
+    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'string' && v.trim()));
+    if (Object.keys(clean).length === 0) return;
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === id ? { ...d, ...clean } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clean),
+    }));
+  }
+
+  function removeDecisionPointType(id: string) {
+    // Per-case decision records cascade server-side (deliberate).
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.filter((d) => d.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, { method: 'DELETE' }));
   }
 
   function addWorkTypeHandler(e: React.FormEvent) {
@@ -1081,6 +1124,59 @@ export default function SettingsPage() {
             <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
           </form>
         </div>
+
+        {/* Decision points — gated on decisionPointsEnabled (Skipton dotted box).
+            Each type carries its own outcome wording; rows edit on blur. */}
+        {study.decisionPointsEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.decisionPointTypes')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.decisionPointTypesDesc')}</p>
+            <ul className="space-y-2 mb-4">
+              {(study.decisionPointTypes || []).map((dp) => (
+                <li key={dp.id} className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <input
+                      type="text"
+                      defaultValue={dp.label}
+                      aria-label={t('settings.decisionPointTypes')}
+                      onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
+                      className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                    />
+                    <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs text-gray-500">
+                      {t('settings.dpPositiveLabel')}
+                      <input
+                        type="text"
+                        defaultValue={dp.positiveLabel}
+                        onBlur={(e) => patchDecisionPointType(dp.id, { positiveLabel: e.target.value })}
+                        className="w-full mt-0.5 px-2 py-1 rounded text-sm text-green-700 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
+                      />
+                    </label>
+                    <label className="text-xs text-gray-500">
+                      {t('settings.dpNegativeLabel')}
+                      <input
+                        type="text"
+                        defaultValue={dp.negativeLabel}
+                        onBlur={(e) => patchDecisionPointType(dp.id, { negativeLabel: e.target.value })}
+                        className="w-full mt-0.5 px-2 py-1 rounded text-sm text-red-700 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 outline-none"
+                      />
+                    </label>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <form onSubmit={addDecisionPointTypeHandler} className="space-y-2">
+              <input type="text" value={newDpLabel} onChange={(e) => setNewDpLabel(e.target.value)} placeholder={t('settings.decisionPointTypes')} className={inputCls} />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="text" value={newDpPos} onChange={(e) => setNewDpPos(e.target.value)} placeholder={t('settings.dpPositiveLabel')} className={inputCls} />
+                <input type="text" value={newDpNeg} onChange={(e) => setNewDpNeg(e.target.value)} placeholder={t('settings.dpNegativeLabel')} className={inputCls} />
+              </div>
+              <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            </form>
+          </div>
+        )}
 
         {/* Work sources — gated on workSourcesEnabled (toggle lives in CaptureTogglesPanel above). */}
         {study.workSourcesEnabled && (

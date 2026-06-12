@@ -64,6 +64,10 @@ export const studies = pgTable('studies', {
     .$type<'transactional' | 'flow'>()
     .notNull()
     .default('transactional'),
+  // Decision points (Skipton dotted box, 2026-06-12): per-case end-to-end
+  // decision capture — outcome + clean/dirty + date. Default false; part of
+  // the flow preset.
+  decisionPointsEnabled: boolean('decision_points_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -209,6 +213,39 @@ export const caseWhatMatters = pgTable('case_what_matters', {
   whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
 }, (t) => ({
   uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
+}));
+
+// Decision points (Skipton dotted box, 2026-06-12). A per-study taxonomy —
+// NOT a hardcoded person/property/value enum — so the tool stays generic.
+// Each type carries its own outcome wording (Accept/Decline, £ accepted/
+// £ disputed, ...). The three mortgage points are seed data per locale.
+export const decisionPointTypes = pgTable('decision_point_types', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  positiveLabel: text('positive_label').notNull(),
+  negativeLabel: text('negative_label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+// One row per decided point per case; pending points simply have no row.
+// E2E time per point = decidedAt − cases.openedAt, always computed, never
+// stored. Cleanliness is captured HERE and only here (per Skipton req 7:
+// per-step dirtiness is too noisy — the decision point is the measure).
+// Type-FK cascades deliberately: deleting a decision-point type from
+// settings is a consultant taxonomy fix and takes its case records along.
+export const caseDecisionPoints = pgTable('case_decision_points', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
+  outcome: text('outcome').$type<'positive' | 'negative'>().notNull(),
+  cleanliness: text('cleanliness').$type<'clean' | 'dirty'>().notNull(),
+  dirtyCause: text('dirty_cause'),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
+  recordedByCollector: text('recorded_by_collector'),
+}, (t) => ({
+  // Explicit short name (63-char identifier lesson, see 0019).
+  uniqCaseDp: unique('case_decision_points_unique').on(t.caseId, t.decisionPointTypeId),
 }));
 
 export const demandEntries = pgTable('demand_entries', {
