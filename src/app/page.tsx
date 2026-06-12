@@ -16,6 +16,9 @@ export default function Home() {
   const [customContactMethod, setCustomContactMethod] = useState('');
   const [pointOfTransaction, setPointOfTransaction] = useState('');
   const [consultantPin, setConsultantPin] = useState('');
+  // System type (2026-06-11): the layout regime the study starts in.
+  // Transactional preselected — preserves today's behaviour.
+  const [systemType, setSystemType] = useState<'transactional' | 'flow'>('transactional');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,7 +55,7 @@ export default function Home() {
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined }),
+      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined, systemType }),
     });
 
     if (!res.ok) {
@@ -132,6 +135,37 @@ export default function Home() {
             <form onSubmit={handleCreate} className="rounded-xl shadow-sm p-6 bg-white border border-gray-200">
               <h2 className="text-lg font-semibold mb-4 text-gray-900">{t('landing.createStudy')}</h2>
               <div className="space-y-4">
+                {/* System type — the first decision: which way in. Two cards,
+                    transactional preselected (today's behaviour). */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t('create.systemTypeLabel')}
+                  </label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {(['transactional', 'flow'] as const).map((type) => {
+                      const isSelected = systemType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setSystemType(type)}
+                          className={`px-4 py-3 rounded-lg text-left transition-all ${
+                            isSelected
+                              ? 'bg-[#ac2c2d] text-white ring-2 ring-[#ac2c2d] ring-offset-1'
+                              : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold">
+                            {t(type === 'flow' ? 'create.systemTypeFlow' : 'create.systemTypeTransactional')}
+                          </span>
+                          <span className={`block text-xs mt-0.5 ${isSelected ? 'text-red-100' : 'text-gray-500'}`}>
+                            {t(type === 'flow' ? 'create.systemTypeFlowDesc' : 'create.systemTypeTransactionalDesc')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('landing.studyName')}

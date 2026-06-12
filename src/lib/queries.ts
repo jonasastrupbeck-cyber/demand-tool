@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -72,7 +72,21 @@ const DEFAULT_WORK_TYPES: Record<Locale, string[]> = {
   de: ['Informationsanfrage (intern)', 'Management-Berichterstattung', 'Interne Prozessanfrage'],
 };
 
-export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false, consultantPin?: string) {
+// Flow preset (2026-06-11): the strand toggles a flow-based study starts with.
+// Applied ADDITIVELY only — choosing or switching to 'flow' turns these on,
+// never turns anything off (hiding captured data is the documented anti-pattern).
+export const FLOW_PRESET_TOGGLES = {
+  caseTrackingEnabled: true,
+  classificationEnabled: true,
+  demandTypesEnabled: true,
+  handlingEnabled: true,
+  lifeProblemsEnabled: true,
+  whatMattersEnabled: true,
+  workTrackingEnabled: true,
+  flowWorkEnabled: true,
+} as const;
+
+export async function createStudy(name: string, description: string = '', locale: Locale = 'en', primaryContactMethod?: string, pointOfTransaction?: string, workTrackingEnabled: boolean = false, consultantPin?: string, systemType: 'transactional' | 'flow' = 'transactional') {
   const id = generateId();
   let accessCode = generateAccessCode();
 
@@ -82,16 +96,21 @@ export async function createStudy(name: string, description: string = '', locale
     accessCode = generateAccessCode();
   }
 
+  const isFlow = systemType === 'flow';
   await db.insert(studies).values({
     id,
     accessCode,
     name,
     description,
-    workTrackingEnabled,
+    workTrackingEnabled: workTrackingEnabled || isFlow,
     activeLayer: 1,
     consultantPin: consultantPin || null,
     createdAt: new Date(),
     isActive: true,
+    systemType,
+    // Flow studies start with the case-first strands on (preset, still
+    // individually tunable afterwards in the toggles panel).
+    ...(isFlow ? FLOW_PRESET_TOGGLES : {}),
   });
 
   // Create default handling types in the chosen language
@@ -181,8 +200,9 @@ export async function createStudy(name: string, description: string = '', locale
     await db.update(studies).set({ primaryPointOfTransactionId: potId }).where(eq(studies.id, id));
   }
 
-  // Create default work types if work tracking is enabled
-  if (workTrackingEnabled) {
+  // Create default work types if work tracking is enabled (the flow preset
+  // turns work tracking on too).
+  if (workTrackingEnabled || isFlow) {
     const localizedWorkTypes = DEFAULT_WORK_TYPES[locale];
     for (let i = 0; i < localizedWorkTypes.length; i++) {
       await db.insert(workTypes).values({
@@ -811,7 +831,10 @@ export async function getCases(studyId: string) {
     note: cases.note,
     createdByCollector: cases.createdByCollector,
     createdAt: cases.createdAt,
-    entryCount: sql<number>`(select count(*)::int from ${demandEntries} where ${demandEntries.caseId} = ${cases.id})`,
+    // Explicitly qualified: drizzle renders interpolated columns unqualified
+    // here, which made the correlated subquery compare demand_entries.case_id
+    // to demand_entries.id (always 0 rows).
+    entryCount: sql<number>`(select count(*)::int from demand_entries de where de.case_id = cases.id)`,
   })
     .from(cases)
     .where(eq(cases.studyId, studyId))
@@ -836,6 +859,11 @@ export async function updateCase(caseId: string, data: {
   openedAt?: Date;
   closedAt?: Date | null;
   note?: string | null;
+  // Flow-mode person context (slice B).
+  contextSituation?: string | null;
+  lifeProblemId?: string | null;
+  whatMatters?: string | null;
+  whatMattersTypeIds?: string[];
 }) {
   const updateFields: Record<string, unknown> = {};
   if (data.demandTypeId !== undefined) updateFields.demandTypeId = data.demandTypeId;
@@ -848,9 +876,27 @@ export async function updateCase(caseId: string, data: {
   if (data.openedAt !== undefined) updateFields.openedAt = data.openedAt;
   if (data.closedAt !== undefined) updateFields.closedAt = data.closedAt;
   if (data.note !== undefined) updateFields.note = data.note;
+  if (data.contextSituation !== undefined) updateFields.contextSituation = data.contextSituation;
+  if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
+  if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
   if (Object.keys(updateFields).length > 0) {
     await db.update(cases).set(updateFields).where(eq(cases.id, caseId));
   }
+  // Replace-set semantics, mirroring entry-level what-matters handling.
+  if (data.whatMattersTypeIds !== undefined) {
+    await db.delete(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+    for (const wmtId of data.whatMattersTypeIds) {
+      await db.insert(caseWhatMatters).values({
+        id: generateId(),
+        caseId,
+        whatMattersTypeId: wmtId,
+      });
+    }
+  }
+}
+
+export async function getCaseWhatMatters(caseId: string) {
+  return db.select().from(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
 }
 
 export async function getEntries(studyId: string, from?: Date, to?: Date) {

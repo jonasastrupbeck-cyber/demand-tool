@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -98,6 +98,19 @@ export async function PUT(
   if (body.lifeProblemsEnabled !== undefined) updates.lifeProblemsEnabled = body.lifeProblemsEnabled;
   // Case stitching toggle (Skipton slice 1, 2026-06-11).
   if (body.caseTrackingEnabled !== undefined) updates.caseTrackingEnabled = body.caseTrackingEnabled;
+  // System type (2026-06-11): layout regime, validated enum. Switching TO
+  // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
+  // forces caseTrackingEnabled — flow layout is meaningless without cases.
+  // Switching to 'transactional' changes only the layout; no toggles touched.
+  if (typeof body.systemType === 'string'
+      && (body.systemType === 'transactional' || body.systemType === 'flow')) {
+    updates.systemType = body.systemType;
+    if (body.systemType === 'flow') {
+      for (const [key, value] of Object.entries(FLOW_PRESET_TOGGLES)) {
+        if (!study[key as keyof typeof FLOW_PRESET_TOGGLES]) updates[key] = value;
+      }
+    }
+  }
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
 
   // Only call the DB update when we actually have something to set — Drizzle's

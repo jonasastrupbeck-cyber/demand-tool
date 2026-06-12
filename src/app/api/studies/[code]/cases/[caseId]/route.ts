@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters } from '@/lib/queries';
 
 // Case detail + its timeline of touches (oldest first). The timeline ordered
 // by createdAt IS the repeatable Capability-of-Response sequence.
@@ -16,8 +16,11 @@ export async function GET(
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
 
-  const entries = await getCaseEntries(caseId);
-  return NextResponse.json({ ...caseRow, entries });
+  const [entries, wmRows] = await Promise.all([
+    getCaseEntries(caseId),
+    getCaseWhatMatters(caseId),
+  ]);
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId) });
 }
 
 export async function PATCH(
@@ -62,8 +65,18 @@ export async function PATCH(
     }
   }
   if (body.note !== undefined) data.note = typeof body.note === 'string' ? body.note : null;
+  // Flow-mode person context (slice B).
+  if (body.contextSituation !== undefined) data.contextSituation = typeof body.contextSituation === 'string' ? body.contextSituation : null;
+  if (body.lifeProblemId !== undefined) data.lifeProblemId = body.lifeProblemId || null;
+  if (body.whatMatters !== undefined) data.whatMatters = typeof body.whatMatters === 'string' ? body.whatMatters : null;
+  if (body.whatMattersTypeIds !== undefined) {
+    if (!Array.isArray(body.whatMattersTypeIds) || !body.whatMattersTypeIds.every((x: unknown) => typeof x === 'string')) {
+      return NextResponse.json({ error: 'whatMattersTypeIds must be an array of ids' }, { status: 400 });
+    }
+    data.whatMattersTypeIds = body.whatMattersTypeIds;
+  }
 
   await updateCase(caseId, data);
-  const updated = await getCase(caseId);
-  return NextResponse.json(updated);
+  const [updated, wmRows] = await Promise.all([getCase(caseId), getCaseWhatMatters(caseId)]);
+  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId) });
 }

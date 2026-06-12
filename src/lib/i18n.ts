@@ -2340,6 +2340,71 @@ const translations = {
     sv: 'Ärende',
     de: 'Fall',
   },
+  // System type (2026-06-11): the two ways in. DA/SV use canonical
+  // value-demand wording; DE stays neutral (no canon).
+  'create.systemTypeLabel': {
+    en: 'What kind of system are you studying?',
+    da: 'Hvilken slags system undersøger du?',
+    sv: 'Vilket slags system studerar du?',
+    de: 'Welche Art von System untersuchen Sie?',
+  },
+  'create.systemTypeTransactional': {
+    en: 'Transactional',
+    da: 'Transaktionsbaseret',
+    sv: 'Transaktionsbaserat',
+    de: 'Transaktionsbasiert',
+  },
+  'create.systemTypeTransactionalDesc': {
+    en: 'Demand arrives, is captured as one entry, and is handled — each capture is complete in itself.',
+    da: 'Efterspørgslen kommer ind, registreres som én registrering og håndteres — hver registrering er komplet i sig selv.',
+    sv: 'Efterfrågan kommer in, registreras som en registrering och hanteras — varje registrering är komplett i sig.',
+    de: 'Ein Anliegen kommt herein, wird als ein Eintrag erfasst und bearbeitet — jede Erfassung ist in sich abgeschlossen.',
+  },
+  'create.systemTypeFlow': {
+    en: 'Flow-based',
+    da: 'Flowbaseret',
+    sv: 'Flödesbaserat',
+    de: 'Flussbasiert',
+  },
+  'create.systemTypeFlowDesc': {
+    en: 'A value demand opens a case. Work continues across handoffs and returns over time, stitched together by a case reference.',
+    da: 'En værdiskabende efterspørgsel åbner en sag. Arbejdet fortsætter på tværs af overleveringer og tilbageløb over tid, holdt sammen af en sagsreference.',
+    sv: 'En värdeskapande efterfrågan öppnar ett ärende. Arbetet fortsätter över överlämningar och återkomster över tid, sammanhållet av en ärendereferens.',
+    de: 'Ein Anliegen öffnet einen Fall. Die Arbeit läuft über Übergaben und Rückläufe hinweg weiter, verbunden durch eine Fallreferenz.',
+  },
+  'settings.systemTypeTitle': {
+    en: 'System type',
+    da: 'Systemtype',
+    sv: 'Systemtyp',
+    de: 'Systemtyp',
+  },
+  'settings.systemTypeDesc': {
+    en: 'How the capture page is shaped. Flow-based leads with the case; transactional captures complete entries one by one. Switching never deletes anything.',
+    da: 'Hvordan registreringssiden er formet. Flowbaseret tager udgangspunkt i sagen; transaktionsbaseret registrerer komplette registreringer én ad gangen. Et skift sletter aldrig noget.',
+    sv: 'Hur registreringssidan är formad. Flödesbaserat utgår från ärendet; transaktionsbaserat registrerar kompletta registreringar en i taget. Ett byte raderar aldrig något.',
+    de: 'Wie die Erfassungsseite aufgebaut ist. Flussbasiert geht vom Fall aus; transaktionsbasiert erfasst vollständige Einträge einzeln. Ein Wechsel löscht nie etwas.',
+  },
+  'settings.systemTypeConfirmFlow': {
+    en: 'Switching to flow-based also turns on case tracking and the flow strands (nothing is turned off). Continue?',
+    da: 'Skift til flowbaseret slår også sagsregistrering og flow-elementerne til (intet slås fra). Fortsæt?',
+    sv: 'Byte till flödesbaserat slår också på ärenderegistrering och flödesdelarna (inget stängs av). Fortsätt?',
+    de: 'Der Wechsel zu flussbasiert aktiviert auch Fallerfassung und Fluss-Elemente (nichts wird deaktiviert). Fortfahren?',
+  },
+  // Flow-mode case context (slice B). "Context & situation" is wireframe
+  // language, not Vanguard canon — plain words. P2BS and What Matters reuse
+  // the existing canonical capture.* keys.
+  'capture.caseContextPlaceholder': {
+    en: 'Context & situation — what is going on around this person?',
+    da: 'Kontekst & situation — hvad foregår der omkring personen?',
+    sv: 'Kontext & situation — vad pågår runt personen?',
+    de: 'Kontext & Situation — was geht rund um diese Person vor?',
+  },
+  'capture.caseAttachLast': {
+    en: 'Attach last entry to this case',
+    da: 'Knyt seneste registrering til denne sag',
+    sv: 'Koppla senaste registreringen till detta ärende',
+    de: 'Letzten Eintrag diesem Fall zuordnen',
+  },
   'capture.toggles.sequenceWork': {
     en: 'Capture sequence work',
     da: 'Registrer sekvensarbejde',

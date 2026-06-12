@@ -11,6 +11,8 @@ export async function POST(request: Request) {
 
   const validLocale = ['en', 'da', 'sv', 'de'].includes(locale) ? locale : 'en';
   const pin = consultantPin?.trim() || undefined;
-  const result = await createStudy(name.trim(), description?.trim() || '', validLocale, primaryContactMethod?.trim() || undefined, pointOfTransaction?.trim() || undefined, false, pin);
+  // System type (2026-06-11): 'flow' = case-first layout + additive preset.
+  const systemType = body.systemType === 'flow' ? 'flow' : 'transactional';
+  const result = await createStudy(name.trim(), description?.trim() || '', validLocale, primaryContactMethod?.trim() || undefined, pointOfTransaction?.trim() || undefined, false, pin, systemType);
   return NextResponse.json(result, { status: 201 });
 }

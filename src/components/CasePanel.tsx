@@ -18,6 +18,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
+import CaseContextSection from '@/components/CaseContextSection';
 
 interface CaseRow {
   id: string;
@@ -26,6 +27,10 @@ interface CaseRow {
   status: 'open' | 'closed';
   openedAt: string;
   closedAt: string | null;
+  // Flow-mode person context (slice B).
+  contextSituation: string | null;
+  lifeProblemId: string | null;
+  whatMatters: string | null;
 }
 
 interface CaseEntry {
@@ -47,6 +52,16 @@ interface Props {
   onActiveCaseChange: (c: { id: string; caseRef: string } | null) => void;
   /** Bump after each saved entry so the timeline refetches. */
   refreshSignal: number;
+  // Flow mode (slice B): when 'flow', the case carries the person context
+  // (context & situation, P2BS, what matters) via CaseContextSection.
+  systemType: 'transactional' | 'flow';
+  lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
+  onTypesChanged?: () => Promise<void> | void;
+  /** "Capture first, stitch when the number arrives": the id of the last
+   *  saved entry if it has no case yet — renders a one-tap attach chip. */
+  unattachedLastEntryId: string | null;
+  onAttachedLast?: (caseId: string) => void;
 }
 
 const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
@@ -56,7 +71,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -64,6 +79,8 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const [error, setError] = useState('');
   const [caseRow, setCaseRow] = useState<CaseRow | null>(null);
   const [entries, setEntries] = useState<CaseEntry[]>([]);
+  const [wmIds, setWmIds] = useState<string[]>([]);
+  const [attaching, setAttaching] = useState(false);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -71,6 +88,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     const data = await res.json();
     setCaseRow(data);
     setEntries(data.entries || []);
+    setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
   }, [code]);
 
   // Refetch the timeline when the active case changes or an entry was saved.
@@ -103,14 +121,34 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
 
   async function patchCase(body: Record<string, unknown>) {
     if (!caseRow) return;
-    // Optimistic local update; refetch on failure to re-sync.
-    setCaseRow({ ...caseRow, ...body } as CaseRow);
+    // Optimistic local update; refetch on failure to re-sync. The what-matters
+    // set lives in its own state (junction-backed), the rest on caseRow.
+    const { whatMattersTypeIds: nextWmIds, ...rowFields } = body as { whatMattersTypeIds?: string[] } & Record<string, unknown>;
+    if (nextWmIds !== undefined) setWmIds(nextWmIds);
+    if (Object.keys(rowFields).length > 0) setCaseRow({ ...caseRow, ...rowFields } as CaseRow);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseRow.id)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) await loadCase(caseRow.id);
+  }
+
+  // "Capture first, stitch when the number arrives" (slice B3): attach the
+  // last saved un-stitched entry to this case in one tap.
+  async function attachLastEntry() {
+    if (!caseRow || !unattachedLastEntryId || attaching) return;
+    setAttaching(true);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${encodeURIComponent(unattachedLastEntryId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseId: caseRow.id }),
+    });
+    if (res.ok) {
+      onAttachedLast?.(caseRow.id);
+      await loadCase(caseRow.id);
+    }
+    setAttaching(false);
   }
 
   const handlingLabel = (id: string | null) => {
@@ -189,6 +227,36 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           />
         </label>
       </div>
+
+      {/* Flow mode: the person context lives on the case (slice B). */}
+      {systemType === 'flow' && (
+        <CaseContextSection
+          code={code}
+          contextSituation={caseRow.contextSituation}
+          lifeProblemId={caseRow.lifeProblemId}
+          whatMatters={caseRow.whatMatters}
+          whatMattersTypeIds={wmIds}
+          lifeProblems={lifeProblems}
+          whatMattersTypes={whatMattersTypes}
+          onPatch={patchCase}
+          onTypesChanged={onTypesChanged}
+        />
+      )}
+
+      {/* "Capture first, stitch when the number arrives": one-tap attach for
+          the entry saved before this case existed (slice B3). */}
+      {unattachedLastEntryId && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={attachLastEntry}
+            disabled={attaching}
+            className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+          >
+            + {t('capture.caseAttachLast')}
+          </button>
+        </div>
+      )}
 
       {/* Timeline of touches — oldest first. Each touch = one entry with its
           own collector and Capability of Response (sky badge). */}

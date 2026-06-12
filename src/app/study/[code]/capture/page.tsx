@@ -76,6 +76,9 @@ interface StudyData {
   lifeProblemsEnabled: boolean;
   // Case stitching (Skipton slice 1, 2026-06-11).
   caseTrackingEnabled: boolean;
+  // System type (2026-06-11): layout regime. 'flow' = case-first, person
+  // context on the case, lean touches.
+  systemType: 'transactional' | 'flow';
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -103,7 +106,9 @@ export default function CapturePage() {
   const [failureCauseSuggestions, setFailureCauseSuggestions] = useState<string[]>([]);
   const [collectorName, setCollectorName] = useState('');
   const [nameConfirmed, setNameConfirmed] = useState(false);
-  const [lastEntry, setLastEntry] = useState<{ id: string; verbatim: string } | null>(null);
+  // caseId records which case the entry was attached to at save time (null =
+  // un-stitched, eligible for the one-tap attach chip on the case card).
+  const [lastEntry, setLastEntry] = useState<{ id: string; verbatim: string; caseId: string | null } | null>(null);
 
   // Entries list + filter chips
   interface EntryRow {
@@ -528,7 +533,7 @@ export default function CapturePage() {
     const lastVerbatim = isWorkSubmit && validWorkBlocks.length > 0
       ? validWorkBlocks.map((b) => `[${b.tag}] ${b.text}`).join(' · ')
       : verbatim.trim();
-    setLastEntry({ id: saved.id, verbatim: lastVerbatim });
+    setLastEntry({ id: saved.id, verbatim: lastVerbatim, caseId: (body.caseId as string | undefined) ?? null });
     setSuccess(true);
     resetForm();
     // Case stitching: the timeline in CasePanel refetches on this tick.
@@ -680,6 +685,12 @@ export default function CapturePage() {
           activeCaseId={activeCase?.id ?? null}
           onActiveCaseChange={setActiveCase}
           refreshSignal={caseRefreshTick}
+          systemType={study.systemType}
+          lifeProblems={study.lifeProblems}
+          whatMattersTypes={study.whatMattersTypes}
+          onTypesChanged={refreshStudy}
+          unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
+          onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         />
       )}
 
@@ -897,13 +908,17 @@ export default function CapturePage() {
           // skipping classification means the tool assumes value).
           const isFailureDemand = isDemand && classification === 'failure';
           const isValueDemand = isDemand && classification === 'value';
-          const whatMattersVisible = isDemand && (isValueDemand || !study.classificationEnabled);
+          // Flow-based system (slice B): the person context (what matters,
+          // life problem) lives on the CASE, so the per-entry sections hide
+          // and each touch stays lean. Transactional studies are unaffected.
+          const flowMode = study.systemType === 'flow';
+          const whatMattersVisible = !flowMode && isDemand && (isValueDemand || !study.classificationEnabled);
           const hasDemandStrand =
             (study.demandTypesEnabled && isDemand && classification !== 'unknown' && classification !== 'sequence') ||
             (study.workTypesEnabled && !isDemand) ||
             (study.valueLinkingEnabled && isFailureDemand) ||
             (study.whatMattersEnabled && whatMattersVisible) ||
-            (study.lifeProblemsEnabled && isDemand) ||
+            (study.lifeProblemsEnabled && isDemand && !flowMode) ||
             (!study.volumeMode && !isDemand); // Flow — always renders for work
           const hasResponseStrand = !!study.handlingEnabled;
           const hasSystemStrand = scVisible && !!(study.systemConditionsEnabled || study.thinkingsEnabled);
@@ -1037,7 +1052,7 @@ export default function CapturePage() {
         {/* What matters multi-select pills (Value Demand only — per Vanguard Method, What Matters is
             captured against the original Value Demand). Header dropped; leading "+ what matters" pill
             takes its place. Vanguard semantics: value/purpose/what-matters all read green. */}
-        {study.whatMattersEnabled && isDemand && (classification === 'value' || !study.classificationEnabled) && (
+        {study.whatMattersEnabled && whatMattersVisible && (
           <div>
             <div className="flex flex-wrap gap-2 justify-center">
               <button
@@ -1074,7 +1089,7 @@ export default function CapturePage() {
         )}
 
         {/* What matters note — collapsed by default. Auto-opens if the field already has text. (Value Demand only) */}
-        {study.whatMattersEnabled && isDemand && (classification === 'value' || !study.classificationEnabled) && (
+        {study.whatMattersEnabled && whatMattersVisible && (
           (whatMattersNoteOpen || whatMatters.trim()) ? (
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -1106,7 +1121,7 @@ export default function CapturePage() {
             selected life problem renders as a green chip card below, and the
             "+ Life problem to be solved" pill stays as the add trigger above.
             Clearer than showing the selection as the pill text itself. */}
-        {study.lifeProblemsEnabled && isDemand && (
+        {study.lifeProblemsEnabled && isDemand && !flowMode && (
           <div className="space-y-2">
             {/* Selected life problem card */}
             {lifeProblemId && (() => {

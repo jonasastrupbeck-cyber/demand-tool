@@ -86,6 +86,8 @@ interface StudyData {
   lifeProblemsEnabled: boolean;
   // Case stitching (Skipton slice 1, 2026-06-11).
   caseTrackingEnabled: boolean;
+  // System type (2026-06-11): layout regime — transactional vs flow-based.
+  systemType: 'transactional' | 'flow';
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -920,6 +922,37 @@ export default function SettingsPage() {
             </button>
             {purposeSaved && <span className="text-sm text-green-600">{t('settings.saved')}</span>}
           </div>
+        </div>
+
+        {/* System type — the layout regime (2026-06-11). A regime, not a
+            strand toggle, so it lives outside CaptureTogglesPanel. Switching
+            to flow re-applies the additive preset server-side; switching back
+            only changes the layout — nothing is ever turned off. */}
+        <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.systemTypeTitle')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.systemTypeDesc')}</p>
+          <SegmentedToggle
+            ariaLabel={t('settings.systemTypeTitle')}
+            value={study.systemType}
+            onChange={async (next) => {
+              if (next === study.systemType) return;
+              if (next === 'flow' && !window.confirm(t('settings.systemTypeConfirmFlow'))) return;
+              // Optimistic flip; full reload after so the preset toggles the
+              // server flipped on arrive too.
+              setStudy((s) => s ? { ...s, systemType: next as 'transactional' | 'flow' } : s);
+              const res = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ systemType: next }),
+              });
+              if (res.ok) await loadStudy();
+              else setStudy((s) => s ? { ...s, systemType: study.systemType } : s);
+            }}
+            options={[
+              { value: 'transactional', label: t('create.systemTypeTransactional'), activeColor: 'burgundy' },
+              { value: 'flow', label: t('create.systemTypeFlow'), activeColor: 'green' },
+            ]}
+          />
         </div>
 
         {/* What are we capturing? — toggles that replaced layer activation */}

@@ -53,6 +53,17 @@ export const studies = pgTable('studies', {
   // one value demand, letting multiple collectors append entries to the same
   // case across time and handoffs. See docs/ and the Skipton requirements note.
   caseTrackingEnabled: boolean('case_tracking_enabled').notNull().default(false),
+  // System type (2026-06-11): the LAYOUT REGIME, not a strand toggle — follows
+  // the workClassificationMode text-enum precedent. 'transactional' = today's
+  // interface (atomic entries, entry-level person context). 'flow' = case-first:
+  // person context (context & situation, P2BS, what matters) lives on the case
+  // and touches are lean. The 17 strand toggles stay individually tunable in
+  // both regimes; choosing 'flow' applies a one-time ADDITIVE preset and the
+  // server forces caseTrackingEnabled=true (flow is meaningless without cases).
+  systemType: text('system_type')
+    .$type<'transactional' | 'flow'>()
+    .notNull()
+    .default('transactional'),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -176,8 +187,28 @@ export const cases = pgTable('cases', {
   note: text('note'),
   createdByCollector: text('created_by_collector'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  // Flow-mode person context (slice B, 2026-06-11). In a flow-based system the
+  // context belongs to the CASE (per Ali's wireframe: Account Ref / Context &
+  // Situation / P2BS / What Matters), not to each touch. Entry-level fields
+  // stay for transactional studies.
+  contextSituation: text('context_situation'),
+  lifeProblemId: text('life_problem_id').references(() => lifeProblems.id),
+  // Free-text note alongside the caseWhatMatters junction — intentional
+  // duplication mirroring demandEntries.whatMatters vs demandEntryWhatMatters
+  // (categories + a nuance note are different data; don't "clean up").
+  whatMatters: text('what_matters'),
 }, (t) => ({
   uniqStudyCaseRef: unique().on(t.studyId, t.caseRef),
+}));
+
+// Case-level what-matters multi-select (flow mode). Mirrors
+// demandEntryWhatMatters exactly, one level up.
+export const caseWhatMatters = pgTable('case_what_matters', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
+}, (t) => ({
+  uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
 }));
 
 export const demandEntries = pgTable('demand_entries', {
