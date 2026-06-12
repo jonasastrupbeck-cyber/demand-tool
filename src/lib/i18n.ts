@@ -415,11 +415,13 @@ const translations = {
     sv: 'Vad \u00e4r viktigt f\u00f6r kunden? (anteckningar)',
     de: 'Was ist dem Kunden wichtig? (Notizen)',
   },
+  // Canonical Vanguard phrasing (Jonas, 2026-06-12): "What matters to the
+  // customer?" — DA/SV mirror the vault's "vigtigt for kunden" construction.
   'capture.whatMattersPlaceholder': {
-    en: 'What does the customer really care about?',
-    da: 'Hvad er kunden virkelig optaget af?',
-    sv: 'Vad bryr sig kunden verkligen om?',
-    de: 'Was ist dem Kunden wirklich wichtig?',
+    en: 'What matters to the customer?',
+    da: 'Hvad er vigtigt for kunden?',
+    sv: 'Vad är viktigt för kunden?',
+    de: 'Was ist für den Kunden wichtig?',
   },
   'capture.addNote': {
     en: '+ Add note',
