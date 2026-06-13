@@ -50,6 +50,7 @@ export async function GET(
       tag: (r.tag === 'value' ? 'value' : r.tag === 'sequence' ? 'sequence' : 'failure') as 'value' | 'sequence' | 'failure',
       text: r.text,
       workStepTypeId: r.workStepTypeId ?? null,
+      systemConditionId: r.systemConditionId ?? null,
     })),
   });
 }
@@ -135,10 +136,11 @@ export async function PATCH(
     )) {
       return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }) => ({
       tag: b.tag,
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
+      systemConditionId: typeof b.systemConditionId === 'string' ? b.systemConditionId : null,
     }));
   }
 

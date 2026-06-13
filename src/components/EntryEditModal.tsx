@@ -15,11 +15,13 @@ interface PointOfTransaction { id: string; label: string }
 interface WhatMattersType { id: string; label: string }
 interface LifeProblem { id: string; label: string }
 interface WorkType { id: string; label: string }
-interface SystemCondition { id: string; label: string }
+interface SystemCondition { id: string; label: string; operationalDefinition?: string | null }
 interface Thinking { id: string; label: string }
 
 export interface EntryEditModalStudy {
   activeLayer: number;
+  // System type (2026-06-12): drives the flow-work per-block SC picker.
+  systemType?: 'transactional' | 'flow';
   classificationEnabled: boolean;
   handlingEnabled: boolean;
   valueLinkingEnabled: boolean;
@@ -104,7 +106,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null }[]>([]);
   // Case stitching (Skipton slice 1): the case ref this entry belongs to,
   // looked up from caseId for read-only display. Re-assigning is a later slice.
   const [caseRef, setCaseRef] = useState<string | null>(null);
@@ -156,11 +158,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
               freeText: !b.workStepTypeId && !!b.text,
+              systemConditionId: b.systemConditionId ?? null,
             }))
           : []);
         // Auto-open the note disclosure if the field already has content.
@@ -193,7 +196,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       // Strip the UI-only freeText flag before PATCH.
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
-        .map(({ tag, text, workStepTypeId }) => ({ tag, text, workStepTypeId }));
+        .map(({ tag, text, workStepTypeId, systemConditionId }) => ({ tag, text, workStepTypeId, systemConditionId }));
     }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -209,6 +212,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 
   const isDemand = entry?.entryType === 'demand';
+  // Flow-mode work path (2026-06-12): per-block system condition picker.
+  const flowWorkPath = study.systemType === 'flow' && !isDemand;
   const isFailure = entry?.classification === 'failure';
   // System conditions + Thinking are visible on every classified entry.
   // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY
@@ -668,7 +673,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   value={b.tag}
                                   onChange={(v) => {
                                     const tag: 'value' | 'sequence' | 'failure' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : 'failure';
-                                    setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag } : p)));
+                                    setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionId: tag === 'value' ? null : p.systemConditionId } : p)));
                                   }}
                                   ariaLabel={t('capture.workBlocksLabel')}
                                 />
@@ -691,12 +696,27 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               />
                             </>
                           )}
+
+                          {/* Per-block system condition (2026-06-12), flow-work only. */}
+                          {flowWorkPath && study.systemConditionsEnabled && (b.tag === 'sequence' || b.tag === 'failure') && (
+                            <div className={`mt-1 p-2 rounded-md border ${b.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                              <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                              <PillSelect
+                                ariaLabel={t('capture.flowScQuestion')}
+                                placeholder={t('capture.selectSystemCondition')}
+                                value={b.systemConditionId ?? ''}
+                                onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionId: id || null } : p))}
+                                options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
+                                variant="add"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
                     >

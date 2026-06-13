@@ -192,7 +192,12 @@ export default function CapturePage() {
   // `freeText` is a UI-only flag that distinguishes "empty new block (show
   // picker)" from "user chose free-text mode (show textarea)" when the picker
   // is on but no step is picked. Not persisted to the DB.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean }[]>([]);
+  // `systemConditionId` (2026-06-12): per-block system condition, set when the
+  // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null }[]>([]);
+  // Which block's "+ add new system condition" was clicked — the shared inline
+  // adder writes the created SC back into this block (addingType is global).
+  const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
 
   // Inline type creation state
   const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'lifeProblem'|'systemCondition'|'thinking'|'originalValue'|null>(null);
@@ -459,14 +464,25 @@ export default function CapturePage() {
     const validWorkBlocks = workBlocks.filter((b) => b.text.trim().length > 0);
     const hasWorkBlockText = isWorkSubmit && validWorkBlocks.length > 0;
     if (!isVolumeMode && !verbatim.trim() && !hasWorkBlockText) return;
-    if (!effectiveClassification) return;
+    // Flow-mode work path: the classification pills are gone — derive the entry
+    // classification from the block tags (precedence failure > sequence > value)
+    // so the case-timeline dot is meaningful and the submit guard is satisfied.
+    const isFlowWorkSubmit = !!study && study.systemType === 'flow' && isWorkSubmit;
+    let resolvedClassification = effectiveClassification;
+    if (isFlowWorkSubmit) {
+      const tags = validWorkBlocks.map((b) => b.tag);
+      resolvedClassification = tags.includes('failure') ? 'failure'
+        : tags.includes('sequence') ? 'sequence'
+        : 'value';
+    }
+    if (!resolvedClassification) return;
 
     setSubmitting(true);
     setError('');
 
     const body: Record<string, unknown> = {
       verbatim: verbatim.trim() || '',
-      classification: effectiveClassification,
+      classification: resolvedClassification,
       entryType,
       contactMethodId: contactMethodId || undefined,
       pointOfTransactionId: pointOfTransactionId || undefined,
@@ -479,9 +495,9 @@ export default function CapturePage() {
     };
 
     // Work tab: send workBlocks; server auto-populates verbatim from them.
-    // Strip the UI-only `freeText` flag before sending.
+    // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId }) => ({ tag, text, workStepTypeId }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionId }) => ({ tag, text, workStepTypeId, systemConditionId }));
     }
 
     // Handling — only when the toggle is on.
@@ -635,6 +651,10 @@ export default function CapturePage() {
   // renders inside CasePanel, tabs/separators/flow-blocks/full-SC hide, and
   // failure/sequence actions get the lean system-condition question instead.
   const flowMode = study.systemType === 'flow';
+  // Flow-mode "Work we did" path (2026-06-12): captured via the flow-block strip
+  // (tag per block + per-block system condition), NOT the single classification
+  // pills. The entry-level classification is derived from the blocks at submit.
+  const flowWorkPath = flowMode && entryType === 'work';
   const classificationLabel = classification === 'value' ? t('capture.value').toLowerCase() : t('capture.failure').toLowerCase();
   // System conditions + Thinking are visible on every classified entry.
   // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY
@@ -859,7 +879,7 @@ export default function CapturePage() {
             verbatim, so the form would otherwise be unsubmittable). In flow
             mode each action is one step, so verbatim always renders.
             Header removed: the placeholder ("Write the customer's words…") carries the prompt. */}
-        {!study.volumeMode && (isDemand || !study.flowWorkEnabled || flowMode) && (
+        {!study.volumeMode && (isDemand || !study.flowWorkEnabled || flowMode) && !flowWorkPath && (
           <textarea
             aria-label={isDemand ? t('capture.verbatimLabel') : t('capture.workVerbatimLabel')}
             value={verbatim}
@@ -874,7 +894,7 @@ export default function CapturePage() {
 
         {/* Value / Failure / ? toggle — when classification is on. Work adds a Sequence option.
             Header removed: the pills (Value / Sequence / Failure / ?) are self-describing. */}
-        {study.classificationEnabled && (isDemand || study.workClassificationEnabled) && (
+        {study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !flowWorkPath && (
           <div role="radiogroup" aria-label={t('capture.classification')} className="flex flex-wrap gap-2 items-center justify-center">
             <button
                 type="button"
@@ -937,7 +957,7 @@ export default function CapturePage() {
             same entry-level systemConditions state as the full transactional
             block (single-select, dimension 'hinders', attaches to work or
             demand per entry kind). */}
-        {flowMode && study.systemConditionsEnabled && (classification === 'failure' || classification === 'sequence') && (
+        {flowMode && !flowWorkPath && study.systemConditionsEnabled && (classification === 'failure' || classification === 'sequence') && (
           <div className={`p-3 rounded-lg border ${classification === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
             <p className="text-sm font-medium text-gray-800 mb-2 text-center">{t('capture.flowScQuestion')}</p>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -992,7 +1012,7 @@ export default function CapturePage() {
             on every classification click anyway, so it's been removed.
             Three subtle strand separators inside teach the Vanguard frame each capture:
             "Demand"/"Work" → "Response" → "System" (S2 / 2026-04-19). */}
-        {(classification || !study.classificationEnabled) && (() => {
+        {(classification || !study.classificationEnabled || flowWorkPath) && (() => {
           // Strand visibility checks — separator only shows if at least one child renders.
           // When classification is disabled, treat "unclassified" demands as value for the
           // purpose of rendering what-matters (per Vanguard: what matters sits on value demand;
@@ -1070,7 +1090,7 @@ export default function CapturePage() {
         {/* Work type (work only) — moved up, sits under classification row.
             Header dropped; the PillSelect placeholder ("Select work type…")
             is self-explanatory, mirroring the demand-type treatment. */}
-        {study.workTypesEnabled && !isDemand && classification && classification !== 'unknown' && (
+        {study.workTypesEnabled && !isDemand && !flowWorkPath && classification && classification !== 'unknown' && (
           <div>
             <div className="flex gap-2 items-center justify-center">
               <PillSelect
@@ -1293,9 +1313,21 @@ export default function CapturePage() {
             failure-work steps. Opt-in per entry-type via flowDemandEnabled /
             flowWorkEnabled (migration 0014). Verbatim auto-populates as
             `[tag] text\n\n[tag] text` for downstream consumers. */}
-        {!flowMode && !study.volumeMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
+        {!study.volumeMode && ((!flowMode && ((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled))) || flowWorkPath) && (
           <div>
-            {sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
+            {/* sep() returns null in flow mode, so render the "Flow: Capacity =
+                value work + failure work" heading explicitly for the flow-work
+                path (matches EntryEditModal's separator markup). */}
+            {flowWorkPath ? (
+              <div className="flex items-center gap-3 pt-2 pb-0 mb-2">
+                <div className="flex-1 h-px bg-gray-100" />
+                <span className="text-[10px] tracking-widest text-gray-400 font-medium inline-flex items-center gap-1">
+                  {t('capture.strand.flow')}
+                  <InfoPopover label={t('capture.strand.flow')}>{t('capture.workClassificationHelp')}</InfoPopover>
+                </span>
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+            ) : sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
             <div className="overflow-x-auto -mx-1 px-1 pb-2">
               <div className="flex gap-2 items-stretch min-w-min">
                 {workBlocks.map((block, idx) => {
@@ -1405,7 +1437,7 @@ export default function CapturePage() {
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
-                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' } : b))}
+                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionId: v === 'value' ? null : b.systemConditionId } : b))}
                               options={[
                                 { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
                                 { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
@@ -1430,12 +1462,30 @@ export default function CapturePage() {
                           />
                         </>
                       )}
+
+                      {/* Per-block system condition (2026-06-12): for flow-mode
+                          sequence/failure work, ask what's driving THIS block. */}
+                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure') && (
+                        <div className={`mt-1 p-2 rounded-md border ${block.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                          <PillSelect
+                            ariaLabel={t('capture.flowScQuestion')}
+                            placeholder={t('capture.selectSystemCondition')}
+                            value={block.systemConditionId ?? ''}
+                            onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionId: id || null } : b))}
+                            options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
+                            variant="add"
+                            onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                            addNewLabel={t('capture.addNew')}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
                 >
@@ -1443,6 +1493,14 @@ export default function CapturePage() {
                 </button>
               </div>
             </div>
+            {/* Shared inline "create system condition" input for the flow-work
+                blocks. addingType is global, so one input serves all blocks; the
+                new SC lands in the block recorded in scAddTargetBlockIdx. Gated
+                on flowWorkPath so it never duplicates the transactional SC adder. */}
+            {flowWorkPath && renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => {
+              setWorkBlocks((prev) => prev.map((b, i) => i === scAddTargetBlockIdx ? { ...b, systemConditionId: id } : b));
+              setScAddTargetBlockIdx(null);
+            }, { variant: 'sky' })}
           </div>
         )}
 
@@ -1732,7 +1790,7 @@ export default function CapturePage() {
           <div className="max-w-lg mx-auto">
             <button
               type="submit"
-              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification)}
+              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification && !flowWorkPath)}
               className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
@@ -1949,6 +2007,7 @@ export default function CapturePage() {
           entryId={editingEntryId}
           study={{
             activeLayer: study.activeLayer,
+            systemType: study.systemType,
             classificationEnabled: study.classificationEnabled,
             handlingEnabled: study.handlingEnabled,
             valueLinkingEnabled: study.valueLinkingEnabled,
@@ -1970,7 +2029,7 @@ export default function CapturePage() {
             lifeProblems: study.lifeProblems.map(lp => ({ id: lp.id, label: lp.label })),
             workTypes: study.workTypes,
             workStepTypes: study.workStepTypes || [],
-            systemConditions: (study.systemConditions || []).map(s => ({ id: s.id, label: s.label })),
+            systemConditions: (study.systemConditions || []).map(s => ({ id: s.id, label: s.label, operationalDefinition: s.operationalDefinition })),
             thinkings: (study.thinkings || []).map(t => ({ id: t.id, label: t.label })),
           }}
           onClose={() => setEditingEntryId(null)}

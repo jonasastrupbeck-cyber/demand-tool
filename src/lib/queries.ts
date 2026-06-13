@@ -699,7 +699,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
 }, createdAt?: Date) {
@@ -814,6 +814,7 @@ export async function createEntry(studyId: string, data: {
         text: block.text,
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
+        systemConditionId: block.systemConditionId ?? null,
       });
     }
   }
@@ -1107,7 +1108,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
 }) {
@@ -1213,6 +1214,7 @@ export async function updateEntry(entryId: string, data: {
         text: block.text,
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
+        systemConditionId: block.systemConditionId ?? null,
       });
     }
   }

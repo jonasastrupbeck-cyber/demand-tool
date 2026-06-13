@@ -355,4 +355,10 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // ON DELETE SET NULL means deleting a step reverts the block to free-text
   // (text + tag are preserved, no data loss).
   workStepTypeId: text('work_step_type_id').references(() => workStepTypes.id, { onDelete: 'set null' }),
+  // Per-block system condition (2026-06-12): in flow mode each failure/sequence
+  // work block asks "which system condition is driving this?" — anchored to the
+  // block, not the entry. One SC per block; nullable (value blocks + all older
+  // rows have none). SET NULL mirrors workStepTypeId: deleting an SC keeps the
+  // block's tag/text.
+  systemConditionId: text('system_condition_id').references(() => systemConditions.id, { onDelete: 'set null' }),
 });
