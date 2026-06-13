@@ -24,12 +24,17 @@ interface Props {
   whatMattersTypeIds: string[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
+  // Value demand (2026-06-12): in flow mode the demand the customer places on
+  // the system lives here, right below the life problem it flows from — the
+  // Vanguard causal order (life problem → value demand). Patched on the case.
+  demandTypeId: string | null;
+  valueDemandTypes: { id: string; label: string; operationalDefinition: string | null }[];
   onPatch: (body: Record<string, unknown>) => void;
   /** Refresh study taxonomies after an inline add. */
   onTypesChanged?: () => Promise<void> | void;
 }
 
-export default function CaseContextSection({ code, contextSituation, lifeProblemId, whatMatters, whatMattersTypeIds, lifeProblems, whatMattersTypes, onPatch, onTypesChanged }: Props) {
+export default function CaseContextSection({ code, contextSituation, lifeProblemId, whatMatters, whatMattersTypeIds, lifeProblems, whatMattersTypes, demandTypeId, valueDemandTypes, onPatch, onTypesChanged }: Props) {
   const { t, tl } = useLocale();
 
   // Local draft for the free-text fields; saved on blur. Re-sync when another
@@ -51,23 +56,10 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
 
   return (
     <div className="mt-2 space-y-2">
-      {/* Context & situation — free text, the person's circumstances. */}
-      <textarea
-        value={contextDraft}
-        onChange={(e) => setContextDraft(e.target.value)}
-        onBlur={() => {
-          if (contextDraft.trim() !== (contextSituation ?? '').trim()) {
-            onPatch({ contextSituation: contextDraft.trim() || null });
-          }
-        }}
-        placeholder={t('capture.caseContextPlaceholder')}
-        aria-label={t('capture.caseContextPlaceholder')}
-        rows={2}
-        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
-      />
-
-      {/* P2BS — the life problem the case exists to solve. Green strand;
-          reuses the canonical lifeProblem copy. */}
+      {/* P2BS — the life problem the case exists to solve, the ROOT need.
+          On top: the customer has a life problem ("buy a house for my
+          family") and BECAUSE of it places a value demand on the system.
+          Green strand; reuses the canonical lifeProblem copy. */}
       <div className="flex flex-wrap items-center justify-center gap-2">
         <PillSelect
           ariaLabel={t('capture.lifeProblemLabel')}
@@ -86,6 +78,37 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           inputVariant="green"
         />
       </div>
+
+      {/* Value demand — what the customer places on the system BECAUSE of the
+          life problem above. Sits directly beneath it (Vanguard causal order:
+          life problem → value demand). */}
+      {valueDemandTypes.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <PillSelect
+            ariaLabel={t('capture.caseDemandTypePlaceholder')}
+            placeholder={t('capture.caseDemandTypePlaceholder')}
+            value={demandTypeId || ''}
+            onChange={(id) => onPatch({ demandTypeId: id || null })}
+            options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
+            variant={demandTypeId ? 'value' : 'valueLight'}
+          />
+        </div>
+      )}
+
+      {/* Context & situation — free text, the person's circumstances. */}
+      <textarea
+        value={contextDraft}
+        onChange={(e) => setContextDraft(e.target.value)}
+        onBlur={() => {
+          if (contextDraft.trim() !== (contextSituation ?? '').trim()) {
+            onPatch({ contextSituation: contextDraft.trim() || null });
+          }
+        }}
+        placeholder={t('capture.caseContextPlaceholder')}
+        aria-label={t('capture.caseContextPlaceholder')}
+        rows={2}
+        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+      />
 
       {/* What matters — green chip multi-select + optional nuance note. */}
       {(whatMattersTypes.length > 0 || whatMattersTypeIds.length > 0) && (

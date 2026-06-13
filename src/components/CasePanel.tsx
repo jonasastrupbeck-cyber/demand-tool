@@ -224,7 +224,10 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         }`}>
           {isOpen ? t('capture.caseStatusOpen') : t('capture.caseStatusClosed')}
         </span>
-        {valueDemandTypes.length > 0 && (
+        {/* Transactional case: the value demand stays in the header (no life
+            problem to anchor it to). Flow mode renders it inside
+            CaseContextSection, directly under the life problem. */}
+        {!isFlow && valueDemandTypes.length > 0 && (
           <PillSelect
             ariaLabel={t('capture.caseDemandTypePlaceholder')}
             placeholder={t('capture.caseDemandTypePlaceholder')}
@@ -260,6 +263,8 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           whatMattersTypeIds={wmIds}
           lifeProblems={lifeProblems}
           whatMattersTypes={whatMattersTypes}
+          demandTypeId={caseRow.demandTypeId}
+          valueDemandTypes={valueDemandTypes}
           onPatch={patchCase}
           onTypesChanged={onTypesChanged}
         />
