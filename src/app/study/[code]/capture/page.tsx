@@ -1328,8 +1328,12 @@ export default function CapturePage() {
                 <div className="flex-1 h-px bg-gray-100" />
               </div>
             ) : sep(t('capture.strand.flow'), t('capture.workClassificationHelp'))}
-            <div className="overflow-x-auto -mx-1 px-1 pb-2">
-              <div className="flex gap-2 items-stretch min-w-min">
+            {/* Flow mode stacks blocks vertically (full-width) so each card —
+                and its per-block system-condition picker/dropdown — can expand
+                downward without the overflow-x-auto strip clipping it. Non-flow
+                studies keep the horizontal scrolling strip. */}
+            <div className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
+              <div className={flowWorkPath ? 'space-y-2' : 'flex gap-2 items-stretch min-w-min'}>
                 {workBlocks.map((block, idx) => {
                   // Phase 4 (2026-04-16): three render modes per block
                   //   A) Picker mode — toggle ON, no step picked, rendering a step dropdown
@@ -1349,7 +1353,7 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}>
+                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1487,9 +1491,9 @@ export default function CapturePage() {
                   type="button"
                   onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
-                  className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
+                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center ${flowWorkPath ? 'w-full py-2 gap-1 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                 >
-                  +
+                  {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                 </button>
               </div>
             </div>

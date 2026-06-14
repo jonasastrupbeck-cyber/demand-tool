@@ -581,8 +581,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                   </span>
                   <div className="flex-1 h-px bg-gray-100" />
                 </div>
-                <div className="overflow-x-auto -mx-1 px-1 pb-2">
-                  <div className="flex gap-2 items-stretch min-w-min">
+                {/* Flow mode stacks blocks vertically (full-width) so the
+                    per-block SC picker can expand below without clipping. */}
+                <div className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
+                  <div className={flowWorkPath ? 'space-y-2' : 'flex gap-2 items-stretch min-w-min'}>
                     {workBlocks.map((b, idx) => {
                       // Phase 4 — same three-mode decision as in capture/page.tsx.
                       const pickerOn = study.workStepTypesEnabled && (study.workStepTypes || []).length > 0;
@@ -594,7 +596,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       return (
-                        <div key={idx} className={`flex-none p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}>
+                        <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
                               <span className={`flex-1 min-w-0 px-2 py-1 rounded text-xs font-medium whitespace-normal break-words leading-snug ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>
@@ -718,9 +720,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       type="button"
                       onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
-                      className="flex-none w-16 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center text-2xl"
+                      className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >
-                      +
+                      {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                     </button>
                   </div>
                 </div>
