@@ -704,7 +704,7 @@ export default function CapturePage() {
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
           Rendered as PillSelects (custom dropdown with nicer visuals than a native <select>). */}
-      {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0 || (study.workSourcesEnabled && entryType === 'work')) && (
+      {(study.pointsOfTransaction.length > 0 || (study.contactMethods.length > 0 && !flowMode) || (study.workSourcesEnabled && entryType === 'work')) && (
         <div className="mb-4 flex flex-wrap gap-2 justify-center">
           {study.pointsOfTransaction.length > 0 && (
             <PillSelect
@@ -731,7 +731,8 @@ export default function CapturePage() {
               options={(study.workSources || []).map((ws) => ({ id: ws.id, label: tl(ws.label) }))}
             />
           )}
-          {study.contactMethods.length > 0 && (
+          {/* Contact method — hidden in flow mode (not captured there). */}
+          {study.contactMethods.length > 0 && !flowMode && (
             <PillSelect
               ariaLabel={t('capture.sessionContactMethodLabel')}
               placeholder={t('capture.selectContactMethod')}

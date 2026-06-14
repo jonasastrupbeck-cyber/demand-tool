@@ -214,142 +214,173 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const isOpen = caseRow.status === 'open';
   const isFlow = systemType === 'flow';
 
+  // Shared sub-blocks — composed differently in flow vs transactional layouts.
+  const headerRow = (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <span className="font-semibold text-gray-900 text-sm">#{caseRow.caseRef}</span>
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
+        isOpen ? 'border-green-300 bg-green-50 text-green-700' : 'bg-gray-200 border-gray-300 text-gray-600'
+      }`}>
+        {isOpen ? t('capture.caseStatusOpen') : t('capture.caseStatusClosed')}
+      </span>
+      {/* Transactional case: the value demand stays in the header (no life
+          problem to anchor it to). Flow mode renders it inside
+          CaseContextSection, directly under the life problem. */}
+      {!isFlow && valueDemandTypes.length > 0 && (
+        <PillSelect
+          ariaLabel={t('capture.caseDemandTypePlaceholder')}
+          placeholder={t('capture.caseDemandTypePlaceholder')}
+          value={caseRow.demandTypeId || ''}
+          onChange={(id) => patchCase({ demandTypeId: id || null })}
+          options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
+          variant={caseRow.demandTypeId ? 'value' : 'valueLight'}
+        />
+      )}
+      <label className="flex items-center gap-1 text-xs text-gray-500">
+        {t('capture.caseOpenedAt')}
+        <input
+          type="date"
+          value={caseRow.openedAt ? caseRow.openedAt.slice(0, 10) : ''}
+          onChange={(e) => {
+            if (!e.target.value) return;
+            // Keep the original time-of-day; only the date is edited here.
+            const time = caseRow.openedAt ? caseRow.openedAt.slice(10) : 'T09:00:00.000Z';
+            patchCase({ openedAt: `${e.target.value}${time}` });
+          }}
+          className="px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+        />
+      </label>
+    </div>
+  );
+
+  const attachLastChip = unattachedLastEntryId ? (
+    <div className="mt-2 flex justify-center">
+      <button
+        type="button"
+        onClick={attachLastEntry}
+        disabled={attaching}
+        className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+      >
+        + {t('capture.caseAttachLast')}
+      </button>
+    </div>
+  ) : null;
+
+  // Timeline of touches — oldest first. Each touch = one entry with its own
+  // collector and Capability of Response (sky badge).
+  const timelineList = entries.length === 0 ? (
+    <p className="text-xs text-gray-400 text-center py-1">{t('capture.caseTimelineEmpty')}</p>
+  ) : (
+    <ul className="space-y-1">
+      {entries.map((e) => (
+        <li key={e.id} className="flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-200 px-2 py-1.5">
+          <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
+          <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+          {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
+          <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
+          {handlingLabel(e.handlingTypeId) && (
+            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
+              {handlingLabel(e.handlingTypeId)}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+
+  const caseFooter = (
+    <div className="mt-2 flex items-center justify-between gap-2">
+      <p className="text-xs text-gray-400">{t('capture.caseAttachNote')}</p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => patchCase({ status: isOpen ? 'closed' : 'open' })}
+          className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+        >
+          {isOpen ? t('capture.caseCloseBtn') : t('capture.caseReopenBtn')}
+        </button>
+        <button
+          type="button"
+          onClick={() => onActiveCaseChange(null)}
+          className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+        >
+          {t('capture.caseSetAside')}
+        </button>
+      </div>
+    </div>
+  );
+
+  // Flow mode (2026-06-14): three legible zones so it's clear what's "already
+  // there" (the case) vs "what I'm adding" (the composer):
+  //   1. tinted case-state panel (constant — attached to the value demand & problem)
+  //   2. previous touches (history)
+  //   3. white "What's happening now?" composer card (the add zone)
+  if (isFlow) {
+    return (
+      <>
+        <div className="mb-3 rounded-xl border border-green-100 bg-green-50/40 p-3">
+          {headerRow}
+          <CaseContextSection
+            code={code}
+            contextSituation={caseRow.contextSituation}
+            lifeProblemId={caseRow.lifeProblemId}
+            whatMatters={caseRow.whatMatters}
+            whatMattersTypeIds={wmIds}
+            lifeProblems={lifeProblems}
+            whatMattersTypes={whatMattersTypes}
+            demandTypeId={caseRow.demandTypeId}
+            valueDemandTypes={valueDemandTypes}
+            onPatch={patchCase}
+            onTypesChanged={onTypesChanged}
+          />
+          {decisionPointsEnabled && (
+            <CaseDecisionPoints
+              code={code}
+              caseId={caseRow.id}
+              decisionPointTypes={decisionPointTypes}
+              decisions={decisions}
+              collectorName={collectorName}
+              onChanged={() => loadCase(caseRow.id)}
+            />
+          )}
+          {attachLastChip}
+        </div>
+
+        {/* Previous touches — the history of the flow. */}
+        <div className="mb-3">
+          {entries.length > 0 && (
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1 px-1">
+              {t('capture.casePreviousTouches')}
+            </p>
+          )}
+          {timelineList}
+        </div>
+
+        {/* The add zone — visually distinct white card so it's clear this is
+            where you add the next touch. */}
+        {children && (
+          <div className="mb-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
+            {children}
+          </div>
+        )}
+
+        {caseFooter}
+      </>
+    );
+  }
+
+  // Transactional case (case tracking on, not flow): single card, composer
+  // renders below — unchanged from before.
   return (
     <>
     <div className="mb-4 rounded-xl border border-gray-300 bg-gray-50 p-3">
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <span className="font-semibold text-gray-900 text-sm">#{caseRow.caseRef}</span>
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
-          isOpen ? 'border-green-300 bg-green-50 text-green-700' : 'bg-gray-200 border-gray-300 text-gray-600'
-        }`}>
-          {isOpen ? t('capture.caseStatusOpen') : t('capture.caseStatusClosed')}
-        </span>
-        {/* Transactional case: the value demand stays in the header (no life
-            problem to anchor it to). Flow mode renders it inside
-            CaseContextSection, directly under the life problem. */}
-        {!isFlow && valueDemandTypes.length > 0 && (
-          <PillSelect
-            ariaLabel={t('capture.caseDemandTypePlaceholder')}
-            placeholder={t('capture.caseDemandTypePlaceholder')}
-            value={caseRow.demandTypeId || ''}
-            onChange={(id) => patchCase({ demandTypeId: id || null })}
-            options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
-            variant={caseRow.demandTypeId ? 'value' : 'valueLight'}
-          />
-        )}
-        <label className="flex items-center gap-1 text-xs text-gray-500">
-          {t('capture.caseOpenedAt')}
-          <input
-            type="date"
-            value={caseRow.openedAt ? caseRow.openedAt.slice(0, 10) : ''}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              // Keep the original time-of-day; only the date is edited here.
-              const time = caseRow.openedAt ? caseRow.openedAt.slice(10) : 'T09:00:00.000Z';
-              patchCase({ openedAt: `${e.target.value}${time}` });
-            }}
-            className="px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
-          />
-        </label>
-      </div>
-
-      {/* Flow mode: the person context lives on the case (slice B). */}
-      {systemType === 'flow' && (
-        <CaseContextSection
-          code={code}
-          contextSituation={caseRow.contextSituation}
-          lifeProblemId={caseRow.lifeProblemId}
-          whatMatters={caseRow.whatMatters}
-          whatMattersTypeIds={wmIds}
-          lifeProblems={lifeProblems}
-          whatMattersTypes={whatMattersTypes}
-          demandTypeId={caseRow.demandTypeId}
-          valueDemandTypes={valueDemandTypes}
-          onPatch={patchCase}
-          onTypesChanged={onTypesChanged}
-        />
-      )}
-
-      {/* Decision points — the dotted box (Skipton, 2026-06-12). Flow only. */}
-      {isFlow && decisionPointsEnabled && (
-        <CaseDecisionPoints
-          code={code}
-          caseId={caseRow.id}
-          decisionPointTypes={decisionPointTypes}
-          decisions={decisions}
-          collectorName={collectorName}
-          onChanged={() => loadCase(caseRow.id)}
-        />
-      )}
-
-      {/* "Capture first, stitch when the number arrives": one-tap attach for
-          the entry saved before this case existed (slice B3). */}
-      {unattachedLastEntryId && (
-        <div className="mt-2 flex justify-center">
-          <button
-            type="button"
-            onClick={attachLastEntry}
-            disabled={attaching}
-            className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
-          >
-            + {t('capture.caseAttachLast')}
-          </button>
-        </div>
-      )}
-
-      {/* Timeline of touches — oldest first. Each touch = one entry with its
-          own collector and Capability of Response (sky badge). */}
-      <div className="mt-2">
-        {entries.length === 0 ? (
-          <p className="text-xs text-gray-400 text-center py-1">{t('capture.caseTimelineEmpty')}</p>
-        ) : (
-          <ul className="space-y-1">
-            {entries.map((e) => (
-              <li key={e.id} className="flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-200 px-2 py-1.5">
-                <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
-                <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
-                {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
-                <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
-                {handlingLabel(e.handlingTypeId) && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
-                    {handlingLabel(e.handlingTypeId)}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Flow mode: the composer (next action) lives INSIDE the case object,
-          after the timeline — actions fold in one by one until close. */}
-      {isFlow && children && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
-          {children}
-        </div>
-      )}
-
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="text-xs text-gray-400">{t('capture.caseAttachNote')}</p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => patchCase({ status: isOpen ? 'closed' : 'open' })}
-            className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
-          >
-            {isOpen ? t('capture.caseCloseBtn') : t('capture.caseReopenBtn')}
-          </button>
-          <button
-            type="button"
-            onClick={() => onActiveCaseChange(null)}
-            className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
-          >
-            {t('capture.caseSetAside')}
-          </button>
-        </div>
-      </div>
+      {headerRow}
+      {attachLastChip}
+      <div className="mt-2">{timelineList}</div>
+      {caseFooter}
     </div>
-    {!isFlow && children}
+    {children}
     </>
   );
 }

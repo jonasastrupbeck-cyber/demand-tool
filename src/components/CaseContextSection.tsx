@@ -136,7 +136,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
               className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                 on
                   ? 'bg-green-600 text-white border-green-600'
-                  : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                  : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
               }`}
             >
               {tl(wm.label)}

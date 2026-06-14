@@ -2508,6 +2508,19 @@ const translations = {
     sv: 'Koppla senaste registreringen till detta ärende',
     de: 'Letzten Eintrag diesem Fall zuordnen',
   },
+  // Flow case zones (2026-06-14): label the history vs the "add" composer.
+  'capture.casePreviousTouches': {
+    en: 'Previous touches',
+    da: 'Tidligere berøringer',
+    sv: 'Tidigare kontakter',
+    de: 'Frühere Kontakte',
+  },
+  'capture.caseComposerHeading': {
+    en: "What's happening now?",
+    da: 'Hvad sker der nu?',
+    sv: 'Vad händer nu?',
+    de: 'Was passiert jetzt?',
+  },
   'capture.toggles.sequenceWork': {
     en: 'Capture sequence work',
     da: 'Registrer sekvensarbejde',
