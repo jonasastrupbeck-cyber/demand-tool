@@ -2521,6 +2521,18 @@ const translations = {
     sv: 'Vad händer nu?',
     de: 'Was passiert jetzt?',
   },
+  'capture.caseShowEarlierTouches': {
+    en: 'Show {count} earlier',
+    da: 'Vis {count} tidligere',
+    sv: 'Visa {count} tidigare',
+    de: '{count} frühere anzeigen',
+  },
+  'capture.caseShowLess': {
+    en: 'Show less',
+    da: 'Vis mindre',
+    sv: 'Visa mindre',
+    de: 'Weniger anzeigen',
+  },
   'capture.toggles.sequenceWork': {
     en: 'Capture sequence work',
     da: 'Registrer sekvensarbejde',

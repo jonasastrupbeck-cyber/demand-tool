@@ -66,6 +66,8 @@ interface Props {
   // Decision points (Skipton dotted box, 2026-06-12). Empty array hides the box.
   decisionPointsEnabled: boolean;
   decisionPointTypes: DecisionPointType[];
+  /** Tap a previous touch to open its full detail/edit window (2026-06-14). */
+  onOpenEntry?: (id: string) => void;
   /** When false, CasePanel is a pure passthrough rendering only children —
    *  lets the capture page wrap the composer unconditionally. */
   enabled: boolean;
@@ -82,7 +84,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, enabled, children }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -93,6 +95,8 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const [wmIds, setWmIds] = useState<string[]>([]);
   const [decisions, setDecisions] = useState<CaseDecision[]>([]);
   const [attaching, setAttaching] = useState(false);
+  // Previous touches collapse to the latest by default; expand reveals history.
+  const [touchesExpanded, setTouchesExpanded] = useState(false);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -267,25 +271,50 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   ) : null;
 
   // Timeline of touches — oldest first. Each touch = one entry with its own
-  // collector and Capability of Response (sky badge).
+  // collector and Capability of Response (sky badge). Tapping a touch opens
+  // its full detail/edit window via onOpenEntry.
+  const renderTouch = (e: CaseEntry) => (
+    <button
+      key={e.id}
+      type="button"
+      onClick={() => onOpenEntry?.(e.id)}
+      className="w-full flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-200 px-2 py-1.5 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
+    >
+      <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
+      <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+      {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
+      <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
+      {handlingLabel(e.handlingTypeId) && (
+        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
+          {handlingLabel(e.handlingTypeId)}
+        </span>
+      )}
+    </button>
+  );
+
+  // Collapsed: only the latest touch + a "Show N earlier" control. Expanded:
+  // earlier touches (oldest→latest) revealed above the latest, which stays
+  // pinned at the bottom (nearest the composer) — no jump.
+  const earlierTouches = entries.slice(0, -1);
+  const latestTouch = entries.length > 0 ? entries[entries.length - 1] : null;
   const timelineList = entries.length === 0 ? (
     <p className="text-xs text-gray-400 text-center py-1">{t('capture.caseTimelineEmpty')}</p>
   ) : (
-    <ul className="space-y-1">
-      {entries.map((e) => (
-        <li key={e.id} className="flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-200 px-2 py-1.5">
-          <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
-          <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
-          {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
-          <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
-          {handlingLabel(e.handlingTypeId) && (
-            <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">
-              {handlingLabel(e.handlingTypeId)}
-            </span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-1">
+      {earlierTouches.length > 0 && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setTouchesExpanded((v) => !v)}
+            className="text-[11px] text-gray-500 hover:text-gray-700 font-medium"
+          >
+            {touchesExpanded ? `⌃ ${t('capture.caseShowLess')}` : `⌄ ${t('capture.caseShowEarlierTouches', { count: String(earlierTouches.length) })}`}
+          </button>
+        </div>
+      )}
+      {touchesExpanded && earlierTouches.map(renderTouch)}
+      {latestTouch && renderTouch(latestTouch)}
+    </div>
   );
 
   const caseFooter = (
@@ -318,7 +347,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   if (isFlow) {
     return (
       <>
-        <div className="mb-3 rounded-xl border border-green-100 bg-green-50/40 p-3">
+        <div className="mb-3 rounded-xl border border-green-200 bg-green-100/50 p-3">
           {headerRow}
           <CaseContextSection
             code={code}

@@ -766,6 +766,7 @@ export default function CapturePage() {
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
         decisionPointTypes={study.decisionPointTypes}
+        onOpenEntry={(id) => setEditingEntryId(id)}
       >
 
       {/* Demand / Work tabs — shown when work tracking is on, OR when the user has
@@ -2042,7 +2043,7 @@ export default function CapturePage() {
             thinkings: (study.thinkings || []).map(t => ({ id: t.id, label: t.label })),
           }}
           onClose={() => setEditingEntryId(null)}
-          onSaved={() => { loadTodayCount(); loadPendingCounts(); }}
+          onSaved={() => { loadTodayCount(); loadPendingCounts(); setCaseRefreshTick((n) => n + 1); }}
           onStudyRefresh={refreshStudy}
         />
       )}
