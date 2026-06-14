@@ -97,6 +97,14 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const [attaching, setAttaching] = useState(false);
   // Previous touches collapse to the latest by default; expand reveals history.
   const [touchesExpanded, setTouchesExpanded] = useState(false);
+  // Flow entry fork (2026-06-14): null = show the two cards; then 'new' or
+  // 'existing' reveals the reference input. The composer stays hidden until a
+  // customer is open. caseList backs both the recent-open chips and the
+  // new-vs-existing enforcement check.
+  const isFlow = systemType === 'flow';
+  const [chooserMode, setChooserMode] = useState<'new' | 'existing' | null>(null);
+  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string }[]>([]);
+  const [notice, setNotice] = useState<{ kind: 'exists' | 'notfound'; ref: string } | null>(null);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -115,8 +123,23 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     loadCase(activeCaseId);
   }, [activeCaseId, refreshSignal, loadCase]);
 
-  async function openCase() {
-    const ref = refInput.trim();
+  // Flow chooser: load the customer (case) list so the chooser can show recent
+  // open customers and enforce new-vs-existing. Reuses the existing list route.
+  const loadCaseList = useCallback(async () => {
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setCaseList(Array.isArray(data) ? data : []);
+  }, [code]);
+
+  useEffect(() => {
+    if (!enabled || systemType !== 'flow' || activeCaseId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCaseList();
+  }, [enabled, systemType, activeCaseId, refreshSignal, loadCaseList]);
+
+  async function openCase(refArg?: string) {
+    const ref = (refArg ?? refInput).trim();
     if (!ref || opening) return;
     setOpening(true);
     setError('');
@@ -129,11 +152,27 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       if (!res.ok) { setError(t('capture.caseNotFound')); setOpening(false); return; }
       const data: CaseRow = await res.json();
       setRefInput('');
+      // Reset the chooser so a later "set aside" returns to the two cards.
+      setChooserMode(null);
+      setNotice(null);
       onActiveCaseChange({ id: data.id, caseRef: data.caseRef });
     } catch {
       setError(t('capture.caseNotFound'));
     }
     setOpening(false);
+  }
+
+  // Flow chooser submit: enforce the new-vs-existing distinction against the
+  // loaded list. A wrong-side reference shows an inline notice with a one-tap
+  // switch to the other path; the action button then opens regardless.
+  function attemptOpen() {
+    const ref = refInput.trim();
+    if (!ref) return;
+    const exists = caseList.some((c) => c.caseRef === ref);
+    if (chooserMode === 'new' && exists) { setNotice({ kind: 'exists', ref }); return; }
+    if (chooserMode === 'existing' && !exists) { setNotice({ kind: 'notfound', ref }); return; }
+    setNotice(null);
+    openCase(ref);
   }
 
   async function patchCase(body: Record<string, unknown>) {
@@ -178,7 +217,118 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // toggle see exactly the old page).
   if (!enabled) return <>{children}</>;
 
-  // --- Closed state: ref input, composer below (capture first, stitch later) ---
+  // --- Flow closed state: the entry fork (new vs existing customer). The
+  //     composer (children) stays hidden until a customer is open. ---
+  if (isFlow && (!activeCaseId || !caseRow)) {
+    const recentOpen = caseList
+      .filter((c) => c.status === 'open')
+      .sort((a, b) => (b.openedAt || '').localeCompare(a.openedAt || ''))
+      .slice(0, 5);
+    return (
+      <div className="mb-4">
+        {chooserMode === null ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700 text-center mb-1">{t('capture.customerChooseHeading')}</p>
+            <button
+              type="button"
+              onClick={() => { setChooserMode('new'); setRefInput(''); setNotice(null); setError(''); }}
+              className="w-full rounded-xl border border-green-200 bg-green-50 hover:bg-green-100 p-4 text-left transition-colors"
+            >
+              <span className="block text-sm font-semibold text-gray-900">{t('capture.customerChooseNew')}</span>
+              <span className="block text-xs text-gray-500 mt-1">{t('capture.customerChooseNewDesc')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setChooserMode('existing'); setRefInput(''); setNotice(null); setError(''); loadCaseList(); }}
+              className="w-full rounded-xl border border-gray-200 bg-white hover:bg-gray-50 p-4 text-left transition-colors"
+            >
+              <span className="block text-sm font-semibold text-gray-900">{t('capture.customerChooseExisting')}</span>
+              <span className="block text-xs text-gray-500 mt-1">{t('capture.customerChooseExistingDesc')}</span>
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-900">
+                {chooserMode === 'new' ? t('capture.customerChooseNew') : t('capture.customerChooseExisting')}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setChooserMode(null); setRefInput(''); setNotice(null); setError(''); }}
+                className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+              >
+                {t('capture.customerChooserBack')}
+              </button>
+            </div>
+
+            {chooserMode === 'existing' && recentOpen.length > 0 && (
+              <div className="mb-2">
+                <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1">{t('capture.customerRecentOpen')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentOpen.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => openCase(c.caseRef)}
+                      className="text-xs px-2.5 py-1 rounded-full border border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors tabular-nums"
+                    >
+                      #{c.caseRef}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center justify-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={refInput}
+                onChange={(e) => { setRefInput(e.target.value); setNotice(null); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); attemptOpen(); } }}
+                placeholder={t('capture.customerRefPlaceholder')}
+                aria-label={t('capture.customerRefPlaceholder')}
+                className="w-56 px-3 py-1.5 rounded-full text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none text-center"
+              />
+              <button
+                type="button"
+                onClick={attemptOpen}
+                disabled={!refInput.trim() || opening}
+                className="px-3 py-1.5 rounded-full text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                {t('capture.customerOpenBtn')}
+              </button>
+              <InfoPopover label={t('capture.customerRefHelp')}>
+                {t('capture.customerRefHelp')}
+              </InfoPopover>
+            </div>
+
+            {notice && (
+              <div className="mt-2 flex flex-col items-center gap-1">
+                <p className="text-xs text-gray-600 text-center">
+                  {notice.kind === 'exists'
+                    ? t('capture.customerExistsNotice', { ref: notice.ref })
+                    : t('capture.customerNotFoundNotice', { ref: notice.ref })}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openCase(notice.ref)}
+                  className="text-xs px-3 py-1.5 rounded-full font-medium border border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                  {notice.kind === 'exists' ? t('capture.customerAddInstead') : t('capture.customerOpenAsNew')}
+                </button>
+              </div>
+            )}
+
+            {error && <p className="mt-1 text-xs text-red-600 text-center">{error}</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Transactional closed state: ref input, composer below (capture first,
+  //     stitch later). Unchanged. ---
   if (!activeCaseId || !caseRow) {
     return (
       <>
@@ -196,7 +346,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           />
           <button
             type="button"
-            onClick={openCase}
+            onClick={() => openCase()}
             disabled={!refInput.trim() || opening}
             className="px-3 py-1.5 rounded-full text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50 transition-colors"
           >
@@ -216,7 +366,6 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // --- Open state: case card with timeline ---
   const valueDemandTypes = demandTypes.filter((d) => d.category === 'value');
   const isOpen = caseRow.status === 'open';
-  const isFlow = systemType === 'flow';
 
   // Shared sub-blocks — composed differently in flow vs transactional layouts.
   const headerRow = (
@@ -265,7 +414,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         disabled={attaching}
         className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-100 disabled:opacity-50 transition-colors"
       >
-        + {t('capture.caseAttachLast')}
+        + {t(isFlow ? 'capture.customerAttachLast' : 'capture.caseAttachLast')}
       </button>
     </div>
   ) : null;
@@ -319,14 +468,14 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
 
   const caseFooter = (
     <div className="mt-2 flex items-center justify-between gap-2">
-      <p className="text-xs text-gray-400">{t('capture.caseAttachNote')}</p>
+      <p className="text-xs text-gray-400">{t(isFlow ? 'capture.customerAttachNote' : 'capture.caseAttachNote')}</p>
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => patchCase({ status: isOpen ? 'closed' : 'open' })}
           className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
         >
-          {isOpen ? t('capture.caseCloseBtn') : t('capture.caseReopenBtn')}
+          {isOpen ? t(isFlow ? 'capture.customerCloseBtn' : 'capture.caseCloseBtn') : t('capture.caseReopenBtn')}
         </button>
         <button
           type="button"

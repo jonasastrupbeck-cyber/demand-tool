@@ -88,8 +88,8 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
       {valueDemandTypes.length > 0 && (
         <div className="flex flex-wrap items-center justify-center gap-2">
           <PillSelect
-            ariaLabel={t('capture.caseDemandTypePlaceholder')}
-            placeholder={t('capture.caseDemandTypePlaceholder')}
+            ariaLabel={t('capture.customerDemandTypePlaceholder')}
+            placeholder={t('capture.customerDemandTypePlaceholder')}
             value={demandTypeId || ''}
             onChange={(id) => onPatch({ demandTypeId: id || null })}
             options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}

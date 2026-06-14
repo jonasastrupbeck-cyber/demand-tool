@@ -2533,6 +2533,122 @@ const translations = {
     sv: 'Visa mindre',
     de: 'Weniger anzeigen',
   },
+  // Flow-mode customer chooser (2026-06-14): the first decision on a flow study
+  // is "open a new customer" vs "add to an existing customer". User-facing copy
+  // says "customer" (the internal data model stays "case"). Flow-only — the
+  // transactional case* strings above are unchanged.
+  'capture.customerChooseHeading': {
+    en: 'What would you like to do?',
+    da: 'Hvad vil du gøre?',
+    sv: 'Vad vill du göra?',
+    de: 'Was möchten Sie tun?',
+  },
+  'capture.customerChooseNew': {
+    en: 'Open a new customer',
+    da: 'Åbn en ny kunde',
+    sv: 'Öppna en ny kund',
+    de: 'Neuen Kunden öffnen',
+  },
+  'capture.customerChooseNewDesc': {
+    en: 'Start a new customer. Pick a reference number from your own system.',
+    da: 'Start en ny kunde. Vælg et referencenummer fra dit eget system.',
+    sv: 'Starta en ny kund. Välj ett referensnummer från ditt eget system.',
+    de: 'Einen neuen Kunden anlegen. Wählen Sie eine Referenznummer aus Ihrem eigenen System.',
+  },
+  'capture.customerChooseExisting': {
+    en: 'Add to an existing customer',
+    da: 'Tilføj til en eksisterende kunde',
+    sv: 'Lägg till i en befintlig kund',
+    de: 'Zu einem bestehenden Kunden hinzufügen',
+  },
+  'capture.customerChooseExistingDesc': {
+    en: 'Pick up a customer already in progress — type their reference to continue.',
+    da: 'Fortsæt en kunde, der allerede er i gang — skriv deres reference for at fortsætte.',
+    sv: 'Plocka upp en kund som redan pågår — skriv deras referens för att fortsätta.',
+    de: 'Einen bereits laufenden Kunden fortführen — Referenz eingeben, um fortzufahren.',
+  },
+  'capture.customerChooserBack': {
+    en: 'Change',
+    da: 'Skift',
+    sv: 'Ändra',
+    de: 'Ändern',
+  },
+  'capture.customerRefPlaceholder': {
+    en: 'Customer ref (number only)',
+    da: 'Kundereference (kun nummer)',
+    sv: 'Kundreferens (endast nummer)',
+    de: 'Kundenreferenz (nur Nummer)',
+  },
+  'capture.customerRefHelp': {
+    en: 'One reference = one customer = one value demand. Several collectors can add entries to the same customer over time — type the same reference to pick up where it left off. Privacy: use the reference number only, never a name.',
+    da: 'Én reference = én kunde = én værdiskabende efterspørgsel. Flere indsamlere kan tilføje registreringer til samme kunde over tid — skriv den samme reference for at fortsætte, hvor I slap. Privatliv: brug kun referencenummeret, aldrig et navn.',
+    sv: 'En referens = en kund = en värdeskapande efterfrågan. Flera insamlare kan lägga till registreringar för samma kund över tid — skriv samma referens för att fortsätta där ni slutade. Integritet: använd endast referensnumret, aldrig ett namn.',
+    de: 'Eine Referenz = ein Kunde = ein Anliegen. Mehrere Personen können demselben Kunden über die Zeit Einträge hinzufügen — dieselbe Referenz eingeben, um weiterzumachen. Datenschutz: nur die Referenznummer verwenden, niemals einen Namen.',
+  },
+  'capture.customerOpenBtn': {
+    en: 'Open',
+    da: 'Åbn',
+    sv: 'Öppna',
+    de: 'Öffnen',
+  },
+  'capture.customerRecentOpen': {
+    en: 'Recent open customers',
+    da: 'Seneste åbne kunder',
+    sv: 'Senaste öppna kunder',
+    de: 'Zuletzt offene Kunden',
+  },
+  'capture.customerExistsNotice': {
+    en: 'Reference #{ref} already has a customer.',
+    da: 'Reference #{ref} har allerede en kunde.',
+    sv: 'Referens #{ref} har redan en kund.',
+    de: 'Referenz #{ref} hat bereits einen Kunden.',
+  },
+  'capture.customerAddInstead': {
+    en: 'Add to them instead',
+    da: 'Tilføj til dem i stedet',
+    sv: 'Lägg till hos dem istället',
+    de: 'Stattdessen dort hinzufügen',
+  },
+  'capture.customerNotFoundNotice': {
+    en: 'No customer with reference #{ref} yet.',
+    da: 'Ingen kunde med reference #{ref} endnu.',
+    sv: 'Ingen kund med referens #{ref} ännu.',
+    de: 'Noch kein Kunde mit Referenz #{ref}.',
+  },
+  'capture.customerOpenAsNew': {
+    en: 'Open as a new customer',
+    da: 'Åbn som en ny kunde',
+    sv: 'Öppna som en ny kund',
+    de: 'Als neuen Kunden öffnen',
+  },
+  // Flow open-state: customer-worded variants of the shared case footer/chip
+  // strings (the transactional case* versions stay as-is).
+  'capture.customerAttachNote': {
+    en: 'New entries attach to this customer.',
+    da: 'Nye registreringer knyttes til denne kunde.',
+    sv: 'Nya registreringar kopplas till denna kund.',
+    de: 'Neue Einträge werden diesem Kunden zugeordnet.',
+  },
+  'capture.customerCloseBtn': {
+    en: 'Close customer',
+    da: 'Luk kunde',
+    sv: 'Avsluta kund',
+    de: 'Kunde schließen',
+  },
+  'capture.customerAttachLast': {
+    en: 'Attach last entry to this customer',
+    da: 'Knyt seneste registrering til denne kunde',
+    sv: 'Koppla senaste registreringen till denna kund',
+    de: 'Letzten Eintrag diesem Kunden zuordnen',
+  },
+  // Flow CaseContextSection: the value-demand picker, worded for "customer"
+  // (the transactional header keeps capture.caseDemandTypePlaceholder).
+  'capture.customerDemandTypePlaceholder': {
+    en: 'Which value demand is this?',
+    da: 'Hvilken værdiskabende efterspørgsel er dette?',
+    sv: 'Vilken värdeskapande efterfrågan är detta?',
+    de: 'Welches Anliegen ist das?',
+  },
   'capture.toggles.sequenceWork': {
     en: 'Capture sequence work',
     da: 'Registrer sekvensarbejde',
