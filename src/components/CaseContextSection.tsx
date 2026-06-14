@@ -41,6 +41,9 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
   // collector's save arrives via a timeline refetch.
   const [contextDraft, setContextDraft] = useState(contextSituation ?? '');
   const [noteDraft, setNoteDraft] = useState(whatMatters ?? '');
+  // What-matters free-text note is collapsed by default (matches the
+  // transactional tool — pills are the primary capture, the note is opt-in).
+  const [noteOpen, setNoteOpen] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setContextDraft(contextSituation ?? '');
@@ -110,50 +113,70 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
         className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
       />
 
-      {/* What matters — green chip multi-select + optional nuance note. */}
-      {(whatMattersTypes.length > 0 || whatMattersTypeIds.length > 0) && (
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
-          {whatMattersTypes.map((wm) => {
-            const on = whatMattersTypeIds.includes(wm.id);
-            return (
-              <button
-                key={wm.id}
-                type="button"
-                onClick={() => toggleWhatMatters(wm.id)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                  on
-                    ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-white text-green-700 border-green-300 hover:border-green-500 hover:bg-green-50'
-                }`}
-              >
-                {tl(wm.label)}
-              </button>
-            );
-          })}
-          <InlineTypeAdder
-            code={code}
-            apiPath="what-matters-types"
-            onCreated={(id) => onPatch({ whatMattersTypeIds: [...whatMattersTypeIds, id] })}
-            onRefresh={onTypesChanged}
-            compact
-            inputVariant="green"
+      {/* What matters — pills first (like the transactional tool): a leading
+          "+ Add what matters" pill, then the selectable green chips. The
+          free-text note is collapsed behind "+ Add note" — not a persistent box. */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <InlineTypeAdder
+          code={code}
+          apiPath="what-matters-types"
+          onCreated={(id) => onPatch({ whatMattersTypeIds: [...whatMattersTypeIds, id] })}
+          onRefresh={onTypesChanged}
+          pillLabel={t('capture.addWhatMatters')}
+          pillVariant="green"
+          inputVariant="green"
+        />
+        {whatMattersTypes.map((wm) => {
+          const on = whatMattersTypeIds.includes(wm.id);
+          return (
+            <button
+              key={wm.id}
+              type="button"
+              onClick={() => toggleWhatMatters(wm.id)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                on
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+              }`}
+            >
+              {tl(wm.label)}
+            </button>
+          );
+        })}
+      </div>
+      {/* Collapsed free-text note — opt-in, mirrors transactional. */}
+      {(noteOpen || (whatMatters ?? '').trim()) ? (
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-gray-600">{t('capture.whatMattersLabel')}</span>
+            <button
+              type="button"
+              onClick={() => { setNoteDraft(''); onPatch({ whatMatters: null }); setNoteOpen(false); }}
+              className="text-xs text-gray-500 hover:text-gray-700"
+            >
+              {t('capture.hideNote')}
+            </button>
+          </div>
+          <textarea
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            onBlur={() => {
+              if (noteDraft.trim() !== (whatMatters ?? '').trim()) {
+                onPatch({ whatMatters: noteDraft.trim() || null });
+              }
+            }}
+            placeholder={t('capture.whatMattersPlaceholder')}
+            aria-label={t('capture.whatMattersPlaceholder')}
+            rows={2}
+            className="w-full px-3 py-1.5 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
           />
         </div>
-      )}
-      {whatMattersTypeIds.length > 0 && (
-        <input
-          type="text"
-          value={noteDraft}
-          onChange={(e) => setNoteDraft(e.target.value)}
-          onBlur={() => {
-            if (noteDraft.trim() !== (whatMatters ?? '').trim()) {
-              onPatch({ whatMatters: noteDraft.trim() || null });
-            }
-          }}
-          placeholder={t('capture.whatMattersPlaceholder')}
-          aria-label={t('capture.whatMattersPlaceholder')}
-          className="w-full px-3 py-1.5 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
-        />
+      ) : (
+        <div className="flex justify-center">
+          <button type="button" onClick={() => setNoteOpen(true)} className="text-xs text-green-700 hover:underline">
+            {t('capture.addNote')}
+          </button>
+        </div>
       )}
     </div>
   );
