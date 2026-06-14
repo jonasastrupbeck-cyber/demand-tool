@@ -2533,45 +2533,15 @@ const translations = {
     sv: 'Visa mindre',
     de: 'Weniger anzeigen',
   },
-  // Flow-mode customer chooser (2026-06-14): the first decision on a flow study
-  // is "open a new customer" vs "add to an existing customer". User-facing copy
-  // says "customer" (the internal data model stays "case"). Flow-only — the
-  // transactional case* strings above are unchanged.
-  'capture.customerChooseHeading': {
-    en: 'What would you like to do?',
-    da: 'Hvad vil du gøre?',
-    sv: 'Vad vill du göra?',
-    de: 'Was möchten Sie tun?',
-  },
-  'capture.customerChooseNew': {
-    en: 'Open a new customer',
-    da: 'Åbn en ny kunde',
-    sv: 'Öppna en ny kund',
-    de: 'Neuen Kunden öffnen',
-  },
-  'capture.customerChooseNewDesc': {
-    en: 'Start a new customer. Pick a reference number from your own system.',
-    da: 'Start en ny kunde. Vælg et referencenummer fra dit eget system.',
-    sv: 'Starta en ny kund. Välj ett referensnummer från ditt eget system.',
-    de: 'Einen neuen Kunden anlegen. Wählen Sie eine Referenznummer aus Ihrem eigenen System.',
-  },
-  'capture.customerChooseExisting': {
-    en: 'Add to an existing customer',
-    da: 'Tilføj til en eksisterende kunde',
-    sv: 'Lägg till i en befintlig kund',
-    de: 'Zu einem bestehenden Kunden hinzufügen',
-  },
-  'capture.customerChooseExistingDesc': {
-    en: 'Pick up a customer already in progress — type their reference to continue.',
-    da: 'Fortsæt en kunde, der allerede er i gang — skriv deres reference for at fortsætte.',
-    sv: 'Plocka upp en kund som redan pågår — skriv deras referens för att fortsätta.',
-    de: 'Einen bereits laufenden Kunden fortführen — Referenz eingeben, um fortzufahren.',
-  },
-  'capture.customerChooserBack': {
-    en: 'Change',
-    da: 'Skift',
-    sv: 'Ändra',
-    de: 'Ändern',
+  // Flow-mode customer entry (2026-06-14): one unified type-ahead reference
+  // field. Type a reference — a match continues that customer, no match opens a
+  // new one. User-facing copy says "customer" (the internal model stays "case").
+  // Flow-only — the transactional case* strings above are unchanged.
+  'capture.customerRefHeading': {
+    en: 'Which customer is this?',
+    da: 'Hvilken kunde er det?',
+    sv: 'Vilken kund gäller det?',
+    de: 'Um welchen Kunden geht es?',
   },
   'capture.customerRefPlaceholder': {
     en: 'Customer ref (number only)',
@@ -2585,41 +2555,17 @@ const translations = {
     sv: 'En referens = en kund = en värdeskapande efterfrågan. Flera insamlare kan lägga till registreringar för samma kund över tid — skriv samma referens för att fortsätta där ni slutade. Integritet: använd endast referensnumret, aldrig ett namn.',
     de: 'Eine Referenz = ein Kunde = ein Anliegen. Mehrere Personen können demselben Kunden über die Zeit Einträge hinzufügen — dieselbe Referenz eingeben, um weiterzumachen. Datenschutz: nur die Referenznummer verwenden, niemals einen Namen.',
   },
-  'capture.customerOpenBtn': {
-    en: 'Open',
-    da: 'Åbn',
-    sv: 'Öppna',
-    de: 'Öffnen',
-  },
   'capture.customerRecentOpen': {
-    en: 'Recent open customers',
-    da: 'Seneste åbne kunder',
-    sv: 'Senaste öppna kunder',
-    de: 'Zuletzt offene Kunden',
-  },
-  'capture.customerExistsNotice': {
-    en: 'Reference #{ref} already has a customer.',
-    da: 'Reference #{ref} har allerede en kunde.',
-    sv: 'Referens #{ref} har redan en kund.',
-    de: 'Referenz #{ref} hat bereits einen Kunden.',
-  },
-  'capture.customerAddInstead': {
-    en: 'Add to them instead',
-    da: 'Tilføj til dem i stedet',
-    sv: 'Lägg till hos dem istället',
-    de: 'Stattdessen dort hinzufügen',
-  },
-  'capture.customerNotFoundNotice': {
-    en: 'No customer with reference #{ref} yet.',
-    da: 'Ingen kunde med reference #{ref} endnu.',
-    sv: 'Ingen kund med referens #{ref} ännu.',
-    de: 'Noch kein Kunde mit Referenz #{ref}.',
+    en: 'Recent customers',
+    da: 'Seneste kunder',
+    sv: 'Senaste kunder',
+    de: 'Zuletzt geöffnete Kunden',
   },
   'capture.customerOpenAsNew': {
-    en: 'Open as a new customer',
-    da: 'Åbn som en ny kunde',
-    sv: 'Öppna som en ny kund',
-    de: 'Als neuen Kunden öffnen',
+    en: 'Open #{ref} as a new customer',
+    da: 'Åbn #{ref} som en ny kunde',
+    sv: 'Öppna #{ref} som en ny kund',
+    de: '#{ref} als neuen Kunden öffnen',
   },
   // Flow open-state: customer-worded variants of the shared case footer/chip
   // strings (the transactional case* versions stay as-is).
