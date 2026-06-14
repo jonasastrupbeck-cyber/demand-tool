@@ -338,7 +338,9 @@ export default function CapturePage() {
     setWhatMattersNoteOpen(false);
     setWorkTypeId('');
     setWorkTypeFreeText('');
-    setWorkBlocks([]);
+    // After a flow-work save, keep one empty block ready for the next entry
+    // (entryType stays sticky); otherwise clear.
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }] : []);
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -865,7 +867,9 @@ export default function CapturePage() {
                 setDemandTypeId('');
                 setWorkTypeId('');
                 setWorkTypeFreeText('');
-                setWorkBlocks([]);
+                // Flow work always starts with one block ready to fill — no
+                // need to click "+ add step" before typing the first step.
+                setWorkBlocks(v === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }] : []);
               }}
               options={[
                 { value: 'work', label: t('capture.flowEntryWork'), activeColor: 'burgundy' },
