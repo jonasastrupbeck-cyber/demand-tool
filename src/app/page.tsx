@@ -130,7 +130,13 @@ export default function Home() {
         </div>
 
         <div className="text-center mb-8">
-          <Image src="/vanguard-logo.png" alt="Vanguard" width={140} height={153} style={{ margin: '0 auto 16px' }} priority />
+          {/* Co-branded: Skipton (client, official blue) primary + the Vanguard
+              mark recoloured to the brand purple (vanguard-logo-brand.png). */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Image src="/skipton-logo.svg" alt="Skipton Building Society" width={200} height={45} priority />
+            <span className="h-9 w-px bg-gray-300" aria-hidden="true" />
+            <Image src="/vanguard-logo-brand.png" alt="Vanguard" width={37} height={40} priority />
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')}</h1>
           <p className="text-gray-600 mb-3">{t('app.subtitle')}</p>
           <p className="text-sm text-gray-400 max-w-sm mx-auto">{t('landing.methodContext')}</p>
