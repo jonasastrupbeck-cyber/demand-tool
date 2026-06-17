@@ -275,7 +275,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
               {matched ? (
                 <span className="text-sky-700">
                   {t('capture.customerFoundPrefix')}
-                  {summary(matched) ? ` — ${summary(matched)}` : ' —'} · {touchLabel(matched.entryCount)} · {t('capture.customerOpenedOn', { date: new Date(matched.openedAt).toLocaleDateString() })}
+                  {summary(matched) ? ` — ${summary(matched)}` : ''} · {touchLabel(matched.entryCount)} · {t('capture.customerOpenedOn', { date: new Date(matched.openedAt).toLocaleDateString() })}
                   {matched.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500 align-middle">{t('capture.caseStatusClosed')}</span>}
                 </span>
               ) : (
@@ -560,11 +560,15 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // flow, so capture logic is identical.
   if (isFlow && flowLayout === 'freeze') {
     return (
-      // R2: items-start so each pane is content-height and grows downward (not
-      // stretched to the viewport). R5: dashed vertical lines mark the boundaries.
-      <div className="flex items-start min-h-[24rem]">
-        {/* LEFT frozen pane — the customer. Fixed width, grows downward. */}
-        <aside className="w-80 shrink-0 rounded-xl border border-green-200 bg-green-100/50 p-3">
+      // Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
+      // columns (customer left · touch rail + composer middle · decisions right).
+      // Below lg it stacks vertically — capture-first order: context → composer →
+      // touches → decisions — so nothing collapses or scrolls off on a phone.
+      // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
+      // (lg only — they read as zone separators across, not stacked).
+      <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-start min-h-[24rem]">
+        {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg. */}
+        <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border border-green-200 bg-green-100/50 p-3">
           {/* R9: open another customer (a new reference) without leaving capture. */}
           <div className="flex justify-center mb-2">
             <button
@@ -593,21 +597,21 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
-        {/* ┊ boundary + MIDDLE — the flow: saved touches (full, R6) pile up
-            left→right and the highlighted composer is where you're adding now. */}
-        <div className="flex-1 min-w-0 overflow-x-auto border-l-2 border-dashed border-gray-300 ml-3 pl-3">
-          <div className="flex gap-3 min-w-min items-stretch pb-2">
+        {/* ┊ boundary + MIDDLE — the flow. On lg: saved touches pile up left→right
+            with the highlighted composer rightmost (newest). On mobile: a vertical
+            stack, composer FIRST (order-1) then the touches (order-2) below it. */}
+        <div className="order-2 flex-1 min-w-0 lg:overflow-x-auto lg:border-l-2 lg:border-dashed lg:border-gray-300 lg:ml-3 lg:pl-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:min-w-min lg:items-stretch pb-2">
             {entries.map((e) => (
-              <div key={e.id} className="w-72 shrink-0 flex">
+              <div key={e.id} className="order-2 lg:order-1 w-full lg:w-72 shrink-0 flex">
                 {renderTouchFull(e)}
               </div>
             ))}
             {children && (
-              // R6: the composer is clearly "where I'm working now" (brand ring),
-              // content-width so the work blocks can expand to the right. Starts
-              // ~2 work-blocks wide (R-round4) so the first block + Add-block show
-              // side by side and the COR pills wrap to two rows.
-              <div className="shrink-0 w-fit min-w-[37rem] rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
+              // R6: the composer is clearly "where I'm working now" (brand ring).
+              // On lg it's content-width and grows right as blocks are added
+              // (~2 blocks min); on mobile it's full width and comes first.
+              <div className="order-1 lg:order-2 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
                 <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
                 {children}
               </div>
@@ -616,9 +620,9 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         </div>
 
         {/* ┊ boundary + RIGHT frozen pane — decisions overview (R4): blue tint,
-            options shown inline, always in view. */}
+            options shown inline, always in view. Full width on mobile, last. */}
         {decisionPointsEnabled && (
-          <aside className="w-80 shrink-0 border-l-2 border-dashed border-gray-300 ml-3 pl-3">
+          <aside className="order-3 w-full lg:w-80 shrink-0 lg:border-l-2 lg:border-dashed lg:border-gray-300 lg:ml-3 lg:pl-3">
             <div className="rounded-xl bg-sky-50/70 border border-sky-100 p-2">
               <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                 {t('capture.caseDecisionsHeading')}

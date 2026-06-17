@@ -1399,7 +1399,7 @@ export default function CapturePage() {
               {/* R3 (2026-06-17): freeze flow lays work blocks left→right (the
                   outer rail provides the single horizontal scroll); stacked flow
                   keeps the vertical full-width stack. */}
-              <div className={flowWorkPath ? (freezeLayout ? 'flex gap-2 items-start min-w-min' : 'space-y-2') : 'flex gap-2 items-stretch min-w-min'}>
+              <div className={flowWorkPath ? (freezeLayout ? 'flex flex-col gap-2 lg:flex-row lg:items-start lg:min-w-min' : 'space-y-2') : 'flex gap-2 items-stretch min-w-min'}>
                 {workBlocks.map((block, idx) => {
                   // Phase 4 (2026-04-16): three render modes per block
                   //   A) Picker mode — toggle ON, no step picked, rendering a step dropdown
@@ -1419,7 +1419,7 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'flex-none w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1560,7 +1560,7 @@ export default function CapturePage() {
                   type="button"
                   onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
-                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'flex-none w-72 min-h-[6rem] self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
+                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
                   {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                 </button>
