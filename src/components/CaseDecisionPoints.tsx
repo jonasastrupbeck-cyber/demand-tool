@@ -48,9 +48,13 @@ interface Props {
   collectorName: string;
   /** Refetch the case (CasePanel.loadCase) after a save/delete. */
   onChanged: () => Promise<void> | void;
+  // C5/R4 (2026-06-17): 'compact' (default) = the dotted-box tap-to-open cards
+  // (stacked flow). 'overview' = freeze-pane right pane: each milestone's options
+  // shown inline always; the date + Save appear only after an option is pressed.
+  variant?: 'compact' | 'overview';
 }
 
-export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged }: Props) {
+export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact' }: Props) {
   const { t, tl } = useLocale();
 
   // The type whose mini-form is open; prefilled from its decision if decided.
@@ -117,6 +121,119 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   }
 
   if (decisionPointTypes.length === 0) return null;
+
+  // C5/R4 (2026-06-17): freeze-pane overview — every milestone shows its options
+  // inline (styled like the left pane's boxes); the date + Save/Remove appear
+  // only once an outcome or cleanliness is pressed. Pressing any option focuses
+  // that milestone (loads its saved values) so a single edit-state still drives
+  // the form.
+  if (variant === 'overview') {
+    return (
+      <div className="space-y-2">
+        {decisionPointTypes.map((type) => {
+          const decision = decisions.find((d) => d.decisionPointTypeId === type.id);
+          const isActive = openTypeId === type.id;
+          const focus = () => { if (openTypeId !== type.id) openForm(type); };
+          const vOutcome = isActive ? outcome : (decision?.outcome ?? '');
+          const vClean = isActive ? cleanliness : (decision?.cleanliness ?? '');
+          const vWilling = isActive ? willingnessToPay : boolToTri(decision?.willingnessToPay);
+          const vAbility = isActive ? abilityToPay : boolToTri(decision?.abilityToPay);
+          const showSave = isActive && (!!outcome || !!cleanliness);
+          const yesNo = (active: 'yes' | 'no' | '') => active;
+          return (
+            <div key={type.id} className="rounded-lg bg-white border border-gray-200 p-2 space-y-1.5">
+              <p className="text-xs font-medium text-gray-800 text-center">{tl(type.label)}</p>
+              {type.kind === 'person' && (
+                <>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[10px] text-gray-500">{t('capture.dpWillingnessToPay')}</span>
+                    <SegmentedToggle
+                      ariaLabel={t('capture.dpWillingnessToPay')}
+                      value={yesNo(vWilling)}
+                      onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no'); }}
+                      options={[
+                        { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                        { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                      ]}
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[10px] text-gray-500">{t('capture.dpAbilityToPay')}</span>
+                    <SegmentedToggle
+                      ariaLabel={t('capture.dpAbilityToPay')}
+                      value={yesNo(vAbility)}
+                      onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no'); }}
+                      options={[
+                        { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                        { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                      ]}
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex justify-center">
+                <SegmentedToggle
+                  ariaLabel={t('capture.dpOutcomeAria')}
+                  value={vOutcome}
+                  onChange={(v) => { focus(); setOutcome(v as 'positive' | 'negative'); }}
+                  options={[
+                    { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
+                    { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
+                  ]}
+                />
+              </div>
+              <div className="flex justify-center">
+                <SegmentedToggle
+                  ariaLabel={t('capture.dpCleanlinessAria')}
+                  value={vClean}
+                  onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty'); }}
+                  options={[
+                    { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
+                    { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
+                  ]}
+                />
+              </div>
+              {isActive && cleanliness === 'dirty' && (
+                <input
+                  type="text"
+                  value={dirtyCause}
+                  onChange={(e) => setDirtyCause(e.target.value)}
+                  placeholder={t('capture.dpDirtyCausePlaceholder')}
+                  aria-label={t('capture.dpDirtyCausePlaceholder')}
+                  className="w-full px-2 py-1 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-400 outline-none"
+                />
+              )}
+              {showSave && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-center">
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                      {t('capture.dpDecidedAtLabel')}
+                      <input
+                        type="date"
+                        value={decidedAt}
+                        onChange={(e) => setDecidedAt(e.target.value)}
+                        className="px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+                    {decision && (
+                      <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
+                    )}
+                    <button type="button" onClick={() => setOpenTypeId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
+                  </div>
+                </div>
+              )}
+              {!isActive && decision && (
+                <p className="text-[10px] text-gray-400 text-center">{new Date(decision.decidedAt).toLocaleDateString()}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     // The literal dotted box from Ali's wireframe.

@@ -32,9 +32,12 @@ interface Props {
   onChange: (id: string) => void;
   // Optional slot rendered before the radios (e.g. an InlineTypeAdder "+ add new" button).
   leading?: React.ReactNode;
+  // C5/R7 (2026-06-17): smaller pills that wrap more tightly — used in the
+  // narrow freeze-pane composer so the COR options don't dominate the column.
+  compact?: boolean;
 }
 
-export default function CapabilityRadioGroup({ code, options, value, onChange, leading }: Props) {
+export default function CapabilityRadioGroup({ code, options, value, onChange, leading, compact }: Props) {
   const { t, tl } = useLocale();
   const groupId = useId();
   const [openId, setOpenId] = useState<string | null>(null);
@@ -133,7 +136,7 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, l
   }
 
   return (
-    <div ref={containerRef} role="radiogroup" aria-labelledby={`${groupId}-label`} className="flex flex-wrap gap-2 items-center justify-center">
+    <div ref={containerRef} role="radiogroup" aria-labelledby={`${groupId}-label`} className={`flex flex-wrap items-center justify-center ${compact ? 'gap-1' : 'gap-2'}`}>
       {leading}
       {options.map((opt, idx) => {
         const selected = value === opt.id;
@@ -156,7 +159,7 @@ export default function CapabilityRadioGroup({ code, options, value, onChange, l
               onMouseEnter={() => handleHoverEnter(opt.id)}
               onMouseLeave={handleHoverLeave}
               onKeyDown={(e) => handleKeyDown(e, idx)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+              className={`rounded-full font-medium transition-all ${compact ? 'px-2 py-0.5 text-xs' : 'px-3 py-1.5 text-sm'} ${
                 selected
                   ? 'bg-sky-500 text-white ring-2 ring-sky-500 ring-offset-1'
                   : 'bg-white text-sky-700 border border-sky-300 hover:bg-sky-50 hover:border-sky-500'

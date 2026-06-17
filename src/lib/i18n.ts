@@ -2157,6 +2157,19 @@ const translations = {
     sv: 'Nej — intern överlämning',
     de: 'Nein — interne Übergabe',
   },
+  // C5/R6 (2026-06-17): short chips on the full saved-touch card in the freeze rail.
+  'capture.touchFelt': {
+    en: 'Customer felt it',
+    da: 'Kunden mærkede det',
+    sv: 'Kunden märkte det',
+    de: 'Kunde hat es gespürt',
+  },
+  'capture.touchInternal': {
+    en: 'Internal',
+    da: 'Intern',
+    sv: 'Intern',
+    de: 'Intern',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {
@@ -2637,6 +2650,51 @@ const translations = {
     da: 'Hvilken kunde er det?',
     sv: 'Vilken kund gäller det?',
     de: 'Um welchen Kunden geht es?',
+  },
+  // C5/R9 (2026-06-17): pill atop the freeze left pane to find/open another
+  // customer (a new reference number) without leaving the capture page.
+  'capture.openNewReference': {
+    en: 'Open new reference number',
+    da: 'Åbn nyt referencenummer',
+    sv: 'Öppna nytt referensnummer',
+    de: 'Neue Referenznummer öffnen',
+  },
+  // C5 case-search table (2026-06-17): the "Which customer is this?" overview.
+  'capture.caseTableAccount': {
+    en: 'Account Number',
+    da: 'Kontonummer',
+    sv: 'Kontonummer',
+    de: 'Kontonummer',
+  },
+  'capture.caseTableP2bs': {
+    en: 'P2BS',
+    da: 'P2BS',
+    sv: 'P2BS',
+    de: 'P2BS',
+  },
+  'capture.caseTableWhatMatters': {
+    en: 'What Matters',
+    da: 'Hvad betyder noget',
+    sv: 'Vad är viktigt',
+    de: 'Was wichtig ist',
+  },
+  'capture.caseTableEnter': {
+    en: 'Enter Case',
+    da: 'Åbn sag',
+    sv: 'Öppna ärende',
+    de: 'Fall öffnen',
+  },
+  'capture.caseSearchPlaceholder': {
+    en: 'Search or type a new reference number…',
+    da: 'Søg eller indtast et nyt referencenummer…',
+    sv: 'Sök eller ange ett nytt referensnummer…',
+    de: 'Suchen oder neue Referenznummer eingeben…',
+  },
+  'capture.caseTableEmpty': {
+    en: 'No customers yet — type a reference number above to start one.',
+    da: 'Ingen kunder endnu — indtast et referencenummer ovenfor for at starte.',
+    sv: 'Inga kunder ännu — ange ett referensnummer ovan för att börja.',
+    de: 'Noch keine Kunden — geben Sie oben eine Referenznummer ein, um zu beginnen.',
   },
   'capture.customerRefPlaceholder': {
     en: 'Customer ref (number only)',

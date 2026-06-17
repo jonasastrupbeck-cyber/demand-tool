@@ -867,6 +867,10 @@ export async function getCases(studyId: string) {
     id: cases.id,
     caseRef: cases.caseRef,
     demandTypeId: cases.demandTypeId,
+    // C5 case-search table (2026-06-17): P2BS + What Matters so the entry screen
+    // can show an overview (Account Number / P2BS / Demand / What Matters).
+    lifeProblemId: cases.lifeProblemId,
+    whatMattersTypeIds: sql<string | null>`(select string_agg(cwm.what_matters_type_id, ',') from case_what_matters cwm where cwm.case_id = cases.id)`,
     status: cases.status,
     openedAt: cases.openedAt,
     closedAt: cases.closedAt,

@@ -856,8 +856,9 @@ export default function CapturePage() {
         </div>
       )}
 
-      {/* Last entry undo card */}
-      {lastEntry && (
+      {/* Last entry undo card. Hidden in the freeze layout (2026-06-17): the saved
+          touches show in full in the rail, so the undo card is redundant clutter. */}
+      {lastEntry && !freezeLayout && (
         <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-gray-400">{t('capture.lastEntry')}</p>
@@ -1303,27 +1304,44 @@ export default function CapturePage() {
             <button
               type="button"
               onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-              className="px-3 py-1.5 rounded-full text-sm font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors"
+              className={`rounded-full font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors ${freezeLayout ? 'px-2 py-0.5 text-xs' : 'px-3 py-1.5 text-sm'}`}
             >
               {t('capture.addHandlingButton')}
             </button>
           );
+          // C7: default "did the customer feel it?" from the chosen COR's
+          // customer-facing flag, unless the user set it manually.
+          const onPickCor = (id: string) => {
+            setHandlingTypeId(id);
+            if (!customerFeltTouched) {
+              const cor = study.handlingTypes.find((h) => h.id === id);
+              setCustomerFelt(cor ? !!cor.customerFacing : null);
+            }
+          };
           return (
-            <div>
-              {study.handlingTypes.length > 0 ? (
+            <div className={freezeLayout ? 'max-w-[37rem] mx-auto' : undefined}>
+              {freezeLayout ? (
+                // Freeze (2026-06-17): the COR is a single dropdown pill sitting
+                // on top of the work blocks, not a row of radio pills.
+                <div className="flex justify-center">
+                  <PillSelect
+                    ariaLabel={t('capture.handlingLabel')}
+                    placeholder={t('capture.addHandlingButton')}
+                    value={handlingTypeId}
+                    onChange={onPickCor}
+                    options={study.handlingTypes.map((h) => ({ id: h.id, label: tl(h.label), operationalDefinition: h.operationalDefinition ? tl(h.operationalDefinition) : null }))}
+                    onAddNew={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+                    addNewLabel={t('capture.addHandlingButton').replace(/^\+\s*/, '')}
+                    variant="add"
+                  />
+                </div>
+              ) : study.handlingTypes.length > 0 ? (
                 <CapabilityRadioGroup
                   code={code}
+                  compact={freezeLayout}
                   options={study.handlingTypes}
                   value={handlingTypeId}
-                  onChange={(id) => {
-                    setHandlingTypeId(id);
-                    // C7: default "did the customer feel it?" from the chosen
-                    // COR's customer-facing flag, unless the user set it manually.
-                    if (!customerFeltTouched) {
-                      const cor = study.handlingTypes.find((h) => h.id === id);
-                      setCustomerFelt(cor ? !!cor.customerFacing : null);
-                    }
-                  }}
+                  onChange={onPickCor}
                   leading={capabilityAddPill}
                 />
               ) : (
@@ -1343,8 +1361,8 @@ export default function CapturePage() {
                     value={customerFelt === null ? '' : customerFelt ? 'felt' : 'internal'}
                     onChange={(v) => { setCustomerFeltTouched(true); setCustomerFelt(v === 'felt'); }}
                     options={[
-                      { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'green' },
-                      { value: 'internal', label: t('capture.customerFeltNo') },
+                      { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'red' },
+                      { value: 'internal', label: t('capture.customerFeltNo'), activeColor: 'blue' },
                     ]}
                   />
                 </div>
@@ -1378,7 +1396,10 @@ export default function CapturePage() {
                 downward without the overflow-x-auto strip clipping it. Non-flow
                 studies keep the horizontal scrolling strip. */}
             <div className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
-              <div className={flowWorkPath ? 'space-y-2' : 'flex gap-2 items-stretch min-w-min'}>
+              {/* R3 (2026-06-17): freeze flow lays work blocks left→right (the
+                  outer rail provides the single horizontal scroll); stacked flow
+                  keeps the vertical full-width stack. */}
+              <div className={flowWorkPath ? (freezeLayout ? 'flex gap-2 items-start min-w-min' : 'space-y-2') : 'flex gap-2 items-stretch min-w-min'}>
                 {workBlocks.map((block, idx) => {
                   // Phase 4 (2026-04-16): three render modes per block
                   //   A) Picker mode — toggle ON, no step picked, rendering a step dropdown
@@ -1398,7 +1419,7 @@ export default function CapturePage() {
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
-                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'flex-none w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1507,7 +1528,10 @@ export default function CapturePage() {
                             onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, text: e.target.value } : b))}
                             placeholder={t('capture.workBlockPlaceholder')}
                             rows={4}
-                            className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none resize-none flex-1"
+                            /* R1 (2026-06-17): grow with typing (field-sizing where
+                               supported) + a taller min-height + manual resize so
+                               more of the captured text is visible. */
+                            className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none resize-y field-sizing-content min-h-[6rem] flex-1"
                           />
                         </>
                       )}
@@ -1536,7 +1560,7 @@ export default function CapturePage() {
                   type="button"
                   onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
-                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 gap-1 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
+                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'flex-none w-72 min-h-[6rem] self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
                   {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                 </button>
@@ -1852,7 +1876,10 @@ export default function CapturePage() {
 
       {/* Entries tab-box — tab-strip visual, tighter than Demand/Work since reclass is an optional
           review action (not a per-entry step). The chevron sits inside its own small pill so the
-          click target reads as "open review" rather than "click the whole card". */}
+          click target reads as "open review" rather than "click the whole card".
+          Hidden in the freeze layout (2026-06-17): the rail boxes already show previous work, so
+          this legacy review list is redundant clutter there. */}
+      {!freezeLayout && (
       <div className="mt-8 mb-24">
         <div className="flex justify-center">
           <div className="inline-flex p-1 bg-gray-200 rounded-lg">
@@ -1907,6 +1934,7 @@ export default function CapturePage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Entries bottom sheet */}
       {entriesSheetOpen && (

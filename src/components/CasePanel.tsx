@@ -43,6 +43,8 @@ interface CaseEntry {
   entryType: 'demand' | 'work';
   handlingTypeId: string | null;
   collectorName: string | null;
+  // C5/R6 (2026-06-17): shown on the full saved-touch card in the freeze rail.
+  customerFelt?: boolean | null;
 }
 
 interface Props {
@@ -105,7 +107,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // composer stays hidden until a customer is open. caseList backs the
   // combobox's recent-open list and its autocomplete matches.
   const isFlow = systemType === 'flow';
-  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string }[]>([]);
+  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null }[]>([]);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -206,10 +208,94 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   //     type decides it — a match continues that customer, no match opens a new
   //     one. The composer (children) stays hidden until a customer is open. ---
   if (isFlow && (!activeCaseId || !caseRow)) {
+    // C5 case-search table (2026-06-17, freeze only): an overview of existing
+    // cases (Account Number / P2BS / Demand / What Matters) with "Enter Case"
+    // per row, plus a search box to find or open a new reference number. The
+    // stacked flow keeps the compact combobox card below.
+    if (flowLayout === 'freeze') {
+      const lpLabel = (id: string | null) => { const x = lifeProblems.find((l) => l.id === id); return x ? tl(x.label) : ''; };
+      const dtLabel = (id: string | null) => { const x = demandTypes.find((d) => d.id === id); return x ? tl(x.label) : ''; };
+      const wmLabel = (ids: string | null) => (ids || '').split(',').filter(Boolean)
+        .map((i) => { const x = whatMattersTypes.find((w) => w.id === i); return x ? tl(x.label) : null; })
+        .filter(Boolean).join(', ');
+      const q = refInput.trim();
+      const filtered = q ? caseList.filter((c) => c.caseRef.toLowerCase().startsWith(q.toLowerCase())) : caseList;
+      const exact = caseList.some((c) => c.caseRef.toLowerCase() === q.toLowerCase());
+      return (
+        <div className="max-w-5xl mx-auto mt-4">
+          <div className="flex items-center justify-center gap-1.5 mb-3">
+            <p className="text-lg font-semibold text-gray-800">{t('capture.customerRefHeading')}</p>
+            <InfoPopover label={t('capture.customerRefHelp')}>{t('capture.customerRefHelp')}</InfoPopover>
+          </div>
+          {/* Search + open-new */}
+          <div className="flex items-center gap-2 max-w-lg mx-auto mb-3">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={refInput}
+              onChange={(e) => setRefInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && q) { e.preventDefault(); openCase(q); } }}
+              placeholder={t('capture.caseSearchPlaceholder')}
+              aria-label={t('capture.caseSearchPlaceholder')}
+              className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => q && openCase(q)}
+              disabled={!q || opening}
+              className="shrink-0 px-3 py-2 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
+            >
+              {q && !exact ? `+ ${t('capture.customerOpenAsNew', { ref: q })}` : t('capture.caseTableEnter')}
+            </button>
+          </div>
+          {/* Overview table */}
+          <div className="rounded-xl border border-gray-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-sky-100 text-gray-700">
+                <tr>
+                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableAccount')}</th>
+                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableP2bs')}</th>
+                  <th className="text-left font-semibold px-3 py-2">{t('capture.demand')}</th>
+                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableWhatMatters')}</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400">{t('capture.caseTableEmpty')}</td></tr>
+                ) : filtered.map((c) => (
+                  <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-900 tabular-nums whitespace-nowrap">
+                      #{c.caseRef}
+                      {c.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700">{lpLabel(c.lifeProblemId)}</td>
+                    <td className="px-3 py-2 text-gray-700">{dtLabel(c.demandTypeId)}</td>
+                    <td className="px-3 py-2 text-gray-700">{wmLabel(c.whatMattersTypeIds)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openCase(c.caseRef)}
+                        disabled={opening}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 hover:border-sky-500 disabled:opacity-50 transition-colors"
+                      >
+                        {t('capture.caseTableEnter')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {error && <p className="mt-2 text-xs text-red-600 text-center">{error}</p>}
+        </div>
+      );
+    }
+    // C5/R10 (2026-06-17): stacked flow keeps a tidy, centred combobox card.
     return (
-      <div className="mb-4 rounded-xl border border-gray-200 bg-white p-3">
-        <div className="flex items-center gap-2 mb-2">
-          <p className="text-sm font-medium text-gray-700">{t('capture.customerRefHeading')}</p>
+      <div className="max-w-md mx-auto mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-center gap-1.5 mb-3">
+          <p className="text-base font-semibold text-gray-800">{t('capture.customerRefHeading')}</p>
           <InfoPopover label={t('capture.customerRefHelp')}>
             {t('capture.customerRefHelp')}
           </InfoPopover>
@@ -221,7 +307,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           onSelect={(ref) => openCase(ref)}
           disabled={opening}
         />
-        {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+        {error && <p className="mt-2 text-xs text-red-600 text-center">{error}</p>}
       </div>
     );
   }
@@ -340,6 +426,57 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     </button>
   );
 
+  // C5/R6 (2026-06-17): a saved touch rendered IN FULL for the freeze rail —
+  // the work steps exactly as captured (parsed from the stored `[tag] text`
+  // verbatim, colour-coded value/sequence/failure, wrapped not truncated), plus
+  // the COR and the customer-felt flag. Read-only; clicking opens the edit window.
+  // Touches pile up left→right so the whole flow is visible end-to-end.
+  const STEP_TAG_CLASS: Record<string, string> = {
+    value: 'border-green-200 bg-green-50 text-green-800',
+    sequence: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    failure: 'border-red-200 bg-red-50 text-red-800',
+  };
+  const renderTouchFull = (e: CaseEntry) => {
+    const steps = e.verbatim.split('\n\n')
+      .map((line) => {
+        const m = line.match(/^\[(value|sequence|failure)\]\s*([\s\S]*)$/);
+        return m ? { tag: m[1], text: m[2] } : { tag: 'value', text: line };
+      })
+      .filter((s) => s.text.trim().length > 0);
+    const cor = handlingLabel(e.handlingTypeId);
+    return (
+      <button
+        key={e.id}
+        type="button"
+        onClick={() => onOpenEntry?.(e.id)}
+        className="w-full h-full text-left rounded-xl border border-gray-200 bg-white p-3 hover:border-gray-400 transition-colors flex flex-col gap-2"
+      >
+        <div className="flex items-center gap-2 text-[11px] text-gray-400">
+          <span className="tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+          {e.collectorName && <span className="text-gray-600 font-medium">{e.collectorName}</span>}
+        </div>
+        <div className="space-y-1">
+          {steps.map((s, i) => (
+            <div key={i} className={`px-2 py-1.5 rounded-lg border text-xs whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
+              {s.text}
+            </div>
+          ))}
+        </div>
+        {cor && (
+          <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[11px]">{cor}</span>
+            {e.customerFelt === true && (
+              <span className="px-1.5 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[11px]">{t('capture.touchFelt')}</span>
+            )}
+            {e.customerFelt === false && (
+              <span className="px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-500 text-[11px]">{t('capture.touchInternal')}</span>
+            )}
+          </div>
+        )}
+      </button>
+    );
+  };
+
   // Collapsed: only the latest touch + a "Show N earlier" control. Expanded:
   // earlier touches (oldest→latest) revealed above the latest, which stays
   // pinned at the bottom (nearest the composer) — no jump.
@@ -394,9 +531,21 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // flow, so capture logic is identical.
   if (isFlow && flowLayout === 'freeze') {
     return (
-      <div className="flex gap-3 h-[calc(100vh-11rem)] min-h-[28rem]">
-        {/* LEFT frozen pane — the customer (account ref, P2BS, demand, what matters). */}
-        <aside className="w-80 shrink-0 overflow-y-auto rounded-xl border border-green-200 bg-green-100/50 p-3 flex flex-col">
+      // R2: items-start so each pane is content-height and grows downward (not
+      // stretched to the viewport). R5: dashed vertical lines mark the boundaries.
+      <div className="flex items-start min-h-[24rem]">
+        {/* LEFT frozen pane — the customer. Fixed width, grows downward. */}
+        <aside className="w-80 shrink-0 rounded-xl border border-green-200 bg-green-100/50 p-3">
+          {/* R9: open another customer (a new reference) without leaving capture. */}
+          <div className="flex justify-center mb-2">
+            <button
+              type="button"
+              onClick={() => onActiveCaseChange(null)}
+              className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              + {t('capture.openNewReference')}
+            </button>
+          </div>
           {headerRow}
           <CaseContextSection
             code={code}
@@ -412,19 +561,24 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
             onTypesChanged={onTypesChanged}
           />
           {attachLastChip}
-          <div className="mt-auto pt-2">{caseFooter}</div>
+          <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
-        {/* MIDDLE — horizontally scrolling rail of touches; composer is the newest column. */}
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex gap-3 h-full min-w-min items-stretch">
-            {entries.length > 0 && entries.map((e) => (
-              <div key={e.id} className="w-64 shrink-0 flex flex-col">
-                {renderTouch(e)}
+        {/* ┊ boundary + MIDDLE — the flow: saved touches (full, R6) pile up
+            left→right and the highlighted composer is where you're adding now. */}
+        <div className="flex-1 min-w-0 overflow-x-auto border-l-2 border-dashed border-gray-300 ml-3 pl-3">
+          <div className="flex gap-3 min-w-min items-stretch pb-2">
+            {entries.map((e) => (
+              <div key={e.id} className="w-72 shrink-0 flex">
+                {renderTouchFull(e)}
               </div>
             ))}
             {children && (
-              <div className="w-96 shrink-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+              // R6: the composer is clearly "where I'm working now" (brand ring),
+              // content-width so the work blocks can expand to the right. Starts
+              // ~2 work-blocks wide (R-round4) so the first block + Add-block show
+              // side by side and the COR pills wrap to two rows.
+              <div className="shrink-0 w-fit min-w-[37rem] rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
                 <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
                 {children}
               </div>
@@ -432,20 +586,24 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           </div>
         </div>
 
-        {/* RIGHT frozen pane — decision milestones, always in view. */}
+        {/* ┊ boundary + RIGHT frozen pane — decisions overview (R4): blue tint,
+            options shown inline, always in view. */}
         {decisionPointsEnabled && (
-          <aside className="w-72 shrink-0 overflow-y-auto">
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1 px-1 text-center">
-              {t('capture.caseDecisionsHeading')}
-            </p>
-            <CaseDecisionPoints
-              code={code}
-              caseId={caseRow.id}
-              decisionPointTypes={decisionPointTypes}
-              decisions={decisions}
-              collectorName={collectorName}
-              onChanged={() => loadCase(caseRow.id)}
-            />
+          <aside className="w-80 shrink-0 border-l-2 border-dashed border-gray-300 ml-3 pl-3">
+            <div className="rounded-xl bg-sky-50/70 border border-sky-100 p-2">
+              <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
+                {t('capture.caseDecisionsHeading')}
+              </p>
+              <CaseDecisionPoints
+                code={code}
+                caseId={caseRow.id}
+                decisionPointTypes={decisionPointTypes}
+                decisions={decisions}
+                collectorName={collectorName}
+                variant="overview"
+                onChanged={() => loadCase(caseRow.id)}
+              />
+            </div>
           </aside>
         )}
       </div>

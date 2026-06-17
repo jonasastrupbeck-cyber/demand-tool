@@ -268,8 +268,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               ) : null}
             </div>
 
-            {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip */}
-            {(study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
+            {/* Session context (Point of transaction + Contact method) — mirrors Capture's top strip.
+                Hidden in flow (2026-06-17): flow capture doesn't use the top strip, so it's legacy
+                clutter in the flow edit window. */}
+            {study.systemType !== 'flow' && (study.pointsOfTransaction.length > 0 || study.contactMethods.length > 0) && (
               <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {study.pointsOfTransaction.length > 0 && (
@@ -306,8 +308,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Classification — work gets an extra Sequence button */}
-            {study.classificationEnabled && (() => {
+            {/* Classification — work gets an extra Sequence button. Hidden for
+                flow work (2026-06-17): the class is derived from the V/S/F block
+                tags, so the "classify this demand" row is legacy clutter here. */}
+            {study.classificationEnabled && !flowWorkPath && (() => {
               const options = isDemand
                 ? (['value', 'failure', 'unknown'] as const)
                 : (['value', 'sequence', 'failure', 'unknown'] as const);
@@ -529,7 +533,19 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 blue pill both trailing the radio group and standing alone in zero-state. */}
             {study.handlingEnabled && (
               <div>
-                {study.handlingTypes.length > 0 ? (
+                {study.systemType === 'flow' ? (
+                  // Flow (2026-06-17): single COR dropdown pill, matching the composer.
+                  <div className="flex justify-center">
+                    <PillSelect
+                      ariaLabel={t('capture.handlingLabel')}
+                      placeholder={t('capture.addHandlingButton')}
+                      value={entry.handlingTypeId || ''}
+                      onChange={(id) => setEntry({ ...entry, handlingTypeId: id || null })}
+                      options={study.handlingTypes.map((h) => ({ id: h.id, label: tl(h.label), operationalDefinition: h.operationalDefinition ? tl(h.operationalDefinition) : null }))}
+                      variant="add"
+                    />
+                  </div>
+                ) : study.handlingTypes.length > 0 ? (
                   <CapabilityRadioGroup
                     code={code}
                     options={study.handlingTypes}
@@ -568,8 +584,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             {/* Flow — opt-in per entry-type via flowDemandEnabled / flowWorkEnabled
                 (migration 0014). Horizontal sequence of Value/Failure steps
                 describing the work behind the Capability of Response. Matches the
-                Capture form's Flow section (Ali mockup 2026-04-16). */}
-            {((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled)) && (
+                Capture form's Flow section (Ali mockup 2026-04-16). For flow
+                studies the work steps always show (2026-06-17) — `flowWorkPath` —
+                so editing a touch shows exactly the boxes that were captured. */}
+            {((isDemand && study.flowDemandEnabled) || (!isDemand && study.flowWorkEnabled) || flowWorkPath) && (
               <div>
                 <div className="flex items-center gap-3 pt-2 pb-0 mb-2">
                   <div className="flex-1 h-px bg-gray-100" />
@@ -1006,7 +1024,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
             disabled={saving || loading || !entry}
             className="flex-1 py-3 rounded-lg font-semibold text-base text-white bg-brand hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {saving ? t('capture.saving') : t('capture.save')}
+            {saving ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
           </button>
         </div>
       </div>

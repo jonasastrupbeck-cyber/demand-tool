@@ -1,6 +1,6 @@
 'use client';
 
-type ActiveColor = 'burgundy' | 'green' | 'red' | 'emerald';
+type ActiveColor = 'burgundy' | 'green' | 'red' | 'emerald' | 'blue';
 
 interface SegmentedToggleOption {
   value: string;
@@ -32,6 +32,7 @@ const ACTIVE_CLASSES: Record<ActiveColor, string> = {
   // Emerald matches the Sequence classification pill — used on Flow block
   // free-text mode when the user tags a step as sequence work.
   emerald: 'bg-emerald-500 text-white',
+  blue: 'bg-blue-600 text-white',
 };
 
 export default function SegmentedToggle({ options, value, onChange, ariaLabel }: Props) {

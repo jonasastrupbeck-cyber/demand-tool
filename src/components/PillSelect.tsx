@@ -12,7 +12,8 @@
  * language used elsewhere in the capture form.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface PillSelectOption {
   id: string;
@@ -85,40 +86,59 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
 export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  // Fixed-position coords for the portalled popover, so it floats above any
+  // scroll/overflow container (e.g. the freeze-pane touch rail) instead of being
+  // clipped inside the composer card.
+  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
   const selected = options.find((o) => o.id === value) ?? null;
+
+  const computePos = useRef(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(Math.max(r.width, 240), window.innerWidth - margin * 2);
+    let left = r.left;
+    if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
+    if (left < margin) left = margin;
+    setPos({ left, top: r.bottom + 6, width });
+  });
+
+  useLayoutEffect(() => {
+    if (open) computePos.current();
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onDocPointer(e: PointerEvent) {
-      if (!wrapperRef.current) return;
-      if (!wrapperRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (wrapperRef.current?.contains(t) || popoverRef.current?.contains(t)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
     }
+    // Reposition (not close) when an ancestor scrolls or the window resizes so
+    // the floating menu stays glued to its pill.
+    const reposition = () => computePos.current();
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
       document.removeEventListener('pointerdown', onDocPointer);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [open]);
-
-  // Shift the popover horizontally if it would clip the viewport.
-  const popoverMountRef = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.style.transform = '';
-    const rect = el.getBoundingClientRect();
-    const margin = 8;
-    let shift = 0;
-    if (rect.left < margin) shift = margin - rect.left;
-    else if (rect.right > window.innerWidth - margin) shift = window.innerWidth - margin - rect.right;
-    if (shift !== 0) el.style.transform = `translateX(${shift}px)`;
-  }, []);
 
   return (
     <div ref={wrapperRef} className={`relative inline-block ${className}`}>
       <button
+        ref={btnRef}
         type="button"
         aria-label={ariaLabel ?? placeholder}
         aria-haspopup="listbox"
@@ -143,11 +163,12 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
           <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
       </button>
-      {open && (
+      {open && pos && typeof document !== 'undefined' && createPortal(
         <div
-          ref={popoverMountRef}
+          ref={popoverRef}
           role="listbox"
-          className="absolute z-30 left-0 top-full mt-1.5 min-w-full max-w-[calc(100vw-2rem)] py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
+          style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width }}
+          className="z-50 max-h-[60vh] overflow-y-auto py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
         >
           {options.length === 0 && !onAddNew ? (
             <div className="px-3 py-2 text-sm text-gray-400">—</div>
@@ -172,9 +193,9 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="whitespace-nowrap">{opt.label}</div>
+                    <div className="break-words leading-snug">{opt.label}</div>
                     {def && (
-                      <div className="mt-0.5 text-xs text-gray-500 font-normal whitespace-normal leading-snug max-w-xs">
+                      <div className="mt-0.5 text-xs text-gray-500 font-normal whitespace-normal leading-snug">
                         {def}
                       </div>
                     )}
@@ -190,7 +211,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                       onAddNew();
                       setOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-sm whitespace-nowrap text-sky-700 hover:bg-sky-50 transition-colors"
+                    className="w-full text-left px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 transition-colors"
                   >
                     + {addNewLabel ?? 'Add new'}
                   </button>
@@ -198,7 +219,8 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
