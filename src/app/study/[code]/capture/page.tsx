@@ -679,9 +679,12 @@ export default function CapturePage() {
   // renders inside CasePanel, tabs/separators/flow-blocks/full-SC hide, and
   // failure/sequence actions get the lean system-condition question instead.
   const flowMode = study.systemType === 'flow';
-  // C5 (2026-06-17): wide-screen freeze-pane layout (vs the stacked flow). When
-  // on, the page goes full-width and the submit bar renders inline (not fixed).
-  const freezeLayout = flowMode && study.flowLayout === 'freeze';
+  // Wide-screen freeze-pane is the ONLY flow layout (2026-06-17): the page goes
+  // full-width and the submit bar renders inline (not fixed). It is responsive —
+  // the three zones stack on narrow screens. (The legacy 'stacked' flow layout
+  // and the studies.flow_layout switch were retired; the DB column is left in
+  // place per the additive-only rule but is no longer read.)
+  const freezeLayout = flowMode;
   // Flow-mode "Work we did" path (2026-06-12): captured via the flow-block strip
   // (tag per block + per-block system condition), NOT the single classification
   // pills. The entry-level classification is derived from the blocks at submit.
@@ -794,7 +797,6 @@ export default function CapturePage() {
         onActiveCaseChange={setActiveCase}
         refreshSignal={caseRefreshTick}
         systemType={study.systemType}
-        flowLayout={study.flowLayout}
         lifeProblems={study.lifeProblems}
         whatMattersTypes={study.whatMattersTypes}
         onTypesChanged={refreshStudy}

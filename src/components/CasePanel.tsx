@@ -20,7 +20,6 @@ import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection from '@/components/CaseContextSection';
 import CaseDecisionPoints, { type CaseDecision, type DecisionPointType } from '@/components/CaseDecisionPoints';
-import CustomerRefCombobox from '@/components/CustomerRefCombobox';
 
 interface CaseRow {
   id: string;
@@ -59,9 +58,6 @@ interface Props {
   // Flow mode (slice B): when 'flow', the case carries the person context
   // (context & situation, P2BS, what matters) via CaseContextSection.
   systemType: 'transactional' | 'flow';
-  // C5 (2026-06-17): flow sub-layout. 'stacked' = today's vertical flow;
-  // 'freeze' = wide-screen freeze-pane (customer left, touch rail, decisions right).
-  flowLayout?: 'stacked' | 'freeze';
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
   onTypesChanged?: () => Promise<void> | void;
@@ -90,7 +86,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, flowLayout = 'stacked', lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -208,12 +204,10 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   //     type decides it — a match continues that customer, no match opens a new
   //     one. The composer (children) stays hidden until a customer is open. ---
   if (isFlow && (!activeCaseId || !caseRow)) {
-    // C5 case-search table (2026-06-17, freeze only): an overview of existing
-    // cases (Account Number / P2BS / Demand / What Matters) with "Enter Case"
-    // per row, plus a search box to find or open a new reference number. The
-    // stacked flow keeps the compact combobox card below.
-    if (flowLayout === 'freeze') {
-      // Cold-start entry screen (Option A, 2026-06-17): one smart reference field
+    // Cold-start entry screen (Option A, 2026-06-17): one smart reference field
+    {
+      // [former freeze-only gate removed 2026-06-17 — freeze is the only flow
+      //  layout now; the old stacked combobox card was deleted.]
       // that drives the primary action AND filters the recent list. In both the
       // new-case and resume paths the user types the same thing (the reference);
       // the screen decides new-vs-resume from whether it already exists — no
@@ -320,25 +314,6 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         </div>
       );
     }
-    // C5/R10 (2026-06-17): stacked flow keeps a tidy, centred combobox card.
-    return (
-      <div className="max-w-md mx-auto mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-center gap-1.5 mb-3">
-          <p className="text-base font-semibold text-gray-800">{t('capture.customerRefHeading')}</p>
-          <InfoPopover label={t('capture.customerRefHelp')}>
-            {t('capture.customerRefHelp')}
-          </InfoPopover>
-        </div>
-        <CustomerRefCombobox
-          value={refInput}
-          onChange={setRefInput}
-          customers={caseList}
-          onSelect={(ref) => openCase(ref)}
-          disabled={opening}
-        />
-        {error && <p className="mt-2 text-xs text-red-600 text-center">{error}</p>}
-      </div>
-    );
   }
 
   // --- Transactional closed state: ref input, composer below (capture first,
@@ -558,7 +533,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // rail scrolling horizontally between them, the composer as the newest column.
   // Built for wide/curved screens; recomposes the same sub-blocks as the stacked
   // flow, so capture logic is identical.
-  if (isFlow && flowLayout === 'freeze') {
+  if (isFlow) {
     return (
       // Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
       // columns (customer left · touch rail + composer middle · decisions right).
@@ -640,66 +615,6 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           </aside>
         )}
       </div>
-    );
-  }
-
-  // Flow mode (2026-06-14): three legible zones so it's clear what's "already
-  // there" (the case) vs "what I'm adding" (the composer):
-  //   1. tinted case-state panel (constant — attached to the value demand & problem)
-  //   2. previous touches (history)
-  //   3. white "What's happening now?" composer card (the add zone)
-  if (isFlow) {
-    return (
-      <>
-        <div className="mb-3 rounded-xl border border-green-200 bg-green-100/50 p-3">
-          {headerRow}
-          <CaseContextSection
-            code={code}
-            contextSituation={caseRow.contextSituation}
-            lifeProblemId={caseRow.lifeProblemId}
-            whatMatters={caseRow.whatMatters}
-            whatMattersTypeIds={wmIds}
-            lifeProblems={lifeProblems}
-            whatMattersTypes={whatMattersTypes}
-            demandTypeId={caseRow.demandTypeId}
-            valueDemandTypes={valueDemandTypes}
-            onPatch={patchCase}
-            onTypesChanged={onTypesChanged}
-          />
-          {decisionPointsEnabled && (
-            <CaseDecisionPoints
-              code={code}
-              caseId={caseRow.id}
-              decisionPointTypes={decisionPointTypes}
-              decisions={decisions}
-              collectorName={collectorName}
-              onChanged={() => loadCase(caseRow.id)}
-            />
-          )}
-          {attachLastChip}
-        </div>
-
-        {/* Previous touches — the history of the flow. */}
-        <div className="mb-3">
-          {entries.length > 0 && (
-            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1 px-1">
-              {t('capture.casePreviousTouches')}
-            </p>
-          )}
-          {timelineList}
-        </div>
-
-        {/* The add zone — visually distinct white card so it's clear this is
-            where you add the next touch. */}
-        {children && (
-          <div className="mb-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
-            {children}
-          </div>
-        )}
-
-        {caseFooter}
-      </>
     );
   }
 
