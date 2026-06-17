@@ -2720,6 +2720,51 @@ const translations = {
     sv: 'Öppna #{ref} som en ny kund',
     de: '#{ref} als neuen Kunden öffnen',
   },
+  // Entry-screen cold start (2026-06-17): smart field + recent list. The live
+  // feedback line below the field (Resume an existing customer / open a new one)
+  // and the recent-customers rows. Flow + freeze only.
+  'capture.customerResume': {
+    en: 'Resume',
+    da: 'Fortsæt',
+    sv: 'Fortsätt',
+    de: 'Fortsetzen',
+  },
+  'capture.customerNewHint': {
+    en: 'New customer — starts a fresh case',
+    da: 'Ny kunde — starter en ny sag',
+    sv: 'Ny kund — startar ett nytt ärende',
+    de: 'Neuer Kunde — beginnt einen neuen Fall',
+  },
+  'capture.customerFoundPrefix': {
+    en: 'Found',
+    da: 'Fundet',
+    sv: 'Hittad',
+    de: 'Gefunden',
+  },
+  'capture.customerOpenedOn': {
+    en: 'opened {date}',
+    da: 'åbnet {date}',
+    sv: 'öppnad {date}',
+    de: 'geöffnet {date}',
+  },
+  'capture.customerTouches': {
+    en: '{n} touches',
+    da: '{n} berøringer',
+    sv: '{n} kontakter',
+    de: '{n} Kontakte',
+  },
+  'capture.customerTouchOne': {
+    en: '1 touch',
+    da: '1 berøring',
+    sv: '1 kontakt',
+    de: '1 Kontakt',
+  },
+  'capture.customerNoMatch': {
+    en: 'No existing match.',
+    da: 'Ingen eksisterende match.',
+    sv: 'Ingen befintlig träff.',
+    de: 'Keine vorhandene Übereinstimmung.',
+  },
   // Flow open-state: customer-worded variants of the shared case footer/chip
   // strings (the transactional case* versions stay as-is).
   'capture.customerAttachNote': {

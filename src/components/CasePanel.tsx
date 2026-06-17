@@ -107,7 +107,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // composer stays hidden until a customer is open. caseList backs the
   // combobox's recent-open list and its autocomplete matches.
   const isFlow = systemType === 'flow';
-  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null }[]>([]);
+  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null; entryCount: number }[]>([]);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -213,22 +213,35 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     // per row, plus a search box to find or open a new reference number. The
     // stacked flow keeps the compact combobox card below.
     if (flowLayout === 'freeze') {
-      const lpLabel = (id: string | null) => { const x = lifeProblems.find((l) => l.id === id); return x ? tl(x.label) : ''; };
+      // Cold-start entry screen (Option A, 2026-06-17): one smart reference field
+      // that drives the primary action AND filters the recent list. In both the
+      // new-case and resume paths the user types the same thing (the reference);
+      // the screen decides new-vs-resume from whether it already exists — no
+      // search-vs-create lane choice. Replaces the sparse 4-column table.
       const dtLabel = (id: string | null) => { const x = demandTypes.find((d) => d.id === id); return x ? tl(x.label) : ''; };
+      const lpLabel = (id: string | null) => { const x = lifeProblems.find((l) => l.id === id); return x ? tl(x.label) : ''; };
       const wmLabel = (ids: string | null) => (ids || '').split(',').filter(Boolean)
         .map((i) => { const x = whatMattersTypes.find((w) => w.id === i); return x ? tl(x.label) : null; })
         .filter(Boolean).join(', ');
+      // A one-line summary for a recent row / the found line: demand, else the
+      // life problem, else what-matters (whatever the study actually populates).
+      const summary = (c: typeof caseList[number]) => dtLabel(c.demandTypeId) || lpLabel(c.lifeProblemId) || wmLabel(c.whatMattersTypeIds);
+      const touchLabel = (n: number) => n === 1 ? t('capture.customerTouchOne') : t('capture.customerTouches', { n: String(n) });
       const q = refInput.trim();
-      const filtered = q ? caseList.filter((c) => c.caseRef.toLowerCase().startsWith(q.toLowerCase())) : caseList;
-      const exact = caseList.some((c) => c.caseRef.toLowerCase() === q.toLowerCase());
+      const matched = q ? caseList.find((c) => c.caseRef.toLowerCase() === q.toLowerCase()) : undefined;
+      // Recent list: open cases before closed, each group newest-first (caseList
+      // already arrives createdAt-desc). Filter by what's typed (startsWith).
+      const filtered = (q ? caseList.filter((c) => c.caseRef.toLowerCase().startsWith(q.toLowerCase())) : caseList);
+      const recent = [...filtered].sort((a, b) => (a.status === b.status ? 0 : a.status === 'open' ? -1 : 1));
       return (
-        <div className="max-w-5xl mx-auto mt-4">
+        <div className="max-w-2xl mx-auto mt-6">
           <div className="flex items-center justify-center gap-1.5 mb-3">
             <p className="text-lg font-semibold text-gray-800">{t('capture.customerRefHeading')}</p>
             <InfoPopover label={t('capture.customerRefHelp')}>{t('capture.customerRefHelp')}</InfoPopover>
           </div>
-          {/* Search + open-new */}
-          <div className="flex items-center gap-2 max-w-lg mx-auto mb-3">
+
+          {/* Smart field — drives the button and filters the list below. */}
+          <div className="flex items-center gap-2">
             <input
               type="text"
               inputMode="numeric"
@@ -237,55 +250,71 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
               onKeyDown={(e) => { if (e.key === 'Enter' && q) { e.preventDefault(); openCase(q); } }}
               placeholder={t('capture.caseSearchPlaceholder')}
               aria-label={t('capture.caseSearchPlaceholder')}
-              className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+              className="flex-1 px-3 py-2.5 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
             />
             <button
               type="button"
               onClick={() => q && openCase(q)}
               disabled={!q || opening}
-              className="shrink-0 px-3 py-2 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
+              className={`shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors ${
+                matched
+                  ? 'border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 hover:border-sky-500'
+                  : 'text-white bg-brand hover:bg-brand-hover'
+              }`}
             >
-              {q && !exact ? `+ ${t('capture.customerOpenAsNew', { ref: q })}` : t('capture.caseTableEnter')}
+              {matched
+                ? t('capture.customerResume')
+                : (q ? `+ ${t('capture.customerOpenAsNew', { ref: q })}` : t('capture.caseTableEnter'))}
             </button>
           </div>
-          {/* Overview table */}
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-sky-100 text-gray-700">
-                <tr>
-                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableAccount')}</th>
-                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableP2bs')}</th>
-                  <th className="text-left font-semibold px-3 py-2">{t('capture.demand')}</th>
-                  <th className="text-left font-semibold px-3 py-2">{t('capture.caseTableWhatMatters')}</th>
-                  <th className="px-3 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="px-3 py-6 text-center text-gray-400">{t('capture.caseTableEmpty')}</td></tr>
-                ) : filtered.map((c) => (
-                  <tr key={c.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2 font-medium text-gray-900 tabular-nums whitespace-nowrap">
-                      #{c.caseRef}
-                      {c.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
-                    </td>
-                    <td className="px-3 py-2 text-gray-700">{lpLabel(c.lifeProblemId)}</td>
-                    <td className="px-3 py-2 text-gray-700">{dtLabel(c.demandTypeId)}</td>
-                    <td className="px-3 py-2 text-gray-700">{wmLabel(c.whatMattersTypeIds)}</td>
-                    <td className="px-3 py-2 text-right">
+
+          {/* Live feedback line — confirm the right customer before resuming, or
+              that a new one will be created. Empty input shows nothing. */}
+          {q && (
+            <p className="mt-2 text-xs text-center min-h-[1rem]">
+              {matched ? (
+                <span className="text-sky-700">
+                  {t('capture.customerFoundPrefix')}
+                  {summary(matched) ? ` — ${summary(matched)}` : ' —'} · {touchLabel(matched.entryCount)} · {t('capture.customerOpenedOn', { date: new Date(matched.openedAt).toLocaleDateString() })}
+                  {matched.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500 align-middle">{t('capture.caseStatusClosed')}</span>}
+                </span>
+              ) : (
+                <span className="text-gray-500">{t('capture.customerNewHint')}</span>
+              )}
+            </p>
+          )}
+
+          {/* Recent customers — clean rows, not a wide table. */}
+          <div className="mt-5">
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1.5 px-1">{t('capture.customerRecentOpen')}</p>
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              {caseList.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-gray-400">{t('capture.caseTableEmpty')}</p>
+              ) : recent.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-gray-400">{t('capture.customerNoMatch')}</p>
+              ) : (
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {recent.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50">
+                      <span className="font-medium text-gray-900 tabular-nums whitespace-nowrap min-w-[4.5rem]">
+                        #{c.caseRef}
+                        {c.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
+                      </span>
+                      <span className="flex-1 min-w-0 truncate text-sm text-gray-600">{summary(c)}</span>
+                      <span className="shrink-0 text-xs text-gray-400 tabular-nums">{touchLabel(c.entryCount)}</span>
                       <button
                         type="button"
                         onClick={() => openCase(c.caseRef)}
                         disabled={opening}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 hover:border-sky-500 disabled:opacity-50 transition-colors"
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium border border-sky-300 bg-white text-sky-700 hover:bg-sky-50 hover:border-sky-500 disabled:opacity-50 transition-colors"
                       >
-                        {t('capture.caseTableEnter')}
+                        {t('capture.customerResume')}
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           {error && <p className="mt-2 text-xs text-red-600 text-center">{error}</p>}
         </div>
