@@ -541,7 +541,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       // touches → decisions — so nothing collapses or scrolls off on a phone.
       // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
       // (lg only — they read as zone separators across, not stacked).
-      <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-start min-h-[24rem]">
+      <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-stretch min-h-[24rem]">
         {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg. */}
         <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border border-green-200 bg-green-100/50 p-3">
           {/* R9: open another customer (a new reference) without leaving capture. */}
@@ -575,7 +575,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         {/* ┊ boundary + MIDDLE — the flow. On lg: saved touches pile up left→right
             with the highlighted composer rightmost (newest). On mobile: a vertical
             stack, composer FIRST (order-1) then the touches (order-2) below it. */}
-        <div className="order-2 flex-1 min-w-0 lg:overflow-x-auto lg:border-l-2 lg:border-dashed lg:border-gray-300 lg:ml-3 lg:pl-3">
+        <div className="order-2 flex-1 min-w-0 lg:overflow-x-auto lg:border-l-2 lg:border-dashed lg:border-gray-400 lg:ml-3 lg:pl-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:min-w-min lg:items-stretch pb-2">
             {entries.map((e) => (
               <div key={e.id} className="order-2 lg:order-1 w-full lg:w-72 shrink-0 flex">
@@ -597,7 +597,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         {/* ┊ boundary + RIGHT frozen pane — decisions overview (R4): blue tint,
             options shown inline, always in view. Full width on mobile, last. */}
         {decisionPointsEnabled && (
-          <aside className="order-3 w-full lg:w-80 shrink-0 lg:border-l-2 lg:border-dashed lg:border-gray-300 lg:ml-3 lg:pl-3">
+          <aside className="order-3 w-full lg:w-80 shrink-0 lg:border-l-2 lg:border-dashed lg:border-gray-400 lg:ml-3 lg:pl-3">
             <div className="rounded-xl bg-sky-50/70 border border-sky-100 p-2">
               <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                 {t('capture.caseDecisionsHeading')}
