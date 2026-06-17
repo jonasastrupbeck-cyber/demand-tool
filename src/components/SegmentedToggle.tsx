@@ -16,6 +16,11 @@ interface Props {
   value: string;
   onChange: (value: string) => void;
   ariaLabel?: string;
+  /** When true, clicking the already-selected option clears it (fires
+   *  onChange('')). Opt-in so toggles that must always hold a value (work
+   *  V/S/F, customer-felt) keep their current behaviour. Used by the decision
+   *  points so a mis-click can be un-clicked. */
+  allowDeselect?: boolean;
 }
 
 // Compact two-option (or N-option) toggle. Used by SC Helps/Hinders and
@@ -35,7 +40,7 @@ const ACTIVE_CLASSES: Record<ActiveColor, string> = {
   blue: 'bg-blue-600 text-white',
 };
 
-export default function SegmentedToggle({ options, value, onChange, ariaLabel }: Props) {
+export default function SegmentedToggle({ options, value, onChange, ariaLabel, allowDeselect = false }: Props) {
   return (
     <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={ariaLabel}>
       {options.map((opt) => {
@@ -45,7 +50,7 @@ export default function SegmentedToggle({ options, value, onChange, ariaLabel }:
           <button
             key={opt.value}
             type="button"
-            onClick={() => onChange(opt.value)}
+            onClick={() => onChange(allowDeselect && active ? '' : opt.value)}
             className={`px-2 py-1 text-xs font-medium transition-colors ${
               active
                 ? activeClass

@@ -1053,7 +1053,17 @@ export async function upsertCaseDecision(caseId: string, data: {
 }
 
 export async function deleteCaseDecision(id: string) {
+  // Look the row up before deleting so we can mirror the upsert's case-status
+  // rule: removing the 'person' milestone (which may have closed the case via a
+  // Decline) reopens it — so an un-clicked Decline is fully reversible.
+  const row = (await db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.id, id)))[0];
   await db.delete(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
+  if (row) {
+    const dpType = (await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.id, row.decisionPointTypeId)))[0];
+    if (dpType?.kind === 'person') {
+      await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, row.caseId));
+    }
+  }
 }
 
 export async function getEntries(studyId: string, from?: Date, to?: Date) {

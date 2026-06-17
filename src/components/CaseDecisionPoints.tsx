@@ -120,6 +120,20 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     setSaving(false);
   }
 
+  // Outcome is the defining field. Un-clicking it (deselect → '') on a SAVED
+  // decision removes the decision entirely — and, for the person milestone,
+  // reopens the case (handled in deleteCaseDecision). On an unsaved/in-progress
+  // decision it just clears local state. Sub-fields (cleanliness / willingness /
+  // ability) clear locally and re-persist on Save.
+  function setOrClearOutcome(decision: CaseDecision | undefined, v: string) {
+    if (v === '') {
+      setOutcome('');
+      if (decision) void remove(decision.id);
+    } else {
+      setOutcome(v as 'positive' | 'negative');
+    }
+  }
+
   if (decisionPointTypes.length === 0) return null;
 
   // C5/R4 (2026-06-17): freeze-pane overview — every milestone shows its options
@@ -150,7 +164,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     <SegmentedToggle
                       ariaLabel={t('capture.dpWillingnessToPay')}
                       value={yesNo(vWilling)}
-                      onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no'); }}
+                      allowDeselect
+                      onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no' | ''); }}
                       options={[
                         { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
                         { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
@@ -162,7 +177,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     <SegmentedToggle
                       ariaLabel={t('capture.dpAbilityToPay')}
                       value={yesNo(vAbility)}
-                      onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no'); }}
+                      allowDeselect
+                      onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no' | ''); }}
                       options={[
                         { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
                         { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
@@ -175,7 +191,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                 <SegmentedToggle
                   ariaLabel={t('capture.dpOutcomeAria')}
                   value={vOutcome}
-                  onChange={(v) => { focus(); setOutcome(v as 'positive' | 'negative'); }}
+                  allowDeselect
+                  onChange={(v) => { focus(); setOrClearOutcome(decision, v); }}
                   options={[
                     { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
                     { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
@@ -186,7 +203,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                 <SegmentedToggle
                   ariaLabel={t('capture.dpCleanlinessAria')}
                   value={vClean}
-                  onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty'); }}
+                  allowDeselect
+                  onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty' | ''); }}
                   options={[
                     { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
                     { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
@@ -256,7 +274,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                       <SegmentedToggle
                         ariaLabel={t('capture.dpWillingnessToPay')}
                         value={willingnessToPay}
-                        onChange={(v) => setWillingnessToPay(v as 'yes' | 'no')}
+                        allowDeselect
+                        onChange={(v) => setWillingnessToPay(v as 'yes' | 'no' | '')}
                         options={[
                           { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
                           { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
@@ -268,7 +287,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                       <SegmentedToggle
                         ariaLabel={t('capture.dpAbilityToPay')}
                         value={abilityToPay}
-                        onChange={(v) => setAbilityToPay(v as 'yes' | 'no')}
+                        allowDeselect
+                        onChange={(v) => setAbilityToPay(v as 'yes' | 'no' | '')}
                         options={[
                           { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
                           { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
@@ -281,7 +301,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   <SegmentedToggle
                     ariaLabel={t('capture.dpOutcomeAria')}
                     value={outcome}
-                    onChange={(v) => setOutcome(v as 'positive' | 'negative')}
+                    allowDeselect
+                    onChange={(v) => setOrClearOutcome(decision, v)}
                     options={[
                       { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
                       { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
@@ -292,7 +313,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   <SegmentedToggle
                     ariaLabel={t('capture.dpCleanlinessAria')}
                     value={cleanliness}
-                    onChange={(v) => setCleanliness(v as 'clean' | 'dirty')}
+                    allowDeselect
+                    onChange={(v) => setCleanliness(v as 'clean' | 'dirty' | '')}
                     options={[
                       { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
                       { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },

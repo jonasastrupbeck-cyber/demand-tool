@@ -1555,6 +1555,7 @@ export default function CapturePage() {
                             onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionId: id || null } : b))}
                             options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
                             variant="add"
+                            fullWidth
                             onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
                             addNewLabel={t('capture.addNew')}
                           />

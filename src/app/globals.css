@@ -5,16 +5,18 @@
 }
 
 /* Brand colour tokens (C11, 2026-06-17). Single source of truth for the brand
-   accent so the scheme can be swapped in one place. These values are TODAY'S
-   red — when the final blue RGBs arrive, change only these three lines and the
-   whole app (Tailwind `*-brand*` utilities AND the dashboard charts via
-   var(--color-brand)) follows. NB: these are the BRAND accent only — the
-   semantic strand colours (green=value, red=failure, sky=system conditions,
-   blue=thinking) are deliberately NOT tokenised here and must stay as-is. */
+   accent so the scheme can be swapped in one place — change only these three
+   lines and the whole app (Tailwind `*-brand*` utilities AND the dashboard
+   charts via var(--color-brand)) follows. NB: these are the BRAND accent only —
+   the semantic strand colours (green=value, red=failure, sky=system conditions,
+   blue=thinking) are deliberately NOT tokenised here and must stay as-is.
+   2026-06-17: re-skinned to Skipton Building Society's Primary Purple (#2B2171,
+   from brand.skipton.co.uk) — chosen over Skipton Blue so the brand accent stays
+   distinct from the sky/blue Vanguard strand colours. Closes C-Open-3. */
 @theme {
-  --color-brand: #ac2c2d;
-  --color-brand-hover: #8a2324;
-  --color-brand-accent: #d4393a;
+  --color-brand: #2B2171;
+  --color-brand-hover: #211a5a;
+  --color-brand-accent: #3d33a0;
 }
 
 html, body {

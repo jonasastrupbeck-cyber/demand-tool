@@ -41,6 +41,11 @@ interface Props {
   onAddNew?: () => void;
   /** Label for the "+ new" action row in the popover. */
   addNewLabel?: string;
+  /** When true, the pill fills its container's width (trigger `w-full`, label
+   *  truncates) and the popover matches that width exactly (no 240px floor). Used
+   *  for the per-block system-condition picker so it never grows wider than the
+   *  work block it's attached to. Default false = today's content-width pill. */
+  fullWidth?: boolean;
 }
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
@@ -83,7 +88,7 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   return 'bg-white text-gray-500 border-gray-300 hover:border-gray-400';
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel }: Props) {
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel, fullWidth = false }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -99,7 +104,10 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
     if (!btn) return;
     const r = btn.getBoundingClientRect();
     const margin = 8;
-    const width = Math.min(Math.max(r.width, 240), window.innerWidth - margin * 2);
+    // fullWidth pills match their trigger exactly (no 240px floor) so the
+    // popover never exceeds the work block the pill sits in.
+    const minWidth = fullWidth ? r.width : 240;
+    const width = Math.min(Math.max(r.width, minWidth), window.innerWidth - margin * 2);
     let left = r.left;
     if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
     if (left < margin) left = margin;
@@ -136,7 +144,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
   }, [open]);
 
   return (
-    <div ref={wrapperRef} className={`relative inline-block ${className}`}>
+    <div ref={wrapperRef} className={`relative ${fullWidth ? 'block w-full' : 'inline-block'} ${className}`}>
       <button
         ref={btnRef}
         type="button"
@@ -144,9 +152,9 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${pillClasses(variant, Boolean(selected))}`}
+        className={`${fullWidth ? 'flex w-full justify-between' : 'inline-flex'} items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${pillClasses(variant, Boolean(selected))}`}
       >
-        <span>{selected ? selected.label : placeholder}</span>
+        <span className={fullWidth ? 'min-w-0 truncate' : undefined}>{selected ? selected.label : placeholder}</span>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="12"
