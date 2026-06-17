@@ -264,6 +264,8 @@ export default function CapturePage() {
   useEffect(() => {
     if (loading || !study) return;
     if (entryType === 'work' && !study.workClassificationEnabled && classification !== 'unknown') {
+      // Derive-on-load: set the implicit classification once the study/tab is known.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setClassification('unknown');
     }
   }, [loading, study, entryType, classification]);
@@ -275,6 +277,9 @@ export default function CapturePage() {
   useEffect(() => {
     if (loading || !study || study.systemType !== 'flow') return;
     if (entryType !== 'work') {
+      // Derive-on-load: flow capture is work-only, so force the work path once a
+      // flow study has loaded.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
       setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }]);
     }
