@@ -4,6 +4,19 @@
   --font-sans: var(--font-geist-sans);
 }
 
+/* Brand colour tokens (C11, 2026-06-17). Single source of truth for the brand
+   accent so the scheme can be swapped in one place. These values are TODAY'S
+   red — when the final blue RGBs arrive, change only these three lines and the
+   whole app (Tailwind `*-brand*` utilities AND the dashboard charts via
+   var(--color-brand)) follows. NB: these are the BRAND accent only — the
+   semantic strand colours (green=value, red=failure, sky=system conditions,
+   blue=thinking) are deliberately NOT tokenised here and must stay as-is. */
+@theme {
+  --color-brand: #ac2c2d;
+  --color-brand-hover: #8a2324;
+  --color-brand-accent: #d4393a;
+}
+
 html, body {
   background-color: #ffffff !important;
 }

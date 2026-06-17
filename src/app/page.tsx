@@ -20,6 +20,9 @@ export default function Home() {
   // Transactional preselected — preserves today's behaviour.
   const [systemType, setSystemType] = useState<'transactional' | 'flow'>('transactional');
   const [showCreate, setShowCreate] = useState(false);
+  // C2 (2026-06-17): study creation is gated behind a consultant unlock.
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [adminSecret, setAdminSecret] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,6 +42,48 @@ export default function Home() {
     router.push(`/study/${accessCode.trim().toUpperCase()}/capture`);
   }
 
+  // Open the create flow. If the consultant gate isn't configured (no
+  // CONSULTANT_ADMIN_SECRET), go straight to the form to preserve old
+  // behaviour; otherwise prompt for the consultant code first.
+  async function openCreate() {
+    setError('');
+    try {
+      const res = await fetch('/api/admin-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret: '' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.configured === false) {
+          setShowCreate(true);
+          return;
+        }
+      }
+    } catch {
+      // Network issue — fall through to the unlock prompt.
+    }
+    setShowUnlock(true);
+  }
+
+  async function handleUnlock(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    const res = await fetch('/api/admin-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: adminSecret }),
+    });
+    setLoading(false);
+    if (!res.ok) {
+      setError(t('landing.adminCodeInvalid'));
+      return;
+    }
+    setShowUnlock(false);
+    setShowCreate(true);
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!studyName.trim()) return;
@@ -55,7 +100,7 @@ export default function Home() {
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined, systemType }),
+      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined, systemType, adminSecret }),
     });
 
     if (!res.ok) {
@@ -76,7 +121,7 @@ export default function Home() {
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value as Locale)}
-            className="text-sm rounded-lg px-3 py-1.5 bg-white border border-gray-300 text-gray-600 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+            className="text-sm rounded-lg px-3 py-1.5 bg-white border border-gray-300 text-gray-600 focus:ring-2 focus:ring-brand outline-none"
           >
             {Object.entries(LOCALE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
@@ -97,7 +142,7 @@ export default function Home() {
           </div>
         )}
 
-        {!showCreate ? (
+        {!showCreate && !showUnlock ? (
           <div className="space-y-6">
             <form onSubmit={handleJoin} className="rounded-xl shadow-sm p-6 bg-white border border-gray-200">
               <h2 className="text-lg font-semibold mb-4 text-gray-900">{t('landing.joinStudy')}</h2>
@@ -110,12 +155,12 @@ export default function Home() {
                 onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
                 placeholder="e.g. ABC123"
                 maxLength={6}
-                className="w-full px-4 py-3 rounded-lg text-lg tracking-widest text-center font-mono uppercase text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                className="w-full px-4 py-3 rounded-lg text-lg tracking-widest text-center font-mono uppercase text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
               />
               <button
                 type="submit"
                 disabled={loading || accessCode.trim().length < 4}
-                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand hover:bg-brand-hover"
               >
                 {loading ? t('landing.joining') : t('landing.join')}
               </button>
@@ -123,10 +168,44 @@ export default function Home() {
 
             <div className="text-center">
               <button
-                onClick={() => setShowCreate(true)}
-                className="text-[#ac2c2d] hover:text-[#d4393a] font-medium"
+                onClick={openCreate}
+                className="text-brand hover:text-brand-accent font-medium"
               >
-                {t('landing.createNew')}
+                {t('landing.consultantAccess')}
+              </button>
+            </div>
+          </div>
+        ) : showUnlock ? (
+          <div className="space-y-6">
+            <form onSubmit={handleUnlock} className="rounded-xl shadow-sm p-6 bg-white border border-gray-200">
+              <h2 className="text-lg font-semibold mb-2 text-gray-900">{t('landing.consultantAccess')}</h2>
+              <p className="text-sm text-gray-500 mb-4">{t('landing.consultantAccessHint')}</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('landing.adminCode')}
+              </label>
+              <input
+                type="password"
+                value={adminSecret}
+                onChange={(e) => setAdminSecret(e.target.value)}
+                placeholder={t('landing.adminCodePlaceholder')}
+                autoFocus
+                className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+              />
+              <button
+                type="submit"
+                disabled={loading || !adminSecret.trim()}
+                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand hover:bg-brand-hover"
+              >
+                {loading ? t('landing.unlocking') : t('landing.unlock')}
+              </button>
+            </form>
+
+            <div className="text-center">
+              <button
+                onClick={() => { setShowUnlock(false); setAdminSecret(''); setError(''); }}
+                className="text-brand hover:text-brand-accent font-medium"
+              >
+                {t('landing.joinExisting')}
               </button>
             </div>
           </div>
@@ -151,7 +230,7 @@ export default function Home() {
                           onClick={() => setSystemType(type)}
                           className={`px-4 py-3 rounded-lg text-left transition-all ${
                             isSelected
-                              ? 'bg-[#ac2c2d] text-white ring-2 ring-[#ac2c2d] ring-offset-1'
+                              ? 'bg-brand text-white ring-2 ring-brand ring-offset-1'
                               : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
                           }`}
                         >
@@ -175,7 +254,7 @@ export default function Home() {
                     value={studyName}
                     onChange={(e) => setStudyName(e.target.value)}
                     placeholder={t('landing.studyNamePlaceholder')}
-                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
                 <div>
@@ -187,7 +266,7 @@ export default function Home() {
                     onChange={(e) => setStudyDesc(e.target.value)}
                     placeholder={t('landing.descriptionPlaceholder')}
                     rows={3}
-                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
                 <div>
@@ -209,7 +288,7 @@ export default function Home() {
                           onClick={() => setContactMethodChoice(choice === contactMethodChoice ? '' : choice)}
                           className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                             isSelected
-                              ? 'bg-[#ac2c2d] text-white ring-2 ring-[#ac2c2d] ring-offset-1'
+                              ? 'bg-brand text-white ring-2 ring-brand ring-offset-1'
                               : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
                           } ${choice === 'other' ? 'col-span-2' : ''}`}
                         >
@@ -224,7 +303,7 @@ export default function Home() {
                       value={customContactMethod}
                       onChange={(e) => setCustomContactMethod(e.target.value)}
                       placeholder={t('landing.contactOtherPlaceholder')}
-                      className="w-full mt-2 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                      className="w-full mt-2 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                     />
                   )}
                 </div>
@@ -237,7 +316,7 @@ export default function Home() {
                     value={pointOfTransaction}
                     onChange={(e) => setPointOfTransaction(e.target.value)}
                     placeholder={t('landing.pointOfTransactionPlaceholder')}
-                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
                 <div>
@@ -252,14 +331,14 @@ export default function Home() {
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={6}
-                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                    className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
               </div>
               <button
                 type="submit"
                 disabled={loading || !studyName.trim()}
-                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand hover:bg-brand-hover"
               >
                 {loading ? t('landing.creating') : t('landing.create')}
               </button>
@@ -268,7 +347,7 @@ export default function Home() {
             <div className="text-center">
               <button
                 onClick={() => setShowCreate(false)}
-                className="text-[#ac2c2d] hover:text-[#d4393a] font-medium"
+                className="text-brand hover:text-brand-accent font-medium"
               >
                 {t('landing.joinExisting')}
               </button>

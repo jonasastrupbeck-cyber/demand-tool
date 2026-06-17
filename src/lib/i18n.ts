@@ -51,6 +51,48 @@ const translations = {
     sv: 'Skapa en ny studie',
     de: 'Neue Studie erstellen',
   },
+  'landing.consultantAccess': {
+    en: 'Consultant access',
+    da: 'Konsulentadgang',
+    sv: 'Konsultåtkomst',
+    de: 'Beraterzugang',
+  },
+  'landing.consultantAccessHint': {
+    en: 'Creating a study is for consultants. Enter your consultant code to continue.',
+    da: 'Oprettelse af et studie er for konsulenter. Indtast din konsulentkode for at fortsætte.',
+    sv: 'Att skapa en studie är för konsulter. Ange din konsultkod för att fortsätta.',
+    de: 'Das Erstellen einer Studie ist Beratern vorbehalten. Geben Sie Ihren Beratercode ein, um fortzufahren.',
+  },
+  'landing.adminCode': {
+    en: 'Consultant code',
+    da: 'Konsulentkode',
+    sv: 'Konsultkod',
+    de: 'Beratercode',
+  },
+  'landing.adminCodePlaceholder': {
+    en: 'Enter consultant code',
+    da: 'Indtast konsulentkode',
+    sv: 'Ange konsultkod',
+    de: 'Beratercode eingeben',
+  },
+  'landing.unlock': {
+    en: 'Unlock',
+    da: 'Lås op',
+    sv: 'Lås upp',
+    de: 'Entsperren',
+  },
+  'landing.unlocking': {
+    en: 'Unlocking…',
+    da: 'Låser op…',
+    sv: 'Låser upp…',
+    de: 'Entsperren…',
+  },
+  'landing.adminCodeInvalid': {
+    en: 'Incorrect consultant code',
+    da: 'Forkert konsulentkode',
+    sv: 'Felaktig konsultkod',
+    de: 'Falscher Beratercode',
+  },
   'landing.methodContext': {
     en: 'Understand what customers really need by studying demand from their perspective. Separate value demand from failure demand to redesign the system.',
     da: 'Forstå hvad kunderne virkelig har brug for ved at studere efterspørgslen fra deres perspektiv. Adskil værdiskabende fra ikke-værdiskabende efterspørgsel for at redesigne systemet.',
@@ -2095,6 +2137,26 @@ const translations = {
     sv: '+ COR',
     de: '+ COR',
   },
+  // C7 (2026-06-17): "did the customer feel this touch?" — customer-facing COR
+  // vs internal/partner handoff. Not a Vanguard-glossary concept, written natively.
+  'capture.customerFeltQuestion': {
+    en: 'Did the customer feel this?',
+    da: 'Mærkede kunden det?',
+    sv: 'Märkte kunden av det?',
+    de: 'Hat der Kunde es gespürt?',
+  },
+  'capture.customerFeltYes': {
+    en: 'Yes — customer felt it',
+    da: 'Ja — kunden mærkede det',
+    sv: 'Ja — kunden märkte det',
+    de: 'Ja — Kunde hat es gespürt',
+  },
+  'capture.customerFeltNo': {
+    en: 'No — internal handoff',
+    da: 'Nej — intern overdragelse',
+    sv: 'Nej — intern överlämning',
+    de: 'Nein — interne Übergabe',
+  },
 
   // Capture form - linked demand
   'capture.linkedValueDemand': {
@@ -2424,6 +2486,32 @@ const translations = {
     sv: 'Orent',
     de: 'Unsauber',
   },
+  // C9 (2026-06-17): person-decision affordability sub-states. Plain terms,
+  // written natively (not Vanguard-glossary concepts).
+  'capture.dpWillingnessToPay': {
+    en: 'Willingness to pay',
+    da: 'Vilje til at betale',
+    sv: 'Vilja att betala',
+    de: 'Zahlungsbereitschaft',
+  },
+  'capture.dpAbilityToPay': {
+    en: 'Ability to pay',
+    da: 'Evne til at betale',
+    sv: 'Förmåga att betala',
+    de: 'Zahlungsfähigkeit',
+  },
+  'capture.dpYes': {
+    en: 'Yes',
+    da: 'Ja',
+    sv: 'Ja',
+    de: 'Ja',
+  },
+  'capture.dpNo': {
+    en: 'No',
+    da: 'Nej',
+    sv: 'Nej',
+    de: 'Nein',
+  },
   'capture.dpCleanlinessAria': {
     en: 'Was this decision reached cleanly or dirtily?',
     da: 'Blev beslutningen nået rent eller urent?',
@@ -2520,6 +2608,13 @@ const translations = {
     da: 'Hvad sker der nu?',
     sv: 'Vad händer nu?',
     de: 'Was passiert jetzt?',
+  },
+  // C5 (2026-06-17): heading over the frozen decision-milestone pane.
+  'capture.caseDecisionsHeading': {
+    en: 'Decisions',
+    da: 'Beslutninger',
+    sv: 'Beslut',
+    de: 'Entscheidungen',
   },
   'capture.caseShowEarlierTouches': {
     en: 'Show {count} earlier',

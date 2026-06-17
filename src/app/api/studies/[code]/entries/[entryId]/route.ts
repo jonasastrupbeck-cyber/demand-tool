@@ -128,6 +128,7 @@ export async function PATCH(
   if (body.workTypeFreeText !== undefined) updates.workTypeFreeText = body.workTypeFreeText;
   if (body.whatMatters !== undefined) updates.whatMatters = body.whatMatters;
   if (body.lifeProblemId !== undefined) updates.lifeProblemId = body.lifeProblemId;
+  if (body.customerFelt !== undefined) updates.customerFelt = typeof body.customerFelt === 'boolean' ? body.customerFelt : null;
   if (body.workBlocks !== undefined) {
     if (!Array.isArray(body.workBlocks) || !body.workBlocks.every((b: unknown) =>
       b && typeof b === 'object'

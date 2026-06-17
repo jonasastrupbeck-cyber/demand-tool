@@ -208,7 +208,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
     onClose();
   }
 
-  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none';
+  const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none';
   const labelCls = 'block text-sm font-medium text-gray-700 mb-1';
 
   const isDemand = entry?.entryType === 'demand';
@@ -278,7 +278,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       <select
                         value={entry.pointOfTransactionId || ''}
                         onChange={(e) => setEntry({ ...entry, pointOfTransactionId: e.target.value || null })}
-                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                       >
                         <option value="">{t('capture.selectPointOfTransaction')}</option>
                         {study.pointsOfTransaction.map((pot) => (
@@ -293,7 +293,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       <select
                         value={entry.contactMethodId || ''}
                         onChange={(e) => setEntry({ ...entry, contactMethodId: e.target.value || null })}
-                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                       >
                         <option value="">{t('capture.selectContactMethod')}</option>
                         {study.contactMethods.map((cm) => (
@@ -694,7 +694,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                 }}
                                 placeholder={t('capture.workBlockPlaceholder')}
                                 rows={4}
-                                className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none resize-none flex-1"
+                                className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none resize-none flex-1"
                               />
                             </>
                           )}
@@ -720,7 +720,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       type="button"
                       onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
-                      className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
+                      className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >
                       {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                     </button>
@@ -784,8 +784,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     onClick={() => setSystemConditions((prev) => prev.map((p, i) => i === idx ? { ...p, [field]: !p[field] } : p))}
                                     className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
                                       on
-                                        ? 'bg-[#ac2c2d] text-white border-[#ac2c2d]'
-                                        : 'bg-white text-gray-600 border-gray-300 hover:border-[#ac2c2d] hover:text-[#ac2c2d]'
+                                        ? 'bg-brand text-white border-brand'
+                                        : 'bg-white text-gray-600 border-gray-300 hover:border-brand hover:text-brand'
                                     }`}
                                     aria-pressed={on}
                                   >
@@ -1004,7 +1004,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
           <button
             onClick={handleSave}
             disabled={saving || loading || !entry}
-            className="flex-1 py-3 rounded-lg font-semibold text-base text-white bg-[#ac2c2d] hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="flex-1 py-3 rounded-lg font-semibold text-base text-white bg-brand hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {saving ? t('capture.saving') : t('capture.save')}
           </button>

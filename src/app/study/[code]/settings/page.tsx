@@ -832,9 +832,9 @@ export default function SettingsPage() {
             onChange={(e) => setEditingLabelValue(e.target.value)}
             autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') setEditingLabelId(null); }}
-            className="px-2 py-0.5 rounded text-sm text-gray-800 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+            className="px-2 py-0.5 rounded text-sm text-gray-800 bg-white border border-gray-300 focus:ring-1 focus:ring-brand outline-none"
           />
-          <button onClick={saveLabel} className="text-xs px-2 py-0.5 bg-[#ac2c2d] text-white rounded">{t('settings.save')}</button>
+          <button onClick={saveLabel} className="text-xs px-2 py-0.5 bg-brand text-white rounded">{t('settings.save')}</button>
           <button onClick={() => setEditingLabelId(null)} className="text-xs px-1 text-gray-500" aria-label="Cancel">&times;</button>
         </span>
       );
@@ -875,7 +875,7 @@ export default function SettingsPage() {
   }
 
   const cardCls = 'rounded-xl shadow-sm p-5 bg-white border border-gray-200';
-  const inputCls = 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none';
+  const inputCls = 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none';
   const itemCls = 'flex items-center justify-between py-2 px-3 rounded-lg';
 
   if (loading) return <div className="p-4 text-gray-500">{t('capture.loading')}</div>;
@@ -900,12 +900,12 @@ export default function SettingsPage() {
               pattern="[0-9]*"
               maxLength={6}
               autoFocus
-              className="w-full px-4 py-3 rounded-lg text-lg tracking-widest text-center font-mono text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+              className="w-full px-4 py-3 rounded-lg text-lg tracking-widest text-center font-mono text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
             />
             <button
               type="submit"
               disabled={pinInput.length < 4}
-              className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+              className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand hover:bg-brand-hover"
             >
               {t('consultant.unlock')}
             </button>
@@ -937,9 +937,9 @@ export default function SettingsPage() {
                 inputMode="numeric"
                 pattern="[0-9]*"
                 maxLength={6}
-                className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none"
+                className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
               />
-              <button type="submit" disabled={newPinInput.length < 4} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+              <button type="submit" disabled={newPinInput.length < 4} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
           </div>
         )}
@@ -953,13 +953,13 @@ export default function SettingsPage() {
             onChange={(e) => setPurposeInput(e.target.value)}
             placeholder={t('settings.purposePlaceholder')}
             rows={2}
-            className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none mb-2"
+            className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none mb-2"
           />
           <div className="flex items-center gap-2">
             <button
               onClick={savePurpose}
               disabled={purposeInput.trim() === (study.purpose || '')}
-              className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+              className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors bg-brand hover:bg-brand-hover"
             >
               {t('settings.save')}
             </button>
@@ -1015,7 +1015,7 @@ export default function SettingsPage() {
           <h2 className="text-base font-semibold mb-3 text-gray-900">{t('settings.accessCode')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.shareCode')}</p>
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-mono font-bold tracking-widest px-4 py-2 rounded-lg text-[#ac2c2d] bg-red-50">
+            <span className="text-2xl font-mono font-bold tracking-widest px-4 py-2 rounded-lg text-brand bg-red-50">
               {study.accessCode}
             </span>
             <button onClick={copyCode} className="px-4 py-2 text-sm rounded-lg transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">
@@ -1054,11 +1054,11 @@ export default function SettingsPage() {
                       value={editingDefValue}
                       onChange={(e) => setEditingDefValue(e.target.value)}
                       placeholder={t('settings.operationalDefinitionPlaceholder')}
-                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-brand outline-none"
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
                     />
-                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-brand text-white rounded">{t('settings.add')}</button>
                     <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
                   </div>
                 ) : (
@@ -1074,7 +1074,7 @@ export default function SettingsPage() {
           </ul>
           <form onSubmit={addHandlingType} className="flex gap-2">
             <input type="text" value={newHandling} onChange={(e) => setNewHandling(e.target.value)} placeholder={t('settings.addHandling')} className={inputCls} />
-            <button type="submit" disabled={!newHandling.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            <button type="submit" disabled={!newHandling.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
         </div>}
 
@@ -1092,7 +1092,7 @@ export default function SettingsPage() {
           </ul>
           <form onSubmit={addContactMethodHandler} className="flex gap-2">
             <input type="text" value={newContactMethod} onChange={(e) => setNewContactMethod(e.target.value)} placeholder={t('settings.addContactMethod')} className={inputCls} />
-            <button type="submit" disabled={!newContactMethod.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            <button type="submit" disabled={!newContactMethod.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
         </div>
 
@@ -1110,7 +1110,7 @@ export default function SettingsPage() {
                       type="checkbox"
                       checked={pot.customerFacing}
                       onChange={(e) => togglePointOfTransactionCustomerFacing(pot.id, e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-300 text-[#ac2c2d] focus:ring-[#ac2c2d]"
+                      className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                     />
                     {t('settings.customerFacing')}
                   </label>
@@ -1121,7 +1121,7 @@ export default function SettingsPage() {
           </ul>
           <form onSubmit={addPointOfTransactionHandler} className="flex gap-2">
             <input type="text" value={newPointOfTransaction} onChange={(e) => setNewPointOfTransaction(e.target.value)} placeholder={t('settings.addPointOfTransaction')} className={inputCls} />
-            <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
         </div>
 
@@ -1140,7 +1140,7 @@ export default function SettingsPage() {
                       defaultValue={dp.label}
                       aria-label={t('settings.decisionPointTypes')}
                       onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
-                      className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none"
+                      className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                     />
                     <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
                   </div>
@@ -1173,7 +1173,7 @@ export default function SettingsPage() {
                 <input type="text" value={newDpPos} onChange={(e) => setNewDpPos(e.target.value)} placeholder={t('settings.dpPositiveLabel')} className={inputCls} />
                 <input type="text" value={newDpNeg} onChange={(e) => setNewDpNeg(e.target.value)} placeholder={t('settings.dpNegativeLabel')} className={inputCls} />
               </div>
-              <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+              <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
           </div>
         )}
@@ -1193,7 +1193,7 @@ export default function SettingsPage() {
                         type="checkbox"
                         checked={ws.customerFacing}
                         onChange={(e) => toggleWorkSourceCustomerFacing(ws.id, e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-[#ac2c2d] focus:ring-[#ac2c2d]"
+                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                       />
                       {t('settings.customerFacing')}
                     </label>
@@ -1204,7 +1204,7 @@ export default function SettingsPage() {
             </ul>
             <form onSubmit={addWorkSourceHandler} className="flex gap-2">
               <input type="text" value={newWorkSource} onChange={(e) => setNewWorkSource(e.target.value)} placeholder={t('settings.addWorkSource')} className={inputCls} />
-              <button type="submit" disabled={!newWorkSource.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+              <button type="submit" disabled={!newWorkSource.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
           </div>
         )}
@@ -1394,7 +1394,7 @@ export default function SettingsPage() {
             </ul>
             <form onSubmit={addWhatMattersTypeHandler} className="flex gap-2">
               <input type="text" value={newWhatMattersType} onChange={(e) => setNewWhatMattersType(e.target.value)} placeholder={t('settings.addWhatMattersType')} className={inputCls} />
-              <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+              <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
           </div>
         )}
@@ -1418,11 +1418,11 @@ export default function SettingsPage() {
                       value={editingDefValue}
                       onChange={(e) => setEditingDefValue(e.target.value)}
                       placeholder={t('settings.operationalDefinitionPlaceholder')}
-                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none"
+                      className="flex-1 px-2 py-1 rounded text-xs text-gray-700 bg-white border border-gray-300 focus:ring-1 focus:ring-brand outline-none"
                       autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') saveOperationalDefinition(); if (e.key === 'Escape') setEditingDefId(null); }}
                     />
-                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-[#ac2c2d] text-white rounded">{t('settings.add')}</button>
+                    <button onClick={saveOperationalDefinition} className="text-xs px-2 py-1 bg-brand text-white rounded">{t('settings.add')}</button>
                     <button onClick={() => setEditingDefId(null)} className="text-xs px-2 py-1 text-gray-500">&times;</button>
                   </div>
                 ) : (
@@ -1438,7 +1438,7 @@ export default function SettingsPage() {
           </ul>
           <form onSubmit={addLifeProblemHandler} className="flex gap-2">
             <input type="text" value={newLifeProblem} onChange={(e) => setNewLifeProblem(e.target.value)} placeholder={t('settings.addLifeProblem')} className={inputCls} />
-            <button type="submit" disabled={!newLifeProblem.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]">{t('settings.add')}</button>
+            <button type="submit" disabled={!newLifeProblem.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
         </div>
         )}
@@ -1498,7 +1498,7 @@ export default function SettingsPage() {
                   onChange={toggleWorkStepTypes}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-brand transition-colors" />
                 <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
               </div>
               <span className="text-sm text-gray-700 font-medium">{t('settings.enableWorkSteps')}</span>
@@ -1535,13 +1535,13 @@ export default function SettingsPage() {
                     value={newWorkStepTag}
                     onChange={(v) => setNewWorkStepTag(v as 'value' | 'sequence' | 'failure')}
                   />
-                  <button type="submit" disabled={!newWorkStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d] hover:bg-[#8a2425]">{t('settings.add')}</button>
+                  <button type="submit" disabled={!newWorkStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand hover:bg-[#8a2425]">{t('settings.add')}</button>
                 </form>
                 {/* Phase 4B — synthesis helper entry point. */}
                 <button
                   type="button"
                   onClick={openSynthesiseModal}
-                  className="mt-4 text-sm text-[#ac2c2d] hover:underline font-medium"
+                  className="mt-4 text-sm text-brand hover:underline font-medium"
                 >
                   {t('settings.synthesiseWorkSteps')} →
                 </button>
@@ -1562,7 +1562,7 @@ export default function SettingsPage() {
                 onChange={toggleVolumeMode}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-[#ac2c2d] transition-colors" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-brand transition-colors" />
               <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
             </div>
             <span className="text-sm text-gray-700 font-medium">{t('settings.enableVolumeMode')}</span>
@@ -1652,7 +1652,7 @@ export default function SettingsPage() {
                 </div>
               )}
               {/* Submit button */}
-              <button disabled className="w-full px-4 py-3 text-white rounded-lg font-medium bg-[#ac2c2d] opacity-50">
+              <button disabled className="w-full px-4 py-3 text-white rounded-lg font-medium bg-brand opacity-50">
                 {t('capture.save')}
               </button>
             </div>
@@ -1704,7 +1704,7 @@ export default function SettingsPage() {
                                   type="text"
                                   value={labelValue}
                                   onChange={(e) => setSynthesiseEdits(prev => ({ ...prev, [key]: e.target.value }))}
-                                  className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-[#ac2c2d] outline-none mb-2"
+                                  className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-1 focus:ring-brand outline-none mb-2"
                                 />
                                 <div className="text-xs text-gray-500 mb-2 space-y-0.5">
                                   {c.exampleTexts.slice(0, 3).map((ex, i) => (
@@ -1724,7 +1724,7 @@ export default function SettingsPage() {
                                     type="button"
                                     onClick={() => promoteCluster(c)}
                                     disabled={!labelValue.trim()}
-                                    className="text-xs px-3 py-1 bg-[#ac2c2d] hover:bg-[#8a2425] text-white rounded font-medium disabled:opacity-50"
+                                    className="text-xs px-3 py-1 bg-brand hover:bg-[#8a2425] text-white rounded font-medium disabled:opacity-50"
                                   >
                                     {t('settings.promote')}
                                   </button>

@@ -76,6 +76,8 @@ export async function PUT(
     }
   }
   if (body.workStepTypesEnabled !== undefined) updates.workStepTypesEnabled = body.workStepTypesEnabled;
+  // C5 (2026-06-17): flow layout sub-mode (stacked vs wide-screen freeze-pane).
+  if (body.flowLayout === 'stacked' || body.flowLayout === 'freeze') updates.flowLayout = body.flowLayout;
   // Flow toggles (migration 0014) — Flow is opt-in per entry-type.
   if (body.flowDemandEnabled !== undefined) updates.flowDemandEnabled = body.flowDemandEnabled;
   if (body.flowWorkEnabled !== undefined) updates.flowWorkEnabled = body.flowWorkEnabled;

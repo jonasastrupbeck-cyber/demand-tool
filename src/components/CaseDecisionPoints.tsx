@@ -24,6 +24,8 @@ export interface DecisionPointType {
   positiveLabel: string;
   negativeLabel: string;
   sortOrder: number;
+  // C9 (2026-06-17): 'person' adds the Willingness/Ability-to-Pay sub-states.
+  kind?: string | null;
 }
 
 export interface CaseDecision {
@@ -33,6 +35,9 @@ export interface CaseDecision {
   cleanliness: 'clean' | 'dirty';
   dirtyCause: string | null;
   decidedAt: string;
+  // C9 (2026-06-17): affordability sub-states (person-kind milestones).
+  willingnessToPay?: boolean | null;
+  abilityToPay?: boolean | null;
 }
 
 interface Props {
@@ -54,7 +59,13 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   const [cleanliness, setCleanliness] = useState<'clean' | 'dirty' | ''>('');
   const [dirtyCause, setDirtyCause] = useState('');
   const [decidedAt, setDecidedAt] = useState('');
+  // C9 (2026-06-17): affordability sub-states ('' = unset, 'yes'/'no').
+  const [willingnessToPay, setWillingnessToPay] = useState<'yes' | 'no' | ''>('');
+  const [abilityToPay, setAbilityToPay] = useState<'yes' | 'no' | ''>('');
   const [saving, setSaving] = useState(false);
+
+  const boolToTri = (b: boolean | null | undefined): 'yes' | 'no' | '' => (b === true ? 'yes' : b === false ? 'no' : '');
+  const triToBool = (v: 'yes' | 'no' | '') => (v === 'yes' ? true : v === 'no' ? false : null);
 
   function openForm(type: DecisionPointType) {
     const existing = decisions.find((d) => d.decisionPointTypeId === type.id);
@@ -63,6 +74,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     setCleanliness(existing?.cleanliness ?? '');
     setDirtyCause(existing?.dirtyCause ?? '');
     setDecidedAt((existing?.decidedAt ?? new Date().toISOString()).slice(0, 10));
+    setWillingnessToPay(boolToTri(existing?.willingnessToPay));
+    setAbilityToPay(boolToTri(existing?.abilityToPay));
   }
 
   async function save(type: DecisionPointType) {
@@ -78,6 +91,9 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
         dirtyCause: cleanliness === 'dirty' ? dirtyCause.trim() || undefined : undefined,
         decidedAt: decidedAt ? `${decidedAt}T12:00:00.000Z` : undefined,
         recordedByCollector: collectorName || undefined,
+        // C9: only send pay sub-states for person-kind milestones.
+        willingnessToPay: type.kind === 'person' ? triToBool(willingnessToPay) : undefined,
+        abilityToPay: type.kind === 'person' ? triToBool(abilityToPay) : undefined,
       }),
     });
     if (res.ok) {
@@ -114,6 +130,36 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
             return (
               <div key={type.id} className="w-full p-2 rounded-lg bg-white border border-gray-300 space-y-2">
                 <p className="text-sm font-medium text-gray-800 text-center">{tl(type.label)}</p>
+                {/* C9 (2026-06-17): affordability sub-states feed the person
+                    decision — Willingness to Pay, then Ability to Pay. */}
+                {type.kind === 'person' && (
+                  <>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-xs text-gray-500">{t('capture.dpWillingnessToPay')}</span>
+                      <SegmentedToggle
+                        ariaLabel={t('capture.dpWillingnessToPay')}
+                        value={willingnessToPay}
+                        onChange={(v) => setWillingnessToPay(v as 'yes' | 'no')}
+                        options={[
+                          { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                          { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                        ]}
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-xs text-gray-500">{t('capture.dpAbilityToPay')}</span>
+                      <SegmentedToggle
+                        ariaLabel={t('capture.dpAbilityToPay')}
+                        value={abilityToPay}
+                        onChange={(v) => setAbilityToPay(v as 'yes' | 'no')}
+                        options={[
+                          { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                          { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                        ]}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-center">
                   <SegmentedToggle
                     ariaLabel={t('capture.dpOutcomeAria')}
@@ -162,7 +208,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     type="button"
                     onClick={() => save(type)}
                     disabled={!outcome || !cleanliness || saving}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-[#ac2c2d] hover:bg-[#8a2324] disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
                   >
                     {t('settings.save')}
                   </button>

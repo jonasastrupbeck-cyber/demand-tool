@@ -56,6 +56,9 @@ export async function POST(
     dirtyCause: typeof body.dirtyCause === 'string' ? body.dirtyCause.trim() || null : null,
     decidedAt,
     recordedByCollector: typeof body.recordedByCollector === 'string' ? body.recordedByCollector.trim() || null : null,
+    // C9 (2026-06-17): affordability sub-states (person-kind milestones).
+    willingnessToPay: typeof body.willingnessToPay === 'boolean' ? body.willingnessToPay : null,
+    abilityToPay: typeof body.abilityToPay === 'boolean' ? body.abilityToPay : null,
   });
   return NextResponse.json(row, { status: 201 });
 }

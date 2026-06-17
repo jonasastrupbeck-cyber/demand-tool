@@ -64,6 +64,14 @@ export const studies = pgTable('studies', {
     .$type<'transactional' | 'flow'>()
     .notNull()
     .default('transactional'),
+  // C5 (2026-06-17): which flow layout to render. 'stacked' = today's mobile-
+  // first vertical flow (Skipton's live field test stays here). 'freeze' = the
+  // wide-screen freeze-pane (frozen customer pane left, scrolling touch rail,
+  // frozen decision-milestone pane right). Only meaningful when systemType='flow'.
+  flowLayout: text('flow_layout')
+    .$type<'stacked' | 'freeze'>()
+    .notNull()
+    .default('stacked'),
   // Decision points (Skipton dotted box, 2026-06-12): per-case end-to-end
   // decision capture — outcome + clean/dirty + date. Default false; part of
   // the flow preset.
@@ -78,6 +86,10 @@ export const handlingTypes = pgTable('handling_types', {
   studyId: text('study_id').notNull().references(() => studies.id),
   label: text('label').notNull(),
   operationalDefinition: text('operational_definition'),
+  // C7 (2026-06-17): is this Capability of Response felt by the customer
+  // (customer-facing) vs an internal/partner handoff? Drives the default of
+  // demandEntries.customerFelt and the "touches from the customer's POV" metric.
+  customerFacing: boolean('customer_facing').notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
@@ -226,6 +238,10 @@ export const decisionPointTypes = pgTable('decision_point_types', {
   positiveLabel: text('positive_label').notNull(),
   negativeLabel: text('negative_label').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
+  // C9 (2026-06-17): which sub-state template this milestone shows. 'person'
+  // adds the Willingness/Ability-to-Pay yes/no sub-states (the affordability
+  // gate before an Accept/Decline). Null = standard (outcome + cleanliness only).
+  kind: text('kind'),
 });
 
 // One row per decided point per case; pending points simply have no row.
@@ -243,6 +259,11 @@ export const caseDecisionPoints = pgTable('case_decision_points', {
   dirtyCause: text('dirty_cause'),
   decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
   recordedByCollector: text('recorded_by_collector'),
+  // C9 (2026-06-17): affordability sub-states captured for 'person'-kind
+  // milestones. Nullable — only set when the type asks for them; legacy rows
+  // and other decision kinds stay null.
+  willingnessToPay: boolean('willingness_to_pay'),
+  abilityToPay: boolean('ability_to_pay'),
 }, (t) => ({
   // Explicit short name (63-char identifier lesson, see 0019).
   uniqCaseDp: unique('case_decision_points_unique').on(t.caseId, t.decisionPointTypeId),
@@ -276,6 +297,10 @@ export const demandEntries = pgTable('demand_entries', {
   // Case stitching (Skipton slice 1, 2026-06-11): which case this touch belongs
   // to. Null for all entries in studies without caseTrackingEnabled.
   caseId: text('case_id').references(() => cases.id),
+  // C7 (2026-06-17): did the customer feel this touch (customer-facing) vs an
+  // internal/partner handoff? Defaults from the chosen COR's customerFacing but
+  // is overridable per touch. Null = not asked / legacy entries.
+  customerFelt: boolean('customer_felt'),
 });
 
 export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {

@@ -57,6 +57,9 @@ interface Props {
   // Flow mode (slice B): when 'flow', the case carries the person context
   // (context & situation, P2BS, what matters) via CaseContextSection.
   systemType: 'transactional' | 'flow';
+  // C5 (2026-06-17): flow sub-layout. 'stacked' = today's vertical flow;
+  // 'freeze' = wide-screen freeze-pane (customer left, touch rail, decisions right).
+  flowLayout?: 'stacked' | 'freeze';
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
   onTypesChanged?: () => Promise<void> | void;
@@ -85,7 +88,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, flowLayout = 'stacked', lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -383,6 +386,71 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       </div>
     </div>
   );
+
+  // C5 (2026-06-17): wide-screen freeze-pane layout. Two frozen panes —
+  // customer context (left) and decision milestones (right) — with the touch
+  // rail scrolling horizontally between them, the composer as the newest column.
+  // Built for wide/curved screens; recomposes the same sub-blocks as the stacked
+  // flow, so capture logic is identical.
+  if (isFlow && flowLayout === 'freeze') {
+    return (
+      <div className="flex gap-3 h-[calc(100vh-11rem)] min-h-[28rem]">
+        {/* LEFT frozen pane — the customer (account ref, P2BS, demand, what matters). */}
+        <aside className="w-80 shrink-0 overflow-y-auto rounded-xl border border-green-200 bg-green-100/50 p-3 flex flex-col">
+          {headerRow}
+          <CaseContextSection
+            code={code}
+            contextSituation={caseRow.contextSituation}
+            lifeProblemId={caseRow.lifeProblemId}
+            whatMatters={caseRow.whatMatters}
+            whatMattersTypeIds={wmIds}
+            lifeProblems={lifeProblems}
+            whatMattersTypes={whatMattersTypes}
+            demandTypeId={caseRow.demandTypeId}
+            valueDemandTypes={valueDemandTypes}
+            onPatch={patchCase}
+            onTypesChanged={onTypesChanged}
+          />
+          {attachLastChip}
+          <div className="mt-auto pt-2">{caseFooter}</div>
+        </aside>
+
+        {/* MIDDLE — horizontally scrolling rail of touches; composer is the newest column. */}
+        <div className="flex-1 overflow-x-auto">
+          <div className="flex gap-3 h-full min-w-min items-stretch">
+            {entries.length > 0 && entries.map((e) => (
+              <div key={e.id} className="w-64 shrink-0 flex flex-col">
+                {renderTouch(e)}
+              </div>
+            ))}
+            {children && (
+              <div className="w-96 shrink-0 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
+                {children}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT frozen pane — decision milestones, always in view. */}
+        {decisionPointsEnabled && (
+          <aside className="w-72 shrink-0 overflow-y-auto">
+            <p className="text-[10px] uppercase tracking-widest text-gray-400 font-medium mb-1 px-1 text-center">
+              {t('capture.caseDecisionsHeading')}
+            </p>
+            <CaseDecisionPoints
+              code={code}
+              caseId={caseRow.id}
+              decisionPointTypes={decisionPointTypes}
+              decisions={decisions}
+              collectorName={collectorName}
+              onChanged={() => loadCase(caseRow.id)}
+            />
+          </aside>
+        )}
+      </div>
+    );
+  }
 
   // Flow mode (2026-06-14): three legible zones so it's clear what's "already
   // there" (the case) vs "what I'm adding" (the composer):

@@ -67,7 +67,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
                     href={tab.href}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                       isActive
-                        ? 'border-[#ac2c2d] text-[#ac2c2d]'
+                        ? 'border-brand text-brand'
                         : 'border-transparent text-gray-500 hover:text-gray-700'
                     }`}
                   >

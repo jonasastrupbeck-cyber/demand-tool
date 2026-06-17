@@ -16,7 +16,7 @@ import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEdit
 const THEME = {
   text: '#1f2937',
   textSecondary: '#6b7280',
-  accent: '#ac2c2d',
+  accent: 'var(--color-brand)', // C11: brand token (globals.css) — flips with the scheme
   grid: '#e5e7eb',
 };
 
@@ -336,7 +336,7 @@ export default function DashboardPage() {
                   key={range}
                   onClick={() => setDateRange(range)}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    dateRange === range ? 'bg-[#ac2c2d] text-white' : 'text-gray-600 hover:bg-gray-100'
+                    dateRange === range ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
                   {dateRangeLabels[range]}
@@ -372,7 +372,7 @@ export default function DashboardPage() {
             <button onClick={handleExport} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
               {t('dashboard.export')}
             </button>
-            <button onClick={handleExportPptx} disabled={exportingPptx || !data || data.totalEntries === 0} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-[#ac2c2d] text-white hover:bg-[#8f2324] disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={handleExportPptx} disabled={exportingPptx || !data || data.totalEntries === 0} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-[#8f2324] disabled:opacity-50 disabled:cursor-not-allowed">
               {exportingPptx ? '...' : t('dashboard.exportPptx')}
             </button>
           </div>
@@ -393,7 +393,7 @@ export default function DashboardPage() {
                   key={view}
                   onClick={() => setDashboardView(view)}
                   className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
-                    dashboardView === view ? 'bg-[#ac2c2d] text-white' : 'text-gray-600 hover:bg-gray-100'
+                    dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
                   {view === 'demand' ? t('dashboard.demandTab') : view === 'work' ? t('dashboard.workTab') : t('dashboard.overview')}

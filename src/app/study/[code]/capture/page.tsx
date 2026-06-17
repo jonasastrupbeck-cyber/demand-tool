@@ -15,6 +15,8 @@ interface HandlingType {
   id: string;
   label: string;
   operationalDefinition: string | null;
+  // C7 (2026-06-17): is this COR felt by the customer (vs internal handoff)?
+  customerFacing?: boolean;
 }
 
 interface DemandType {
@@ -79,6 +81,7 @@ interface StudyData {
   // System type (2026-06-11): layout regime. 'flow' = case-first, person
   // context on the case, lean touches.
   systemType: 'transactional' | 'flow';
+  flowLayout: 'stacked' | 'freeze';
   // Decision points (Skipton dotted box, 2026-06-12).
   decisionPointsEnabled: boolean;
   oneStopHandlingType: string | null;
@@ -93,7 +96,7 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null }[];
 }
 
 export default function CapturePage() {
@@ -149,6 +152,12 @@ export default function CapturePage() {
   const [classification, setClassification] = useState<'value' | 'failure' | 'unknown' | 'sequence' | ''>('');
   const [demandTypeId, setDemandTypeId] = useState('');
   const [handlingTypeId, setHandlingTypeId] = useState('');
+  // C7 (2026-06-17): did the customer feel this touch? Defaults from the chosen
+  // COR's customerFacing flag (see the COR onChange); overridable; null = unset.
+  const [customerFelt, setCustomerFelt] = useState<boolean | null>(null);
+  // Tracks whether the user has manually overridden customerFelt, so re-picking
+  // a COR doesn't clobber a deliberate choice.
+  const [customerFeltTouched, setCustomerFeltTouched] = useState(false);
   const [contactMethodId, setContactMethodId] = useState('');
   const [pointOfTransactionId, setPointOfTransactionId] = useState('');
   const [workSourceId, setWorkSourceId] = useState('');
@@ -259,6 +268,18 @@ export default function CapturePage() {
     }
   }, [loading, study, entryType, classification]);
 
+  // Flow capture is work-only (2026-06-17): a touch in flow mode is always work
+  // (the customer's value demand lives once on the case, in the frozen context
+  // pane — there is no per-touch demand/work choice). Force the work path once a
+  // flow study has loaded so the composer opens straight on the work blocks.
+  useEffect(() => {
+    if (loading || !study || study.systemType !== 'flow') return;
+    if (entryType !== 'work') {
+      setEntryType('work');
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }]);
+    }
+  }, [loading, study, entryType]);
+
   const refreshStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
     if (res.ok) {
@@ -327,6 +348,8 @@ export default function CapturePage() {
     setClassification('');
     setDemandTypeId('');
     setHandlingTypeId('');
+    setCustomerFelt(null);
+    setCustomerFeltTouched(false);
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
     setLifeProblemId('');
@@ -404,12 +427,12 @@ export default function CapturePage() {
       variant === 'green'    ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
       variant === 'sky'      ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
       variant === 'thinking' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
-                               'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] outline-none';
+                               'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none';
     const addBtnClass =
       variant === 'green'    ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
       variant === 'sky'      ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
       variant === 'thinking' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
-                               'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-[#ac2c2d]';
+                               'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand';
     return (
       <div className="flex gap-2 mt-2">
         <input
@@ -505,6 +528,9 @@ export default function CapturePage() {
     // Handling — only when the toggle is on.
     if (handlingOn) {
       body.handlingTypeId = handlingTypeId || undefined;
+      // C7 (2026-06-17): the touch-level "did the customer feel it?" flag.
+      // Only meaningful once a COR is chosen; null when unset.
+      if (handlingTypeId) body.customerFelt = customerFelt;
     }
 
     if (entryType === 'demand') {
@@ -637,7 +663,7 @@ export default function CapturePage() {
               <button
                 type="submit"
                 disabled={!collectorName.trim()}
-                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d] hover:bg-[#8a2324]"
+                className="w-full mt-4 px-4 py-3 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand hover:bg-brand-hover"
               >
                 {t('capture.continue')}
               </button>
@@ -653,6 +679,9 @@ export default function CapturePage() {
   // renders inside CasePanel, tabs/separators/flow-blocks/full-SC hide, and
   // failure/sequence actions get the lean system-condition question instead.
   const flowMode = study.systemType === 'flow';
+  // C5 (2026-06-17): wide-screen freeze-pane layout (vs the stacked flow). When
+  // on, the page goes full-width and the submit bar renders inline (not fixed).
+  const freezeLayout = flowMode && study.flowLayout === 'freeze';
   // Flow-mode "Work we did" path (2026-06-12): captured via the flow-block strip
   // (tag per block + per-block system condition), NOT the single classification
   // pills. The entry-level classification is derived from the blocks at submit.
@@ -666,7 +695,7 @@ export default function CapturePage() {
   const scVisible = !!classification && classification !== 'unknown';
 
   return (
-    <div className="max-w-lg mx-auto p-4 pb-24">
+    <div className={freezeLayout ? 'max-w-none px-4 pb-6' : 'max-w-lg mx-auto p-4 pb-24'}>
       {/* Header: study name, collector (with pencil), settings icon */}
       <div className="flex items-center justify-between mb-4 gap-3">
         <div className="min-w-0">
@@ -765,6 +794,7 @@ export default function CapturePage() {
         onActiveCaseChange={setActiveCase}
         refreshSignal={caseRefreshTick}
         systemType={study.systemType}
+        flowLayout={study.flowLayout}
         lifeProblems={study.lifeProblems}
         whatMattersTypes={study.whatMattersTypes}
         onTypesChanged={refreshStudy}
@@ -860,32 +890,10 @@ export default function CapturePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Flow mode: the Demand/Work tabs collapse into one compact control
-            inside the composer — "Work we did" vs "Demand that hit us".
-            Replicates the tab onClick resets so a stale type never leaks
-            into the wrong entry kind. */}
-        {flowMode && (study.workTrackingEnabled || study.workTypesEnabled) && (
-          <div className="flex justify-center">
-            <SegmentedToggle
-              ariaLabel={t('capture.flowEntryKindAria')}
-              value={entryType}
-              onChange={(v) => {
-                setEntryType(v as 'demand' | 'work');
-                setClassification('');
-                setDemandTypeId('');
-                setWorkTypeId('');
-                setWorkTypeFreeText('');
-                // Flow work always starts with one block ready to fill — no
-                // need to click "+ add step" before typing the first step.
-                setWorkBlocks(v === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }] : []);
-              }}
-              options={[
-                { value: 'work', label: t('capture.flowEntryWork'), activeColor: 'burgundy' },
-                { value: 'demand', label: t('capture.flowEntryDemand'), activeColor: 'burgundy' },
-              ]}
-            />
-          </div>
-        )}
+        {/* Flow capture is work-only (2026-06-17): no per-touch demand/work
+            toggle. entryType is forced to 'work' for flow studies (effect
+            above); the customer's value demand is captured once on the case in
+            the frozen context pane. */}
         {/* Verbatim — demand tab always; work tab when Flow blocks are off
             (without a Flow block UI there is no other place to enter the
             verbatim, so the form would otherwise be unsubmittable). In flow
@@ -1307,7 +1315,15 @@ export default function CapturePage() {
                   code={code}
                   options={study.handlingTypes}
                   value={handlingTypeId}
-                  onChange={(id) => setHandlingTypeId(id)}
+                  onChange={(id) => {
+                    setHandlingTypeId(id);
+                    // C7: default "did the customer feel it?" from the chosen
+                    // COR's customer-facing flag, unless the user set it manually.
+                    if (!customerFeltTouched) {
+                      const cor = study.handlingTypes.find((h) => h.id === id);
+                      setCustomerFelt(cor ? !!cor.customerFacing : null);
+                    }
+                  }}
                   leading={capabilityAddPill}
                 />
               ) : (
@@ -1316,6 +1332,23 @@ export default function CapturePage() {
                 </div>
               )}
               {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
+              {/* C7 (2026-06-17): once a COR is chosen, capture whether the
+                  customer felt this touch (customer-facing) vs an internal/
+                  partner handoff. Flow capture only. */}
+              {flowMode && handlingTypeId && (
+                <div className="mt-3 flex flex-col items-center gap-1">
+                  <span className="text-xs text-gray-500">{t('capture.customerFeltQuestion')}</span>
+                  <SegmentedToggle
+                    ariaLabel={t('capture.customerFeltQuestion')}
+                    value={customerFelt === null ? '' : customerFelt ? 'felt' : 'internal'}
+                    onChange={(v) => { setCustomerFeltTouched(true); setCustomerFelt(v === 'felt'); }}
+                    options={[
+                      { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'green' },
+                      { value: 'internal', label: t('capture.customerFeltNo') },
+                    ]}
+                  />
+                </div>
+              )}
             </div>
           );
         })()}
@@ -1474,7 +1507,7 @@ export default function CapturePage() {
                             onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, text: e.target.value } : b))}
                             placeholder={t('capture.workBlockPlaceholder')}
                             rows={4}
-                            className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-[#ac2c2d] focus:border-[#ac2c2d] outline-none resize-none flex-1"
+                            className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none resize-none flex-1"
                           />
                         </>
                       )}
@@ -1503,7 +1536,7 @@ export default function CapturePage() {
                   type="button"
                   onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
-                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-[#ac2c2d] hover:text-[#ac2c2d] flex items-center justify-center ${flowWorkPath ? 'w-full py-2 gap-1 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
+                  className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 gap-1 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                 >
                   {flowWorkPath ? t('capture.addWorkBlockButton') : '+'}
                 </button>
@@ -1579,8 +1612,8 @@ export default function CapturePage() {
                                 onClick={() => setSystemConditions(prev => prev.map((p, i) => i === idx ? { ...p, [field]: !p[field] } : p))}
                                 className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
                                   on
-                                    ? 'bg-[#ac2c2d] text-white border-[#ac2c2d]'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:border-[#ac2c2d] hover:text-[#ac2c2d]'
+                                    ? 'bg-brand text-white border-brand'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:border-brand hover:text-brand'
                                 }`}
                                 aria-pressed={on}
                               >
@@ -1801,13 +1834,14 @@ export default function CapturePage() {
           );
         })()}
 
-        {/* Submit button - sticky at bottom */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
-          <div className="max-w-lg mx-auto">
+        {/* Submit button. Freeze layout: inline within the composer column so it
+            doesn't overlap the horizontal touch rail. Otherwise: sticky at bottom. */}
+        <div className={freezeLayout ? 'mt-3' : 'fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200'}>
+          <div className={freezeLayout ? '' : 'max-w-lg mx-auto'}>
             <button
               type="submit"
               disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification && !flowWorkPath)}
-              className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-[#ac2c2d]"
+              className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand"
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
             </button>
@@ -1905,7 +1939,7 @@ export default function CapturePage() {
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
                   placeholder={t('capture.searchPlaceholder')}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg text-sm text-gray-900 bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-[#ac2c2d] focus:bg-white outline-none"
+                  className="w-full pl-9 pr-3 py-2 rounded-lg text-sm text-gray-900 bg-gray-50 border border-gray-200 focus:ring-2 focus:ring-brand focus:bg-white outline-none"
                 />
               </div>
               {searchLoading && <p className="mt-2 text-xs text-gray-400">{t('capture.loading')}</p>}
@@ -1950,7 +1984,7 @@ export default function CapturePage() {
                   onClick={() => setFilter(chip.key as typeof filter)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                     filter === chip.key
-                      ? 'bg-[#ac2c2d] text-white'
+                      ? 'bg-brand text-white'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >

@@ -133,6 +133,9 @@ export async function POST(
           systemConditionId: typeof b.systemConditionId === 'string' ? b.systemConditionId : null,
         }))
       : undefined,
+    // C7 (2026-06-17): did the customer feel this touch? (defaults client-side
+    // from the chosen COR's customerFacing; overridable). null = not answered.
+    customerFelt: typeof body.customerFelt === 'boolean' ? body.customerFelt : null,
   });
 
   // Fold the three post-save refreshes into this response so the client skips

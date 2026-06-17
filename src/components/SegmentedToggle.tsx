@@ -26,7 +26,7 @@ interface Props {
 // e.g. helps → green, hinders → red — so the colour of the active button
 // reinforces the meaning rather than using a generic accent.
 const ACTIVE_CLASSES: Record<ActiveColor, string> = {
-  burgundy: 'bg-[#ac2c2d] text-white',
+  burgundy: 'bg-brand text-white',
   green: 'bg-green-600 text-white',
   red: 'bg-red-600 text-white',
   // Emerald matches the Sequence classification pill — used on Flow block

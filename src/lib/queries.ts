@@ -68,24 +68,24 @@ const DEFAULT_CONTACT_METHODS: Record<Locale, string[]> = {
 // Decision points (Skipton dotted box, 2026-06-12). Seeded for flow studies;
 // labels are DB data per locale, fully editable in settings afterwards.
 // EN verbatim from the Skipton requirements note.
-const DEFAULT_DECISION_POINT_TYPES: Record<Locale, { label: string; positiveLabel: string; negativeLabel: string }[]> = {
+const DEFAULT_DECISION_POINT_TYPES: Record<Locale, { label: string; positiveLabel: string; negativeLabel: string; kind?: string }[]> = {
   en: [
-    { label: 'Decision on the person', positiveLabel: 'Accept', negativeLabel: 'Decline' },
+    { label: 'Decision on the person', positiveLabel: 'Accept', negativeLabel: 'Decline', kind: 'person' },
     { label: 'Decision on the property', positiveLabel: 'Accept', negativeLabel: 'Decline' },
     { label: 'Decision on the value', positiveLabel: '\u00a3 accepted', negativeLabel: '\u00a3 disputed' },
   ],
   da: [
-    { label: 'Beslutning om personen', positiveLabel: 'Godkendt', negativeLabel: 'Afvist' },
+    { label: 'Beslutning om personen', positiveLabel: 'Godkendt', negativeLabel: 'Afvist', kind: 'person' },
     { label: 'Beslutning om ejendommen', positiveLabel: 'Godkendt', negativeLabel: 'Afvist' },
     { label: 'Beslutning om v\u00e6rdien', positiveLabel: 'V\u00e6rdi godkendt', negativeLabel: 'V\u00e6rdi bestridt' },
   ],
   sv: [
-    { label: 'Beslut om personen', positiveLabel: 'Godk\u00e4nd', negativeLabel: 'Avslagen' },
+    { label: 'Beslut om personen', positiveLabel: 'Godk\u00e4nd', negativeLabel: 'Avslagen', kind: 'person' },
     { label: 'Beslut om fastigheten', positiveLabel: 'Godk\u00e4nd', negativeLabel: 'Avslagen' },
     { label: 'Beslut om v\u00e4rdet', positiveLabel: 'V\u00e4rde godk\u00e4nt', negativeLabel: 'V\u00e4rde bestritt' },
   ],
   de: [
-    { label: 'Entscheidung zur Person', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt' },
+    { label: 'Entscheidung zur Person', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt', kind: 'person' },
     { label: 'Entscheidung zur Immobilie', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt' },
     { label: 'Entscheidung zum Wert', positiveLabel: 'Wert akzeptiert', negativeLabel: 'Wert strittig' },
   ],
@@ -282,7 +282,7 @@ export async function addHandlingType(studyId: string, label: string) {
   return row;
 }
 
-export async function updateHandlingType(id: string, data: { label?: string; operationalDefinition?: string | null }) {
+export async function updateHandlingType(id: string, data: { label?: string; operationalDefinition?: string | null; customerFacing?: boolean }) {
   await db.update(handlingTypes).set(data).where(eq(handlingTypes.id, id));
 }
 
@@ -702,6 +702,9 @@ export async function createEntry(studyId: string, data: {
   workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
+  // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
+  // internal/partner handoff). Null = not asked.
+  customerFelt?: boolean | null;
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -732,6 +735,7 @@ export async function createEntry(studyId: string, data: {
     whatMatters: isDemand ? (data.whatMatters || null) : null,
     collectorName: data.collectorName || null,
     caseId: data.caseId || null,
+    customerFelt: data.customerFelt ?? null,
   });
 
   // Insert what matters junction records
@@ -951,6 +955,7 @@ export async function seedDefaultDecisionPointTypes(studyId: string, locale: Loc
       positiveLabel: defaults[i].positiveLabel,
       negativeLabel: defaults[i].negativeLabel,
       sortOrder: i,
+      kind: defaults[i].kind ?? null,
     });
   }
 }
@@ -967,12 +972,13 @@ export async function addDecisionPointType(studyId: string, label: string, posit
   return row;
 }
 
-export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number }) {
+export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number; kind?: string | null }) {
   const updateFields: Record<string, unknown> = {};
   if (data.label !== undefined) updateFields.label = data.label;
   if (data.positiveLabel !== undefined) updateFields.positiveLabel = data.positiveLabel;
   if (data.negativeLabel !== undefined) updateFields.negativeLabel = data.negativeLabel;
   if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  if (data.kind !== undefined) updateFields.kind = data.kind;
   if (Object.keys(updateFields).length > 0) {
     await db.update(decisionPointTypes).set(updateFields).where(eq(decisionPointTypes.id, id));
   }
@@ -995,6 +1001,9 @@ export async function upsertCaseDecision(caseId: string, data: {
   dirtyCause?: string | null;
   decidedAt?: Date;
   recordedByCollector?: string | null;
+  // C9 (2026-06-17): affordability sub-states for 'person'-kind milestones.
+  willingnessToPay?: boolean | null;
+  abilityToPay?: boolean | null;
 }) {
   const values = {
     id: generateId(),
@@ -1006,6 +1015,8 @@ export async function upsertCaseDecision(caseId: string, data: {
     dirtyCause: data.cleanliness === 'dirty' ? (data.dirtyCause || null) : null,
     decidedAt: data.decidedAt || new Date(),
     recordedByCollector: data.recordedByCollector || null,
+    willingnessToPay: data.willingnessToPay ?? null,
+    abilityToPay: data.abilityToPay ?? null,
   };
   await db.insert(caseDecisionPoints).values(values).onConflictDoUpdate({
     target: [caseDecisionPoints.caseId, caseDecisionPoints.decisionPointTypeId],
@@ -1015,8 +1026,23 @@ export async function upsertCaseDecision(caseId: string, data: {
       dirtyCause: values.dirtyCause,
       decidedAt: values.decidedAt,
       recordedByCollector: values.recordedByCollector,
+      willingnessToPay: values.willingnessToPay,
+      abilityToPay: values.abilityToPay,
     },
   });
+
+  // C9 (2026-06-17): a Decline on the 'person' milestone closes the case path.
+  // Conversely, re-recording it as Accept reopens the case (so a mis-click is
+  // recoverable). Only the person-kind decision drives case status.
+  const dpType = (await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.id, data.decisionPointTypeId)))[0];
+  if (dpType?.kind === 'person') {
+    if (data.outcome === 'negative') {
+      await db.update(cases).set({ status: 'closed', closedAt: values.decidedAt }).where(eq(cases.id, caseId));
+    } else {
+      await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, caseId));
+    }
+  }
+
   const rows = await db.select().from(caseDecisionPoints)
     .where(and(eq(caseDecisionPoints.caseId, caseId), eq(caseDecisionPoints.decisionPointTypeId, data.decisionPointTypeId)));
   return rows[0];
@@ -1111,6 +1137,8 @@ export async function updateEntry(entryId: string, data: {
   workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
+  // C7 (2026-06-17): did the customer feel this touch?
+  customerFelt?: boolean | null;
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
@@ -1129,6 +1157,7 @@ export async function updateEntry(entryId: string, data: {
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
   if (data.caseId !== undefined) updateFields.caseId = data.caseId;
+  if (data.customerFelt !== undefined) updateFields.customerFelt = data.customerFelt;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
   // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
   if (workBlocks !== undefined && workBlocks.length > 0) {
