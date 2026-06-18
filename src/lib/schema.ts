@@ -227,6 +227,19 @@ export const caseWhatMatters = pgTable('case_what_matters', {
   uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
 }));
 
+// Milestones (2026-06-18). An ordered container layer ABOVE decision points:
+// a mortgage journey runs through milestones (e.g. milestone 1 wraps the
+// person/property/value decisions; later ones lead to "completion / funds
+// paid out"). Milestones run chronologically; each carries its OWN per-case
+// outcome (see caseMilestones) separate from the decisions inside it. Backfill
+// 0026 gives every existing study one "Milestone 1" wrapping its decisions.
+export const milestones = pgTable('milestones', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 // Decision points (Skipton dotted box, 2026-06-12). A per-study taxonomy —
 // NOT a hardcoded person/property/value enum — so the tool stays generic.
 // Each type carries its own outcome wording (Accept/Decline, £ accepted/
@@ -242,6 +255,11 @@ export const decisionPointTypes = pgTable('decision_point_types', {
   // adds the Willingness/Ability-to-Pay yes/no sub-states (the affordability
   // gate before an Accept/Decline). Null = standard (outcome + cleanliness only).
   kind: text('kind'),
+  // 2026-06-18: the milestone this decision point belongs to. Nullable so a
+  // point can be transiently unassigned in Settings; SET NULL on milestone
+  // delete (deleting a milestone keeps its decision points, just unassigns
+  // them — contrast caseDecisionPoints.decisionPointTypeId which cascades).
+  milestoneId: text('milestone_id').references(() => milestones.id, { onDelete: 'set null' }),
 });
 
 // One row per decided point per case; pending points simply have no row.
@@ -267,6 +285,23 @@ export const caseDecisionPoints = pgTable('case_decision_points', {
 }, (t) => ({
   // Explicit short name (63-char identifier lesson, see 0019).
   uniqCaseDp: unique('case_decision_points_unique').on(t.caseId, t.decisionPointTypeId),
+}));
+
+// One row per achieved/not-achieved milestone per case (2026-06-18). The
+// milestone's OWN outcome, recorded explicitly and separately from the
+// decisions inside it. A 'not_achieved' outcome halts the journey and closes
+// the case (status closed, closedAt = reachedAt); 'achieved' / no row keeps it
+// open. reachedAt feeds the later "time between events" capability charts.
+// Both FKs cascade: deleting a case or a milestone type drops its records.
+export const caseMilestones = pgTable('case_milestones', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
+  outcome: text('outcome').$type<'achieved' | 'not_achieved'>().notNull(),
+  reachedAt: timestamp('reached_at', { withTimezone: true }).notNull(),
+  recordedByCollector: text('recorded_by_collector'),
+}, (t) => ({
+  uniqCaseMilestone: unique('case_milestones_unique').on(t.caseId, t.milestoneId),
 }));
 
 export const demandEntries = pgTable('demand_entries', {
