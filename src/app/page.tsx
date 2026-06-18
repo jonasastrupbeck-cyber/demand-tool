@@ -227,21 +227,31 @@ export default function Home() {
                   <div className="grid grid-cols-1 gap-2">
                     {(['transactional', 'flow'] as const).map((type) => {
                       const isSelected = systemType === type;
+                      const isFlowType = type === 'flow';
+                      // Flow path carries the Skipton co-brand (mirrors R5): the
+                      // selected flow card is Skipton blue, transactional stays
+                      // Vanguard red. Skipton hexes match StudyChrome.tsx.
+                      const selectedStyle = isSelected && isFlowType
+                        ? ({ backgroundColor: '#0072C5', '--tw-ring-color': '#0072C5' } as React.CSSProperties)
+                        : undefined;
                       return (
                         <button
                           key={type}
                           type="button"
                           onClick={() => setSystemType(type)}
+                          style={selectedStyle}
                           className={`px-4 py-3 rounded-lg text-left transition-all ${
                             isSelected
-                              ? 'bg-brand text-white ring-2 ring-brand ring-offset-1'
+                              ? isFlowType
+                                ? 'text-white ring-2 ring-offset-1'
+                                : 'bg-brand text-white ring-2 ring-brand ring-offset-1'
                               : 'bg-gray-50 text-gray-700 border border-gray-200 hover:border-gray-400'
                           }`}
                         >
                           <span className="block text-sm font-semibold">
                             {t(type === 'flow' ? 'create.systemTypeFlow' : 'create.systemTypeTransactional')}
                           </span>
-                          <span className={`block text-xs mt-0.5 ${isSelected ? 'text-red-100' : 'text-gray-500'}`}>
+                          <span className={`block text-xs mt-0.5 ${isSelected ? (isFlowType ? 'text-blue-100' : 'text-red-100') : 'text-gray-500'}`}>
                             {t(type === 'flow' ? 'create.systemTypeFlowDesc' : 'create.systemTypeTransactionalDesc')}
                           </span>
                         </button>
@@ -273,6 +283,11 @@ export default function Home() {
                     className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
+                {/* Flow studies capture context per case, not per study — a flow
+                    consultant only needs name/description/PIN. Transactional keeps
+                    the full create form (contact method + point of transaction). */}
+                {systemType !== 'flow' && (
+                <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {t('landing.contactMethodQuestion')}
@@ -323,6 +338,8 @@ export default function Home() {
                     className="w-full px-4 py-3 rounded-lg text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
                   />
                 </div>
+                </>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('landing.consultantPin')}

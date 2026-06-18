@@ -10,16 +10,16 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 const translations = {
   // Landing page
   'app.title': {
-    en: 'Demand Analysis',
-    da: 'Eftersp\u00f8rgselsanalyse',
-    sv: 'Efterfr\u00e5geanalys',
-    de: 'Nachfrageanalyse',
+    en: 'Understanding your organisation from the outside in',
+    da: 'Forst\u00e5 din organisation udefra og ind',
+    sv: 'F\u00f6rst\u00e5 din organisation utifr\u00e5n och in',
+    de: 'Verstehen Sie Ihre Organisation von au\u00dfen nach innen',
   },
   'app.subtitle': {
-    en: 'Vanguard Method demand gathering tool',
-    da: 'V\u00e6rkt\u00f8j til indsamling af eftersp\u00f8rgsel efter Vanguard Metoden',
-    sv: 'Verktyg f\u00f6r insamling av efterfr\u00e5gan enligt Vanguard-metoden',
-    de: 'Werkzeug zur Nachfrageerfassung nach der Vanguard-Methode',
+    en: 'Data Gathering Powered by the Vanguard Method',
+    da: 'Dataindsamling drevet af Vanguard-metoden',
+    sv: 'Datainsamling med Vanguard-metoden',
+    de: 'Datenerfassung mit der Vanguard-Methode',
   },
   'landing.joinStudy': {
     en: 'Join a Study',
@@ -94,10 +94,10 @@ const translations = {
     de: 'Falscher Beratercode',
   },
   'landing.methodContext': {
-    en: 'Understand what customers really need by studying demand from their perspective. Separate value demand from failure demand to redesign the system.',
-    da: 'Forstå hvad kunderne virkelig har brug for ved at studere efterspørgslen fra deres perspektiv. Adskil værdiskabende fra ikke-værdiskabende efterspørgsel for at redesigne systemet.',
-    sv: 'Förstå vad kunderna verkligen behöver genom att studera efterfrågan från deras perspektiv. Separera värdeskapande från icke-värdeskapande efterfrågan för att designa om systemet.',
-    de: 'Verstehen Sie was Kunden wirklich brauchen, indem Sie die Nachfrage aus deren Perspektive untersuchen. Trennen Sie Wert-Nachfrage von Fehler-Nachfrage, um das System neu zu gestalten.',
+    en: 'Study your service from your customers’ perspective — to understand how the system really performs and where to improve.',
+    da: 'Studér din service udefra og ind — for at forstå hvordan systemet faktisk præsterer, og hvor det kan forbedres.',
+    sv: 'Studera din tjänst utifrån och in — för att förstå hur systemet faktiskt fungerar och var det kan förbättras.',
+    de: 'Betrachten Sie Ihren Service von außen nach innen — um zu verstehen, wie das System wirklich funktioniert und wo es sich verbessern lässt.',
   },
   'landing.joinExisting': {
     en: 'Join an existing study',

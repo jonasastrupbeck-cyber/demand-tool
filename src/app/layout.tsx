@@ -9,7 +9,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Demand Analysis Tool",
+  title: "Understanding your organisation from the outside in",
   description: "Vanguard Method demand gathering and analysis",
   verification: {
     google: "8ey5bDguCyf7dhmwzkqsONJ1Rklirnh96Dk_fqPZi8o",
