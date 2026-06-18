@@ -78,12 +78,14 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
     <div className="flex flex-col min-h-full bg-white" style={brandStyle}>
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between min-h-16 py-2">
             {/* Branding by study type (R5): flow → Skipton + Vanguard co-brand
-                lockup; demand/transactional → the Vanguard mark only. */}
+                lockup (~3.5× larger per Jonas, 2026-06-18); demand/transactional
+                → the Vanguard mark only. The row uses min-h-16 so it grows for the
+                tall flow lockup but stays compact for the small demand mark. */}
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
               {isFlow ? (
-                <Image src="/vanguard-skipton.svg" alt="Skipton Building Society · Powered by Vanguard Method" width={164} height={90} className="h-11 w-auto" priority />
+                <Image src="/vanguard-skipton.svg" alt="Skipton Building Society · Powered by Vanguard Method" width={280} height={154} className="h-[154px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
