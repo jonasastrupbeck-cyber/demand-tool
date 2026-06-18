@@ -2,10 +2,44 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
+import { CaptureBarProvider, useCaptureBar } from '@/lib/capture-bar-context';
 import { LOCALE_LABELS, type Locale } from '@/lib/i18n';
 import type { TranslationKey } from '@/lib/i18n';
+
+// Undo button (2026-06-18): removes the last saved touch. Shown only on the
+// capture route when there is one to undo (state lives in CaptureBarContext,
+// set by the capture page). Sits to the right of the Capture/Dashboard tabs.
+function UndoButton({ code }: { code: string }) {
+  const { lastTouch, setLastTouch, bumpUndoSignal } = useCaptureBar();
+  const { t } = useLocale();
+  const pathname = usePathname();
+  const [undoing, setUndoing] = useState(false);
+  if (!pathname.startsWith(`/study/${code}/capture`) || !lastTouch) return null;
+  async function undo() {
+    if (undoing || !lastTouch) return;
+    setUndoing(true);
+    try {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${encodeURIComponent(lastTouch.id)}`, { method: 'DELETE' });
+    } catch {}
+    setLastTouch(null);
+    bumpUndoSignal();
+    setUndoing(false);
+  }
+  return (
+    <button
+      type="button"
+      onClick={undo}
+      disabled={undoing}
+      title={lastTouch.label}
+      className="self-center inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium text-gray-600 border border-gray-300 bg-white hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 transition-colors"
+    >
+      <span aria-hidden="true">↩</span> {t('capture.undo')}
+    </button>
+  );
+}
 
 export default function StudyLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -20,6 +54,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
   const settingsTab = { labelKey: 'nav.settings' as TranslationKey, href: `/study/${code}/settings` };
 
   return (
+    <CaptureBarProvider>
     <div className="flex flex-col min-h-full bg-white">
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4">
@@ -62,7 +97,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
               </Link>
             </div>
           </div>
-          <div className="flex -mb-px">
+          <div className="flex -mb-px items-center justify-between">
             <div className="flex gap-1">
               {workflowTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.href);
@@ -81,10 +116,12 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
                 );
               })}
             </div>
+            <UndoButton code={code} />
           </div>
         </div>
       </nav>
       <div className="flex-1">{children}</div>
     </div>
+    </CaptureBarProvider>
   );
 }

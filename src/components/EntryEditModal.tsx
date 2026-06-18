@@ -83,6 +83,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   // Attachment flags per SC — which of the 5 capture fields this SC is about.
@@ -203,6 +204,17 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    setSaving(false);
+    onSaved?.();
+    onClose();
+  }
+
+  // Delete this touch (mistake). Two-click confirm (no window.confirm). Reuses
+  // the existing DELETE entry endpoint, then the same refetch path as save.
+  async function handleDelete() {
+    if (!entry || saving) return;
+    setSaving(true);
+    await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, { method: 'DELETE' });
     setSaving(false);
     onSaved?.();
     onClose();
@@ -1012,6 +1024,23 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         )}
 
         <div className="p-5 border-t border-gray-200 flex gap-3 sticky bottom-0 bg-white">
+          {confirmingDelete ? (
+            <button
+              onClick={handleDelete}
+              disabled={saving || !entry}
+              className="shrink-0 px-4 py-3 rounded-lg font-semibold text-base text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
+            >
+              {t('capture.deleteTouchConfirm')}
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              disabled={saving || loading || !entry}
+              className="shrink-0 px-4 py-3 rounded-lg font-medium text-base text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+              {t('capture.deleteTouch')}
+            </button>
+          )}
           <button
             onClick={onClose}
             disabled={saving}

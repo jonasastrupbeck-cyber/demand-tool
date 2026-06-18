@@ -507,6 +507,26 @@ const translations = {
     sv: 'Ångra',
     de: 'Rückgängig',
   },
+  // Regret = abandon the entry being typed (kept distinct from Undo's "Fortryd"/
+  // "Ångra" since both can be visible at once).
+  'capture.regret': {
+    en: 'Regret',
+    da: 'Ryd',
+    sv: 'Rensa',
+    de: 'Verwerfen',
+  },
+  'capture.deleteTouch': {
+    en: 'Delete',
+    da: 'Slet',
+    sv: 'Radera',
+    de: 'Löschen',
+  },
+  'capture.deleteTouchConfirm': {
+    en: 'Delete — sure?',
+    da: 'Slet — sikker?',
+    sv: 'Radera — säker?',
+    de: 'Löschen — sicher?',
+  },
   'capture.saveFailed': {
     en: 'Failed to save entry. Please try again.',
     da: 'Kunne ikke gemme registrering. Pr\u00f8v igen.',

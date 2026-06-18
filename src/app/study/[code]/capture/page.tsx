@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
+import { useCaptureBar } from '@/lib/capture-bar-context';
 import EntryEditModal from '@/components/EntryEditModal';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import CapabilityRadioGroup from '@/components/CapabilityRadioGroup';
@@ -104,6 +105,9 @@ export default function CapturePage() {
   const params = useParams();
   const code = params.code as string;
   const { t, tl } = useLocale();
+  // Nav "Undo" button (2026-06-18): we publish the last saved touch here and
+  // react to an undo (which deletes it) by refetching.
+  const { setLastTouch, undoSignal } = useCaptureBar();
 
   const [study, setStudy] = useState<StudyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,7 +148,8 @@ export default function CapturePage() {
 
   // Case stitching (Skipton slice 1): the active case every saved entry
   // attaches to, plus a tick that tells CasePanel to refetch its timeline
-  // after each save. In-memory only — "Set aside" or a reload clears it.
+  // after each save. Persisted to capture-session:<code> (2026-06-18) so it
+  // survives navigation + reload; "Open new reference" / Set aside clears it.
   const [activeCase, setActiveCase] = useState<{ id: string; caseRef: string } | null>(null);
   const [caseRefreshTick, setCaseRefreshTick] = useState(0);
 
@@ -230,7 +235,7 @@ export default function CapturePage() {
       const data = await res.json();
       setStudy(data);
       // Session-sticky defaults: localStorage overrides study primary.
-      let savedSession: { contactMethodId?: string; pointOfTransactionId?: string; workSourceId?: string } = {};
+      let savedSession: { contactMethodId?: string; pointOfTransactionId?: string; workSourceId?: string; activeCaseId?: string; activeCaseRef?: string } = {};
       try {
         const raw = localStorage.getItem(`capture-session:${code}`);
         if (raw) savedSession = JSON.parse(raw);
@@ -241,20 +246,39 @@ export default function CapturePage() {
       if (initialCm) setContactMethodId(initialCm);
       if (initialPot) setPointOfTransactionId(initialPot);
       if (initialWs) setWorkSourceId(initialWs);
+      // Restore the open case so navigating to Settings/Dashboard (or a reload)
+      // returns to the same reference. If it was deleted, CasePanel.loadCase
+      // 404s and falls back to the entry screen. Cleared when the user opens a
+      // new reference / sets aside (setActiveCase(null) → persisted as null).
+      if (savedSession.activeCaseId && savedSession.activeCaseRef) {
+        setActiveCase({ id: savedSession.activeCaseId, caseRef: savedSession.activeCaseRef });
+      }
     }
     setLoading(false);
   }, [code]);
 
-  // Persist session-sticky defaults whenever they change (after initial load).
+  // Persist session-sticky defaults + the open case whenever they change (after
+  // initial load), so navigation/reload returns to the same reference.
   useEffect(() => {
     if (loading) return;
     try {
       localStorage.setItem(
         `capture-session:${code}`,
-        JSON.stringify({ contactMethodId, pointOfTransactionId, workSourceId }),
+        JSON.stringify({ contactMethodId, pointOfTransactionId, workSourceId, activeCaseId: activeCase?.id, activeCaseRef: activeCase?.caseRef }),
       );
     } catch {}
-  }, [code, loading, contactMethodId, pointOfTransactionId, workSourceId]);
+  }, [code, loading, contactMethodId, pointOfTransactionId, workSourceId, activeCase]);
+
+  // React to the nav Undo (it deleted the last touch): refetch the case
+  // timeline + recent list and drop the stale lastEntry chip. Skip mount.
+  const undoMounted = useRef(false);
+  useEffect(() => {
+    if (!undoMounted.current) { undoMounted.current = true; return; }
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setCaseRefreshTick((n) => n + 1);
+    setLastEntry(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [undoSignal]);
 
   // When the Work-tab classification row is hidden (workClassificationEnabled
   // off), implicitly set classification to 'unknown' so downstream gates
@@ -584,6 +608,8 @@ export default function CapturePage() {
       ? validWorkBlocks.map((b) => `[${b.tag}] ${b.text}`).join(' · ')
       : verbatim.trim();
     setLastEntry({ id: saved.id, verbatim: lastVerbatim, caseId: (body.caseId as string | undefined) ?? null });
+    // Publish to the nav Undo button (removes this touch in one click).
+    setLastTouch({ id: saved.id, label: lastVerbatim });
     setSuccess(true);
     resetForm();
     // Case stitching: the timeline in CasePanel refetches on this tick.
@@ -935,6 +961,7 @@ export default function CapturePage() {
             onClick={async () => {
               await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${lastEntry.id}`, { method: 'DELETE' });
               setLastEntry(null);
+              setLastTouch(null); // keep the nav Undo button in sync
             }}
             className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
           >
@@ -1873,6 +1900,17 @@ export default function CapturePage() {
             >
               {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
             </button>
+            {/* Regret (2026-06-18): abandon what's being typed (before saving).
+                Shown only when the composer has content. */}
+            {(verbatim.trim() || workBlocks.some((b) => b.text.trim().length > 0) || !!classification || !!demandTypeId) && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="w-full mt-2 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+              >
+                {t('capture.regret')}
+              </button>
+            )}
           </div>
         </div>
       </form>

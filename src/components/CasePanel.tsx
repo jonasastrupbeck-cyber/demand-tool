@@ -111,7 +111,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   // composer stays hidden until a customer is open. caseList backs the
   // combobox's recent-open list and its autocomplete matches.
   const isFlow = systemType === 'flow';
-  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null; entryCount: number }[]>([]);
+  const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null; entryCount: number; lastEntryAt: string | null; lastEntryVerbatim: string | null }[]>([]);
 
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
@@ -234,6 +234,19 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       // life problem, else what-matters (whatever the study actually populates).
       const summary = (c: typeof caseList[number]) => dtLabel(c.demandTypeId) || lpLabel(c.lifeProblemId) || wmLabel(c.whatMattersTypeIds);
       const touchLabel = (n: number) => n === 1 ? t('capture.customerTouchOne') : t('capture.customerTouches', { n: String(n) });
+      // Last touch (2026-06-18): date + a clean excerpt of the latest entry's
+      // work description (strip the [value]/[sequence]/[failure] block tags) so
+      // users recognise the case. Null when the case has no entries yet.
+      const lastTouch = (c: typeof caseList[number]) => {
+        if (!c.lastEntryAt) return null;
+        const text = (c.lastEntryVerbatim || '')
+          .split('\n\n')
+          .map((s) => s.replace(/^\[(value|sequence|failure)\]\s*/, '').trim())
+          .filter(Boolean)
+          .join(' · ');
+        const excerpt = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+        return { date: new Date(c.lastEntryAt).toLocaleDateString(), excerpt };
+      };
       const q = refInput.trim();
       const matched = q ? caseList.find((c) => c.caseRef.toLowerCase() === q.toLowerCase()) : undefined;
       // Recent list: open cases before closed, each group newest-first (caseList
@@ -301,14 +314,21 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
                 <p className="px-3 py-6 text-center text-sm text-gray-400">{t('capture.customerNoMatch')}</p>
               ) : (
                 <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
-                  {recent.map((c) => (
+                  {recent.map((c) => {
+                    const lt = lastTouch(c);
+                    return (
                     <div key={c.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50">
-                      <span className="font-medium text-gray-900 tabular-nums whitespace-nowrap min-w-[4.5rem]">
+                      <span className="font-medium text-gray-900 tabular-nums whitespace-nowrap min-w-[4.5rem] self-start mt-0.5">
                         #{c.caseRef}
                         {c.status === 'closed' && <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
                       </span>
-                      <span className="flex-1 min-w-0 truncate text-sm text-gray-600">{summary(c)}</span>
-                      <span className="shrink-0 text-xs text-gray-400 tabular-nums">{touchLabel(c.entryCount)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate text-sm text-gray-600">{summary(c)}</p>
+                        {lt && (
+                          <p className="truncate text-xs text-gray-400">{lt.date}{lt.excerpt ? ` · ${lt.excerpt}` : ''}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-xs text-gray-400 tabular-nums self-start mt-0.5">{touchLabel(c.entryCount)}</span>
                       <button
                         type="button"
                         onClick={() => openCase(c.caseRef)}
@@ -318,7 +338,8 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
                         {t('capture.customerResume')}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
