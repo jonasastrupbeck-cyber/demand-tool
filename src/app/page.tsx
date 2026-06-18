@@ -135,7 +135,7 @@ export default function Home() {
           <div className="flex items-center justify-center mb-4">
             <Image src="/vanguard-logo.png" alt="Vanguard" width={64} height={70} className="h-16 w-auto" priority />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')}</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2 whitespace-pre-line leading-tight">{t('app.title')}</h1>
           <p className="text-gray-600 mb-3">{t('app.subtitle')}</p>
           <p className="text-sm text-gray-400 max-w-sm mx-auto">{t('landing.methodContext')}</p>
         </div>

@@ -9,11 +9,14 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 const translations = {
   // Landing page
+  // Newlines are intentional: the landing renders this stacked over three lines
+  // (whitespace-pre-line). The browser tab title is a separate single-line
+  // string in layout.tsx, so it is unaffected.
   'app.title': {
-    en: 'Understanding your organisation from the outside in',
-    da: 'Forst\u00e5 din organisation udefra og ind',
-    sv: 'F\u00f6rst\u00e5 din organisation utifr\u00e5n och in',
-    de: 'Verstehen Sie Ihre Organisation von au\u00dfen nach innen',
+    en: 'Understanding\nyour organisation\nfrom the outside in',
+    da: 'Forst\u00e5\ndin organisation\nudefra og ind',
+    sv: 'F\u00f6rst\u00e5\ndin organisation\nutifr\u00e5n och in',
+    de: 'Verstehen Sie Ihre\nOrganisation\nvon au\u00dfen nach innen',
   },
   'app.subtitle': {
     en: 'Data Gathering Powered by the Vanguard Method',
