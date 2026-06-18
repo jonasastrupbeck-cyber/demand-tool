@@ -85,7 +85,7 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
                 tall flow lockup but stays compact for the small demand mark. */}
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
               {isFlow ? (
-                <Image src="/vanguard-skipton.svg" alt="Skipton Building Society · Powered by Vanguard Method" width={280} height={154} className="h-[154px] w-auto" priority />
+                <Image src="/vanguard-skipton.png" alt="Skipton Building Society · Powered by Vanguard Method" width={253} height={154} className="h-[154px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
