@@ -702,6 +702,81 @@ export default function CapturePage() {
   // failure-work steps. Only hide when classification is unset or '?'.
   const scVisible = !!classification && classification !== 'unknown';
 
+  // Capability of response (COR) block, extracted so it can be placed either
+  // BEFORE the Flow work-blocks (transactional: classify the response, then the
+  // steps) or AFTER them (flow composer: COR sits below, just above Save — Jonas
+  // 2026-06-18). Same markup/behaviour in both positions.
+  const corBlock = study.handlingEnabled ? (() => {
+    const capabilityAddPill = (
+      <button
+        type="button"
+        onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+        className={`rounded-full font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors ${freezeLayout ? 'px-2 py-0.5 text-xs' : 'px-3 py-1.5 text-sm'}`}
+      >
+        {t('capture.addHandlingButton')}
+      </button>
+    );
+    // C7: default "did the customer feel it?" from the chosen COR's
+    // customer-facing flag, unless the user set it manually.
+    const onPickCor = (id: string) => {
+      setHandlingTypeId(id);
+      if (!customerFeltTouched) {
+        const cor = study.handlingTypes.find((h) => h.id === id);
+        setCustomerFelt(cor ? !!cor.customerFacing : null);
+      }
+    };
+    return (
+      <div className={freezeLayout ? 'max-w-[37rem] mx-auto' : undefined}>
+        {freezeLayout ? (
+          // Freeze: the COR is a single dropdown pill, not a row of radio pills.
+          <div className="flex justify-center">
+            <PillSelect
+              ariaLabel={t('capture.handlingLabel')}
+              placeholder={t('capture.addHandlingButton')}
+              value={handlingTypeId}
+              onChange={onPickCor}
+              options={study.handlingTypes.map((h) => ({ id: h.id, label: tl(h.label), operationalDefinition: h.operationalDefinition ? tl(h.operationalDefinition) : null }))}
+              onAddNew={() => { setAddingType('handling'); setNewTypeLabel(''); }}
+              addNewLabel={t('capture.addHandlingButton').replace(/^\+\s*/, '')}
+              variant="add"
+            />
+          </div>
+        ) : study.handlingTypes.length > 0 ? (
+          <CapabilityRadioGroup
+            code={code}
+            compact={freezeLayout}
+            options={study.handlingTypes}
+            value={handlingTypeId}
+            onChange={onPickCor}
+            leading={capabilityAddPill}
+          />
+        ) : (
+          <div className="flex gap-2 items-center justify-center">
+            {capabilityAddPill}
+          </div>
+        )}
+        {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
+        {/* C7 (2026-06-17): once a COR is chosen, capture whether the
+            customer felt this touch (customer-facing) vs an internal/
+            partner handoff. Flow capture only. */}
+        {flowMode && handlingTypeId && (
+          <div className="mt-3 flex flex-col items-center gap-1">
+            <span className="text-xs text-gray-500">{t('capture.customerFeltQuestion')}</span>
+            <SegmentedToggle
+              ariaLabel={t('capture.customerFeltQuestion')}
+              value={customerFelt === null ? '' : customerFelt ? 'felt' : 'internal'}
+              onChange={(v) => { setCustomerFeltTouched(true); setCustomerFelt(v === 'felt'); }}
+              options={[
+                { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'red' },
+                { value: 'internal', label: t('capture.customerFeltNo'), activeColor: 'blue' },
+              ]}
+            />
+          </div>
+        )}
+      </div>
+    );
+  })() : null;
+
   return (
     <div className={freezeLayout ? 'max-w-none px-4 pb-6' : 'max-w-lg mx-auto p-4 pb-24'}>
       {/* Header: study name, collector (with pencil), settings icon */}
@@ -1306,77 +1381,9 @@ export default function CapturePage() {
             Header dropped; zero-state shows a single blue "+ Add capability of response"
             pill (click → inline add input). Populated state uses CapabilityRadioGroup
             so users still get the per-option hover tooltips with operational definitions. */}
-        {study.handlingEnabled && (() => {
-          const capabilityAddPill = (
-            <button
-              type="button"
-              onClick={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-              className={`rounded-full font-medium border border-dashed bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors ${freezeLayout ? 'px-2 py-0.5 text-xs' : 'px-3 py-1.5 text-sm'}`}
-            >
-              {t('capture.addHandlingButton')}
-            </button>
-          );
-          // C7: default "did the customer feel it?" from the chosen COR's
-          // customer-facing flag, unless the user set it manually.
-          const onPickCor = (id: string) => {
-            setHandlingTypeId(id);
-            if (!customerFeltTouched) {
-              const cor = study.handlingTypes.find((h) => h.id === id);
-              setCustomerFelt(cor ? !!cor.customerFacing : null);
-            }
-          };
-          return (
-            <div className={freezeLayout ? 'max-w-[37rem] mx-auto' : undefined}>
-              {freezeLayout ? (
-                // Freeze (2026-06-17): the COR is a single dropdown pill sitting
-                // on top of the work blocks, not a row of radio pills.
-                <div className="flex justify-center">
-                  <PillSelect
-                    ariaLabel={t('capture.handlingLabel')}
-                    placeholder={t('capture.addHandlingButton')}
-                    value={handlingTypeId}
-                    onChange={onPickCor}
-                    options={study.handlingTypes.map((h) => ({ id: h.id, label: tl(h.label), operationalDefinition: h.operationalDefinition ? tl(h.operationalDefinition) : null }))}
-                    onAddNew={() => { setAddingType('handling'); setNewTypeLabel(''); }}
-                    addNewLabel={t('capture.addHandlingButton').replace(/^\+\s*/, '')}
-                    variant="add"
-                  />
-                </div>
-              ) : study.handlingTypes.length > 0 ? (
-                <CapabilityRadioGroup
-                  code={code}
-                  compact={freezeLayout}
-                  options={study.handlingTypes}
-                  value={handlingTypeId}
-                  onChange={onPickCor}
-                  leading={capabilityAddPill}
-                />
-              ) : (
-                <div className="flex gap-2 items-center justify-center">
-                  {capabilityAddPill}
-                </div>
-              )}
-              {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
-              {/* C7 (2026-06-17): once a COR is chosen, capture whether the
-                  customer felt this touch (customer-facing) vs an internal/
-                  partner handoff. Flow capture only. */}
-              {flowMode && handlingTypeId && (
-                <div className="mt-3 flex flex-col items-center gap-1">
-                  <span className="text-xs text-gray-500">{t('capture.customerFeltQuestion')}</span>
-                  <SegmentedToggle
-                    ariaLabel={t('capture.customerFeltQuestion')}
-                    value={customerFelt === null ? '' : customerFelt ? 'felt' : 'internal'}
-                    onChange={(v) => { setCustomerFeltTouched(true); setCustomerFelt(v === 'felt'); }}
-                    options={[
-                      { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'red' },
-                      { value: 'internal', label: t('capture.customerFeltNo'), activeColor: 'blue' },
-                    ]}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        {/* Transactional: COR before the Flow steps. Flow composer renders it
+            AFTER the work blocks instead (see below). */}
+        {!flowWorkPath && corBlock}
 
         {/* Flow — sits AFTER Capability of Response on both tabs (Jonas 2026-04-22).
             A horizontal sequence of small text boxes describing value-work and
@@ -1427,6 +1434,25 @@ export default function CapturePage() {
 
                   return (
                     <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                      {/* Per-block system condition (2026-06-12; moved to TOP of the
+                          block 2026-06-18): for flow-mode sequence/failure work, ask
+                          what's driving THIS block. Sits above the tag toggle/step. */}
+                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure') && (
+                        <div className={`p-2 rounded-md border ${block.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                          <PillSelect
+                            ariaLabel={t('capture.flowScQuestion')}
+                            placeholder={t('capture.selectSystemCondition')}
+                            value={block.systemConditionId ?? ''}
+                            onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionId: id || null } : b))}
+                            options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
+                            variant="add"
+                            fullWidth
+                            onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                            addNewLabel={t('capture.addNew')}
+                          />
+                        </div>
+                      )}
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1543,24 +1569,6 @@ export default function CapturePage() {
                         </>
                       )}
 
-                      {/* Per-block system condition (2026-06-12): for flow-mode
-                          sequence/failure work, ask what's driving THIS block. */}
-                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure') && (
-                        <div className={`mt-1 p-2 rounded-md border ${block.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
-                          <PillSelect
-                            ariaLabel={t('capture.flowScQuestion')}
-                            placeholder={t('capture.selectSystemCondition')}
-                            value={block.systemConditionId ?? ''}
-                            onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionId: id || null } : b))}
-                            options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
-                            variant="add"
-                            fullWidth
-                            onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
-                            addNewLabel={t('capture.addNew')}
-                          />
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -1584,6 +1592,10 @@ export default function CapturePage() {
             }, { variant: 'sky' })}
           </div>
         )}
+
+        {/* Flow composer (2026-06-18): COR sits BELOW the work blocks, just above
+            the Save Work Entry bar. */}
+        {flowWorkPath && corBlock}
 
         {hasSystemStrand && sep(t('capture.strand.system'))}
         {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
