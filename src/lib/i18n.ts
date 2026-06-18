@@ -1163,6 +1163,31 @@ const translations = {
     sv: 'Gränser visas när minst 2 ärenden har båda händelserna.',
     de: 'Grenzen erscheinen, sobald mindestens 2 Fälle beide Ereignisse haben.',
   },
+  // R7: capability point ordering + image export.
+  'dashboard.sortLabel': {
+    en: 'Order',
+    da: 'Rækkefølge',
+    sv: 'Ordning',
+    de: 'Reihenfolge',
+  },
+  'dashboard.sortStart': {
+    en: 'Start date',
+    da: 'Startdato',
+    sv: 'Startdatum',
+    de: 'Startdatum',
+  },
+  'dashboard.sortClosed': {
+    en: 'Close date',
+    da: 'Lukkedato',
+    sv: 'Stängningsdatum',
+    de: 'Abschlussdatum',
+  },
+  'dashboard.exportImage': {
+    en: 'Export image',
+    da: 'Eksportér billede',
+    sv: 'Exportera bild',
+    de: 'Bild exportieren',
+  },
   // R4: exclude / annotate a datapoint (per measure).
   'dashboard.capabilityInspectHint': {
     en: 'Tip: click a point to exclude it from the limits or add a note.',

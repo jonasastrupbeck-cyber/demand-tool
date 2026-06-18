@@ -1,7 +1,7 @@
 /* Dashboard – demand / work / overview tabs */
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,6 +13,7 @@ import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 import PillSelect, { type PillSelectOption } from '@/components/PillSelect';
+import { exportNodeToPng } from '@/lib/chart-image';
 
 const THEME = {
   text: '#1f2937',
@@ -71,13 +72,17 @@ export default function DashboardPage() {
   const [fullStudy, setFullStudy] = useState<EntryEditModalStudy | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   // Capability / lead-time (2026-06-18): event-pair pickers + XmR chart data.
+  const [systemType, setSystemType] = useState<string | null>(null); // R7: flow → capability-only
   const [caseTrackingEnabled, setCaseTrackingEnabled] = useState(false);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   const [capFrom, setCapFrom] = useState('');
   const [capTo, setCapTo] = useState('');
+  const [capSort, setCapSort] = useState<'start' | 'closed'>('start'); // R7: point order
   const [capData, setCapData] = useState<CapabilityData | null>(null);
   const [capLoading, setCapLoading] = useState(false);
+  const capExportRef = useRef<HTMLDivElement>(null); // R7: region captured for PNG export
+  const [capExporting, setCapExporting] = useState(false);
   // R4 (2026-06-18): point inspector — exclude / reason / note, per measure.
   const [capTick, setCapTick] = useState(0); // bump to refetch after a save
   const [selectedCapCaseId, setSelectedCapCaseId] = useState<string | null>(null);
@@ -134,6 +139,7 @@ export default function DashboardPage() {
         if (!s) return;
         setStudyName(s.name);
         setStudyPurpose(s.purpose || '');
+        setSystemType(s.systemType ?? null);
         setWorkTrackingEnabled(s.workTrackingEnabled);
         setDemandTypesEnabled(s.demandTypesEnabled ?? false);
         setCaseTrackingEnabled(s.caseTrackingEnabled ?? false);
@@ -173,6 +179,8 @@ export default function DashboardPage() {
   // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
   // decision:<id>, milestone:<id>).
   const capabilityAvailable = caseTrackingEnabled && (decisionPointTypes.length > 0 || milestones.length > 0);
+  // R7: flow studies get a capability-only dashboard (demand widgets stripped).
+  const isFlow = systemType === 'flow';
   const eventOptions: PillSelectOption[] = useMemo(() => {
     const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
     const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
@@ -206,7 +214,7 @@ export default function DashboardPage() {
     if (!capFrom || !capTo) { setCapData(null); return; }
     setCapLoading(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo });
+    const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo, sort: capSort });
     const range = getDateRangeParams();
     if (range.from) qp.set('dateFrom', range.from);
     if (range.to) qp.set('dateTo', range.to);
@@ -214,7 +222,21 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, getDateRangeParams, capTick]);
+  }, [capFrom, capTo, code, getDateRangeParams, capTick, capSort]);
+
+  // R7: flow studies show only the capability view.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isFlow) setDashboardView('capability');
+  }, [isFlow]);
+
+  // R7: export the capability chart card (title + chart + tiles) as a PNG.
+  const handleExportCapabilityImage = useCallback(async () => {
+    if (!capExportRef.current || capExporting) return;
+    setCapExporting(true);
+    try { await exportNodeToPng(capExportRef.current, `capability-${code}.png`); } catch {}
+    setCapExporting(false);
+  }, [code, capExporting]);
 
   // Save a capability annotation (exclude / reason / note) for one case, scoped
   // to the current measure, then refetch so the limits recompute.
@@ -437,19 +459,28 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="flex gap-2">
-            <button onClick={handleDownloadTemplate} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
-              {t('dashboard.downloadTemplate')}
-            </button>
-            <label className={`px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
-              {uploading ? t('dashboard.uploading') : t('dashboard.uploadXlsx')}
-              <input type="file" accept=".xlsx,.xls" onChange={handleUpload} className="hidden" disabled={uploading} />
-            </label>
-            <button onClick={handleExport} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
-              {t('dashboard.export')}
-            </button>
-            <button onClick={handleExportPptx} disabled={exportingPptx || !data || data.totalEntries === 0} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-[#8f2324] disabled:opacity-50 disabled:cursor-not-allowed">
-              {exportingPptx ? '...' : t('dashboard.exportPptx')}
-            </button>
+            {isFlow ? (
+              /* R7: flow dashboards only export pictures of the capability chart. */
+              <button onClick={handleExportCapabilityImage} disabled={capExporting || !capData || capData.points.length === 0} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed">
+                {capExporting ? '...' : t('dashboard.exportImage')}
+              </button>
+            ) : (
+              <>
+                <button onClick={handleDownloadTemplate} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+                  {t('dashboard.downloadTemplate')}
+                </button>
+                <label className={`px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {uploading ? t('dashboard.uploading') : t('dashboard.uploadXlsx')}
+                  <input type="file" accept=".xlsx,.xls" onChange={handleUpload} className="hidden" disabled={uploading} />
+                </label>
+                <button onClick={handleExport} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+                  {t('dashboard.export')}
+                </button>
+                <button onClick={handleExportPptx} disabled={exportingPptx || !data || data.totalEntries === 0} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed">
+                  {exportingPptx ? '...' : t('dashboard.exportPptx')}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -461,7 +492,7 @@ export default function DashboardPage() {
 
         {/* Dashboard view tabs — demand always; work/overview when there's work
             data; capability when the study tracks cases with decisions/milestones. */}
-        {(() => {
+        {!isFlow && (() => {
           const hasWork = workTrackingEnabled && data.workCount > 0;
           const tabs: DashboardView[] = [
             'demand',
@@ -492,7 +523,7 @@ export default function DashboardPage() {
         })()}
 
         {/* Summary cards */}
-        {dashboardView === 'demand' && (
+        {!isFlow && dashboardView === 'demand' && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card label={t('dashboard.totalEntries')} value={data.totalEntries} />
           {activeLayer >= 2 && <Card label={t('dashboard.valueDemand')} value={`${valuePercent}%`} sub={`${data.valueCount} ${t('dashboard.entries')}`} color={COLORS.value} />}
@@ -505,13 +536,13 @@ export default function DashboardPage() {
         )}
 
         {/* ── DEMAND VIEW ── */}
-        {dashboardView === 'demand' && data.totalEntries === 0 && (
+        {!isFlow && dashboardView === 'demand' && data.totalEntries === 0 && (
           <div className="rounded-xl p-8 text-center bg-white border border-gray-200">
             <p className="text-lg font-semibold text-gray-700 mb-2">{t('dashboard.noEntries')}</p>
             <p className="text-sm text-gray-500">{t('dashboard.noEntriesHint')}</p>
           </div>
         )}
-        {dashboardView === 'demand' && data.totalEntries > 0 && (
+        {!isFlow && dashboardView === 'demand' && data.totalEntries > 0 && (
           <>
             {/* Value/Failure pie (Layer 2+) */}
             {activeLayer >= 2 && <ChartCard title={t('dashboard.valueVsFailure')}>
@@ -1007,7 +1038,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── WORK VIEW ── */}
-        {dashboardView === 'work' && (
+        {!isFlow && dashboardView === 'work' && (
           <>
             {/* Work summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1220,7 +1251,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── OVERVIEW VIEW ── */}
-        {dashboardView === 'overview' && (() => {
+        {!isFlow && dashboardView === 'overview' && (() => {
           const totalCapacity = data.totalEntries + data.workCount;
           const failDemandPct = data.totalEntries > 0 ? Math.round((data.failureCount / data.totalEntries) * 100) : 0;
           const failWorkPct = data.workCount > 0 ? Math.round((data.workFailureCount / data.workCount) * 100) : 0;
@@ -1341,7 +1372,7 @@ export default function DashboardPage() {
           </ChartCard>
         )}
         {/* ── CAPABILITY / LEAD-TIME VIEW ── */}
-        {dashboardView === 'capability' && (
+        {(isFlow || dashboardView === 'capability') && (
           <div className="space-y-4">
             <ChartCard title={t('dashboard.capabilityLeadTime')}>
               <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -1350,6 +1381,15 @@ export default function DashboardPage() {
                 <span className="text-gray-400" aria-hidden="true">→</span>
                 <span className="text-xs font-medium text-gray-500">{t('dashboard.eventTo')}</span>
                 <PillSelect value={capTo} onChange={setCapTo} options={eventOptions} placeholder={t('dashboard.eventTo')} ariaLabel={t('dashboard.eventTo')} />
+                {/* R7: point order — changes the XmR sequence → different limits/signals. */}
+                <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.sortLabel')}</span>
+                <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
+                  {(['start', 'closed'] as const).map((s) => (
+                    <button key={s} type="button" onClick={() => setCapSort(s)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${capSort === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {s === 'start' ? t('dashboard.sortStart') : t('dashboard.sortClosed')}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {!capFrom || !capTo ? (
@@ -1363,8 +1403,16 @@ export default function DashboardPage() {
                 const chartPoints = capData.points.map((p) => ({ ...p, includedValue: p.excluded ? null : p.leadTime, excludedValue: p.excluded ? p.leadTime : null }));
                 const selPoint = capData.points.find((p) => p.caseId === selectedCapCaseId) || null;
                 const openInspector = (pt: typeof capData.points[number]) => { setSelectedCapCaseId(pt.caseId); setCapNote(pt.note ?? ''); setCapReason(''); };
+                const fromLabel = (eventOptions.find((o) => o.id === capFrom)?.label || capFrom).replace(/^◇ /, '');
+                const toLabel = (eventOptions.find((o) => o.id === capTo)?.label || capTo).replace(/^◇ /, '');
                 return (
                 <>
+                  {/* R7: the captured region for "Export image" — title + chart + tiles (not the controls/inspector). */}
+                  <div ref={capExportRef} className="bg-white">
+                  <div className="mb-2">
+                    <p className="text-sm font-semibold text-gray-900">{studyName}</p>
+                    <p className="text-xs text-gray-500">{fromLabel} → {toLabel} · {t('dashboard.sortLabel')}: {capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.sortStart')}</p>
+                  </div>
                   <ResponsiveContainer width="100%" height={340}>
                     <LineChart data={chartPoints} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
@@ -1435,7 +1483,6 @@ export default function DashboardPage() {
                   {capData.unpl == null && capData.n > 0 && (
                     <p className="mt-2 text-center text-xs text-gray-400">{t('dashboard.capabilityNeedMore')}</p>
                   )}
-                  <p className="mt-1 text-center text-[11px] text-gray-400">{t('dashboard.capabilityInspectHint')}</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                     <Card label={t('dashboard.capabilityCases')} value={capData.n} sub={capData.nExcluded > 0 ? `+${capData.nExcluded} ${t('dashboard.excludedLegend').toLowerCase()}` : undefined} />
                     <Card label={t('dashboard.processAvg')} value={capData.mean != null ? `${capData.mean} ${t('dashboard.daysShort')}` : '—'} color={THEME.textSecondary} />
@@ -1444,6 +1491,8 @@ export default function DashboardPage() {
                     <Card label={t('dashboard.lowerLimit')} value={capData.lnpl != null ? `${capData.lnpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
                     <Card label={t('dashboard.signals')} value={capData.points.filter((p) => p.special).length} color={capData.points.some((p) => p.special) ? COLORS.failure : COLORS.value} />
                   </div>
+                  </div>{/* end export region */}
+                  <p className="mt-2 text-center text-[11px] text-gray-400">{t('dashboard.capabilityInspectHint')}</p>
 
                   {/* Point inspector — exclude / reason / note (per measure). */}
                   {selPoint && (
@@ -1490,7 +1539,7 @@ export default function DashboardPage() {
         )}
 
         {/* Raw entries list */}
-        {dashboardView === 'demand' && data.totalEntries > 0 && (
+        {!isFlow && dashboardView === 'demand' && data.totalEntries > 0 && (
           <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
             <button
               onClick={() => setShowEntries(!showEntries)}

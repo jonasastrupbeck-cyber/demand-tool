@@ -756,6 +756,7 @@ export async function getCapabilityData(
   toEvent: EventToken,
   dateFrom?: Date,
   dateTo?: Date,
+  sort: 'start' | 'closed' = 'start',
 ): Promise<CapabilityData> {
   const empty: CapabilityData = { unit: 'days', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
 
@@ -796,7 +797,7 @@ export async function getCapabilityData(
   }
 
   // Per case: resolve both events; keep cases where both exist and to ≥ from.
-  type Raw = { caseId: string; caseRef: string; fromTs: Date; leadTime: number; excluded: boolean; note: string | null };
+  type Raw = { caseId: string; caseRef: string; fromTs: Date; closedAt: Date | null; leadTime: number; excluded: boolean; note: string | null };
   const raw: Raw[] = [];
   for (const c of caseRows) {
     const ctx = {
@@ -814,12 +815,22 @@ export async function getCapabilityData(
     if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
     const leadTime = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
     const anno = annoByCase.get(c.id);
-    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, leadTime, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
+    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, closedAt: ctx.closedAt, leadTime, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
   }
   if (raw.length === 0) return empty;
 
-  // XmR needs time order. Sort by the FROM event (journey start).
-  raw.sort((a, b) => a.fromTs.getTime() - b.fromTs.getTime());
+  // XmR needs a time order; the chosen order changes the moving ranges → limits.
+  // 'start' = by the FROM event (journey start). 'closed' = by case close date
+  // (still-open cases, closedAt null, sort last; tie-break by start).
+  if (sort === 'closed') {
+    raw.sort((a, b) => {
+      const ax = a.closedAt ? a.closedAt.getTime() : Infinity;
+      const bx = b.closedAt ? b.closedAt.getTime() : Infinity;
+      return ax !== bx ? ax - bx : a.fromTs.getTime() - b.fromTs.getTime();
+    });
+  } else {
+    raw.sort((a, b) => a.fromTs.getTime() - b.fromTs.getTime());
+  }
 
   // Limits + mean/median are computed from INCLUDED points only; excluded points
   // still ride along on the chart (greyed) but don't move the limits.

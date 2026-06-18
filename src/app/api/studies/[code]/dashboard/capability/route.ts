@@ -20,7 +20,8 @@ export async function GET(
   }
   const dateFrom = sp.get('dateFrom') ? new Date(sp.get('dateFrom')!) : undefined;
   const dateTo = sp.get('dateTo') ? new Date(sp.get('dateTo')!) : undefined;
+  const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort);
   return NextResponse.json(data);
 }
