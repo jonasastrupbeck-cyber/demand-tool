@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getDecisionPointTypes, addDecisionPointType } from '@/lib/queries';
+import { getStudyByCode, getDecisionPointTypes, addDecisionPointType, getMilestones } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -28,6 +28,16 @@ export async function POST(
     }
   }
 
-  const row = await addDecisionPointType(study.id, body.label.trim(), body.positiveLabel.trim(), body.negativeLabel.trim());
+  // Optional: place the new decision point inside a milestone of this study.
+  let milestoneId: string | null = null;
+  if (typeof body.milestoneId === 'string' && body.milestoneId) {
+    const ms = await getMilestones(study.id);
+    if (!ms.some((m) => m.id === body.milestoneId)) {
+      return NextResponse.json({ error: 'milestoneId not found in study' }, { status: 400 });
+    }
+    milestoneId = body.milestoneId;
+  }
+
+  const row = await addDecisionPointType(study.id, body.label.trim(), body.positiveLabel.trim(), body.negativeLabel.trim(), milestoneId);
   return NextResponse.json(row, { status: 201 });
 }

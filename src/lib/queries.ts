@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -89,6 +89,15 @@ const DEFAULT_DECISION_POINT_TYPES: Record<Locale, { label: string; positiveLabe
     { label: 'Entscheidung zur Immobilie', positiveLabel: 'Angenommen', negativeLabel: 'Abgelehnt' },
     { label: 'Entscheidung zum Wert', positiveLabel: 'Wert akzeptiert', negativeLabel: 'Wert strittig' },
   ],
+};
+
+// Default milestone wrapping the seeded decision points on a fresh study
+// (2026-06-18). Plain domain wording (not a Vanguard concept); consultants rename.
+const DEFAULT_MILESTONE_LABEL: Record<Locale, string> = {
+  en: 'Milestone 1',
+  da: 'Milepæl 1',
+  sv: 'Milstolpe 1',
+  de: 'Meilenstein 1',
 };
 
 const DEFAULT_WORK_TYPES: Record<Locale, string[]> = {
@@ -966,6 +975,11 @@ export async function getCaseWhatMatters(caseId: string) {
 export async function seedDefaultDecisionPointTypes(studyId: string, locale: Locale = 'en') {
   const existing = await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId));
   if (existing.length > 0) return; // seed once, never duplicate
+  // Every decision point lives in a milestone (2026-06-18). A fresh study gets
+  // one default milestone wrapping the seeded decisions — same shape the 0026
+  // backfill gave existing studies.
+  const milestoneId = generateId();
+  await db.insert(milestones).values({ id: milestoneId, studyId, label: DEFAULT_MILESTONE_LABEL[locale], sortOrder: 0 });
   const defaults = DEFAULT_DECISION_POINT_TYPES[locale];
   for (let i = 0; i < defaults.length; i++) {
     await db.insert(decisionPointTypes).values({
@@ -976,6 +990,7 @@ export async function seedDefaultDecisionPointTypes(studyId: string, locale: Loc
       negativeLabel: defaults[i].negativeLabel,
       sortOrder: i,
       kind: defaults[i].kind ?? null,
+      milestoneId,
     });
   }
 }
@@ -984,21 +999,22 @@ export async function getDecisionPointTypes(studyId: string) {
   return db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId)).orderBy(asc(decisionPointTypes.sortOrder));
 }
 
-export async function addDecisionPointType(studyId: string, label: string, positiveLabel: string, negativeLabel: string) {
+export async function addDecisionPointType(studyId: string, label: string, positiveLabel: string, negativeLabel: string, milestoneId?: string | null) {
   const id = generateId();
   const existing = await getDecisionPointTypes(studyId);
-  const row = { id, studyId, label, positiveLabel, negativeLabel, sortOrder: existing.length };
+  const row = { id, studyId, label, positiveLabel, negativeLabel, sortOrder: existing.length, milestoneId: milestoneId ?? null };
   await db.insert(decisionPointTypes).values(row);
   return row;
 }
 
-export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number; kind?: string | null }) {
+export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number; kind?: string | null; milestoneId?: string | null }) {
   const updateFields: Record<string, unknown> = {};
   if (data.label !== undefined) updateFields.label = data.label;
   if (data.positiveLabel !== undefined) updateFields.positiveLabel = data.positiveLabel;
   if (data.negativeLabel !== undefined) updateFields.negativeLabel = data.negativeLabel;
   if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
   if (data.kind !== undefined) updateFields.kind = data.kind;
+  if (data.milestoneId !== undefined) updateFields.milestoneId = data.milestoneId;
   if (Object.keys(updateFields).length > 0) {
     await db.update(decisionPointTypes).set(updateFields).where(eq(decisionPointTypes.id, id));
   }
@@ -1007,6 +1023,96 @@ export async function updateDecisionPointType(id: string, data: { label?: string
 export async function deleteDecisionPointType(id: string) {
   // case_decision_points rows cascade (deliberate; see schema comment).
   await db.delete(decisionPointTypes).where(eq(decisionPointTypes.id, id));
+}
+
+// --- Milestones (2026-06-18) — ordered containers above decision points ---
+
+export async function getMilestones(studyId: string) {
+  return db.select().from(milestones).where(eq(milestones.studyId, studyId)).orderBy(asc(milestones.sortOrder));
+}
+
+export async function addMilestone(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getMilestones(studyId);
+  const row = { id, studyId, label, sortOrder: existing.length };
+  await db.insert(milestones).values(row);
+  return row;
+}
+
+export async function updateMilestone(id: string, data: { label?: string; sortOrder?: number }) {
+  const updateFields: Record<string, unknown> = {};
+  if (data.label !== undefined) updateFields.label = data.label;
+  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  if (Object.keys(updateFields).length > 0) {
+    await db.update(milestones).set(updateFields).where(eq(milestones.id, id));
+  }
+}
+
+// One POST reorders the whole list — set sortOrder = position. Avoids the
+// per-row PATCH races a drag-reorder would otherwise create.
+export async function reorderMilestones(studyId: string, orderedIds: string[]) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(milestones).set({ sortOrder: i })
+      .where(and(eq(milestones.id, orderedIds[i]), eq(milestones.studyId, studyId)));
+  }
+}
+
+export async function deleteMilestone(id: string) {
+  // decision_point_types.milestone_id is SET NULL (decisions survive, just
+  // unassigned); case_milestones rows cascade.
+  await db.delete(milestones).where(eq(milestones.id, id));
+}
+
+export async function getCaseMilestones(caseId: string) {
+  return db.select().from(caseMilestones).where(eq(caseMilestones.caseId, caseId));
+}
+
+// Record-or-edit are the same call: upsert on (caseId, milestoneId). A
+// 'not_achieved' outcome halts the journey and closes the case; 'achieved'
+// (re)opens it — so a mis-click is recoverable. This is now the SINGLE lever on
+// case status (the legacy person-kind decision auto-close was retired 2026-06-18).
+export async function upsertCaseMilestone(caseId: string, data: {
+  milestoneId: string;
+  outcome: 'achieved' | 'not_achieved';
+  reachedAt?: Date;
+  recordedByCollector?: string | null;
+}) {
+  const values = {
+    id: generateId(),
+    caseId,
+    milestoneId: data.milestoneId,
+    outcome: data.outcome,
+    reachedAt: data.reachedAt || new Date(),
+    recordedByCollector: data.recordedByCollector || null,
+  };
+  await db.insert(caseMilestones).values(values).onConflictDoUpdate({
+    target: [caseMilestones.caseId, caseMilestones.milestoneId],
+    set: {
+      outcome: values.outcome,
+      reachedAt: values.reachedAt,
+      recordedByCollector: values.recordedByCollector,
+    },
+  });
+
+  if (data.outcome === 'not_achieved') {
+    await db.update(cases).set({ status: 'closed', closedAt: values.reachedAt }).where(eq(cases.id, caseId));
+  } else {
+    await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, caseId));
+  }
+
+  const rows = await db.select().from(caseMilestones)
+    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, data.milestoneId)));
+  return rows[0];
+}
+
+export async function deleteCaseMilestone(id: string) {
+  // Mirror the upsert rule: removing a 'not_achieved' milestone (which closed
+  // the case) reopens it. Removing an 'achieved' one needs no status change.
+  const row = (await db.select().from(caseMilestones).where(eq(caseMilestones.id, id)))[0];
+  await db.delete(caseMilestones).where(eq(caseMilestones.id, id));
+  if (row && row.outcome === 'not_achieved') {
+    await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, row.caseId));
+  }
 }
 
 export async function getCaseDecisions(caseId: string) {
@@ -1051,17 +1157,10 @@ export async function upsertCaseDecision(caseId: string, data: {
     },
   });
 
-  // C9 (2026-06-17): a Decline on the 'person' milestone closes the case path.
-  // Conversely, re-recording it as Accept reopens the case (so a mis-click is
-  // recoverable). Only the person-kind decision drives case status.
-  const dpType = (await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.id, data.decisionPointTypeId)))[0];
-  if (dpType?.kind === 'person') {
-    if (data.outcome === 'negative') {
-      await db.update(cases).set({ status: 'closed', closedAt: values.decidedAt }).where(eq(cases.id, caseId));
-    } else {
-      await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, caseId));
-    }
-  }
+  // 2026-06-18: case status is no longer driven by the person-kind decision.
+  // It is driven solely by milestone outcomes (see upsertCaseMilestone) — a
+  // 'not_achieved' milestone closes the case. The person decision is now just
+  // detail inside milestone 1.
 
   const rows = await db.select().from(caseDecisionPoints)
     .where(and(eq(caseDecisionPoints.caseId, caseId), eq(caseDecisionPoints.decisionPointTypeId, data.decisionPointTypeId)));
@@ -1069,17 +1168,9 @@ export async function upsertCaseDecision(caseId: string, data: {
 }
 
 export async function deleteCaseDecision(id: string) {
-  // Look the row up before deleting so we can mirror the upsert's case-status
-  // rule: removing the 'person' milestone (which may have closed the case via a
-  // Decline) reopens it — so an un-clicked Decline is fully reversible.
-  const row = (await db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.id, id)))[0];
+  // 2026-06-18: deleting a decision no longer touches case status (milestone
+  // outcomes are the single lever now — see deleteCaseMilestone).
   await db.delete(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
-  if (row) {
-    const dpType = (await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.id, row.decisionPointTypeId)))[0];
-    if (dpType?.kind === 'person') {
-      await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, row.caseId));
-    }
-  }
 }
 
 export async function getEntries(studyId: string, from?: Date, to?: Date) {
