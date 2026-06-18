@@ -469,12 +469,6 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         {cor && (
           <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
             <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[11px]">{cor}</span>
-            {e.customerFelt === true && (
-              <span className="px-1.5 py-0.5 rounded-full bg-green-50 border border-green-200 text-green-700 text-[11px]">{t('capture.touchFelt')}</span>
-            )}
-            {e.customerFelt === false && (
-              <span className="px-1.5 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-gray-500 text-[11px]">{t('capture.touchInternal')}</span>
-            )}
           </div>
         )}
       </button>
@@ -643,8 +637,6 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
                   ) : (
                     <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
                   )}
-                  {e.customerFelt === true && <span className="shrink-0 w-2 h-2 rounded-full bg-green-500" title={t('capture.touchFelt')} />}
-                  {e.customerFelt === false && <span className="shrink-0 w-2 h-2 rounded-full bg-gray-300" title={t('capture.touchInternal')} />}
                 </button>
               );
             })}

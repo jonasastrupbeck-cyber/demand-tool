@@ -10,6 +10,7 @@ interface HandlingType {
   id: string;
   label: string;
   operationalDefinition: string | null;
+  customerFacing: boolean;
 }
 
 interface DemandType {
@@ -273,7 +274,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, handlingTypes: [...s.handlingTypes, { id, label, operationalDefinition: null }] } : s)),
+      (id) => setStudy((s) => (s ? { ...s, handlingTypes: [...s.handlingTypes, { id, label, operationalDefinition: null, customerFacing: false }] } : s)),
     );
   }
 
@@ -408,6 +409,17 @@ export default function SettingsPage() {
   function togglePointOfTransactionCustomerFacing(id: string, customerFacing: boolean) {
     setStudy((s) => (s ? { ...s, pointsOfTransaction: s.pointsOfTransaction.map((p) => (p.id === id ? { ...p, customerFacing } : p)) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/points-of-transaction/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerFacing }),
+    }));
+  }
+
+  // Mark a Capability of Response as customer-facing (the customer is affected)
+  // vs internal. Replaces the per-touch felt/internal toggle (2026-06-18).
+  function toggleHandlingTypeCustomerFacing(id: string, customerFacing: boolean) {
+    setStudy((s) => (s ? { ...s, handlingTypes: s.handlingTypes.map((h) => (h.id === id ? { ...h, customerFacing } : h)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/handling-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
@@ -1040,7 +1052,16 @@ export default function SettingsPage() {
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">{t('settings.oneStop')}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ht.customerFacing}
+                        onChange={(e) => toggleHandlingTypeCustomerFacing(ht.id, e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                      />
+                      {t('settings.customerFacing')}
+                    </label>
                     {study.oneStopHandlingType !== ht.id && (
                       <button onClick={() => setOneStop(ht.id)} className="text-xs text-blue-600 hover:text-blue-800">{t('settings.setOneStop')}</button>
                     )}

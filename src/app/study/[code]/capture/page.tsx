@@ -152,12 +152,10 @@ export default function CapturePage() {
   const [classification, setClassification] = useState<'value' | 'failure' | 'unknown' | 'sequence' | ''>('');
   const [demandTypeId, setDemandTypeId] = useState('');
   const [handlingTypeId, setHandlingTypeId] = useState('');
-  // C7 (2026-06-17): did the customer feel this touch? Defaults from the chosen
-  // COR's customerFacing flag (see the COR onChange); overridable; null = unset.
+  // C7 (2026-06-17): whether the customer was affected by this touch. Inherited
+  // automatically from the chosen COR's customerFacing flag (set per COR in
+  // Settings, 2026-06-18) — no longer a per-touch question. null = no COR yet.
   const [customerFelt, setCustomerFelt] = useState<boolean | null>(null);
-  // Tracks whether the user has manually overridden customerFelt, so re-picking
-  // a COR doesn't clobber a deliberate choice.
-  const [customerFeltTouched, setCustomerFeltTouched] = useState(false);
   const [contactMethodId, setContactMethodId] = useState('');
   const [pointOfTransactionId, setPointOfTransactionId] = useState('');
   const [workSourceId, setWorkSourceId] = useState('');
@@ -354,7 +352,6 @@ export default function CapturePage() {
     setDemandTypeId('');
     setHandlingTypeId('');
     setCustomerFelt(null);
-    setCustomerFeltTouched(false);
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
     setLifeProblemId('');
@@ -716,14 +713,12 @@ export default function CapturePage() {
         {t('capture.addHandlingButton')}
       </button>
     );
-    // C7: default "did the customer feel it?" from the chosen COR's
-    // customer-facing flag, unless the user set it manually.
+    // C7: the touch inherits "was the customer affected?" from the chosen COR's
+    // customer-facing flag (set per COR in Settings). No per-touch override.
     const onPickCor = (id: string) => {
       setHandlingTypeId(id);
-      if (!customerFeltTouched) {
-        const cor = study.handlingTypes.find((h) => h.id === id);
-        setCustomerFelt(cor ? !!cor.customerFacing : null);
-      }
+      const cor = study.handlingTypes.find((h) => h.id === id);
+      setCustomerFelt(cor ? !!cor.customerFacing : null);
     };
     return (
       <div className={freezeLayout ? 'max-w-[37rem] mx-auto' : undefined}>
@@ -756,23 +751,9 @@ export default function CapturePage() {
           </div>
         )}
         {renderAddTypeInput('handling', 'handling-types', {}, (id) => setHandlingTypeId(id), { variant: 'sky', placeholder: t('capture.typeInHandlingPlaceholder') })}
-        {/* C7 (2026-06-17): once a COR is chosen, capture whether the
-            customer felt this touch (customer-facing) vs an internal/
-            partner handoff. Flow capture only. */}
-        {flowMode && handlingTypeId && (
-          <div className="mt-3 flex flex-col items-center gap-1">
-            <span className="text-xs text-gray-500">{t('capture.customerFeltQuestion')}</span>
-            <SegmentedToggle
-              ariaLabel={t('capture.customerFeltQuestion')}
-              value={customerFelt === null ? '' : customerFelt ? 'felt' : 'internal'}
-              onChange={(v) => { setCustomerFeltTouched(true); setCustomerFelt(v === 'felt'); }}
-              options={[
-                { value: 'felt', label: t('capture.customerFeltYes'), activeColor: 'red' },
-                { value: 'internal', label: t('capture.customerFeltNo'), activeColor: 'blue' },
-              ]}
-            />
-          </div>
-        )}
+        {/* "Was the customer affected?" is no longer asked per touch — it's
+            inherited from the chosen COR's customer-facing flag (set per COR in
+            Settings, 2026-06-18). */}
       </div>
     );
   })() : null;
