@@ -2137,40 +2137,6 @@ const translations = {
     sv: '+ COR',
     de: '+ COR',
   },
-  // C7 (2026-06-17): "did the customer feel this touch?" — customer-facing COR
-  // vs internal/partner handoff. Not a Vanguard-glossary concept, written natively.
-  'capture.customerFeltQuestion': {
-    en: 'Did the customer feel this?',
-    da: 'Mærkede kunden det?',
-    sv: 'Märkte kunden av det?',
-    de: 'Hat der Kunde es gespürt?',
-  },
-  'capture.customerFeltYes': {
-    en: 'Yes — customer felt it',
-    da: 'Ja — kunden mærkede det',
-    sv: 'Ja — kunden märkte det',
-    de: 'Ja — Kunde hat es gespürt',
-  },
-  'capture.customerFeltNo': {
-    en: 'No — internal handoff',
-    da: 'Nej — intern overdragelse',
-    sv: 'Nej — intern överlämning',
-    de: 'Nein — interne Übergabe',
-  },
-  // C5/R6 (2026-06-17): short chips on the full saved-touch card in the freeze rail.
-  'capture.touchFelt': {
-    en: 'Customer felt it',
-    da: 'Kunden mærkede det',
-    sv: 'Kunden märkte det',
-    de: 'Kunde hat es gespürt',
-  },
-  'capture.touchInternal': {
-    en: 'Internal',
-    da: 'Intern',
-    sv: 'Intern',
-    de: 'Intern',
-  },
-
   // Capture form - linked demand
   'capture.linkedValueDemand': {
     en: 'Link to originating value demand',
