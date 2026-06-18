@@ -94,9 +94,10 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   const [msOutcome, setMsOutcome] = useState<'achieved' | 'not_achieved' | ''>('');
   const [msReachedAt, setMsReachedAt] = useState('');
   const [msSaving, setMsSaving] = useState(false);
-  // Milestones the consultant has manually expanded (overrides the cold-start
-  // collapse and the soft-lock on later milestones).
-  const [expandedMs, setExpandedMs] = useState<Set<string>>(new Set());
+  // Per-milestone open/closed override (id → forced state). Absence = use the
+  // default (only the first non-achieved milestone is open). Lets the consultant
+  // expand a folded milestone to look inside, and fold an open one back.
+  const [milestoneOverrides, setMilestoneOverrides] = useState<Record<string, boolean>>({});
 
   const boolToTri = (b: boolean | null | undefined): 'yes' | 'no' | '' => (b === true ? 'yes' : b === false ? 'no' : '');
   const triToBool = (v: 'yes' | 'no' | '') => (v === 'yes' ? true : v === 'no' ? false : null);
@@ -187,6 +188,9 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     });
     if (res.ok) {
       setOpenMilestoneId(null);
+      // Clear any manual override so this milestone reverts to default: once it
+      // is 'achieved' it folds, and the next milestone becomes the open one.
+      setMilestoneOverrides((o) => { const n = { ...o }; delete n[m.id]; return n; });
       await onChanged();
     }
     setMsSaving(false);
@@ -195,11 +199,13 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   async function removeMilestone(recordId: string) {
     if (msSaving) return;
     setMsSaving(true);
+    const rec = caseMilestones.find((r) => r.id === recordId);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/milestones/${encodeURIComponent(recordId)}`, {
       method: 'DELETE',
     });
     if (res.ok) {
       setOpenMilestoneId(null);
+      if (rec) setMilestoneOverrides((o) => { const n = { ...o }; delete n[rec.milestoneId]; return n; });
       await onChanged();
     }
     setMsSaving(false);
@@ -338,14 +344,16 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
       return <div className="space-y-2">{decisionPointTypes.map(renderOverviewDecision)}</div>;
     }
     const recFor = (mid: string) => caseMilestones.find((r) => r.milestoneId === mid);
-    // Quiet-then-bloom: nothing recorded yet → only the first milestone is open,
-    // the rest are muted label rows. The pane blooms once any record lands.
-    const hasAnyRecord = caseMilestones.length > 0 || decisions.length > 0;
     // Soft-lock: a milestone is locked once any EARLIER milestone isn't achieved.
     // Precomputed purely (no in-render mutation) — index i is locked if any
     // milestone before it lacks an 'achieved' record.
     const achievedIds = new Set(caseMilestones.filter((r) => r.outcome === 'achieved').map((r) => r.milestoneId));
     const lockedFlags = orderedMs.map((_, i) => orderedMs.slice(0, i).some((pm) => !achievedIds.has(pm.id)));
+    // The one milestone open by default = the first that isn't achieved yet (the
+    // "current" step). Achieved milestones fold to save space; the next opens
+    // below. -1 when every milestone is achieved (all fold). This also gives the
+    // cold-start "only the first is open" for free.
+    const firstOpenIdx = orderedMs.findIndex((m) => recFor(m.id)?.outcome !== 'achieved');
     return (
       <div className="space-y-2">
         {orderedMs.map((m, idx) => {
@@ -353,21 +361,25 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
           const achieved = rec?.outcome === 'achieved';
           const lockedByOrder = lockedFlags[idx];
           const types = decisionPointTypes.filter((d) => d.milestoneId === m.id).sort((a, b) => a.sortOrder - b.sortOrder);
-          const defaultCollapsed = idx > 0 && (!hasAnyRecord || lockedByOrder);
-          const expanded = expandedMs.has(m.id) || !defaultCollapsed;
+          const defaultOpen = idx === firstOpenIdx;
+          const isOpen = m.id in milestoneOverrides ? milestoneOverrides[m.id] : defaultOpen;
+          const toggleOpen = (open: boolean) => setMilestoneOverrides((o) => ({ ...o, [m.id]: open }));
 
-          if (!expanded) {
-            // Muted, clickable header — expanding a locked one is the override.
+          if (!isOpen) {
+            // Folded, clickable header. Achieved → green "done" chip (✓ + date);
+            // locked → muted gray + 🔒; otherwise a neutral sky "+".
             return (
               <button
                 key={m.id}
                 type="button"
-                onClick={() => setExpandedMs((s) => new Set(s).add(m.id))}
-                className="w-full flex items-center gap-1.5 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-2 py-1.5 text-left opacity-70 hover:opacity-100 transition-opacity"
+                onClick={() => toggleOpen(true)}
+                aria-label={t('capture.milestoneExpand')}
+                className={`w-full flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-left transition-colors ${achieved ? 'border-green-300 bg-green-50/70 hover:bg-green-100/70' : lockedByOrder ? 'border-dashed border-gray-200 bg-gray-50/60 opacity-70 hover:opacity-100' : 'border-sky-200 bg-sky-50/50 hover:bg-sky-100/50'}`}
               >
                 <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-center">{idx + 1}</span>
-                <span className="flex-1 text-xs font-medium text-gray-500 truncate">{m.label}</span>
-                <span className="shrink-0 text-[10px] text-gray-400">{lockedByOrder ? '🔒' : '+'}</span>
+                <span className={`flex-1 text-xs font-medium truncate ${achieved ? 'text-green-800' : 'text-gray-500'}`}>{m.label}</span>
+                {achieved && rec && <span className="shrink-0 text-[10px] text-green-600 tabular-nums">{new Date(rec.reachedAt).toLocaleDateString()}</span>}
+                <span className="shrink-0 text-[10px] text-gray-400">{achieved ? '✓' : lockedByOrder ? '🔒' : '+'}</span>
               </button>
             );
           }
@@ -381,6 +393,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               <div className="flex items-center gap-1.5">
                 <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-center">{idx + 1}</span>
                 <p className="flex-1 text-xs font-semibold text-gray-800 truncate">{m.label}</p>
+                <button type="button" onClick={() => toggleOpen(false)} aria-label={t('capture.milestoneCollapse')} className="shrink-0 text-[10px] text-gray-400 hover:text-gray-700 px-1 leading-none">▾</button>
               </div>
               {lockedByOrder && (
                 <p className="text-[10px] text-amber-600 text-center px-1">{t('capture.milestoneLocked')}</p>

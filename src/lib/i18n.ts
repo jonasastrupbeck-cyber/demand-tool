@@ -2643,6 +2643,18 @@ const translations = {
     sv: 'Tidigare milstolpe är inte uppnådd ännu — tryck för att registrera ändå',
     de: 'Früherer Meilenstein noch nicht erreicht — tippen, um trotzdem zu erfassen',
   },
+  'capture.milestoneExpand': {
+    en: 'Expand milestone',
+    da: 'Udvid milepæl',
+    sv: 'Expandera milstolpe',
+    de: 'Meilenstein ausklappen',
+  },
+  'capture.milestoneCollapse': {
+    en: 'Collapse milestone',
+    da: 'Fold milepæl sammen',
+    sv: 'Fäll ihop milstolpe',
+    de: 'Meilenstein einklappen',
+  },
   'capture.flowEntryWork': {
     en: 'Work we did',
     da: 'Udført arbejde',
