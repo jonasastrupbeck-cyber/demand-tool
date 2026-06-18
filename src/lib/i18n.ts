@@ -2620,10 +2620,10 @@ const translations = {
   // C5/R9 (2026-06-17): pill atop the freeze left pane to find/open another
   // customer (a new reference number) without leaving the capture page.
   'capture.openNewReference': {
-    en: 'Open new reference number',
-    da: 'Åbn nyt referencenummer',
-    sv: 'Öppna nytt referensnummer',
-    de: 'Neue Referenznummer öffnen',
+    en: 'Open new account reference number',
+    da: 'Åbn nyt kontoreferencenummer',
+    sv: 'Öppna nytt kontoreferensnummer',
+    de: 'Neue Kontoreferenznummer öffnen',
   },
   // C5 case-search table (2026-06-17): the "Which customer is this?" overview.
   'capture.caseTableAccount': {
@@ -2651,10 +2651,10 @@ const translations = {
     de: 'Fall öffnen',
   },
   'capture.caseSearchPlaceholder': {
-    en: 'Search or type a new reference number…',
-    da: 'Søg eller indtast et nyt referencenummer…',
-    sv: 'Sök eller ange ett nytt referensnummer…',
-    de: 'Suchen oder neue Referenznummer eingeben…',
+    en: 'Search or type a new account reference number…',
+    da: 'Søg eller indtast et nyt kontoreferencenummer…',
+    sv: 'Sök eller ange ett nytt kontoreferensnummer…',
+    de: 'Suchen oder neue Kontoreferenznummer eingeben…',
   },
   'capture.caseTableEmpty': {
     en: 'No customers yet — type a reference number above to start one.',
@@ -2669,10 +2669,10 @@ const translations = {
     de: 'Kundenreferenz (nur Nummer)',
   },
   'capture.customerRefHelp': {
-    en: 'One reference = one customer = one value demand. Several collectors can add entries to the same customer over time — type the same reference to pick up where it left off. Privacy: use the reference number only, never a name.',
-    da: 'Én reference = én kunde = én værdiskabende efterspørgsel. Flere indsamlere kan tilføje registreringer til samme kunde over tid — skriv den samme reference for at fortsætte, hvor I slap. Privatliv: brug kun referencenummeret, aldrig et navn.',
-    sv: 'En referens = en kund = en värdeskapande efterfrågan. Flera insamlare kan lägga till registreringar för samma kund över tid — skriv samma referens för att fortsätta där ni slutade. Integritet: använd endast referensnumret, aldrig ett namn.',
-    de: 'Eine Referenz = ein Kunde = ein Anliegen. Mehrere Personen können demselben Kunden über die Zeit Einträge hinzufügen — dieselbe Referenz eingeben, um weiterzumachen. Datenschutz: nur die Referenznummer verwenden, niemals einen Namen.',
+    en: 'One account reference number = one customer = one value demand. Several collectors can add entries to the same customer over time — type the same number to pick up where it left off. Privacy: use the account reference number only, never a name.',
+    da: 'Ét kontoreferencenummer = én kunde = én værdiskabende efterspørgsel. Flere indsamlere kan tilføje registreringer til samme kunde over tid — skriv det samme nummer for at fortsætte, hvor I slap. Privatliv: brug kun kontoreferencenummeret, aldrig et navn.',
+    sv: 'Ett kontoreferensnummer = en kund = en värdeskapande efterfrågan. Flera insamlare kan lägga till registreringar för samma kund över tid — skriv samma nummer för att fortsätta där ni slutade. Integritet: använd endast kontoreferensnumret, aldrig ett namn.',
+    de: 'Eine Kontoreferenznummer = ein Kunde = ein Anliegen. Mehrere Personen können demselben Kunden über die Zeit Einträge hinzufügen — dieselbe Nummer eingeben, um weiterzumachen. Datenschutz: nur die Kontoreferenznummer verwenden, niemals einen Namen.',
   },
   'capture.customerRecentOpen': {
     en: 'Recent customers',

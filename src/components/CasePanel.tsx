@@ -44,6 +44,9 @@ interface CaseEntry {
   collectorName: string | null;
   // C5/R6 (2026-06-17): shown on the full saved-touch card in the freeze rail.
   customerFelt?: boolean | null;
+  // 2026-06-18: distinct non-null system-condition ids on this touch's work
+  // blocks (comma-joined by getCaseEntries), shown on top of the saved card.
+  systemConditionIds?: string | null;
 }
 
 interface Props {
@@ -60,6 +63,8 @@ interface Props {
   systemType: 'transactional' | 'flow';
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
+  // 2026-06-18: SC taxonomy for the id→label lookup on the saved-touch card.
+  systemConditions: { id: string; label: string }[];
   onTypesChanged?: () => Promise<void> | void;
   /** "Capture first, stitch when the number arrives": the id of the last
    *  saved entry if it has no case yet — renders a one-tap attach chip. */
@@ -86,7 +91,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -195,6 +200,10 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     const ht = handlingTypes.find((h) => h.id === id);
     return ht ? tl(ht.label) : null;
   };
+  // Comma-joined SC ids on a touch → localized labels (drops unknown/empty).
+  const scLabels = (ids: string | null | undefined) => (ids || '').split(',').filter(Boolean)
+    .map((id) => { const x = systemConditions.find((s) => s.id === id); return x ? tl(x.label) : null; })
+    .filter((l): l is string => !!l);
 
   // Case tracking off: pure passthrough (transactional studies without the
   // toggle see exactly the old page).
@@ -448,29 +457,38 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       })
       .filter((s) => s.text.trim().length > 0);
     const cor = handlingLabel(e.handlingTypeId);
+    const scs = scLabels(e.systemConditionIds);
     return (
+      // Content-height (no h-full/mt-auto) so the card crams to its content
+      // instead of stretching with the rail. Order: SC(s) → steps → COR + author.
       <button
         key={e.id}
         type="button"
         onClick={() => onOpenEntry?.(e.id)}
-        className="w-full h-full text-left rounded-xl border border-gray-200 bg-white p-3 hover:border-gray-400 transition-colors flex flex-col gap-2"
+        className="w-full text-left rounded-xl border border-gray-200 bg-white p-2 hover:border-gray-400 transition-colors flex flex-col gap-1.5"
       >
-        <div className="flex items-center gap-2 text-[11px] text-gray-400">
-          <span className="tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
-          {e.collectorName && <span className="text-gray-600 font-medium">{e.collectorName}</span>}
-        </div>
+        {/* 1. System condition(s) driving this touch, on top. */}
+        {scs.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {scs.map((label, i) => (
+              <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] leading-snug break-words">{label}</span>
+            ))}
+          </div>
+        )}
+        {/* 2. What happened — colour-coded steps, chronological. */}
         <div className="space-y-1">
           {steps.map((s, i) => (
-            <div key={i} className={`px-2 py-1.5 rounded-lg border text-xs whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
+            <div key={i} className={`px-1.5 py-1 rounded-md border text-[11px] leading-snug whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
               {s.text}
             </div>
           ))}
         </div>
-        {cor && (
-          <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[11px]">{cor}</span>
-          </div>
-        )}
+        {/* 3. COR + authoring (date, collector) at the bottom. */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
+          {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
+          <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+          {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
+        </div>
       </button>
     );
   };
@@ -536,8 +554,9 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
       // (lg only — they read as zone separators across, not stacked).
       <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-stretch min-h-[24rem]">
-        {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg. */}
-        <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border border-green-200 bg-green-100/50 p-3">
+        {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg.
+            Border-2 darker green, matching the composer's emphasis (2026-06-18). */}
+        <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
           {/* R9: open another customer (a new reference) without leaving capture. */}
           <div className="flex justify-center mb-2">
             <button
@@ -566,16 +585,25 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
-        {/* ┊LEFT boundary + WORKING AREA — the flow AND the (pinned) Decisions,
-            all left of the right dotted line. On lg: a row of [scrolling touch
-            rail + composer] then Decisions, pinned so it stays in view while the
-            rail scrolls. On mobile: composer → touches → decisions, stacked. */}
-        <div className="order-2 flex-1 min-w-0 flex flex-col gap-3 lg:flex-row lg:gap-3 lg:items-stretch lg:border-l-2 lg:border-dashed lg:border-gray-500 lg:ml-3 lg:pl-3">
+        {/* ┊ LEFT dashed boundary — a dedicated vertical line, thicker (border-l-4)
+            and slightly taller than the panes (protrudes ~10px top & bottom via the
+            calc height + negative margin). lg only. */}
+        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 order-2">
+          <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
+        </div>
+
+        {/* WORKING AREA — the flow AND the (pinned) Decisions, all left of the
+            right dotted line. On lg: a row of [scrolling touch rail + composer]
+            then Decisions, pinned so it stays in view while the rail scrolls.
+            On mobile: composer → touches → decisions, stacked. */}
+        <div className="order-2 flex-1 min-w-0 flex flex-col gap-3 lg:flex-row lg:gap-3 lg:items-stretch">
           {/* Touch rail + composer — the only horizontally-scrolling part. */}
           <div className="flex-1 min-w-0 lg:overflow-x-auto">
             <div className="flex flex-col gap-3 lg:flex-row lg:min-w-min lg:items-stretch pb-2">
               {entries.map((e) => (
-                <div key={e.id} className="order-2 lg:order-1 w-full lg:w-72 shrink-0 flex">
+                // ~half the old width (more touches fit) + self-start so the card
+                // stays content-height instead of stretching with the rail.
+                <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex lg:self-start">
                   {renderTouchFull(e)}
                 </div>
               ))}
@@ -594,7 +622,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
               (no divider before it; just left of the right dotted line). */}
           {decisionPointsEnabled && (
             <div className="w-full lg:w-80 shrink-0">
-              <div className="rounded-xl bg-sky-50/70 border border-sky-100 p-2">
+              <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
                 <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                   {t('capture.caseDecisionsHeading')}
                 </p>
@@ -612,10 +640,15 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           )}
         </div>
 
-        {/* ┊RIGHT boundary + COR list — each saved touch's Capability of Response
-            in chronological order (oldest top → newest bottom). Read-only summary
-            of the sequence of capabilities; click a row to open that touch. */}
-        <aside className="order-3 w-full lg:w-72 shrink-0 lg:border-l-2 lg:border-dashed lg:border-gray-500 lg:ml-3 lg:pl-3">
+        {/* ┊ RIGHT dashed boundary — dedicated line (thicker + protruding), lg only. */}
+        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 order-3">
+          <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
+        </div>
+
+        {/* RIGHT pane + COR list — each saved touch's Capability of Response in
+            chronological order (oldest top → newest bottom). Read-only summary of
+            the sequence of capabilities; click a row to open that touch. */}
+        <aside className="order-3 w-full lg:w-72 shrink-0">
           <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
             {t('capture.handlingLabel')}
           </p>

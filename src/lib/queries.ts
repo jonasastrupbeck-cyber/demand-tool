@@ -893,8 +893,24 @@ export async function getCase(caseId: string) {
 }
 
 // Timeline of touches for one case, oldest first — this IS the COR+ sequence.
+// Each row is enriched with the distinct non-null system-condition ids attached
+// to its work blocks (comma-joined), so the saved-touch card can show the SC(s)
+// driving it. Mirrors the string_agg pattern used in getCases.
 export async function getCaseEntries(caseId: string) {
-  return db.select().from(demandEntries)
+  return db.select({
+    id: demandEntries.id,
+    studyId: demandEntries.studyId,
+    caseId: demandEntries.caseId,
+    createdAt: demandEntries.createdAt,
+    verbatim: demandEntries.verbatim,
+    classification: demandEntries.classification,
+    entryType: demandEntries.entryType,
+    handlingTypeId: demandEntries.handlingTypeId,
+    collectorName: demandEntries.collectorName,
+    customerFelt: demandEntries.customerFelt,
+    systemConditionIds: sql<string | null>`(select string_agg(distinct wdb.system_condition_id, ',') from work_description_blocks wdb where wdb.demand_entry_id = demand_entries.id and wdb.system_condition_id is not null)`,
+  })
+    .from(demandEntries)
     .where(eq(demandEntries.caseId, caseId))
     .orderBy(asc(demandEntries.createdAt));
 }

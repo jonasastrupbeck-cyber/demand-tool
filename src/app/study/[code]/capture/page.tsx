@@ -860,6 +860,7 @@ export default function CapturePage() {
         systemType={study.systemType}
         lifeProblems={study.lifeProblems}
         whatMattersTypes={study.whatMattersTypes}
+        systemConditions={study.systemConditions}
         onTypesChanged={refreshStudy}
         unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
