@@ -21,7 +21,8 @@ export async function GET(
   const dateFrom = sp.get('dateFrom') ? new Date(sp.get('dateFrom')!) : undefined;
   const dateTo = sp.get('dateTo') ? new Date(sp.get('dateTo')!) : undefined;
   const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
+  const metric = sp.get('metric') === 'touches' ? 'touches' : 'leadTime';
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric);
   return NextResponse.json(data);
 }

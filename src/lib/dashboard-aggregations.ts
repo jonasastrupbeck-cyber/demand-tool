@@ -757,8 +757,10 @@ export async function getCapabilityData(
   dateFrom?: Date,
   dateTo?: Date,
   sort: 'start' | 'closed' = 'start',
+  metric: 'leadTime' | 'touches' = 'leadTime',
 ): Promise<CapabilityData> {
-  const empty: CapabilityData = { unit: 'days', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
+  const unit = metric === 'touches' ? 'touches' : 'days';
+  const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
 
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
     .from(cases).where(eq(cases.studyId, studyId));
@@ -796,6 +798,20 @@ export async function getCapabilityData(
     msByCase.get(r.caseId)!.set(r.milestoneId, new Date(r.reachedAt as unknown as string));
   }
 
+  // For the 'touches' metric we count entries per case inside the window — pull
+  // every entry timestamp once and bucket by case (only when needed).
+  const entriesByCase = new Map<string, Date[]>();
+  if (metric === 'touches') {
+    const entryRows = await db.select({ caseId: demandEntries.caseId, createdAt: demandEntries.createdAt })
+      .from(demandEntries)
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)));
+    for (const r of entryRows) {
+      if (!r.caseId) continue;
+      if (!entriesByCase.has(r.caseId)) entriesByCase.set(r.caseId, []);
+      entriesByCase.get(r.caseId)!.push(new Date(r.createdAt as unknown as string));
+    }
+  }
+
   // Per case: resolve both events; keep cases where both exist and to ≥ from.
   type Raw = { caseId: string; caseRef: string; fromTs: Date; closedAt: Date | null; leadTime: number; excluded: boolean; note: string | null };
   const raw: Raw[] = [];
@@ -813,9 +829,20 @@ export async function getCapabilityData(
     if (toTs.getTime() < fromTs.getTime()) continue;
     if (dateFrom && fromTs.getTime() < dateFrom.getTime()) continue;
     if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
-    const leadTime = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
+    // The plotted value: lead time in days, or the count of touches in the
+    // [fromTs, toTs] window (inclusive). The field stays named leadTime — it
+    // carries "the metric value"; `unit` disambiguates days vs touches.
+    let value: number;
+    if (metric === 'touches') {
+      const fromMs = fromTs.getTime();
+      const toMs = toTs.getTime();
+      const stamps = entriesByCase.get(c.id) ?? [];
+      value = stamps.filter((d) => { const t = d.getTime(); return t >= fromMs && t <= toMs; }).length;
+    } else {
+      value = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
+    }
     const anno = annoByCase.get(c.id);
-    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, closedAt: ctx.closedAt, leadTime, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
+    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, closedAt: ctx.closedAt, leadTime: value, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
   }
   if (raw.length === 0) return empty;
 
@@ -864,7 +891,7 @@ export async function getCapabilityData(
   }));
 
   return {
-    unit: 'days',
+    unit,
     points,
     mean: mean !== null ? round1(mean) : null,
     median: median !== null ? round1(median) : null,

@@ -79,6 +79,7 @@ export default function DashboardPage() {
   const [capFrom, setCapFrom] = useState('');
   const [capTo, setCapTo] = useState('');
   const [capSort, setCapSort] = useState<'start' | 'closed'>('start'); // R7: point order
+  const [capMetric, setCapMetric] = useState<'leadTime' | 'touches'>('leadTime'); // R10: days vs touch-count
   const [capData, setCapData] = useState<CapabilityData | null>(null);
   const [capLoading, setCapLoading] = useState(false);
   const capExportRef = useRef<HTMLDivElement>(null); // R7: region captured for PNG export
@@ -214,7 +215,7 @@ export default function DashboardPage() {
     if (!capFrom || !capTo) { setCapData(null); return; }
     setCapLoading(true);
     /* eslint-enable react-hooks/set-state-in-effect */
-    const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo, sort: capSort });
+    const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo, sort: capSort, metric: capMetric });
     const range = getDateRangeParams();
     if (range.from) qp.set('dateFrom', range.from);
     if (range.to) qp.set('dateTo', range.to);
@@ -222,7 +223,7 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, getDateRangeParams, capTick, capSort]);
+  }, [capFrom, capTo, code, getDateRangeParams, capTick, capSort, capMetric]);
 
   // R7: flow studies show only the capability view.
   useEffect(() => {
@@ -1381,6 +1382,15 @@ export default function DashboardPage() {
                 <span className="text-gray-400" aria-hidden="true">→</span>
                 <span className="text-xs font-medium text-gray-500">{t('dashboard.eventTo')}</span>
                 <PillSelect value={capTo} onChange={setCapTo} options={eventOptions} placeholder={t('dashboard.eventTo')} ariaLabel={t('dashboard.eventTo')} />
+                {/* R10: measure — lead time (days) vs touch count, between the two events. */}
+                <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.metricLabel')}</span>
+                <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
+                  {(['leadTime', 'touches'] as const).map((m) => (
+                    <button key={m} type="button" onClick={() => setCapMetric(m)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${capMetric === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {m === 'leadTime' ? t('dashboard.metricLeadTime') : t('dashboard.metricTouches')}
+                    </button>
+                  ))}
+                </div>
                 {/* R7: point order — changes the XmR sequence → different limits/signals. */}
                 <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.sortLabel')}</span>
                 <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
@@ -1405,26 +1415,31 @@ export default function DashboardPage() {
                 const openInspector = (pt: typeof capData.points[number]) => { setSelectedCapCaseId(pt.caseId); setCapNote(pt.note ?? ''); setCapReason(''); };
                 const fromLabel = (eventOptions.find((o) => o.id === capFrom)?.label || capFrom).replace(/^◇ /, '');
                 const toLabel = (eventOptions.find((o) => o.id === capTo)?.label || capTo).replace(/^◇ /, '');
+                // R10: unit-aware labelling. Use the unit the data was computed
+                // with (not capMetric) so labels match the points during a switch.
+                const isTouches = capData.unit === 'touches';
+                const valueLabel = isTouches ? t('dashboard.touchesPerCase') : t('dashboard.leadTimeDays');
+                const fmtValue = (v: number | null) => v == null ? '—' : (isTouches ? `${v}` : `${v} ${t('dashboard.daysShort')}`);
                 return (
                 <>
                   {/* R7: the captured region for "Export image" — title + chart + tiles (not the controls/inspector). */}
                   <div ref={capExportRef} className="bg-white">
                   <div className="mb-2">
                     <p className="text-sm font-semibold text-gray-900">{studyName}</p>
-                    <p className="text-xs text-gray-500">{fromLabel} → {toLabel} · {t('dashboard.sortLabel')}: {capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.sortStart')}</p>
+                    <p className="text-xs text-gray-500">{fromLabel} → {toLabel} · {valueLabel} · {t('dashboard.sortLabel')}: {capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.sortStart')}</p>
                   </div>
                   <ResponsiveContainer width="100%" height={340}>
                     <LineChart data={chartPoints} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
                       <XAxis dataKey="caseRef" tick={{ fontSize: 10, fill: THEME.textSecondary }} />
-                      <YAxis allowDecimals tick={{ fontSize: 11, fill: THEME.textSecondary }} label={{ value: t('dashboard.leadTimeDays'), angle: -90, position: 'insideLeft', fill: THEME.textSecondary, fontSize: 11 }} />
+                      <YAxis allowDecimals tick={{ fontSize: 11, fill: THEME.textSecondary }} label={{ value: valueLabel, angle: -90, position: 'insideLeft', fill: THEME.textSecondary, fontSize: 11 }} />
                       <Tooltip {...tooltipStyle} content={(p: { active?: boolean; payload?: readonly { payload?: typeof capData.points[number] }[] }) => {
                         const pt = p.active && p.payload && p.payload.length ? p.payload[0].payload : null;
                         if (!pt) return null;
                         return (
                           <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
                             <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.startedAt).toLocaleDateString()}</div>
-                            <div>{t('dashboard.leadTimeDays')}: {pt.leadTime} {t('dashboard.daysShort')}</div>
+                            <div>{valueLabel}: {fmtValue(pt.leadTime)}</div>
                             {pt.excluded && <div className="text-amber-700">{t('dashboard.excludedLegend')}</div>}
                             {pt.note && <div className="text-gray-500 italic max-w-[220px]">“{pt.note}”</div>}
                           </div>
@@ -1438,7 +1453,7 @@ export default function DashboardPage() {
                         type="monotone"
                         dataKey="includedValue"
                         connectNulls
-                        name={t('dashboard.leadTimeDays')}
+                        name={valueLabel}
                         stroke={COLORS.neutral[0]}
                         strokeWidth={2}
                         isAnimationActive={false}
@@ -1485,10 +1500,10 @@ export default function DashboardPage() {
                   )}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
                     <Card label={t('dashboard.capabilityCases')} value={capData.n} sub={capData.nExcluded > 0 ? `+${capData.nExcluded} ${t('dashboard.excludedLegend').toLowerCase()}` : undefined} />
-                    <Card label={t('dashboard.processAvg')} value={capData.mean != null ? `${capData.mean} ${t('dashboard.daysShort')}` : '—'} color={THEME.textSecondary} />
-                    <Card label={t('dashboard.capabilityMedian')} value={capData.median != null ? `${capData.median} ${t('dashboard.daysShort')}` : '—'} />
-                    <Card label={t('dashboard.upperLimit')} value={capData.unpl != null ? `${capData.unpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
-                    <Card label={t('dashboard.lowerLimit')} value={capData.lnpl != null ? `${capData.lnpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
+                    <Card label={t('dashboard.processAvg')} value={fmtValue(capData.mean)} color={THEME.textSecondary} />
+                    <Card label={t('dashboard.capabilityMedian')} value={fmtValue(capData.median)} />
+                    <Card label={t('dashboard.upperLimit')} value={fmtValue(capData.unpl)} color={COLORS.failure} />
+                    <Card label={t('dashboard.lowerLimit')} value={fmtValue(capData.lnpl)} color={COLORS.failure} />
                     <Card label={t('dashboard.signals')} value={capData.points.filter((p) => p.special).length} color={capData.points.some((p) => p.special) ? COLORS.failure : COLORS.value} />
                   </div>
                   </div>{/* end export region */}

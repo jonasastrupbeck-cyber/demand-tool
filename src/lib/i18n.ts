@@ -1166,6 +1166,31 @@ const translations = {
     sv: 'Gränser visas när minst 2 ärenden har båda händelserna.',
     de: 'Grenzen erscheinen, sobald mindestens 2 Fälle beide Ereignisse haben.',
   },
+  // R10: second capability metric — touches per case.
+  'dashboard.metricLabel': {
+    en: 'Measure',
+    da: 'Mål',
+    sv: 'Mått',
+    de: 'Maß',
+  },
+  'dashboard.metricLeadTime': {
+    en: 'Lead time',
+    da: 'Gennemløbstid',
+    sv: 'Ledtid',
+    de: 'Durchlaufzeit',
+  },
+  'dashboard.metricTouches': {
+    en: 'Touches',
+    da: 'Registreringer',
+    sv: 'Poster',
+    de: 'Einträge',
+  },
+  'dashboard.touchesPerCase': {
+    en: 'Touches per case',
+    da: 'Registreringer pr. sag',
+    sv: 'Poster per ärende',
+    de: 'Einträge pro Fall',
+  },
   // R7: capability point ordering + image export.
   'dashboard.sortLabel': {
     en: 'Order',
