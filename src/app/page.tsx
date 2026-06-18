@@ -131,7 +131,7 @@ export default function Home() {
 
         <div className="text-center mb-8">
           {/* Co-branded: Skipton (client, official blue) primary + the Vanguard
-              mark recoloured to the brand purple (vanguard-logo-brand.png). */}
+              mark recoloured to the Skipton brand blue (vanguard-logo-brand.png). */}
           <div className="flex items-center justify-center gap-3 mb-4">
             <Image src="/skipton-logo.svg" alt="Skipton Building Society" width={200} height={45} priority />
             <span className="h-9 w-px bg-gray-300" aria-hidden="true" />

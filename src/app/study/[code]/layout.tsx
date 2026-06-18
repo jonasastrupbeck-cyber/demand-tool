@@ -25,8 +25,8 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Co-branded: Skipton (client, official blue) primary + the Vanguard
-                mark recoloured to the brand purple (vanguard-logo-brand.png — a
-                purple-on-transparent render of the flat-raster Vanguard mark). */}
+                mark recoloured to the Skipton brand blue (vanguard-logo-brand.png
+                — a blue-on-transparent render of the flat-raster Vanguard mark). */}
             <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
               <Image src="/skipton-logo.svg" alt="Skipton Building Society" width={142} height={32} priority />
               <span className="h-6 w-px bg-gray-300" aria-hidden="true" />

@@ -10,13 +10,15 @@
    charts via var(--color-brand)) follows. NB: these are the BRAND accent only —
    the semantic strand colours (green=value, red=failure, sky=system conditions,
    blue=thinking) are deliberately NOT tokenised here and must stay as-is.
-   2026-06-17: re-skinned to Skipton Building Society's Primary Purple (#2B2171,
-   from brand.skipton.co.uk) — chosen over Skipton Blue so the brand accent stays
-   distinct from the sky/blue Vanguard strand colours. Closes C-Open-3. */
+   2026-06-18: re-skinned to Skipton Building Society's brand BLUE (#0072C5, the
+   colour of the Skipton logo) per Jonas, with hover a darker blue and accent the
+   Skipton Online Cyan (#069DE5). Closes C-Open-3. NB: this blue is close to the
+   sky (system conditions) / blue (thinking) Vanguard strand colours — Jonas's
+   explicit choice; the strand colours themselves are untouched. */
 @theme {
-  --color-brand: #2B2171;
-  --color-brand-hover: #211a5a;
-  --color-brand-accent: #3d33a0;
+  --color-brand: #0072C5;
+  --color-brand-hover: #005a9e;
+  --color-brand-accent: #069DE5;
 }
 
 html, body {
