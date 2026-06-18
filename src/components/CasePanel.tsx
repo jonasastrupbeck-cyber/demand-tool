@@ -19,7 +19,7 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection from '@/components/CaseContextSection';
-import CaseDecisionPoints, { type CaseDecision, type DecisionPointType } from '@/components/CaseDecisionPoints';
+import CaseDecisionPoints, { type CaseDecision, type DecisionPointType, type Milestone, type CaseMilestone } from '@/components/CaseDecisionPoints';
 
 interface CaseRow {
   id: string;
@@ -73,6 +73,8 @@ interface Props {
   // Decision points (Skipton dotted box, 2026-06-12). Empty array hides the box.
   decisionPointsEnabled: boolean;
   decisionPointTypes: DecisionPointType[];
+  // Milestones (2026-06-18): ordered containers grouping the decision points.
+  milestones: Milestone[];
   /** Tap a previous touch to open its full detail/edit window (2026-06-14). */
   onOpenEntry?: (id: string) => void;
   /** When false, CasePanel is a pure passthrough rendering only children —
@@ -91,7 +93,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, milestones, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -101,6 +103,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
   const [entries, setEntries] = useState<CaseEntry[]>([]);
   const [wmIds, setWmIds] = useState<string[]>([]);
   const [decisions, setDecisions] = useState<CaseDecision[]>([]);
+  const [caseMilestones, setCaseMilestones] = useState<CaseMilestone[]>([]);
   const [attaching, setAttaching] = useState(false);
   // Previous touches collapse to the latest by default; expand reveals history.
   const [touchesExpanded, setTouchesExpanded] = useState(false);
@@ -118,6 +121,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
     setEntries(data.entries || []);
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
     setDecisions(Array.isArray(data.decisions) ? data.decisions : []);
+    setCaseMilestones(Array.isArray(data.milestones) ? data.milestones : []);
   }, [code]);
 
   // Refetch the timeline when the active case changes or an entry was saved.
@@ -651,6 +655,8 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
                   caseId={caseRow.id}
                   decisionPointTypes={decisionPointTypes}
                   decisions={decisions}
+                  milestones={milestones}
+                  caseMilestones={caseMilestones}
                   collectorName={collectorName}
                   variant="overview"
                   onChanged={() => loadCase(caseRow.id)}

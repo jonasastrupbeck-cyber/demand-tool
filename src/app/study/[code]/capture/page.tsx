@@ -96,7 +96,8 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null; milestoneId?: string | null }[];
+  milestones: { id: string; label: string; sortOrder: number }[];
 }
 
 export default function CapturePage() {
@@ -866,6 +867,7 @@ export default function CapturePage() {
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
         decisionPointTypes={study.decisionPointTypes}
+        milestones={study.milestones || []}
         onOpenEntry={(id) => setEditingEntryId(id)}
       >
 

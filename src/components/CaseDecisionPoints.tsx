@@ -26,6 +26,8 @@ export interface DecisionPointType {
   sortOrder: number;
   // C9 (2026-06-17): 'person' adds the Willingness/Ability-to-Pay sub-states.
   kind?: string | null;
+  // 2026-06-18: the milestone this decision point belongs to.
+  milestoneId?: string | null;
 }
 
 export interface CaseDecision {
@@ -40,6 +42,21 @@ export interface CaseDecision {
   abilityToPay?: boolean | null;
 }
 
+// 2026-06-18: a milestone (ordered container above decision points) and its
+// per-case outcome.
+export interface Milestone {
+  id: string;
+  label: string;
+  sortOrder: number;
+}
+
+export interface CaseMilestone {
+  id: string;
+  milestoneId: string;
+  outcome: 'achieved' | 'not_achieved';
+  reachedAt: string;
+}
+
 interface Props {
   code: string;
   caseId: string;
@@ -52,9 +69,13 @@ interface Props {
   // (stacked flow). 'overview' = freeze-pane right pane: each milestone's options
   // shown inline always; the date + Save appear only after an option is pressed.
   variant?: 'compact' | 'overview';
+  // 2026-06-18: milestones group the decision points; the overview variant
+  // renders them as an ordered, chronological stepper with its own outcome.
+  milestones?: Milestone[];
+  caseMilestones?: CaseMilestone[];
 }
 
-export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact' }: Props) {
+export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact', milestones = [], caseMilestones = [] }: Props) {
   const { t, tl } = useLocale();
 
   // The type whose mini-form is open; prefilled from its decision if decided.
@@ -67,6 +88,15 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   const [willingnessToPay, setWillingnessToPay] = useState<'yes' | 'no' | ''>('');
   const [abilityToPay, setAbilityToPay] = useState<'yes' | 'no' | ''>('');
   const [saving, setSaving] = useState(false);
+
+  // 2026-06-18: milestone-outcome form state (separate from the decision form).
+  const [openMilestoneId, setOpenMilestoneId] = useState<string | null>(null);
+  const [msOutcome, setMsOutcome] = useState<'achieved' | 'not_achieved' | ''>('');
+  const [msReachedAt, setMsReachedAt] = useState('');
+  const [msSaving, setMsSaving] = useState(false);
+  // Milestones the consultant has manually expanded (overrides the cold-start
+  // collapse and the soft-lock on later milestones).
+  const [expandedMs, setExpandedMs] = useState<Set<string>>(new Set());
 
   const boolToTri = (b: boolean | null | undefined): 'yes' | 'no' | '' => (b === true ? 'yes' : b === false ? 'no' : '');
   const triToBool = (v: 'yes' | 'no' | '') => (v === 'yes' ? true : v === 'no' ? false : null);
@@ -134,117 +164,268 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     }
   }
 
-  if (decisionPointTypes.length === 0) return null;
+  // --- Milestone outcome (2026-06-18): achieved / not_achieved + reached date ---
+  function openMilestoneForm(m: Milestone) {
+    const rec = caseMilestones.find((r) => r.milestoneId === m.id);
+    setOpenMilestoneId(m.id);
+    setMsOutcome(rec?.outcome ?? '');
+    setMsReachedAt((rec?.reachedAt ?? new Date().toISOString()).slice(0, 10));
+  }
+
+  async function saveMilestone(m: Milestone) {
+    if (!msOutcome || msSaving) return;
+    setMsSaving(true);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/milestones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        milestoneId: m.id,
+        outcome: msOutcome,
+        reachedAt: msReachedAt ? `${msReachedAt}T12:00:00.000Z` : undefined,
+        recordedByCollector: collectorName || undefined,
+      }),
+    });
+    if (res.ok) {
+      setOpenMilestoneId(null);
+      await onChanged();
+    }
+    setMsSaving(false);
+  }
+
+  async function removeMilestone(recordId: string) {
+    if (msSaving) return;
+    setMsSaving(true);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/milestones/${encodeURIComponent(recordId)}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      setOpenMilestoneId(null);
+      await onChanged();
+    }
+    setMsSaving(false);
+  }
+
+  // Un-clicking a saved milestone outcome removes it (and reopens the case if it
+  // was 'not_achieved'); on an in-progress one it just clears local state.
+  function setOrClearMsOutcome(rec: CaseMilestone | undefined, v: string) {
+    if (v === '') {
+      setMsOutcome('');
+      if (rec) void removeMilestone(rec.id);
+    } else {
+      setMsOutcome(v as 'achieved' | 'not_achieved');
+    }
+  }
+
+  if (decisionPointTypes.length === 0 && milestones.length === 0) return null;
 
   // C5/R4 (2026-06-17): freeze-pane overview — every milestone shows its options
   // inline (styled like the left pane's boxes); the date + Save/Remove appear
   // only once an outcome or cleanliness is pressed. Pressing any option focuses
   // that milestone (loads its saved values) so a single edit-state still drives
   // the form.
+  // One decision-point card in the overview (options inline; date + Save appear
+  // once an option is pressed). Extracted so milestone groups can render their
+  // own decisions.
+  const renderOverviewDecision = (type: DecisionPointType) => {
+    const decision = decisions.find((d) => d.decisionPointTypeId === type.id);
+    const isActive = openTypeId === type.id;
+    const focus = () => { if (openTypeId !== type.id) openForm(type); };
+    const vOutcome = isActive ? outcome : (decision?.outcome ?? '');
+    const vClean = isActive ? cleanliness : (decision?.cleanliness ?? '');
+    const vWilling = isActive ? willingnessToPay : boolToTri(decision?.willingnessToPay);
+    const vAbility = isActive ? abilityToPay : boolToTri(decision?.abilityToPay);
+    const showSave = isActive && (!!outcome || !!cleanliness);
+    return (
+      <div key={type.id} className="rounded-lg bg-white border border-gray-200 p-2 space-y-1.5">
+        <p className="text-xs font-medium text-gray-800 text-center">{tl(type.label)}</p>
+        {type.kind === 'person' && (
+          <>
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[10px] text-gray-500">{t('capture.dpWillingnessToPay')}</span>
+              <SegmentedToggle
+                ariaLabel={t('capture.dpWillingnessToPay')}
+                value={vWilling}
+                allowDeselect
+                onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no' | ''); }}
+                options={[
+                  { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                  { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                ]}
+              />
+            </div>
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-[10px] text-gray-500">{t('capture.dpAbilityToPay')}</span>
+              <SegmentedToggle
+                ariaLabel={t('capture.dpAbilityToPay')}
+                value={vAbility}
+                allowDeselect
+                onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no' | ''); }}
+                options={[
+                  { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
+                  { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
+                ]}
+              />
+            </div>
+          </>
+        )}
+        <div className="flex justify-center">
+          <SegmentedToggle
+            ariaLabel={t('capture.dpOutcomeAria')}
+            value={vOutcome}
+            allowDeselect
+            onChange={(v) => { focus(); setOrClearOutcome(decision, v); }}
+            options={[
+              { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
+              { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
+            ]}
+          />
+        </div>
+        <div className="flex justify-center">
+          <SegmentedToggle
+            ariaLabel={t('capture.dpCleanlinessAria')}
+            value={vClean}
+            allowDeselect
+            onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty' | ''); }}
+            options={[
+              { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
+              { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
+            ]}
+          />
+        </div>
+        {isActive && cleanliness === 'dirty' && (
+          <input
+            type="text"
+            value={dirtyCause}
+            onChange={(e) => setDirtyCause(e.target.value)}
+            placeholder={t('capture.dpDirtyCausePlaceholder')}
+            aria-label={t('capture.dpDirtyCausePlaceholder')}
+            className="w-full px-2 py-1 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-400 outline-none"
+          />
+        )}
+        {showSave && (
+          <div className="space-y-1.5 pt-1">
+            <div className="flex items-center justify-center">
+              <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                {t('capture.dpDecidedAtLabel')}
+                <input
+                  type="date"
+                  value={decidedAt}
+                  onChange={(e) => setDecidedAt(e.target.value)}
+                  className="px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+                />
+              </label>
+            </div>
+            <div className="flex items-center justify-center gap-1.5">
+              <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+              {decision && (
+                <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
+              )}
+              <button type="button" onClick={() => setOpenTypeId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
+            </div>
+          </div>
+        )}
+        {!isActive && decision && (
+          <p className="text-[10px] text-gray-400 text-center">{new Date(decision.decidedAt).toLocaleDateString()}</p>
+        )}
+      </div>
+    );
+  };
+
   if (variant === 'overview') {
+    const orderedMs = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder);
+    // No milestones (legacy safety): fall back to a flat list of decisions.
+    if (orderedMs.length === 0) {
+      return <div className="space-y-2">{decisionPointTypes.map(renderOverviewDecision)}</div>;
+    }
+    const recFor = (mid: string) => caseMilestones.find((r) => r.milestoneId === mid);
+    // Quiet-then-bloom: nothing recorded yet → only the first milestone is open,
+    // the rest are muted label rows. The pane blooms once any record lands.
+    const hasAnyRecord = caseMilestones.length > 0 || decisions.length > 0;
+    // Soft-lock: a milestone is locked once any EARLIER milestone isn't achieved.
+    // Precomputed purely (no in-render mutation) — index i is locked if any
+    // milestone before it lacks an 'achieved' record.
+    const achievedIds = new Set(caseMilestones.filter((r) => r.outcome === 'achieved').map((r) => r.milestoneId));
+    const lockedFlags = orderedMs.map((_, i) => orderedMs.slice(0, i).some((pm) => !achievedIds.has(pm.id)));
     return (
       <div className="space-y-2">
-        {decisionPointTypes.map((type) => {
-          const decision = decisions.find((d) => d.decisionPointTypeId === type.id);
-          const isActive = openTypeId === type.id;
-          const focus = () => { if (openTypeId !== type.id) openForm(type); };
-          const vOutcome = isActive ? outcome : (decision?.outcome ?? '');
-          const vClean = isActive ? cleanliness : (decision?.cleanliness ?? '');
-          const vWilling = isActive ? willingnessToPay : boolToTri(decision?.willingnessToPay);
-          const vAbility = isActive ? abilityToPay : boolToTri(decision?.abilityToPay);
-          const showSave = isActive && (!!outcome || !!cleanliness);
-          const yesNo = (active: 'yes' | 'no' | '') => active;
+        {orderedMs.map((m, idx) => {
+          const rec = recFor(m.id);
+          const achieved = rec?.outcome === 'achieved';
+          const lockedByOrder = lockedFlags[idx];
+          const types = decisionPointTypes.filter((d) => d.milestoneId === m.id).sort((a, b) => a.sortOrder - b.sortOrder);
+          const defaultCollapsed = idx > 0 && (!hasAnyRecord || lockedByOrder);
+          const expanded = expandedMs.has(m.id) || !defaultCollapsed;
+
+          if (!expanded) {
+            // Muted, clickable header — expanding a locked one is the override.
+            return (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setExpandedMs((s) => new Set(s).add(m.id))}
+                className="w-full flex items-center gap-1.5 rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-2 py-1.5 text-left opacity-70 hover:opacity-100 transition-opacity"
+              >
+                <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-center">{idx + 1}</span>
+                <span className="flex-1 text-xs font-medium text-gray-500 truncate">{m.label}</span>
+                <span className="shrink-0 text-[10px] text-gray-400">{lockedByOrder ? '🔒' : '+'}</span>
+              </button>
+            );
+          }
+
+          const isMsActive = openMilestoneId === m.id;
+          const vMsOutcome = isMsActive ? msOutcome : (rec?.outcome ?? '');
+          const showMsSave = isMsActive && !!msOutcome;
+          const focusMs = () => { if (openMilestoneId !== m.id) openMilestoneForm(m); };
           return (
-            <div key={type.id} className="rounded-lg bg-white border border-gray-200 p-2 space-y-1.5">
-              <p className="text-xs font-medium text-gray-800 text-center">{tl(type.label)}</p>
-              {type.kind === 'person' && (
-                <>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] text-gray-500">{t('capture.dpWillingnessToPay')}</span>
-                    <SegmentedToggle
-                      ariaLabel={t('capture.dpWillingnessToPay')}
-                      value={yesNo(vWilling)}
-                      allowDeselect
-                      onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no' | ''); }}
-                      options={[
-                        { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
-                        { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
-                      ]}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] text-gray-500">{t('capture.dpAbilityToPay')}</span>
-                    <SegmentedToggle
-                      ariaLabel={t('capture.dpAbilityToPay')}
-                      value={yesNo(vAbility)}
-                      allowDeselect
-                      onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no' | ''); }}
-                      options={[
-                        { value: 'no', label: t('capture.dpNo'), activeColor: 'red' },
-                        { value: 'yes', label: t('capture.dpYes'), activeColor: 'green' },
-                      ]}
-                    />
-                  </div>
-                </>
+            <div key={m.id} className={`rounded-xl border-2 p-2 space-y-1.5 ${achieved ? 'border-green-300 bg-green-50/40' : lockedByOrder ? 'border-gray-200 bg-gray-50/60' : 'border-sky-200 bg-white'}`}>
+              <div className="flex items-center gap-1.5">
+                <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-center">{idx + 1}</span>
+                <p className="flex-1 text-xs font-semibold text-gray-800 truncate">{m.label}</p>
+              </div>
+              {lockedByOrder && (
+                <p className="text-[10px] text-amber-600 text-center px-1">{t('capture.milestoneLocked')}</p>
               )}
               <div className="flex justify-center">
                 <SegmentedToggle
-                  ariaLabel={t('capture.dpOutcomeAria')}
-                  value={vOutcome}
+                  ariaLabel={t('capture.milestoneOutcomeAria')}
+                  value={vMsOutcome}
                   allowDeselect
-                  onChange={(v) => { focus(); setOrClearOutcome(decision, v); }}
+                  onChange={(v) => { focusMs(); setOrClearMsOutcome(rec, v); }}
                   options={[
-                    { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
-                    { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
+                    { value: 'achieved', label: t('capture.milestoneAchieved'), activeColor: 'green' },
+                    { value: 'not_achieved', label: t('capture.milestoneNotAchieved'), activeColor: 'red' },
                   ]}
                 />
               </div>
-              <div className="flex justify-center">
-                <SegmentedToggle
-                  ariaLabel={t('capture.dpCleanlinessAria')}
-                  value={vClean}
-                  allowDeselect
-                  onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty' | ''); }}
-                  options={[
-                    { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
-                    { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
-                  ]}
-                />
-              </div>
-              {isActive && cleanliness === 'dirty' && (
-                <input
-                  type="text"
-                  value={dirtyCause}
-                  onChange={(e) => setDirtyCause(e.target.value)}
-                  placeholder={t('capture.dpDirtyCausePlaceholder')}
-                  aria-label={t('capture.dpDirtyCausePlaceholder')}
-                  className="w-full px-2 py-1 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-400 outline-none"
-                />
-              )}
-              {showSave && (
+              {showMsSave && (
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-center">
                     <label className="flex items-center gap-1 text-[10px] text-gray-500">
-                      {t('capture.dpDecidedAtLabel')}
+                      {t('capture.milestoneReachedAtLabel')}
                       <input
                         type="date"
-                        value={decidedAt}
-                        onChange={(e) => setDecidedAt(e.target.value)}
+                        value={msReachedAt}
+                        onChange={(e) => setMsReachedAt(e.target.value)}
                         className="px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
                       />
                     </label>
                   </div>
                   <div className="flex items-center justify-center gap-1.5">
-                    <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
-                    {decision && (
-                      <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
+                    <button type="button" onClick={() => saveMilestone(m)} disabled={!msOutcome || msSaving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+                    {rec && (
+                      <button type="button" onClick={() => removeMilestone(rec.id)} disabled={msSaving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
                     )}
-                    <button type="button" onClick={() => setOpenTypeId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
+                    <button type="button" onClick={() => setOpenMilestoneId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
                   </div>
                 </div>
               )}
-              {!isActive && decision && (
-                <p className="text-[10px] text-gray-400 text-center">{new Date(decision.decidedAt).toLocaleDateString()}</p>
+              {!isMsActive && rec && (
+                <p className="text-[10px] text-gray-400 text-center">{new Date(rec.reachedAt).toLocaleDateString()}</p>
+              )}
+              {types.length > 0 && (
+                <div className="space-y-1.5 pt-1.5 border-t border-gray-200/70">
+                  {types.map(renderOverviewDecision)}
+                </div>
               )}
             </div>
           );
