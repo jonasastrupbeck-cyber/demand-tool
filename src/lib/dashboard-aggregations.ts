@@ -1,8 +1,8 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems } from './schema';
-import { eq, and, sql, gte, lte, desc } from 'drizzle-orm';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones } from './schema';
+import { eq, and, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { DashboardData } from '@/types';
+import type { DashboardData, CapabilityData } from '@/types';
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date): Promise<DashboardData> {
   const baseConditions = [eq(demandEntries.studyId, studyId)];
@@ -729,4 +729,122 @@ export async function getFailureCausesForFlow(
 
     return results.map(r => ({ cause: r.cause!, count: r.count }));
   }
+}
+
+// Capability / lead-time (2026-06-18): the time between any two chosen events
+// across a study's cases, as an XmR individuals (capability) chart. Events:
+//   'caseOpen' | 'firstContact' | 'caseClose' | 'decision:<typeId>' | 'milestone:<id>'
+// All timestamps already captured — read-only analytics, no schema change.
+// Reads are kept FLAT and assembled in JS (Drizzle correlated-subquery gotcha).
+type EventToken = string;
+
+function eventTimestamp(
+  token: EventToken,
+  ctx: { openedAt: Date; closedAt: Date | null; firstContactAt: Date | null; decisions: Map<string, Date>; milestones: Map<string, Date> },
+): Date | null {
+  if (token === 'caseOpen') return ctx.openedAt;
+  if (token === 'firstContact') return ctx.firstContactAt;
+  if (token === 'caseClose') return ctx.closedAt;
+  if (token.startsWith('decision:')) return ctx.decisions.get(token.slice('decision:'.length)) ?? null;
+  if (token.startsWith('milestone:')) return ctx.milestones.get(token.slice('milestone:'.length)) ?? null;
+  return null;
+}
+
+export async function getCapabilityData(
+  studyId: string,
+  fromEvent: EventToken,
+  toEvent: EventToken,
+  dateFrom?: Date,
+  dateTo?: Date,
+): Promise<CapabilityData> {
+  const empty: CapabilityData = { unit: 'days', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0 };
+
+  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
+    .from(cases).where(eq(cases.studyId, studyId));
+  if (caseRows.length === 0) return empty;
+  const caseIds = caseRows.map((c) => c.id);
+
+  // Flat reads, one per event source. first contact = earliest entry per case.
+  const [fcRows, decRows, msRows] = await Promise.all([
+    db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(${demandEntries.createdAt})` })
+      .from(demandEntries)
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)))
+      .groupBy(demandEntries.caseId),
+    db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId, decidedAt: caseDecisionPoints.decidedAt })
+      .from(caseDecisionPoints).where(inArray(caseDecisionPoints.caseId, caseIds)),
+    db.select({ caseId: caseMilestones.caseId, milestoneId: caseMilestones.milestoneId, reachedAt: caseMilestones.reachedAt })
+      .from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)),
+  ]);
+
+  const fcMap = new Map<string, Date>();
+  for (const r of fcRows) if (r.caseId && r.firstAt) fcMap.set(r.caseId, new Date(r.firstAt));
+  const decByCase = new Map<string, Map<string, Date>>();
+  for (const r of decRows) {
+    if (!decByCase.has(r.caseId)) decByCase.set(r.caseId, new Map());
+    decByCase.get(r.caseId)!.set(r.decisionPointTypeId, new Date(r.decidedAt as unknown as string));
+  }
+  const msByCase = new Map<string, Map<string, Date>>();
+  for (const r of msRows) {
+    if (!msByCase.has(r.caseId)) msByCase.set(r.caseId, new Map());
+    msByCase.get(r.caseId)!.set(r.milestoneId, new Date(r.reachedAt as unknown as string));
+  }
+
+  // Per case: resolve both events; keep cases where both exist and to ≥ from.
+  type Raw = { caseId: string; caseRef: string; fromTs: Date; leadTime: number };
+  const raw: Raw[] = [];
+  for (const c of caseRows) {
+    const ctx = {
+      openedAt: new Date(c.openedAt as unknown as string),
+      closedAt: c.closedAt ? new Date(c.closedAt as unknown as string) : null,
+      firstContactAt: fcMap.get(c.id) ?? null,
+      decisions: decByCase.get(c.id) ?? new Map<string, Date>(),
+      milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
+    };
+    const fromTs = eventTimestamp(fromEvent, ctx);
+    const toTs = eventTimestamp(toEvent, ctx);
+    if (!fromTs || !toTs) continue;
+    if (toTs.getTime() < fromTs.getTime()) continue;
+    if (dateFrom && fromTs.getTime() < dateFrom.getTime()) continue;
+    if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
+    const leadTime = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
+    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, leadTime });
+  }
+  if (raw.length === 0) return empty;
+
+  // XmR needs time order. Sort by the FROM event (journey start).
+  raw.sort((a, b) => a.fromTs.getTime() - b.fromTs.getTime());
+  const values = raw.map((r) => r.leadTime);
+  const n = values.length;
+  const mean = values.reduce((s, v) => s + v, 0) / n;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+
+  let unpl: number | null = null;
+  let lnpl: number | null = null;
+  if (n >= 2) {
+    let mrSum = 0;
+    for (let i = 1; i < n; i++) mrSum += Math.abs(values[i] - values[i - 1]);
+    const mrBar = mrSum / (n - 1);
+    unpl = mean + 2.66 * mrBar;
+    lnpl = Math.max(0, mean - 2.66 * mrBar); // lead time can't be negative
+  }
+
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+  const points = raw.map((r) => ({
+    caseId: r.caseId,
+    caseRef: r.caseRef,
+    leadTime: r.leadTime,
+    startedAt: r.fromTs.toISOString(),
+    special: unpl !== null && lnpl !== null && (r.leadTime > unpl || r.leadTime < lnpl),
+  }));
+
+  return {
+    unit: 'days',
+    points,
+    mean: round1(mean),
+    median: round1(median),
+    unpl: unpl !== null ? round1(unpl) : null,
+    lnpl: lnpl !== null ? round1(lnpl) : null,
+    n,
+  };
 }

@@ -1,17 +1,18 @@
 /* Dashboard – demand / work / overview tabs */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, Legend, LabelList, Sankey,
+  ResponsiveContainer, LineChart, Line, Legend, LabelList, Sankey, ReferenceLine,
 } from 'recharts';
 import type { NodeProps, LinkProps } from 'recharts/types/chart/Sankey';
-import type { DashboardData } from '@/types';
+import type { DashboardData, CapabilityData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
+import PillSelect, { type PillSelectOption } from '@/components/PillSelect';
 
 const THEME = {
   text: '#1f2937',
@@ -37,7 +38,7 @@ const tooltipStyle = {
 
 type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
-type DashboardView = 'demand' | 'work' | 'overview';
+type DashboardView = 'demand' | 'work' | 'overview' | 'capability';
 
 export default function DashboardPage() {
   const params = useParams();
@@ -69,6 +70,14 @@ export default function DashboardPage() {
   const [notesGroupBy, setNotesGroupBy] = useState<'date' | 'type'>('date');
   const [fullStudy, setFullStudy] = useState<EntryEditModalStudy | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  // Capability / lead-time (2026-06-18): event-pair pickers + XmR chart data.
+  const [caseTrackingEnabled, setCaseTrackingEnabled] = useState(false);
+  const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
+  const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
+  const [capFrom, setCapFrom] = useState('');
+  const [capTo, setCapTo] = useState('');
+  const [capData, setCapData] = useState<CapabilityData | null>(null);
+  const [capLoading, setCapLoading] = useState(false);
 
   const getDateRangeParams = useCallback((): { from?: string; to?: string } => {
     if (dateRange === 'today') {
@@ -122,6 +131,9 @@ export default function DashboardPage() {
         setStudyPurpose(s.purpose || '');
         setWorkTrackingEnabled(s.workTrackingEnabled);
         setDemandTypesEnabled(s.demandTypesEnabled ?? false);
+        setCaseTrackingEnabled(s.caseTrackingEnabled ?? false);
+        setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
+        setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         // Derive effective layer from the capture toggles so the dashboard
         // gates stay in sync with what the team chose to capture.
         let effective = 1;
@@ -151,6 +163,53 @@ export default function DashboardPage() {
       .then(d => setFlowCauses(d.causes))
       .finally(() => setFlowCausesLoading(false));
   }, [selectedFlow, code, getDateRangeParams]);
+
+  // Capability: event options (fixed + milestones + decision points) for the
+  // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
+  // decision:<id>, milestone:<id>).
+  const capabilityAvailable = caseTrackingEnabled && (decisionPointTypes.length > 0 || milestones.length > 0);
+  const eventOptions: PillSelectOption[] = useMemo(() => {
+    const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
+    const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
+    return [
+      { id: 'caseOpen', label: t('dashboard.evCaseOpened') },
+      { id: 'firstContact', label: t('dashboard.evFirstContact') },
+      ...ms,
+      ...dp,
+      { id: 'caseClose', label: t('dashboard.evCaseClosed') },
+    ];
+  }, [milestones, decisionPointTypes, t, tl]);
+
+  // Default the pickers once options are known: first contact → first milestone
+  // (or first decision, or case closed).
+  useEffect(() => {
+    if (!capabilityAvailable || capFrom || capTo) return;
+    const firstTarget = milestones.length
+      ? `milestone:${[...milestones].sort((a, b) => a.sortOrder - b.sortOrder)[0].id}`
+      : decisionPointTypes.length
+        ? `decision:${[...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder)[0].id}`
+        : 'caseClose';
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setCapFrom('firstContact');
+    setCapTo(firstTarget);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [capabilityAvailable, capFrom, capTo, milestones, decisionPointTypes]);
+
+  // Fetch capability data when the event pair (or date range) changes.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (!capFrom || !capTo) { setCapData(null); return; }
+    setCapLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo });
+    const range = getDateRangeParams();
+    if (range.from) qp.set('dateFrom', range.from);
+    if (range.to) qp.set('dateTo', range.to);
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/capability?${qp}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => setCapData(d))
+      .finally(() => setCapLoading(false));
+  }, [capFrom, capTo, code, getDateRangeParams]);
 
   // Fetch raw entries and demand type map on demand
   useEffect(() => {
@@ -384,29 +443,37 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Dashboard view tabs (only when work tracking enabled and has work data) */}
-        {workTrackingEnabled && data.workCount > 0 && (
-          <div>
-            <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
-              {(['demand', 'work', 'overview'] as DashboardView[]).map((view) => (
-                <button
-                  key={view}
-                  onClick={() => setDashboardView(view)}
-                  className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
-                    dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {view === 'demand' ? t('dashboard.demandTab') : view === 'work' ? t('dashboard.workTab') : t('dashboard.overview')}
-                </button>
-              ))}
+        {/* Dashboard view tabs — demand always; work/overview when there's work
+            data; capability when the study tracks cases with decisions/milestones. */}
+        {(() => {
+          const hasWork = workTrackingEnabled && data.workCount > 0;
+          const tabs: DashboardView[] = [
+            'demand',
+            ...((hasWork ? ['work', 'overview'] : []) as DashboardView[]),
+            ...((capabilityAvailable ? ['capability'] : []) as DashboardView[]),
+          ];
+          if (tabs.length <= 1) return null;
+          const tabLabel = (v: DashboardView) => v === 'demand' ? t('dashboard.demandTab') : v === 'work' ? t('dashboard.workTab') : v === 'overview' ? t('dashboard.overview') : t('dashboard.capabilityTab');
+          const help = dashboardView === 'demand' ? t('dashboard.demandTabHelp') : dashboardView === 'work' ? t('dashboard.workTabHelp') : dashboardView === 'overview' ? t('dashboard.overviewTabHelp') : t('dashboard.capabilityTabHelp');
+          return (
+            <div>
+              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
+                {tabs.map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setDashboardView(view)}
+                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
+                      dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {tabLabel(view)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">{help}</p>
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {dashboardView === 'demand' ? t('dashboard.demandTabHelp') :
-               dashboardView === 'work' ? t('dashboard.workTabHelp') :
-               t('dashboard.overviewTabHelp')}
-            </p>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Summary cards */}
         {dashboardView === 'demand' && (
@@ -1257,6 +1324,66 @@ export default function DashboardPage() {
             </div>
           </ChartCard>
         )}
+        {/* ── CAPABILITY / LEAD-TIME VIEW ── */}
+        {dashboardView === 'capability' && (
+          <div className="space-y-4">
+            <ChartCard title={t('dashboard.capabilityLeadTime')}>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="text-xs font-medium text-gray-500">{t('dashboard.eventFrom')}</span>
+                <PillSelect value={capFrom} onChange={setCapFrom} options={eventOptions} placeholder={t('dashboard.eventFrom')} ariaLabel={t('dashboard.eventFrom')} />
+                <span className="text-gray-400" aria-hidden="true">→</span>
+                <span className="text-xs font-medium text-gray-500">{t('dashboard.eventTo')}</span>
+                <PillSelect value={capTo} onChange={setCapTo} options={eventOptions} placeholder={t('dashboard.eventTo')} ariaLabel={t('dashboard.eventTo')} />
+              </div>
+
+              {!capFrom || !capTo ? (
+                <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilitySelectEvents')}</p>
+              ) : capLoading ? (
+                <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.loading')}</p>
+              ) : !capData || capData.n === 0 ? (
+                <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilityNoData')}</p>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={340}>
+                    <LineChart data={capData.points} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis dataKey="caseRef" tick={{ fontSize: 10, fill: THEME.textSecondary }} />
+                      <YAxis allowDecimals tick={{ fontSize: 11, fill: THEME.textSecondary }} label={{ value: t('dashboard.leadTimeDays'), angle: -90, position: 'insideLeft', fill: THEME.textSecondary, fontSize: 11 }} />
+                      <Tooltip {...tooltipStyle} />
+                      {capData.mean != null && <ReferenceLine y={capData.mean} stroke={THEME.textSecondary} strokeDasharray="5 4" label={{ value: t('dashboard.processAvg'), position: 'right', fill: THEME.textSecondary, fontSize: 10 }} />}
+                      {capData.unpl != null && <ReferenceLine y={capData.unpl} stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.upperLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                      {capData.lnpl != null && <ReferenceLine y={capData.lnpl} stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.lowerLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                      <Line
+                        type="monotone"
+                        dataKey="leadTime"
+                        name={t('dashboard.leadTimeDays')}
+                        stroke={COLORS.neutral[0]}
+                        strokeWidth={2}
+                        dot={(props: { cx?: number; cy?: number; payload?: { caseId: string; special: boolean } }) => {
+                          const { cx, cy, payload } = props;
+                          const special = payload?.special ?? false;
+                          return <circle key={payload?.caseId ?? `${cx}-${cy}`} cx={cx} cy={cy} r={special ? 5 : 3.5} fill={special ? COLORS.failure : COLORS.neutral[0]} stroke="#fff" strokeWidth={1} />;
+                        }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                  {capData.unpl == null && (
+                    <p className="mt-2 text-center text-xs text-gray-400">{t('dashboard.capabilityNeedMore')}</p>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+                    <Card label={t('dashboard.capabilityCases')} value={capData.n} />
+                    <Card label={t('dashboard.processAvg')} value={capData.mean != null ? `${capData.mean} ${t('dashboard.daysShort')}` : '—'} color={THEME.textSecondary} />
+                    <Card label={t('dashboard.capabilityMedian')} value={capData.median != null ? `${capData.median} ${t('dashboard.daysShort')}` : '—'} />
+                    <Card label={t('dashboard.upperLimit')} value={capData.unpl != null ? `${capData.unpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
+                    <Card label={t('dashboard.lowerLimit')} value={capData.lnpl != null ? `${capData.lnpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
+                    <Card label={t('dashboard.signals')} value={capData.points.filter((p) => p.special).length} color={capData.points.some((p) => p.special) ? COLORS.failure : COLORS.value} />
+                  </div>
+                </>
+              )}
+            </ChartCard>
+          </div>
+        )}
+
         {/* Raw entries list */}
         {dashboardView === 'demand' && data.totalEntries > 0 && (
           <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">

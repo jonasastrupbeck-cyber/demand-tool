@@ -1046,6 +1046,123 @@ const translations = {
     sv: 'Hela bilden — all efterfrågedata, systemvillkor och det som betyder något för kunderna',
     de: 'Das Gesamtbild — alle Nachfragedaten, Systembedingungen und was den Kunden wichtig ist',
   },
+  // Capability / lead-time (2026-06-18). Vanguard terms sourced from the vault:
+  // capability chart = kapabilitetsgraf; control limits = kontrolgrænse(r) (DA
+  // ØKG/NKG, SV ÖKG/NKG); special-cause = speciel årsagsvariation / speciella orsaker.
+  'dashboard.capabilityTab': {
+    en: 'Capability',
+    da: 'Kapabilitet',
+    sv: 'Kapabilitet',
+    de: 'Kapabilität',
+  },
+  'dashboard.capabilityTabHelp': {
+    en: 'Lead time between two events across cases — the capability chart shows how predictable the process is.',
+    da: 'Gennemløbstid mellem to hændelser på tværs af sager — kapabilitetsgrafen viser, hvor forudsigelig processen er.',
+    sv: 'Ledtid mellan två händelser över ärenden — kapabilitetsgrafen visar hur förutsägbar processen är.',
+    de: 'Durchlaufzeit zwischen zwei Ereignissen über Fälle — die Kapabilitätsgrafik zeigt, wie vorhersehbar der Prozess ist.',
+  },
+  'dashboard.capabilityLeadTime': {
+    en: 'Capability — lead time between events',
+    da: 'Kapabilitet — gennemløbstid mellem hændelser',
+    sv: 'Kapabilitet — ledtid mellan händelser',
+    de: 'Kapabilität — Durchlaufzeit zwischen Ereignissen',
+  },
+  'dashboard.eventFrom': {
+    en: 'From',
+    da: 'Fra',
+    sv: 'Från',
+    de: 'Von',
+  },
+  'dashboard.eventTo': {
+    en: 'To',
+    da: 'Til',
+    sv: 'Till',
+    de: 'Bis',
+  },
+  'dashboard.evCaseOpened': {
+    en: 'Case opened',
+    da: 'Sag åbnet',
+    sv: 'Ärende öppnat',
+    de: 'Fall eröffnet',
+  },
+  'dashboard.evFirstContact': {
+    en: 'First contact',
+    da: 'Første kontakt',
+    sv: 'Första kontakt',
+    de: 'Erster Kontakt',
+  },
+  'dashboard.evCaseClosed': {
+    en: 'Case closed',
+    da: 'Sag lukket',
+    sv: 'Ärende stängt',
+    de: 'Fall geschlossen',
+  },
+  'dashboard.processAvg': {
+    en: 'Average',
+    da: 'Gennemsnit',
+    sv: 'Medel',
+    de: 'Mittelwert',
+  },
+  'dashboard.upperLimit': {
+    en: 'Upper limit (UCL)',
+    da: 'Øvre kontrolgrænse (ØKG)',
+    sv: 'Övre kontrollgräns (ÖKG)',
+    de: 'Obere Kontrollgrenze',
+  },
+  'dashboard.lowerLimit': {
+    en: 'Lower limit (LCL)',
+    da: 'Nedre kontrolgrænse (NKG)',
+    sv: 'Nedre kontrollgräns (NKG)',
+    de: 'Untere Kontrollgrenze',
+  },
+  'dashboard.signals': {
+    en: 'Special-cause cases',
+    da: 'Speciel årsagsvariation',
+    sv: 'Speciella orsaker',
+    de: 'Spezielle Ursachen',
+  },
+  'dashboard.leadTimeDays': {
+    en: 'Lead time (days)',
+    da: 'Gennemløbstid (dage)',
+    sv: 'Ledtid (dagar)',
+    de: 'Durchlaufzeit (Tage)',
+  },
+  'dashboard.daysShort': {
+    en: 'd',
+    da: 'd',
+    sv: 'd',
+    de: 'T',
+  },
+  'dashboard.capabilityCases': {
+    en: 'Cases',
+    da: 'Sager',
+    sv: 'Ärenden',
+    de: 'Fälle',
+  },
+  'dashboard.capabilityMedian': {
+    en: 'Median',
+    da: 'Median',
+    sv: 'Median',
+    de: 'Median',
+  },
+  'dashboard.capabilitySelectEvents': {
+    en: 'Pick two events to measure the time between them.',
+    da: 'Vælg to hændelser for at måle tiden mellem dem.',
+    sv: 'Välj två händelser för att mäta tiden mellan dem.',
+    de: 'Wählen Sie zwei Ereignisse, um die Zeit dazwischen zu messen.',
+  },
+  'dashboard.capabilityNoData': {
+    en: 'No cases have both of those events recorded yet.',
+    da: 'Ingen sager har begge hændelser registreret endnu.',
+    sv: 'Inga ärenden har båda händelserna registrerade ännu.',
+    de: 'Noch keine Fälle mit beiden Ereignissen erfasst.',
+  },
+  'dashboard.capabilityNeedMore': {
+    en: 'Limits appear once at least 2 cases have both events.',
+    da: 'Grænser vises, når mindst 2 sager har begge hændelser.',
+    sv: 'Gränser visas när minst 2 ärenden har båda händelserna.',
+    de: 'Grenzen erscheinen, sobald mindestens 2 Fälle beide Ereignisse haben.',
+  },
   'dashboard.noEntriesHint': {
     en: 'Share the access code with your team and start capturing demand on the Capture tab, or upload existing data via XLSX.',
     da: 'Del adgangskoden med dit team og begynd at registrere efterspørgsel via Registrér-fanen, eller upload eksisterende data via XLSX.',

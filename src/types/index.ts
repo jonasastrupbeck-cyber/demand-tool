@@ -111,6 +111,18 @@ export interface DemandEntry {
   workBlocks: { tag: 'value' | 'failure'; text: string }[];
 }
 
+// Capability / lead-time (2026-06-18): per-case duration between two chosen
+// events + XmR individuals-chart stats (control limits via the 2.66×mR method).
+export interface CapabilityData {
+  unit: 'days';
+  points: { caseId: string; caseRef: string; leadTime: number; startedAt: string; special: boolean }[];
+  mean: number | null;
+  median: number | null;
+  unpl: number | null; // upper control limit (UCL); null when n < 2
+  lnpl: number | null; // lower control limit (LCL); null when n < 2
+  n: number;
+}
+
 export interface DashboardData {
   totalEntries: number;
   valueCount: number;
