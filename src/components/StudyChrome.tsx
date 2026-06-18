@@ -107,8 +107,9 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
               </Link>
             </div>
           </div>
-          <div className="flex -mb-px items-center justify-between">
-            <div className="flex gap-1">
+          {/* Tabs centered; Undo pinned right so it doesn't offset the centring. */}
+          <div className="relative flex -mb-px items-center justify-center">
+            <div className="flex gap-2">
               {workflowTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.href);
                 return (
@@ -117,7 +118,7 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                     href={tab.href}
                     className={`px-4 py-2 border-b-2 transition-colors ${
                       isActive
-                        ? 'border-brand text-brand text-base font-semibold'
+                        ? 'border-brand text-brand text-lg font-semibold'
                         : 'border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium'
                     }`}
                   >
@@ -126,7 +127,7 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                 );
               })}
             </div>
-            <UndoButton code={code} />
+            <div className="absolute right-0"><UndoButton code={code} /></div>
           </div>
         </div>
       </nav>
