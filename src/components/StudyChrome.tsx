@@ -71,7 +71,7 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                 min-h-16 so it grows for the flow lockup but stays compact for demand. */}
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
               {isFlow ? (
-                <Image src="/vanguard-skipton.png" alt="Skipton Building Society · Powered by Vanguard Method" width={191} height={116} className="h-[116px] w-auto" priority />
+                <Image src="/vgskip.png" alt="Skipton Building Society · Powered by Vanguard Method" width={273} height={116} className="h-[116px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
