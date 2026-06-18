@@ -2119,6 +2119,26 @@ const translations = {
     sv: 'Tänkande',
     de: 'Denken',
   },
+  // Short section headers inside a saved-touch card (2026-06-18) — sized like the
+  // flow separator. Short forms so they fit the narrow card.
+  'capture.touchSecConditions': {
+    en: 'Conditions',
+    da: 'Forhold',
+    sv: 'Villkor',
+    de: 'Bedingungen',
+  },
+  'capture.touchSecSteps': {
+    en: 'Steps',
+    da: 'Trin',
+    sv: 'Steg',
+    de: 'Schritte',
+  },
+  'capture.touchSecCor': {
+    en: 'CoR',
+    da: 'CoR',
+    sv: 'CoR',
+    de: 'CoR',
+  },
   'capture.typeInOriginalValueDemandPlaceholder': {
     en: 'Type in new value demand',
     da: 'Skriv ny værdiskabende efterspørgsel',

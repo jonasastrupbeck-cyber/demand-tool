@@ -458,36 +458,56 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       .filter((s) => s.text.trim().length > 0);
     const cor = handlingLabel(e.handlingTypeId);
     const scs = scLabels(e.systemConditionIds);
+    // Small section header — a centered label flanked by thin lines, matching the
+    // composer's flow separator (capture.strand.flow), so the card reads in clear
+    // sections (2026-06-18).
+    const sepHeader = (label: string) => (
+      <div className="flex items-center gap-1.5">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap">{label}</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+    );
     return (
-      // Content-height (no h-full/mt-auto) so the card crams to its content
-      // instead of stretching with the rail. Order: SC(s) → steps → COR + author.
+      // h-full so the card stretches to the row's height (= the composer), giving
+      // an even overview. Sections: Conditions (if any) → Steps (grows) → CoR.
       <button
         key={e.id}
         type="button"
         onClick={() => onOpenEntry?.(e.id)}
-        className="w-full text-left rounded-xl border border-gray-200 bg-white p-2 hover:border-gray-400 transition-colors flex flex-col gap-1.5"
+        className="w-full h-full text-left rounded-xl border border-gray-200 bg-white p-2 hover:border-gray-400 transition-colors flex flex-col gap-1.5"
       >
-        {/* 1. System condition(s) driving this touch, on top. */}
+        {/* 1. System condition(s) driving this touch — only when present. */}
         {scs.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {scs.map((label, i) => (
-              <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] leading-snug break-words">{label}</span>
-            ))}
+          <div className="flex flex-col gap-1">
+            {sepHeader(t('capture.touchSecConditions'))}
+            <div className="flex flex-wrap gap-1">
+              {scs.map((label, i) => (
+                <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] leading-snug break-words">{label}</span>
+              ))}
+            </div>
           </div>
         )}
-        {/* 2. What happened — colour-coded steps, chronological. */}
-        <div className="space-y-1">
-          {steps.map((s, i) => (
-            <div key={i} className={`px-1.5 py-1 rounded-md border text-[11px] leading-snug whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
-              {s.text}
-            </div>
-          ))}
+        {/* 2. What happened — colour-coded steps. flex-1 absorbs slack so the CoR
+            section pins to the bottom on a stretched card. */}
+        <div className="flex flex-col gap-1 flex-1">
+          {sepHeader(t('capture.touchSecSteps'))}
+          <div className="space-y-1">
+            {steps.map((s, i) => (
+              <div key={i} className={`px-1.5 py-1 rounded-md border text-[11px] leading-snug whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
+                {s.text}
+              </div>
+            ))}
+          </div>
         </div>
-        {/* 3. COR + authoring (date, collector) at the bottom. */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5 border-t border-gray-100 mt-0.5">
-          {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
-          <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
-          {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
+        {/* 3. CoR + authoring (date, collector) at the bottom. */}
+        <div className="flex flex-col gap-1">
+          {sepHeader(t('capture.touchSecCor'))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
+            <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+            {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
+          </div>
         </div>
       </button>
     );
@@ -601,9 +621,9 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
           <div className="flex-1 min-w-0 lg:overflow-x-auto">
             <div className="flex flex-col gap-3 lg:flex-row lg:min-w-min lg:items-stretch pb-2">
               {entries.map((e) => (
-                // ~half the old width (more touches fit) + self-start so the card
-                // stays content-height instead of stretching with the rail.
-                <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex lg:self-start">
+                // ~half the old width (more touches fit). Stretches to the row
+                // (composer) height for an even overview; sections fill it.
+                <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex">
                   {renderTouchFull(e)}
                 </div>
               ))}
