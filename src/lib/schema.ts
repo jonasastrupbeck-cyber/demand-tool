@@ -304,6 +304,26 @@ export const caseMilestones = pgTable('case_milestones', {
   uniqCaseMilestone: unique('case_milestones_unique').on(t.caseId, t.milestoneId),
 }));
 
+// Capability-chart annotations (2026-06-18). A case is a datapoint on the
+// capability/lead-time chart; per the reference capability-tool, a point can be
+// EXCLUDED from the control-limit calc (with a reason) or carry a NOTE. Scoped
+// to the MEASURE — the (fromEvent, toEvent) pair — so excluding an outlier on
+// one chart doesn't affect another. fromEvent/toEvent are the same string tokens
+// the capability API uses (caseOpen | firstContact | caseClose | decision:<id> |
+// milestone:<id>). Cascades on case delete.
+export const capabilityAnnotations = pgTable('capability_annotations', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  fromEvent: text('from_event').notNull(),
+  toEvent: text('to_event').notNull(),
+  excluded: boolean('excluded').notNull().default(false),
+  excludedReason: text('excluded_reason'),
+  note: text('note'),
+}, (t) => ({
+  uniqCapAnno: unique('capability_annotations_unique').on(t.caseId, t.fromEvent, t.toEvent),
+}));
+
 export const demandEntries = pgTable('demand_entries', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),

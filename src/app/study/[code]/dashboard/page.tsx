@@ -78,6 +78,11 @@ export default function DashboardPage() {
   const [capTo, setCapTo] = useState('');
   const [capData, setCapData] = useState<CapabilityData | null>(null);
   const [capLoading, setCapLoading] = useState(false);
+  // R4 (2026-06-18): point inspector — exclude / reason / note, per measure.
+  const [capTick, setCapTick] = useState(0); // bump to refetch after a save
+  const [selectedCapCaseId, setSelectedCapCaseId] = useState<string | null>(null);
+  const [capNote, setCapNote] = useState('');
+  const [capReason, setCapReason] = useState('');
 
   const getDateRangeParams = useCallback((): { from?: string; to?: string } => {
     if (dateRange === 'today') {
@@ -209,7 +214,18 @@ export default function DashboardPage() {
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, getDateRangeParams]);
+  }, [capFrom, capTo, code, getDateRangeParams, capTick]);
+
+  // Save a capability annotation (exclude / reason / note) for one case, scoped
+  // to the current measure, then refetch so the limits recompute.
+  const saveCapAnnotation = useCallback(async (caseId: string, patch: { excluded?: boolean; excludedReason?: string | null; note?: string | null }) => {
+    await fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/capability/annotation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caseId, fromEvent: capFrom, toEvent: capTo, ...patch }),
+    });
+    setCapTick((n) => n + 1);
+  }, [code, capFrom, capTo]);
 
   // Fetch raw entries and demand type map on demand
   useEffect(() => {
@@ -1338,48 +1354,137 @@ export default function DashboardPage() {
 
               {!capFrom || !capTo ? (
                 <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilitySelectEvents')}</p>
-              ) : capLoading ? (
+              ) : capLoading && !capData ? (
                 <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.loading')}</p>
-              ) : !capData || capData.n === 0 ? (
+              ) : !capData || capData.points.length === 0 ? (
                 <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilityNoData')}</p>
-              ) : (
+              ) : (() => {
+                // Two series so the line breaks at excluded points (greyed ×).
+                const chartPoints = capData.points.map((p) => ({ ...p, includedValue: p.excluded ? null : p.leadTime, excludedValue: p.excluded ? p.leadTime : null }));
+                const selPoint = capData.points.find((p) => p.caseId === selectedCapCaseId) || null;
+                const openInspector = (pt: typeof capData.points[number]) => { setSelectedCapCaseId(pt.caseId); setCapNote(pt.note ?? ''); setCapReason(''); };
+                return (
                 <>
                   <ResponsiveContainer width="100%" height={340}>
-                    <LineChart data={capData.points} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
+                    <LineChart data={chartPoints} margin={{ top: 10, right: 16, bottom: 4, left: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
                       <XAxis dataKey="caseRef" tick={{ fontSize: 10, fill: THEME.textSecondary }} />
                       <YAxis allowDecimals tick={{ fontSize: 11, fill: THEME.textSecondary }} label={{ value: t('dashboard.leadTimeDays'), angle: -90, position: 'insideLeft', fill: THEME.textSecondary, fontSize: 11 }} />
-                      <Tooltip {...tooltipStyle} />
+                      <Tooltip {...tooltipStyle} content={(p: { active?: boolean; payload?: readonly { payload?: typeof capData.points[number] }[] }) => {
+                        const pt = p.active && p.payload && p.payload.length ? p.payload[0].payload : null;
+                        if (!pt) return null;
+                        return (
+                          <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                            <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.startedAt).toLocaleDateString()}</div>
+                            <div>{t('dashboard.leadTimeDays')}: {pt.leadTime} {t('dashboard.daysShort')}</div>
+                            {pt.excluded && <div className="text-amber-700">{t('dashboard.excludedLegend')}</div>}
+                            {pt.note && <div className="text-gray-500 italic max-w-[220px]">“{pt.note}”</div>}
+                          </div>
+                        );
+                      }} />
                       {capData.mean != null && <ReferenceLine y={capData.mean} stroke={THEME.textSecondary} strokeDasharray="5 4" label={{ value: t('dashboard.processAvg'), position: 'right', fill: THEME.textSecondary, fontSize: 10 }} />}
                       {capData.unpl != null && <ReferenceLine y={capData.unpl} stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.upperLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
                       {capData.lnpl != null && <ReferenceLine y={capData.lnpl} stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.lowerLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                      {/* Included points — colour/special + note ring; click opens the inspector. */}
                       <Line
                         type="monotone"
-                        dataKey="leadTime"
+                        dataKey="includedValue"
+                        connectNulls
                         name={t('dashboard.leadTimeDays')}
                         stroke={COLORS.neutral[0]}
                         strokeWidth={2}
-                        dot={(props: { cx?: number; cy?: number; payload?: { caseId: string; special: boolean } }) => {
+                        isAnimationActive={false}
+                        activeDot={false}
+                        dot={(props: { cx?: number; cy?: number; payload?: typeof capData.points[number] }) => {
                           const { cx, cy, payload } = props;
-                          const special = payload?.special ?? false;
-                          return <circle key={payload?.caseId ?? `${cx}-${cy}`} cx={cx} cy={cy} r={special ? 5 : 3.5} fill={special ? COLORS.failure : COLORS.neutral[0]} stroke="#fff" strokeWidth={1} />;
+                          if (cx === undefined || cy === undefined || !payload || payload.excluded) return <g key={`i-${payload?.caseId ?? cx}`} />;
+                          const special = payload.special;
+                          return (
+                            <g key={`i-${payload.caseId}`} style={{ cursor: 'pointer' }} onClick={() => openInspector(payload)}>
+                              <circle cx={cx} cy={cy} r={12} fill="transparent" />
+                              {payload.note && <circle cx={cx} cy={cy} r={8} fill="none" stroke="#d97706" strokeWidth={1.5} />}
+                              <circle cx={cx} cy={cy} r={special ? 5 : 3.5} fill={special ? COLORS.failure : COLORS.neutral[0]} stroke="#fff" strokeWidth={1} />
+                            </g>
+                          );
+                        }}
+                      />
+                      {/* Excluded points — grey × ; click re-opens the inspector to include. */}
+                      <Line
+                        type="monotone"
+                        dataKey="excludedValue"
+                        stroke="none"
+                        strokeWidth={0}
+                        connectNulls={false}
+                        isAnimationActive={false}
+                        activeDot={false}
+                        dot={(props: { cx?: number; cy?: number; payload?: typeof capData.points[number] }) => {
+                          const { cx, cy, payload } = props;
+                          if (cx === undefined || cy === undefined || !payload || !payload.excluded) return <g key={`x-${payload?.caseId ?? cx}`} />;
+                          return (
+                            <g key={`x-${payload.caseId}`} style={{ cursor: 'pointer' }} onClick={() => openInspector(payload)}>
+                              <circle cx={cx} cy={cy} r={12} fill="transparent" />
+                              <circle cx={cx} cy={cy} r={5} fill="#9ca3af" stroke="#374151" strokeWidth={1.5} />
+                              <line x1={cx - 3.5} y1={cy - 3.5} x2={cx + 3.5} y2={cy + 3.5} stroke="#374151" strokeWidth={1.5} />
+                              <line x1={cx - 3.5} y1={cy + 3.5} x2={cx + 3.5} y2={cy - 3.5} stroke="#374151" strokeWidth={1.5} />
+                            </g>
+                          );
                         }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
-                  {capData.unpl == null && (
+                  {capData.unpl == null && capData.n > 0 && (
                     <p className="mt-2 text-center text-xs text-gray-400">{t('dashboard.capabilityNeedMore')}</p>
                   )}
+                  <p className="mt-1 text-center text-[11px] text-gray-400">{t('dashboard.capabilityInspectHint')}</p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
-                    <Card label={t('dashboard.capabilityCases')} value={capData.n} />
+                    <Card label={t('dashboard.capabilityCases')} value={capData.n} sub={capData.nExcluded > 0 ? `+${capData.nExcluded} ${t('dashboard.excludedLegend').toLowerCase()}` : undefined} />
                     <Card label={t('dashboard.processAvg')} value={capData.mean != null ? `${capData.mean} ${t('dashboard.daysShort')}` : '—'} color={THEME.textSecondary} />
                     <Card label={t('dashboard.capabilityMedian')} value={capData.median != null ? `${capData.median} ${t('dashboard.daysShort')}` : '—'} />
                     <Card label={t('dashboard.upperLimit')} value={capData.unpl != null ? `${capData.unpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
                     <Card label={t('dashboard.lowerLimit')} value={capData.lnpl != null ? `${capData.lnpl} ${t('dashboard.daysShort')}` : '—'} color={COLORS.failure} />
                     <Card label={t('dashboard.signals')} value={capData.points.filter((p) => p.special).length} color={capData.points.some((p) => p.special) ? COLORS.failure : COLORS.value} />
                   </div>
+
+                  {/* Point inspector — exclude / reason / note (per measure). */}
+                  {selPoint && (
+                    <div className="mt-4 rounded-xl border border-gray-300 bg-gray-50 p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold text-gray-900">#{selPoint.caseRef} · {selPoint.leadTime} {t('dashboard.daysShort')}{selPoint.excluded ? ` · ${t('dashboard.excludedLegend')}` : ''}</p>
+                        <button type="button" onClick={() => setSelectedCapCaseId(null)} className="text-xs text-gray-500 hover:text-gray-800">{t('dashboard.capabilityClose')}</button>
+                      </div>
+                      {selPoint.excluded && (
+                        <input
+                          type="text"
+                          value={capReason}
+                          onChange={(e) => setCapReason(e.target.value)}
+                          onBlur={() => saveCapAnnotation(selPoint.caseId, { excluded: true, excludedReason: capReason || null })}
+                          placeholder={t('dashboard.capabilityReason')}
+                          className="w-full px-2 py-1.5 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                        />
+                      )}
+                      <label className="block text-xs text-gray-500">
+                        {t('dashboard.capabilityNote')}
+                        <textarea
+                          value={capNote}
+                          onChange={(e) => setCapNote(e.target.value)}
+                          onBlur={() => saveCapAnnotation(selPoint.caseId, { note: capNote || null })}
+                          rows={2}
+                          placeholder={t('dashboard.capabilityNotePh')}
+                          className="w-full mt-0.5 px-2 py-1.5 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => saveCapAnnotation(selPoint.caseId, { excluded: !selPoint.excluded, excludedReason: selPoint.excluded ? null : (capReason || null) })}
+                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selPoint.excluded ? 'text-sky-700 bg-sky-50 hover:bg-sky-100' : 'text-red-600 bg-red-50 hover:bg-red-100'}`}
+                      >
+                        {selPoint.excluded ? t('dashboard.capabilityInclude') : t('dashboard.capabilityExclude')}
+                      </button>
+                    </div>
+                  )}
                 </>
-              )}
+                );
+              })()}
             </ChartCard>
           </div>
         )}

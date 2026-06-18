@@ -1163,6 +1163,55 @@ const translations = {
     sv: 'Gränser visas när minst 2 ärenden har båda händelserna.',
     de: 'Grenzen erscheinen, sobald mindestens 2 Fälle beide Ereignisse haben.',
   },
+  // R4: exclude / annotate a datapoint (per measure).
+  'dashboard.capabilityInspectHint': {
+    en: 'Tip: click a point to exclude it from the limits or add a note.',
+    da: 'Tip: klik på et punkt for at udelade det fra grænserne eller tilføje en note.',
+    sv: 'Tips: klicka på en punkt för att utesluta den från gränserna eller lägga till en notis.',
+    de: 'Tipp: Klicken Sie auf einen Punkt, um ihn von den Grenzen auszuschließen oder eine Notiz hinzuzufügen.',
+  },
+  'dashboard.excludedLegend': {
+    en: 'Excluded',
+    da: 'Udeladt',
+    sv: 'Utesluten',
+    de: 'Ausgeschlossen',
+  },
+  'dashboard.capabilityExclude': {
+    en: 'Exclude from limits',
+    da: 'Udelad fra grænser',
+    sv: 'Uteslut från gränser',
+    de: 'Von Grenzen ausschließen',
+  },
+  'dashboard.capabilityInclude': {
+    en: 'Include again',
+    da: 'Medtag igen',
+    sv: 'Inkludera igen',
+    de: 'Wieder einbeziehen',
+  },
+  'dashboard.capabilityReason': {
+    en: 'Why excluded? (optional)',
+    da: 'Hvorfor udeladt? (valgfrit)',
+    sv: 'Varför utesluten? (valfritt)',
+    de: 'Warum ausgeschlossen? (optional)',
+  },
+  'dashboard.capabilityNote': {
+    en: 'Note',
+    da: 'Note',
+    sv: 'Notis',
+    de: 'Notiz',
+  },
+  'dashboard.capabilityNotePh': {
+    en: 'Add a note about this case…',
+    da: 'Tilføj en note om denne sag…',
+    sv: 'Lägg till en notis om detta ärende…',
+    de: 'Notiz zu diesem Fall hinzufügen…',
+  },
+  'dashboard.capabilityClose': {
+    en: 'Close',
+    da: 'Luk',
+    sv: 'Stäng',
+    de: 'Schließen',
+  },
   'dashboard.noEntriesHint': {
     en: 'Share the access code with your team and start capturing demand on the Capture tab, or upload existing data via XLSX.',
     da: 'Del adgangskoden med dit team og begynd at registrere efterspørgsel via Registrér-fanen, eller upload eksisterende data via XLSX.',

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1118,6 +1118,45 @@ export async function deleteCaseMilestone(id: string) {
   if (row && row.outcome === 'not_achieved') {
     await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, row.caseId));
   }
+}
+
+// --- Capability-chart annotations (2026-06-18) — exclude/note per measure ---
+
+export async function getCapabilityAnnotations(studyId: string, fromEvent: string, toEvent: string) {
+  return db.select().from(capabilityAnnotations)
+    .where(and(
+      eq(capabilityAnnotations.studyId, studyId),
+      eq(capabilityAnnotations.fromEvent, fromEvent),
+      eq(capabilityAnnotations.toEvent, toEvent),
+    ));
+}
+
+// Upsert on (caseId, fromEvent, toEvent) — only set the fields provided.
+export async function upsertCapabilityAnnotation(studyId: string, data: {
+  caseId: string;
+  fromEvent: string;
+  toEvent: string;
+  excluded?: boolean;
+  excludedReason?: string | null;
+  note?: string | null;
+}) {
+  const set: Record<string, unknown> = {};
+  if (data.excluded !== undefined) set.excluded = data.excluded;
+  if (data.excludedReason !== undefined) set.excludedReason = data.excludedReason;
+  if (data.note !== undefined) set.note = data.note;
+  await db.insert(capabilityAnnotations).values({
+    id: generateId(),
+    studyId,
+    caseId: data.caseId,
+    fromEvent: data.fromEvent,
+    toEvent: data.toEvent,
+    excluded: data.excluded ?? false,
+    excludedReason: data.excludedReason ?? null,
+    note: data.note ?? null,
+  }).onConflictDoUpdate({
+    target: [capabilityAnnotations.caseId, capabilityAnnotations.fromEvent, capabilityAnnotations.toEvent],
+    set,
+  });
 }
 
 export async function getCaseDecisions(caseId: string) {

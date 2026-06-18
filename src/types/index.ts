@@ -115,12 +115,15 @@ export interface DemandEntry {
 // events + XmR individuals-chart stats (control limits via the 2.66×mR method).
 export interface CapabilityData {
   unit: 'days';
-  points: { caseId: string; caseRef: string; leadTime: number; startedAt: string; special: boolean }[];
+  // excluded points stay on the chart (greyed) but are dropped from the limit
+  // calc; note is a per-measure annotation. (2026-06-18, R4)
+  points: { caseId: string; caseRef: string; leadTime: number; startedAt: string; special: boolean; excluded: boolean; note: string | null }[];
   mean: number | null;
   median: number | null;
-  unpl: number | null; // upper control limit (UCL); null when n < 2
-  lnpl: number | null; // lower control limit (LCL); null when n < 2
-  n: number;
+  unpl: number | null; // upper control limit (UCL); null when n < 2 included
+  lnpl: number | null; // lower control limit (LCL); null when n < 2 included
+  n: number;          // included count (drives the limits)
+  nExcluded: number;
 }
 
 export interface DashboardData {

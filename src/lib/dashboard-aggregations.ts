@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData } from '@/types';
@@ -757,12 +757,18 @@ export async function getCapabilityData(
   dateFrom?: Date,
   dateTo?: Date,
 ): Promise<CapabilityData> {
-  const empty: CapabilityData = { unit: 'days', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0 };
+  const empty: CapabilityData = { unit: 'days', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
 
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
     .from(cases).where(eq(cases.studyId, studyId));
   if (caseRows.length === 0) return empty;
   const caseIds = caseRows.map((c) => c.id);
+
+  // Per-measure annotations (exclude / note), keyed by caseId for this event-pair.
+  const annoRows = await db.select().from(capabilityAnnotations)
+    .where(and(eq(capabilityAnnotations.studyId, studyId), eq(capabilityAnnotations.fromEvent, fromEvent), eq(capabilityAnnotations.toEvent, toEvent)));
+  const annoByCase = new Map<string, { excluded: boolean; note: string | null }>();
+  for (const a of annoRows) annoByCase.set(a.caseId, { excluded: a.excluded, note: a.note });
 
   // Flat reads, one per event source. first contact = earliest entry per case.
   const [fcRows, decRows, msRows] = await Promise.all([
@@ -790,7 +796,7 @@ export async function getCapabilityData(
   }
 
   // Per case: resolve both events; keep cases where both exist and to ≥ from.
-  type Raw = { caseId: string; caseRef: string; fromTs: Date; leadTime: number };
+  type Raw = { caseId: string; caseRef: string; fromTs: Date; leadTime: number; excluded: boolean; note: string | null };
   const raw: Raw[] = [];
   for (const c of caseRows) {
     const ctx = {
@@ -807,24 +813,29 @@ export async function getCapabilityData(
     if (dateFrom && fromTs.getTime() < dateFrom.getTime()) continue;
     if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
     const leadTime = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
-    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, leadTime });
+    const anno = annoByCase.get(c.id);
+    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, leadTime, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
   }
   if (raw.length === 0) return empty;
 
   // XmR needs time order. Sort by the FROM event (journey start).
   raw.sort((a, b) => a.fromTs.getTime() - b.fromTs.getTime());
-  const values = raw.map((r) => r.leadTime);
+
+  // Limits + mean/median are computed from INCLUDED points only; excluded points
+  // still ride along on the chart (greyed) but don't move the limits.
+  const included = raw.filter((r) => !r.excluded);
+  const values = included.map((r) => r.leadTime);
   const n = values.length;
-  const mean = values.reduce((s, v) => s + v, 0) / n;
+  const mean = n ? values.reduce((s, v) => s + v, 0) / n : null;
   const sorted = [...values].sort((a, b) => a - b);
-  const median = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const median = n ? (n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2) : null;
 
   let unpl: number | null = null;
   let lnpl: number | null = null;
-  if (n >= 2) {
+  if (n >= 2 && mean !== null) {
     let mrSum = 0;
-    for (let i = 1; i < n; i++) mrSum += Math.abs(values[i] - values[i - 1]);
-    const mrBar = mrSum / (n - 1);
+    for (let i = 1; i < values.length; i++) mrSum += Math.abs(values[i] - values[i - 1]);
+    const mrBar = mrSum / (values.length - 1);
     unpl = mean + 2.66 * mrBar;
     lnpl = Math.max(0, mean - 2.66 * mrBar); // lead time can't be negative
   }
@@ -835,16 +846,20 @@ export async function getCapabilityData(
     caseRef: r.caseRef,
     leadTime: r.leadTime,
     startedAt: r.fromTs.toISOString(),
-    special: unpl !== null && lnpl !== null && (r.leadTime > unpl || r.leadTime < lnpl),
+    // only included points can be "special"; excluded ones are set aside.
+    special: !r.excluded && unpl !== null && lnpl !== null && (r.leadTime > unpl || r.leadTime < lnpl),
+    excluded: r.excluded,
+    note: r.note,
   }));
 
   return {
     unit: 'days',
     points,
-    mean: round1(mean),
-    median: round1(median),
+    mean: mean !== null ? round1(mean) : null,
+    median: median !== null ? round1(median) : null,
     unpl: unpl !== null ? round1(unpl) : null,
     lnpl: lnpl !== null ? round1(lnpl) : null,
     n,
+    nExcluded: raw.length - n,
   };
 }
