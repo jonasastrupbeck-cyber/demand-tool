@@ -10,15 +10,14 @@
    charts via var(--color-brand)) follows. NB: these are the BRAND accent only —
    the semantic strand colours (green=value, red=failure, sky=system conditions,
    blue=thinking) are deliberately NOT tokenised here and must stay as-is.
-   2026-06-18: re-skinned to Skipton Building Society's brand BLUE (#0072C5, the
-   colour of the Skipton logo) per Jonas, with hover a darker blue and accent the
-   Skipton Online Cyan (#069DE5). Closes C-Open-3. NB: this blue is close to the
-   sky (system conditions) / blue (thinking) Vanguard strand colours — Jonas's
-   explicit choice; the strand colours themselves are untouched. */
+   2026-06-18 (R5): DEFAULT brand = Vanguard red. The demand (transactional) side
+   and the landing page stay Vanguard-branded. Flow studies override these tokens
+   to Skipton blue (#0072C5 / #005a9e / #069DE5) on the study-layout subtree (see
+   study/[code]/layout.tsx) so Skipton co-branding shows ONLY inside a flow study. */
 @theme {
-  --color-brand: #0072C5;
-  --color-brand-hover: #005a9e;
-  --color-brand-accent: #069DE5;
+  --color-brand: #ac2c2d;
+  --color-brand-hover: #8a2324;
+  --color-brand-accent: #c64a4a;
 }
 
 html, body {

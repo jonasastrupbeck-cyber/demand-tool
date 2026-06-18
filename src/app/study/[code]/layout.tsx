@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { CaptureBarProvider, useCaptureBar } from '@/lib/capture-bar-context';
@@ -47,25 +47,46 @@ export default function StudyLayout({ children }: { children: React.ReactNode })
   const code = params.code as string;
   const { locale, setLocale, t } = useLocale();
 
+  // R5 (2026-06-18): branding follows the study type. Demand (transactional)
+  // studies stay Vanguard-branded; flow studies show the Skipton + Vanguard
+  // co-brand lockup and override the brand colour to Skipton blue. Default is
+  // Vanguard (red) so there's no flash for the common demand case.
+  const [isFlow, setIsFlow] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/studies/${encodeURIComponent(code)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((s) => { if (!cancelled && s) setIsFlow(s.systemType === 'flow'); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [code]);
+
   const workflowTabs: Array<{ labelKey: TranslationKey; href: string }> = [
     { labelKey: 'nav.capture', href: `/study/${code}/capture` },
     { labelKey: 'nav.dashboard', href: `/study/${code}/dashboard` },
   ];
   const settingsTab = { labelKey: 'nav.settings' as TranslationKey, href: `/study/${code}/settings` };
 
+  // Flow studies override the brand tokens to Skipton blue on this subtree
+  // (Tailwind `*-brand*` + dashboard chart var(--color-brand) follow it).
+  const brandStyle = isFlow
+    ? ({ '--color-brand': '#0072C5', '--color-brand-hover': '#005a9e', '--color-brand-accent': '#069DE5' } as React.CSSProperties)
+    : undefined;
+
   return (
     <CaptureBarProvider>
-    <div className="flex flex-col min-h-full bg-white">
+    <div className="flex flex-col min-h-full bg-white" style={brandStyle}>
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-            {/* Co-branded: Skipton (client, official blue) primary + the Vanguard
-                mark recoloured to the Skipton brand blue (vanguard-logo-brand.png
-                — a blue-on-transparent render of the flat-raster Vanguard mark). */}
-            <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-              <Image src="/skipton-logo.svg" alt="Skipton Building Society" width={142} height={32} priority />
-              <span className="h-6 w-px bg-gray-300" aria-hidden="true" />
-              <Image src="/vanguard-logo-brand.png" alt="Vanguard" width={26} height={28} priority />
+            {/* Branding by study type (R5): flow → Skipton + Vanguard co-brand
+                lockup; demand/transactional → the Vanguard mark only. */}
+            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+              {isFlow ? (
+                <Image src="/vanguard-skipton.svg" alt="Skipton Building Society · Powered by Vanguard Method" width={164} height={90} className="h-11 w-auto" priority />
+              ) : (
+                <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
+              )}
             </Link>
             <div className="flex items-center gap-3">
               <select

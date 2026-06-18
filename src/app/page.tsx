@@ -130,12 +130,10 @@ export default function Home() {
         </div>
 
         <div className="text-center mb-8">
-          {/* Co-branded: Skipton (client, official blue) primary + the Vanguard
-              mark recoloured to the Skipton brand blue (vanguard-logo-brand.png). */}
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <Image src="/skipton-logo.svg" alt="Skipton Building Society" width={200} height={45} priority />
-            <span className="h-9 w-px bg-gray-300" aria-hidden="true" />
-            <Image src="/vanguard-logo-brand.png" alt="Vanguard" width={37} height={40} priority />
+          {/* R5: the landing is the general entry point → Vanguard branding.
+              Skipton co-branding appears only inside a flow study (see layout). */}
+          <div className="flex items-center justify-center mb-4">
+            <Image src="/vanguard-logo.png" alt="Vanguard" width={64} height={70} className="h-16 w-auto" priority />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{t('app.title')}</h1>
           <p className="text-gray-600 mb-3">{t('app.subtitle')}</p>
