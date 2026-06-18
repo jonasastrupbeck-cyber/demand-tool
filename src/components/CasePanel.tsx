@@ -657,7 +657,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
                 // On lg it's content-width and grows right as blocks are added
                 // (~2 blocks min); on mobile it's full width and comes first.
                 <div className="order-1 lg:order-2 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
-                  <p className="text-sm font-semibold text-gray-900 mb-2">{t('capture.caseComposerHeading')}</p>
+                  <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
                   {children}
                 </div>
               )}

@@ -64,7 +64,8 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
     <CaptureBarProvider>
     <div className="flex flex-col min-h-full bg-white" style={brandStyle}>
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4">
+        {/* Full-width header: logo pinned far left, controls far right. */}
+        <div className="px-6">
           <div className="flex items-center justify-between min-h-16 py-2">
             {/* Branding by study type (R5): flow → Skipton + Vanguard co-brand
                 lockup; demand/transactional → the Vanguard mark only. The row uses
@@ -114,10 +115,10 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                   <Link
                     key={tab.href}
                     href={tab.href}
-                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                    className={`px-4 py-2 border-b-2 transition-colors ${
                       isActive
-                        ? 'border-brand text-brand'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                        ? 'border-brand text-brand text-base font-semibold'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium'
                     }`}
                   >
                     {t(tab.labelKey)}
