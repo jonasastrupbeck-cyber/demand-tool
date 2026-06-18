@@ -97,7 +97,8 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null }[];
+  milestones: { id: string; label: string; sortOrder: number }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -143,6 +144,8 @@ export default function SettingsPage() {
   const [newDpLabel, setNewDpLabel] = useState('');
   const [newDpPos, setNewDpPos] = useState('');
   const [newDpNeg, setNewDpNeg] = useState('');
+  const [newDpMilestoneId, setNewDpMilestoneId] = useState('');
+  const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
@@ -463,14 +466,16 @@ export default function SettingsPage() {
     const positiveLabel = newDpPos.trim();
     const negativeLabel = newDpNeg.trim();
     if (!label || !positiveLabel || !negativeLabel) return;
+    // Default a new decision point into the first milestone if one isn't picked.
+    const milestoneId = newDpMilestoneId || study?.milestones?.[0]?.id || null;
     setNewDpLabel(''); setNewDpPos(''); setNewDpNeg('');
     mutateAdd(
       () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, positiveLabel, negativeLabel }),
+        body: JSON.stringify({ label, positiveLabel, negativeLabel, milestoneId }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, decisionPointTypes: [...s.decisionPointTypes, { id, label, positiveLabel, negativeLabel, sortOrder: s.decisionPointTypes.length }] } : s)),
+      (id) => setStudy((s) => (s ? { ...s, decisionPointTypes: [...s.decisionPointTypes, { id, label, positiveLabel, negativeLabel, sortOrder: s.decisionPointTypes.length, milestoneId }] } : s)),
     );
   }
 
@@ -485,10 +490,75 @@ export default function SettingsPage() {
     }));
   }
 
+  // Move a decision point into a milestone (or unassign with null).
+  function assignDecisionToMilestone(id: string, milestoneId: string | null) {
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === id ? { ...d, milestoneId } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ milestoneId }),
+    }));
+  }
+
   function removeDecisionPointType(id: string) {
     // Per-case decision records cascade server-side (deliberate).
     setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.filter((d) => d.id !== id) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, { method: 'DELETE' }));
+  }
+
+  // --- Milestones (2026-06-18) — optimistic, mirroring the taxonomy handlers ---
+  function addMilestoneHandler(e: React.FormEvent) {
+    e.preventDefault();
+    const label = newMilestoneLabel.trim();
+    if (!label) return;
+    setNewMilestoneLabel('');
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/milestones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length }] } : s)),
+    );
+  }
+
+  function patchMilestone(id: string, label: string) {
+    const clean = label.trim();
+    if (!clean) return;
+    setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === id ? { ...m, label: clean } : m)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: clean }),
+    }));
+  }
+
+  function removeMilestone(id: string) {
+    // Decision points fall back to unassigned (server SET NULL); mirror locally.
+    setStudy((s) => (s ? {
+      ...s,
+      milestones: s.milestones.filter((m) => m.id !== id),
+      decisionPointTypes: s.decisionPointTypes.map((d) => (d.milestoneId === id ? { ...d, milestoneId: null } : d)),
+    } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${id}`, { method: 'DELETE' }));
+  }
+
+  function moveMilestone(id: string, dir: -1 | 1) {
+    setStudy((s) => {
+      if (!s) return s;
+      const ordered = [...s.milestones].sort((a, b) => a.sortOrder - b.sortOrder);
+      const i = ordered.findIndex((m) => m.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= ordered.length) return s;
+      [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+      const renumbered = ordered.map((m, k) => ({ ...m, sortOrder: k }));
+      mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: renumbered.map((m) => m.id) }),
+      }));
+      return { ...s, milestones: renumbered };
+    });
   }
 
   function addWorkTypeHandler(e: React.FormEvent) {
@@ -1148,56 +1218,117 @@ export default function SettingsPage() {
 
         {/* Decision points — gated on decisionPointsEnabled (Skipton dotted box).
             Each type carries its own outcome wording; rows edit on blur. */}
-        {study.decisionPointsEnabled && (
+        {study.decisionPointsEnabled && (() => {
+          const orderedMs = [...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+          const dpsIn = (mid: string | null) => (study.decisionPointTypes || []).filter((d) => d.milestoneId === mid);
+          const unassigned = (study.decisionPointTypes || []).filter((d) => !d.milestoneId);
+          // A single decision-point editor row, reused inside each milestone and
+          // in the unassigned group. The milestone <select> moves it between groups.
+          const renderDpRow = (dp: typeof study.decisionPointTypes[number]) => (
+            <li key={dp.id} className="p-2 rounded-lg bg-white border border-gray-200">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <input
+                  type="text"
+                  defaultValue={dp.label}
+                  aria-label={t('settings.decisionPointTypes')}
+                  onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
+                  className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                />
+                <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-gray-500">
+                  {t('settings.dpPositiveLabel')}
+                  <input
+                    type="text"
+                    defaultValue={dp.positiveLabel}
+                    onBlur={(e) => patchDecisionPointType(dp.id, { positiveLabel: e.target.value })}
+                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-green-700 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
+                  />
+                </label>
+                <label className="text-xs text-gray-500">
+                  {t('settings.dpNegativeLabel')}
+                  <input
+                    type="text"
+                    defaultValue={dp.negativeLabel}
+                    onBlur={(e) => patchDecisionPointType(dp.id, { negativeLabel: e.target.value })}
+                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-red-700 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 outline-none"
+                  />
+                </label>
+              </div>
+              {orderedMs.length > 0 && (
+                <label className="block mt-1.5 text-xs text-gray-500">
+                  {t('settings.assignToMilestone')}
+                  <select
+                    value={dp.milestoneId ?? ''}
+                    onChange={(e) => assignDecisionToMilestone(dp.id, e.target.value || null)}
+                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                  >
+                    {orderedMs.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                    <option value="">— {t('settings.unassignedDecisions')} —</option>
+                  </select>
+                </label>
+              )}
+            </li>
+          );
+          return (
           <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.decisionPointTypes')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.decisionPointTypesDesc')}</p>
-            <ul className="space-y-2 mb-4">
-              {(study.decisionPointTypes || []).map((dp) => (
-                <li key={dp.id} className="p-2 rounded-lg bg-gray-50 border border-gray-200">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.milestones')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.milestonesDesc')}</p>
+            <div className="space-y-3 mb-4">
+              {orderedMs.map((m, idx) => (
+                <div key={m.id} className="rounded-lg border border-gray-200 bg-gray-100/70 p-2">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="shrink-0 w-5 text-xs text-gray-400 tabular-nums text-center">{idx + 1}</span>
                     <input
                       type="text"
-                      defaultValue={dp.label}
-                      aria-label={t('settings.decisionPointTypes')}
-                      onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
-                      className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      defaultValue={m.label}
+                      aria-label={t('settings.milestoneLabel')}
+                      onBlur={(e) => patchMilestone(m.id, e.target.value)}
+                      className="flex-1 px-2 py-1 rounded text-sm font-semibold text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                     />
-                    <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
+                    <button type="button" aria-label={t('settings.moveUp')} disabled={idx === 0} onClick={() => moveMilestone(m.id, -1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
+                    <button type="button" aria-label={t('settings.moveDown')} disabled={idx === orderedMs.length - 1} onClick={() => moveMilestone(m.id, 1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
+                    <button type="button" onClick={() => removeMilestone(m.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs text-gray-500">
-                      {t('settings.dpPositiveLabel')}
-                      <input
-                        type="text"
-                        defaultValue={dp.positiveLabel}
-                        onBlur={(e) => patchDecisionPointType(dp.id, { positiveLabel: e.target.value })}
-                        className="w-full mt-0.5 px-2 py-1 rounded text-sm text-green-700 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
-                      />
-                    </label>
-                    <label className="text-xs text-gray-500">
-                      {t('settings.dpNegativeLabel')}
-                      <input
-                        type="text"
-                        defaultValue={dp.negativeLabel}
-                        onBlur={(e) => patchDecisionPointType(dp.id, { negativeLabel: e.target.value })}
-                        className="w-full mt-0.5 px-2 py-1 rounded text-sm text-red-700 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 outline-none"
-                      />
-                    </label>
-                  </div>
-                </li>
+                  <ul className="space-y-2">
+                    {dpsIn(m.id).map(renderDpRow)}
+                    {dpsIn(m.id).length === 0 && <li className="text-xs text-gray-400 italic px-1">—</li>}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
+            <form onSubmit={addMilestoneHandler} className="flex gap-2 mb-5">
+              <input type="text" value={newMilestoneLabel} onChange={(e) => setNewMilestoneLabel(e.target.value)} placeholder={t('settings.milestoneLabel')} className={inputCls} />
+              <button type="submit" disabled={!newMilestoneLabel.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.addMilestone')}</button>
+            </form>
+
+            {unassigned.length > 0 && (
+              <div className="rounded-lg border border-dashed border-gray-300 p-2 mb-4">
+                <p className="text-xs font-medium text-gray-500 mb-2">{t('settings.unassignedDecisions')}</p>
+                <ul className="space-y-2">{unassigned.map(renderDpRow)}</ul>
+              </div>
+            )}
+
+            <p className="text-sm font-medium text-gray-700 mb-1">{t('settings.decisionPointTypes')}</p>
             <form onSubmit={addDecisionPointTypeHandler} className="space-y-2">
               <input type="text" value={newDpLabel} onChange={(e) => setNewDpLabel(e.target.value)} placeholder={t('settings.decisionPointTypes')} className={inputCls} />
               <div className="grid grid-cols-2 gap-2">
                 <input type="text" value={newDpPos} onChange={(e) => setNewDpPos(e.target.value)} placeholder={t('settings.dpPositiveLabel')} className={inputCls} />
                 <input type="text" value={newDpNeg} onChange={(e) => setNewDpNeg(e.target.value)} placeholder={t('settings.dpNegativeLabel')} className={inputCls} />
               </div>
-              <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
+              <div className="flex gap-2 items-center">
+                {orderedMs.length > 0 && (
+                  <select value={newDpMilestoneId || orderedMs[0].id} onChange={(e) => setNewDpMilestoneId(e.target.value)} className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none">
+                    {orderedMs.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                )}
+                <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.add')}</button>
+              </div>
             </form>
           </div>
-        )}
+          );
+        })()}
 
         {/* Work sources — gated on workSourcesEnabled (toggle lives in CaptureTogglesPanel above). */}
         {study.workSourcesEnabled && (
