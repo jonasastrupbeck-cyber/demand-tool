@@ -28,6 +28,18 @@ const DEFAULT_HANDLING_TYPES: Record<Locale, string[]> = {
   ],
 };
 
+// R9 (2026-06-18): flow studies seed a different set of capability-of-response
+// types — the four CORs Jonas authored on study V5YKDS (Help Me Stay), written
+// in the customer's voice. The first is the one-stop default. English-only
+// starter labels for all locales (a consultant renames per study). label +
+// operationalDefinition.
+const FLOW_COR_DEFAULTS: { label: string; operationalDefinition: string }[] = [
+  { label: 'Done and Dusted', operationalDefinition: 'Nothing more for me to do or Skipton' },
+  { label: 'I was handed off', operationalDefinition: 'was passed to a different team' },
+  { label: 'I want to reflect', operationalDefinition: 'I want time to think' },
+  { label: 'Hand-Off', operationalDefinition: 'Work is passed outside of Help Me Stay (This is one that the customer wouldn\'t feel *)' },
+];
+
 const DEFAULT_VALUE_TYPES: Record<Locale, string[]> = {
   en: [
     'Request for information',
@@ -154,16 +166,21 @@ export async function createStudy(name: string, description: string = '', locale
     ...(isFlow ? FLOW_PRESET_TOGGLES : {}),
   });
 
-  // Create default handling types in the chosen language
-  const localizedHandling = DEFAULT_HANDLING_TYPES[locale];
+  // Create default handling types (capability of response). Flow studies seed
+  // the four flow CORs (with operational definitions); transactional studies
+  // seed the localized One Stop / Pass-on / Pass-back defaults.
+  const handlingSeed = isFlow
+    ? FLOW_COR_DEFAULTS
+    : DEFAULT_HANDLING_TYPES[locale].map((label) => ({ label, operationalDefinition: undefined as string | undefined }));
   const handlingTypeIds: string[] = [];
-  for (let i = 0; i < localizedHandling.length; i++) {
+  for (let i = 0; i < handlingSeed.length; i++) {
     const htId = generateId();
     handlingTypeIds.push(htId);
     await db.insert(handlingTypes).values({
       id: htId,
       studyId: id,
-      label: localizedHandling[i],
+      label: handlingSeed[i].label,
+      operationalDefinition: handlingSeed[i].operationalDefinition ?? null,
       sortOrder: i,
     });
   }

@@ -999,6 +999,12 @@ export default function SettingsPage() {
 
   const valueTypes = study.demandTypes.filter(dt => dt.category === 'value');
   const failureTypes = study.demandTypes.filter(dt => dt.category === 'failure');
+  // R9 (2026-06-18): a flow study's settings are trimmed to what a flow
+  // consultant actually configures — the demand-only boxes (purpose, system
+  // type, capture toggles, contact methods, points of transaction, form
+  // preview) are hidden. Strands are preset at creation, so the kept sections
+  // still show via their own *Enabled toggles.
+  const isFlow = study.systemType === 'flow';
 
   return (
     <div className="pb-8">
@@ -1027,7 +1033,7 @@ export default function SettingsPage() {
         )}
 
         {/* Purpose statement — first per Vanguard Method */}
-        <div className={cardCls}>
+        {!isFlow && <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.purpose')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.purposeDesc')}</p>
           <textarea
@@ -1047,13 +1053,14 @@ export default function SettingsPage() {
             </button>
             {purposeSaved && <span className="text-sm text-green-600">{t('settings.saved')}</span>}
           </div>
-        </div>
+        </div>}
 
         {/* System type — the layout regime (2026-06-11). A regime, not a
             strand toggle, so it lives outside CaptureTogglesPanel. Switching
             to flow re-applies the additive preset server-side; switching back
-            only changes the layout — nothing is ever turned off. */}
-        <div className={cardCls}>
+            only changes the layout — nothing is ever turned off. Hidden for
+            flow studies (R9): you never switch a flow study back. */}
+        {!isFlow && <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.systemTypeTitle')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.systemTypeDesc')}</p>
           <SegmentedToggle
@@ -1078,10 +1085,11 @@ export default function SettingsPage() {
               { value: 'flow', label: t('create.systemTypeFlow'), activeColor: 'green' },
             ]}
           />
-        </div>
+        </div>}
 
-        {/* What are we capturing? — toggles that replaced layer activation */}
-        <div className={cardCls}>
+        {/* What are we capturing? — toggles that replaced layer activation.
+            Hidden for flow (R9): flow strands are preset, not consultant-tuned. */}
+        {!isFlow && <div className={cardCls}>
           <CaptureTogglesPanel
             code={code}
             study={study}
@@ -1090,7 +1098,7 @@ export default function SettingsPage() {
               setStudy((s) => s ? { ...s, [field]: value } : s);
             }}
           />
-        </div>
+        </div>}
 
         {/* Access code */}
         <div className={cardCls}>
@@ -1123,7 +1131,8 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                    {/* Customer-facing flag hidden for flow studies (R9). */}
+                    {!isFlow && <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={ht.customerFacing}
@@ -1131,7 +1140,7 @@ export default function SettingsPage() {
                         className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
                       />
                       {t('settings.customerFacing')}
-                    </label>
+                    </label>}
                     {study.oneStopHandlingType !== ht.id && (
                       <button onClick={() => setOneStop(ht.id)} className="text-xs text-blue-600 hover:text-blue-800">{t('settings.setOneStop')}</button>
                     )}
@@ -1169,8 +1178,8 @@ export default function SettingsPage() {
           </form>
         </div>}
 
-        {/* Contact methods */}
-        <div className={cardCls}>
+        {/* Contact methods — demand-only, hidden for flow (R9). */}
+        {!isFlow && <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.contactMethods')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.contactMethodsDesc')}</p>
           <ul className="space-y-2 mb-4">
@@ -1185,10 +1194,10 @@ export default function SettingsPage() {
             <input type="text" value={newContactMethod} onChange={(e) => setNewContactMethod(e.target.value)} placeholder={t('settings.addContactMethod')} className={inputCls} />
             <button type="submit" disabled={!newContactMethod.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>
+        </div>}
 
-        {/* Points of transaction */}
-        <div className={cardCls}>
+        {/* Points of transaction — demand-only, hidden for flow (R9). */}
+        {!isFlow && <div className={cardCls}>
           <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.pointsOfTransaction')}</h2>
           <p className="text-sm text-gray-600 mb-3">{t('settings.pointsOfTransactionDesc')}</p>
           <ul className="space-y-2 mb-4">
@@ -1214,7 +1223,7 @@ export default function SettingsPage() {
             <input type="text" value={newPointOfTransaction} onChange={(e) => setNewPointOfTransaction(e.target.value)} placeholder={t('settings.addPointOfTransaction')} className={inputCls} />
             <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>
+        </div>}
 
         {/* Decision points — gated on decisionPointsEnabled (Skipton dotted box).
             Each type carries its own outcome wording; rows edit on blur. */}
@@ -1721,8 +1730,8 @@ export default function SettingsPage() {
           </label>
         </div>
 
-        {/* Capture form preview */}
-        <div className={cardCls}>
+        {/* Capture form preview — demand-only, hidden for flow (R9). */}
+        {!isFlow && <div className={cardCls}>
           <button
             onClick={() => setShowPreview(!showPreview)}
             className="w-full flex items-center justify-between text-left"
@@ -1809,7 +1818,7 @@ export default function SettingsPage() {
               </button>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Phase 4B (2026-04-16) — Synthesis modal: cluster existing free-text
