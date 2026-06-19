@@ -620,9 +620,10 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       // touches → decisions — so nothing collapses or scrolls off on a phone.
       // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
       // (lg only — they read as zone separators across, not stacked).
-      <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-stretch min-h-[24rem]">
-        {/* PINNED LEFT — the customer. Always visible on every width. */}
-        <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
+      <div className="flex flex-col gap-3 md:flex-row md:gap-0 md:items-stretch min-h-[24rem]">
+        {/* PINNED LEFT — the customer. Always visible. Board stays horizontal down
+            to md (768px); only below that does it stack (2026-06-19). */}
+        <aside className="order-1 w-full md:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
           {/* Study name — a quiet centred title for this pane (2026-06-19). */}
           {studyName && <p className="text-center text-sm font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           {/* R9: open another customer (a new reference) without leaving capture. */}
@@ -653,32 +654,32 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
-        {/* ┊ boundary after the customer pane (lg only). */}
-        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 lg:order-2">
+        {/* ┊ LEFT dashed boundary (md+ only). */}
+        <div aria-hidden className="hidden md:flex shrink-0 self-stretch items-stretch mx-3 md:order-2">
           <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
         </div>
 
         {/* WORKING AREA — ONE horizontal scroll: captured touches (LEFT) · composer ·
-            decisions · capability of response. The customer is pinned; this whole strip
-            scrolls so the composer is never starved/clipped on a laptop (2026-06-19). */}
-        <div ref={workScrollRef} className="order-2 lg:order-3 flex-1 min-w-0 lg:overflow-x-auto">
-          <div className="flex flex-col gap-3 lg:flex-row lg:gap-3 lg:min-w-min lg:items-stretch pb-2">
+            decisions · ┊ · capability of response. The customer is pinned; this whole
+            strip scrolls so the composer is never starved/clipped on a laptop. */}
+        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 min-w-0 md:overflow-x-auto">
+          <div className="flex flex-col gap-3 md:flex-row md:gap-3 md:min-w-min md:items-stretch pb-2">
             {/* Captured touches — to the LEFT of the composer on desktop; after it on mobile. */}
             {entries.map((e) => (
-              <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex">
+              <div key={e.id} className="order-2 md:order-1 w-full md:w-36 shrink-0 flex">
                 {renderTouchFull(e)}
               </div>
             ))}
             {/* Composer — "What's happening now". Keeps its width so it never clips. */}
             {children && (
-              <div ref={composerColRef} className="order-1 lg:order-2 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
+              <div ref={composerColRef} className="order-1 md:order-2 w-full md:w-fit md:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
                 <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
                 {children}
               </div>
             )}
             {/* Decisions — to the right of the composer (scrolls into view). */}
             {decisionPointsEnabled && (
-              <div className="order-3 w-full lg:w-80 shrink-0">
+              <div className="order-3 w-full md:w-80 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
                   <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                     {t('capture.caseDecisionsHeading')}
@@ -697,8 +698,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                 </div>
               </div>
             )}
+            {/* ┊ RIGHT dashed boundary — between the Decisions box and Capability of
+                Response, inside the scroll (md+ only). Restored 2026-06-19. */}
+            <div aria-hidden className="hidden md:flex shrink-0 self-stretch items-stretch mx-3 md:order-4">
+              <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
+            </div>
             {/* Capability of Response — each saved touch's COR, chronological. */}
-            <aside className="order-4 w-full lg:w-72 shrink-0">
+            <aside className="order-4 md:order-5 w-full md:w-72 shrink-0">
               <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                 {t('capture.handlingLabel')}
               </p>
