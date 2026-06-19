@@ -602,11 +602,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
       // (lg only — they read as zone separators across, not stacked).
       <div className="flex flex-col gap-3 lg:flex-row lg:gap-0 lg:items-stretch min-h-[24rem]">
-        {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg.
-            Border-2 darker green, matching the composer's emphasis (2026-06-18). */}
+        {/* PINNED LEFT — the customer. Always visible on every width. */}
         <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
-          {/* Study name — a quiet centred title for this pane (2026-06-19), in the
-              muted dashboard-menu grey so it doesn't stick out. */}
+          {/* Study name — a quiet centred title for this pane (2026-06-19). */}
           {studyName && <p className="text-center text-sm font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           {/* R9: open another customer (a new reference) without leaving capture. */}
           <div className="flex justify-center mb-2">
@@ -636,98 +634,88 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
-        {/* ┊ LEFT dashed boundary — a dedicated vertical line, thicker (border-l-4)
-            and slightly taller than the panes (protrudes ~10px top & bottom via the
-            calc height + negative margin). lg only. */}
-        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 order-2">
+        {/* ┊ boundary after the customer pane (lg only). */}
+        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 lg:order-2">
           <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
         </div>
 
-        {/* WORKING AREA — the flow AND the (pinned) Decisions, all left of the
-            right dotted line. On lg: a row of [scrolling touch rail + composer]
-            then Decisions, pinned so it stays in view while the rail scrolls.
-            On mobile: composer → touches → decisions, stacked. */}
-        <div className="order-2 flex-1 min-w-0 flex flex-col gap-3 lg:flex-row lg:gap-3 lg:items-stretch">
-          {/* Touch rail + composer — the only horizontally-scrolling part. */}
-          <div className="flex-1 min-w-0 lg:overflow-x-auto">
-            <div className="flex flex-col gap-3 lg:flex-row lg:min-w-min lg:items-stretch pb-2">
-              {entries.map((e) => (
-                // ~half the old width (more touches fit). Stretches to the row
-                // (composer) height for an even overview; sections fill it.
-                <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex">
-                  {renderTouchFull(e)}
-                </div>
-              ))}
-              {children && (
-                // R6: the composer is clearly "where I'm working now" (brand ring).
-                // On lg it's content-width and grows right as blocks are added
-                // (~2 blocks min); on mobile it's full width and comes first.
-                <div className="order-1 lg:order-2 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
-                  <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
-                  {children}
-                </div>
-              )}
-            </div>
+        {/* PINNED — the Work Entry composer. Its own column with shrink-0 so it is
+            ALWAYS fully visible and never clips; the panes to its right scroll
+            (2026-06-19). On mobile it's full-width and second (after the customer). */}
+        {children && (
+          <div className="order-2 lg:order-3 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
+            {children}
           </div>
-          {/* Decisions — pinned at the right of the working area, always visible
-              (no divider before it; just left of the right dotted line). */}
-          {decisionPointsEnabled && (
-            <div className="w-full lg:w-80 shrink-0">
-              <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
-                <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
-                  {t('capture.caseDecisionsHeading')}
-                </p>
-                <CaseDecisionPoints
-                  code={code}
-                  caseId={caseRow.id}
-                  decisionPointTypes={decisionPointTypes}
-                  decisions={decisions}
-                  milestones={milestones}
-                  caseMilestones={caseMilestones}
-                  collectorName={collectorName}
-                  variant="overview"
-                  onChanged={() => loadCase(caseRow.id)}
-                />
+        )}
+
+        {/* ┊ boundary after the composer (lg only). */}
+        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 lg:order-4">
+          <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
+        </div>
+
+        {/* SCROLL REGION — everything right of the composer: decisions, capability
+            of response, and the touch history. Scrolls left↔right when the laptop
+            is too narrow, so the pinned composer/customer never get crammed. */}
+        <div className="order-3 lg:order-5 flex-1 min-w-0 lg:overflow-x-auto">
+          <div className="flex flex-col gap-3 lg:flex-row lg:gap-3 lg:min-w-min lg:items-stretch pb-2">
+            {/* Decisions — first in the scroll row on lg; after touches on mobile. */}
+            {decisionPointsEnabled && (
+              <div className="order-2 lg:order-1 w-full lg:w-80 shrink-0">
+                <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
+                  <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
+                    {t('capture.caseDecisionsHeading')}
+                  </p>
+                  <CaseDecisionPoints
+                    code={code}
+                    caseId={caseRow.id}
+                    decisionPointTypes={decisionPointTypes}
+                    decisions={decisions}
+                    milestones={milestones}
+                    caseMilestones={caseMilestones}
+                    collectorName={collectorName}
+                    variant="overview"
+                    onChanged={() => loadCase(caseRow.id)}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* ┊ RIGHT dashed boundary — dedicated line (thicker + protruding), lg only. */}
-        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 order-3">
-          <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
-        </div>
-
-        {/* RIGHT pane + COR list — each saved touch's Capability of Response in
-            chronological order (oldest top → newest bottom). Read-only summary of
-            the sequence of capabilities; click a row to open that touch. */}
-        <aside className="order-3 w-full lg:w-72 shrink-0">
-          <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
-            {t('capture.handlingLabel')}
-          </p>
-          <div className="space-y-1.5">
-            {entries.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-2">—</p>
-            ) : entries.map((e, i) => {
-              const cor = handlingLabel(e.handlingTypeId);
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => onOpenEntry?.(e.id)}
-                  className="w-full flex items-center gap-2 text-left"
-                >
-                  <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-right">{i + 1}</span>
-                  {cor ? (
-                    <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs truncate">{cor}</span>
-                  ) : (
-                    <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
-                  )}
-                </button>
-              );
-            })}
+            )}
+            {/* Capability of Response — each saved touch's COR, chronological. */}
+            <aside className="order-3 lg:order-2 w-full lg:w-72 shrink-0">
+              <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
+                {t('capture.handlingLabel')}
+              </p>
+              <div className="space-y-1.5">
+                {entries.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-2">—</p>
+                ) : entries.map((e, i) => {
+                  const cor = handlingLabel(e.handlingTypeId);
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => onOpenEntry?.(e.id)}
+                      className="w-full flex items-center gap-2 text-left"
+                    >
+                      <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-right">{i + 1}</span>
+                      {cor ? (
+                        <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs truncate">{cor}</span>
+                      ) : (
+                        <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+            {/* Touch history — far right on lg; first (after composer) on mobile. */}
+            {entries.map((e) => (
+              <div key={e.id} className="order-1 lg:order-3 w-full lg:w-36 shrink-0 flex">
+                {renderTouchFull(e)}
+              </div>
+            ))}
           </div>
-        </aside>
+        </div>
       </div>
     );
   }
