@@ -66,18 +66,40 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         {/* Full-width header: logo pinned far left, controls far right. */}
         <div className="px-6">
-          <div className="flex items-center justify-between min-h-16 py-2">
-            {/* Branding by study type (R5): flow → Skipton + Vanguard co-brand
-                lockup; demand/transactional → the Vanguard mark only. The row uses
-                min-h-16 so it grows for the flow lockup but stays compact for demand. */}
+          {/* ROW 1: logo only, far left. Flow → Skipton + Vanguard lockup (20%
+              smaller, 2026-06-19); demand/transactional → the Vanguard mark. */}
+          <div className="flex items-center py-2">
             <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
               {isFlow ? (
-                <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={273} height={116} className="h-[116px] w-auto" priority />
+                <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={218} height={93} className="h-[93px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
             </Link>
-            <div className="flex items-center gap-3">
+          </div>
+          {/* ROW 2: tabs centered; the controls (language / code / settings) + Undo
+              sit on the right at the SAME height as the Capture/Dashboard tabs. */}
+          <div className="relative flex -mb-px items-center justify-center">
+            <div className="flex gap-2">
+              {workflowTabs.map((tab) => {
+                const isActive = pathname.startsWith(tab.href);
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    className={`px-4 py-2 border-b-2 transition-colors ${
+                      isActive
+                        ? 'border-brand text-brand text-lg font-semibold'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium'
+                    }`}
+                  >
+                    {t(tab.labelKey)}
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="absolute right-0 flex items-center gap-3 pb-1">
+              <UndoButton code={code} />
               <select
                 value={locale}
                 onChange={(e) => setLocale(e.target.value as Locale)}
@@ -106,28 +128,6 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                 </svg>
               </Link>
             </div>
-          </div>
-          {/* Tabs centered; Undo pinned right so it doesn't offset the centring. */}
-          <div className="relative flex -mb-px items-center justify-center">
-            <div className="flex gap-2">
-              {workflowTabs.map((tab) => {
-                const isActive = pathname.startsWith(tab.href);
-                return (
-                  <Link
-                    key={tab.href}
-                    href={tab.href}
-                    className={`px-4 py-2 border-b-2 transition-colors ${
-                      isActive
-                        ? 'border-brand text-brand text-lg font-semibold'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 text-sm font-medium'
-                    }`}
-                  >
-                    {t(tab.labelKey)}
-                  </Link>
-                );
-              })}
-            </div>
-            <div className="absolute right-0"><UndoButton code={code} /></div>
           </div>
         </div>
       </nav>
