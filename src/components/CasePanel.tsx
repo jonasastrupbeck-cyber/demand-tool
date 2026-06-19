@@ -51,6 +51,8 @@ interface CaseEntry {
 
 interface Props {
   code: string;
+  /** Study name — shown as a quiet centred title atop the flow panes (R, 2026-06-19). */
+  studyName?: string;
   demandTypes: { id: string; category: 'value' | 'failure'; label: string; operationalDefinition: string | null }[];
   handlingTypes: { id: string; label: string }[];
   collectorName: string;
@@ -93,7 +95,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, milestones, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, milestones, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -255,6 +257,7 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
       const recent = [...filtered].sort((a, b) => (a.status === b.status ? 0 : a.status === 'open' ? -1 : 1));
       return (
         <div className="max-w-2xl mx-auto mt-6">
+          {studyName && <p className="text-center text-sm font-semibold text-gray-500 mb-3">{studyName}</p>}
           <div className="flex items-center justify-center gap-1.5 mb-3">
             <p className="text-lg font-semibold text-gray-800">{t('capture.customerRefHeading')}</p>
             <InfoPopover label={t('capture.customerRefHelp')}>{t('capture.customerRefHelp')}</InfoPopover>
@@ -602,6 +605,9 @@ export default function CasePanel({ code, demandTypes, handlingTypes, collectorN
         {/* LEFT frozen pane — the customer. Full width on mobile, fixed on lg.
             Border-2 darker green, matching the composer's emphasis (2026-06-18). */}
         <aside className="order-1 w-full lg:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
+          {/* Study name — a quiet centred title for this pane (2026-06-19), in the
+              muted dashboard-menu grey so it doesn't stick out. */}
+          {studyName && <p className="text-center text-sm font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           {/* R9: open another customer (a new reference) without leaving capture. */}
           <div className="flex justify-center mb-2">
             <button

@@ -790,7 +790,9 @@ export default function CapturePage() {
       {/* Header: study name, collector (with pencil), settings icon */}
       <div className="flex items-center justify-between mb-4 gap-3">
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-gray-900 truncate">{study.name}</h1>
+          {/* Flow shows the study name as a quiet centred title atop the green
+              pane (see CasePanel); only transactional keeps the big header name. */}
+          {!flowMode && <h1 className="text-xl font-bold text-gray-900 truncate">{study.name}</h1>}
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-sm text-gray-500 truncate">{collectorName}</span>
             <button
@@ -877,6 +879,7 @@ export default function CapturePage() {
           page reads as one case object. */}
       <CasePanel
         code={code}
+        studyName={study.name}
         enabled={study.caseTrackingEnabled}
         demandTypes={study.demandTypes}
         handlingTypes={study.handlingTypes}
