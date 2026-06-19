@@ -1166,6 +1166,25 @@ const translations = {
     sv: 'Gränser visas när minst 2 ärenden har båda händelserna.',
     de: 'Grenzen erscheinen, sobald mindestens 2 Fälle beide Ereignisse haben.',
   },
+  // R11: stacked charts + full-study spreadsheet.
+  'dashboard.addChart': {
+    en: 'Add chart',
+    da: 'Tilføj graf',
+    sv: 'Lägg till diagram',
+    de: 'Diagramm hinzufügen',
+  },
+  'dashboard.removeChart': {
+    en: 'Remove',
+    da: 'Fjern',
+    sv: 'Ta bort',
+    de: 'Entfernen',
+  },
+  'dashboard.downloadAllData': {
+    en: 'Download data',
+    da: 'Download data',
+    sv: 'Ladda ner data',
+    de: 'Daten herunterladen',
+  },
   // R10: second capability metric — touches per case.
   'dashboard.metricLabel': {
     en: 'Measure',
