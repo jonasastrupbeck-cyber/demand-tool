@@ -65,22 +65,19 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
     <div className="flex flex-col min-h-full bg-white" style={brandStyle}>
       <nav className="sticky top-0 z-10 bg-white border-b border-gray-200">
         {/* Full-width header: logo pinned far left, controls far right. */}
+        {/* One compact row: logo (left, bottom-aligned near the line so there's no
+            empty band on top), tabs absolutely centred on the line, and the controls
+            bottom-right — all at ~the same height above the line. */}
         <div className="px-6">
-          {/* ROW 1: logo only, far left. Flow → Skipton + Vanguard lockup (20%
-              smaller, 2026-06-19); demand/transactional → the Vanguard mark. */}
-          <div className="flex items-center py-2">
-            <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <div className="relative flex items-end -mb-px">
+            <Link href="/" className="flex items-center pt-2 pb-1 hover:opacity-80 transition-opacity">
               {isFlow ? (
                 <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={218} height={93} className="h-[93px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
             </Link>
-          </div>
-          {/* ROW 2: tabs centered; the controls (language / code / settings) + Undo
-              sit on the right at the SAME height as the Capture/Dashboard tabs. */}
-          <div className="relative flex -mb-px items-center justify-center">
-            <div className="flex gap-2">
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex gap-2">
               {workflowTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.href);
                 return (
@@ -98,7 +95,7 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                 );
               })}
             </div>
-            <div className="absolute right-0 flex items-center gap-3 pb-1">
+            <div className="absolute right-0 bottom-0 flex items-center gap-3 pb-1">
               <UndoButton code={code} />
               <select
                 value={locale}
