@@ -826,20 +826,27 @@ export async function getCapabilityData(
     const fromTs = eventTimestamp(fromEvent, ctx);
     const toTs = eventTimestamp(toEvent, ctx);
     if (!fromTs || !toTs) continue;
-    if (toTs.getTime() < fromTs.getTime()) continue;
+    // R12 (2026-06-19): compare at WHOLE-DAY granularity. Milestone/decision
+    // dates come from a date picker (stored date-only at noon), while openedAt /
+    // entry createdAt carry real wall-clock times. Diffing at full resolution
+    // made a same-day "to" event (noon) look earlier than a "from" event (e.g.
+    // 13:56) → spurious negative → the case got dropped. The measure is in days,
+    // so snap every event to its UTC calendar day.
+    const dayIndex = (d: Date) => Math.floor(d.getTime() / 86_400_000);
+    const fromDay = dayIndex(fromTs);
+    const toDay = dayIndex(toTs);
+    if (toDay < fromDay) continue;
     if (dateFrom && fromTs.getTime() < dateFrom.getTime()) continue;
     if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
-    // The plotted value: lead time in days, or the count of touches in the
-    // [fromTs, toTs] window (inclusive). The field stays named leadTime — it
+    // The plotted value: whole-day lead time, or the count of touches in the
+    // [fromDay, toDay] window (inclusive). The field stays named leadTime — it
     // carries "the metric value"; `unit` disambiguates days vs touches.
     let value: number;
     if (metric === 'touches') {
-      const fromMs = fromTs.getTime();
-      const toMs = toTs.getTime();
       const stamps = entriesByCase.get(c.id) ?? [];
-      value = stamps.filter((d) => { const t = d.getTime(); return t >= fromMs && t <= toMs; }).length;
+      value = stamps.filter((d) => { const day = dayIndex(d); return day >= fromDay && day <= toDay; }).length;
     } else {
-      value = Math.round(((toTs.getTime() - fromTs.getTime()) / 86_400_000) * 10) / 10;
+      value = toDay - fromDay;
     }
     const anno = annoByCase.get(c.id);
     raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, closedAt: ctx.closedAt, leadTime: value, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
