@@ -14,7 +14,7 @@
  * saved entry; `refreshSignal` bumps after each save so the timeline refetches.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
@@ -115,6 +115,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const isFlow = systemType === 'flow';
   const [caseList, setCaseList] = useState<{ id: string; caseRef: string; status: 'open' | 'closed'; openedAt: string; demandTypeId: string | null; lifeProblemId: string | null; whatMattersTypeIds: string | null; entryCount: number; lastEntryAt: string | null; lastEntryVerbatim: string | null }[]>([]);
 
+  // Flow board (2026-06-19): the work area scrolls horizontally with the captured
+  // touches to the LEFT of the composer. Keep the composer in view by default —
+  // align it to the left of the scroll viewport so touches sit just off-screen
+  // left (scroll left to see them) and decisions/COR off-screen right.
+  const workScrollRef = useRef<HTMLDivElement>(null);
+  const composerColRef = useRef<HTMLDivElement>(null);
+
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
     if (!res.ok) return;
@@ -132,6 +139,18 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     if (!activeCaseId) { setCaseRow(null); setEntries([]); return; }
     loadCase(activeCaseId);
   }, [activeCaseId, refreshSignal, loadCase]);
+
+  // After the case/touches load (or a new touch is added), scroll the work area
+  // so the composer is fully in view at the left of the viewport — captured
+  // touches then sit just off-screen to its left (scroll left to reveal them).
+  useEffect(() => {
+    const sc = workScrollRef.current, co = composerColRef.current;
+    if (!sc || !co) return;
+    const id = requestAnimationFrame(() => {
+      sc.scrollLeft += co.getBoundingClientRect().left - sc.getBoundingClientRect().left;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [activeCaseId, caseRow?.id, entries.length]);
 
   // Flow chooser: load the customer (case) list so the chooser can show recent
   // open customers and enforce new-vs-existing. Reuses the existing list route.
@@ -639,29 +658,27 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
         </div>
 
-        {/* PINNED — the Work Entry composer. Its own column with shrink-0 so it is
-            ALWAYS fully visible and never clips; the panes to its right scroll
-            (2026-06-19). On mobile it's full-width and second (after the customer). */}
-        {children && (
-          <div className="order-2 lg:order-3 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
-            <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
-            {children}
-          </div>
-        )}
-
-        {/* ┊ boundary after the composer (lg only). */}
-        <div aria-hidden className="hidden lg:flex shrink-0 self-stretch items-stretch mx-3 lg:order-4">
-          <div className="border-l-4 border-dashed border-gray-500 h-[calc(100%+1.25rem)] -my-2.5" />
-        </div>
-
-        {/* SCROLL REGION — everything right of the composer: decisions, capability
-            of response, and the touch history. Scrolls left↔right when the laptop
-            is too narrow, so the pinned composer/customer never get crammed. */}
-        <div className="order-3 lg:order-5 flex-1 min-w-0 lg:overflow-x-auto">
+        {/* WORKING AREA — ONE horizontal scroll: captured touches (LEFT) · composer ·
+            decisions · capability of response. The customer is pinned; this whole strip
+            scrolls so the composer is never starved/clipped on a laptop (2026-06-19). */}
+        <div ref={workScrollRef} className="order-2 lg:order-3 flex-1 min-w-0 lg:overflow-x-auto">
           <div className="flex flex-col gap-3 lg:flex-row lg:gap-3 lg:min-w-min lg:items-stretch pb-2">
-            {/* Decisions — first in the scroll row on lg; after touches on mobile. */}
+            {/* Captured touches — to the LEFT of the composer on desktop; after it on mobile. */}
+            {entries.map((e) => (
+              <div key={e.id} className="order-2 lg:order-1 w-full lg:w-36 shrink-0 flex">
+                {renderTouchFull(e)}
+              </div>
+            ))}
+            {/* Composer — "What's happening now". Keeps its width so it never clips. */}
+            {children && (
+              <div ref={composerColRef} className="order-1 lg:order-2 w-full lg:w-fit lg:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
+                <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
+                {children}
+              </div>
+            )}
+            {/* Decisions — to the right of the composer (scrolls into view). */}
             {decisionPointsEnabled && (
-              <div className="order-2 lg:order-1 w-full lg:w-80 shrink-0">
+              <div className="order-3 w-full lg:w-80 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
                   <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                     {t('capture.caseDecisionsHeading')}
@@ -681,7 +698,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               </div>
             )}
             {/* Capability of Response — each saved touch's COR, chronological. */}
-            <aside className="order-3 lg:order-2 w-full lg:w-72 shrink-0">
+            <aside className="order-4 w-full lg:w-72 shrink-0">
               <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                 {t('capture.handlingLabel')}
               </p>
@@ -708,12 +725,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                 })}
               </div>
             </aside>
-            {/* Touch history — far right on lg; first (after composer) on mobile. */}
-            {entries.map((e) => (
-              <div key={e.id} className="order-1 lg:order-3 w-full lg:w-36 shrink-0 flex">
-                {renderTouchFull(e)}
-              </div>
-            ))}
           </div>
         </div>
       </div>
