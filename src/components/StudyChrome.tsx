@@ -70,14 +70,14 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
             bottom-right — all at ~the same height above the line. */}
         <div className="px-6">
           <div className="relative flex items-end -mb-px">
-            <Link href="/" className="flex items-center pt-2 pb-1 hover:opacity-80 transition-opacity">
+            <Link href="/" className="flex items-center pt-2 pb-3 hover:opacity-80 transition-opacity">
               {isFlow ? (
                 <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={218} height={93} className="h-[93px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
             </Link>
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex gap-2">
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex items-end gap-2">
               {workflowTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.href);
                 return (

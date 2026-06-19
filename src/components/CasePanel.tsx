@@ -659,7 +659,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         {/* GROUP A — [ captured touches → composer ]. Own horizontal scroll with a
             min-width = the Work Entry box, so the composer is ALWAYS fully visible;
             scroll left within this group for the captured touches. */}
-        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[40rem] md:overflow-x-auto">
+        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[42rem] md:overflow-x-auto">
           <div className="flex flex-col gap-3 md:flex-row md:gap-3 md:min-w-min md:items-stretch pb-2">
             {entries.map((e) => (
               <div key={e.id} className="order-2 md:order-1 w-full md:w-36 shrink-0 flex">
@@ -677,7 +677,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
 
         {/* GROUP B — [ decision box ┊ capability of response ]. Own horizontal
             scroll; scroll right within it to reach capability of response. */}
-        <div className="order-3 md:order-4 flex-1 min-w-0 flex flex-col">
+        <div className="order-3 md:order-4 flex-1 min-w-0 md:ml-3 flex flex-col">
           {/* inner row is flex-1 so it fills Group B's (board-stretched) height,
               which lets the dashed line stretch to the SAME height as the left one. */}
           <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch md:min-w-min md:overflow-x-auto">
