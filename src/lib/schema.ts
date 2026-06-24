@@ -76,6 +76,11 @@ export const studies = pgTable('studies', {
   // decision capture — outcome + clean/dirty + date. Default false; part of
   // the flow preset.
   decisionPointsEnabled: boolean('decision_points_enabled').notNull().default(false),
+  // Synthesis (2026-06-24): toggle-gates the "Synthesise system conditions"
+  // surface — study the captured-condition distribution, then merge/rename the
+  // sames+similars in place (the change cascades to every linked record).
+  // Default false; only meaningful alongside systemConditionsEnabled.
+  synthesisEnabled: boolean('synthesis_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -370,6 +375,28 @@ export const systemConditions = pgTable('system_conditions', {
   label: text('label').notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Synthesis soft-archive (migration 0028, 2026-06-24). When a condition is
+  // merged into another, it's archived (not deleted): it disappears from
+  // capture pickers + charts but stays traceable. merged_into_id records the
+  // surviving condition it folded into. Both null for a live condition.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
+});
+
+// One row per synthesis merge (migration 0028). Records exactly which junction
+// and work-block rows were re-pointed so undoSystemConditionMerge can replay it
+// in reverse. The id arrays + source_ids are JSON-encoded text. priorTargetLabel
+// restores a rename of the surviving condition on undo.
+export const systemConditionMerges = pgTable('system_condition_merges', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  targetId: text('target_id').notNull().references(() => systemConditions.id),
+  sourceIds: text('source_ids').notNull(),
+  movedJunctionIds: text('moved_junction_ids').notNull(),
+  movedBlockIds: text('moved_block_ids').notNull(),
+  movedThinkingScs: text('moved_thinking_scs').notNull().default('[]'),
+  priorTargetLabel: text('prior_target_label'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 export const demandEntrySystemConditions = pgTable('demand_entry_system_conditions', {

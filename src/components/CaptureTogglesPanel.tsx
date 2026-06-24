@@ -20,7 +20,9 @@ type ToggleField =
   // Case stitching (Skipton slice 1, 2026-06-11).
   | 'caseTrackingEnabled'
   // Decision points (Skipton dotted box, 2026-06-12).
-  | 'decisionPointsEnabled';
+  | 'decisionPointsEnabled'
+  // Synthesis surface (migration 0028, 2026-06-24).
+  | 'synthesisEnabled';
 
 // Virtual toggle — the UI renders it as a plain on/off row, but it writes to
 // studies.workClassificationMode (text enum) rather than a boolean column.
@@ -48,6 +50,8 @@ export interface CaptureTogglesPanelStudy {
   caseTrackingEnabled: boolean;
   // Decision points (Skipton dotted box, 2026-06-12).
   decisionPointsEnabled: boolean;
+  // Synthesis surface (migration 0028, 2026-06-24).
+  synthesisEnabled: boolean;
   // Work-tab classification preset (migration 0016). Drives the "Capture
   // sequence work" virtual toggle — derived from this, not a column of its own.
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
@@ -166,6 +170,8 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { kind: 'toggle', key: 'workSourcesEnabled', label: t('capture.toggles.workSources'), value: study.workSourcesEnabled },
     { kind: 'toggle', key: 'systemConditionsEnabled', label: t('capture.toggles.systemConditions'), value: study.systemConditionsEnabled },
     { kind: 'toggle', key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
+    // Synthesis surface — study + merge captured system conditions (0028).
+    { kind: 'toggle', key: 'synthesisEnabled', label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
   ];
 
   const list = (

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, systemConditionMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -428,8 +428,13 @@ export async function deleteLifeProblem(id: string) {
 
 // --- System Conditions ---
 
-export async function getSystemConditions(studyId: string) {
-  return db.select().from(systemConditions).where(eq(systemConditions.studyId, studyId)).orderBy(asc(systemConditions.sortOrder));
+export async function getSystemConditions(studyId: string, opts?: { includeArchived?: boolean }) {
+  // Synthesis (0028): archived conditions are merged-away duplicates. Hidden by
+  // default so they vanish from capture pickers, the study payload, and charts.
+  // The synthesis surface passes includeArchived to show them in the merge log.
+  const conds = [eq(systemConditions.studyId, studyId)];
+  if (!opts?.includeArchived) conds.push(isNull(systemConditions.archivedAt));
+  return db.select().from(systemConditions).where(and(...conds)).orderBy(asc(systemConditions.sortOrder));
 }
 
 export async function addSystemCondition(studyId: string, label: string) {
@@ -463,6 +468,271 @@ export async function getSystemConditionsForEntries(entryIds: string[]) {
 export async function getSystemConditionsForEntry(entryId: string) {
   return db.select().from(demandEntrySystemConditions)
     .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+}
+
+// --- System-condition synthesis: merge-in-place + undo (migration 0028) ---
+//
+// The team studies the captured-condition distribution and finds categories
+// that are really the same thing (Same/Similar/Different). mergeSystemConditions
+// re-points EVERY linked record from the sources to one surviving condition,
+// then soft-archives the sources. Three linked-record types are re-pointed:
+//   1. demand_entry_system_conditions   (dedupe key: entry + sc)
+//   2. demand_entry_thinking_scs         (dedupe key: entry + thinking + sc)
+//   3. work_description_blocks           (one sc per block, no dedupe)
+// Each move is recorded so undoSystemConditionMerge can replay it in reverse.
+// neon-http has no interactive transactions, so ops run sequentially (matching
+// createEntry/updateEntry); the audit row is written last.
+
+type EntryScRow = typeof demandEntrySystemConditions.$inferSelect;
+type ThinkingScRow = typeof demandEntryThinkingScs.$inferSelect;
+type MovedJunction =
+  | { a: 'repoint'; id: string; from: string }
+  | { a: 'restore'; row: EntryScRow };
+type MovedThinkingSc =
+  | { a: 'repoint'; id: string; from: string }
+  | { a: 'restore'; row: ThinkingScRow };
+type MovedBlock = { id: string; from: string };
+
+export async function mergeSystemConditions(
+  studyId: string,
+  { targetId, sourceIds, newLabel }: { targetId: string; sourceIds: string[]; newLabel?: string },
+) {
+  const uniqueSources = [...new Set(sourceIds)].filter((id) => id !== targetId);
+  if (uniqueSources.length === 0) throw new Error('No source conditions to merge');
+
+  // Validate: every id belongs to this study and none is already archived.
+  const all = await db.select().from(systemConditions).where(and(
+    eq(systemConditions.studyId, studyId),
+    inArray(systemConditions.id, [targetId, ...uniqueSources]),
+  ));
+  const byId = new Map(all.map((c) => [c.id, c]));
+  const target = byId.get(targetId);
+  if (!target) throw new Error('Target system condition not found in study');
+  if (target.archivedAt) throw new Error('Target system condition is archived');
+  for (const sid of uniqueSources) {
+    const s = byId.get(sid);
+    if (!s) throw new Error('Source system condition not found in study');
+    if (s.archivedAt) throw new Error('Source system condition already archived');
+  }
+
+  const sourceSet = new Set(uniqueSources);
+  const movedJunctions: MovedJunction[] = [];
+  const movedThinkingScs: MovedThinkingSc[] = [];
+  const movedBlocks: MovedBlock[] = [];
+
+  // 1) demand_entry_system_conditions — group per entry; if the entry already
+  // links the target, the source rows are duplicates (delete + record for undo);
+  // otherwise re-point the first source row and drop any further duplicates.
+  {
+    const rows = await db.select({ j: demandEntrySystemConditions })
+      .from(demandEntrySystemConditions)
+      .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+      .where(and(
+        eq(demandEntries.studyId, studyId),
+        inArray(demandEntrySystemConditions.systemConditionId, [targetId, ...uniqueSources]),
+      ));
+    const groups = new Map<string, EntryScRow[]>();
+    for (const { j } of rows) {
+      const g = groups.get(j.demandEntryId);
+      if (g) g.push(j); else groups.set(j.demandEntryId, [j]);
+    }
+    for (const group of groups.values()) {
+      const hasTarget = group.some((r) => r.systemConditionId === targetId);
+      const srcRows = group.filter((r) => sourceSet.has(r.systemConditionId));
+      if (srcRows.length === 0) continue;
+      if (hasTarget) {
+        for (const r of srcRows) {
+          await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.id, r.id));
+          movedJunctions.push({ a: 'restore', row: r });
+        }
+      } else {
+        const [keep, ...rest] = srcRows;
+        movedJunctions.push({ a: 'repoint', id: keep.id, from: keep.systemConditionId });
+        await db.update(demandEntrySystemConditions).set({ systemConditionId: targetId }).where(eq(demandEntrySystemConditions.id, keep.id));
+        for (const r of rest) {
+          await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.id, r.id));
+          movedJunctions.push({ a: 'restore', row: r });
+        }
+      }
+    }
+  }
+
+  // 2) demand_entry_thinking_scs — same shape, dedupe key is (entry, thinking, sc).
+  {
+    const rows = await db.select({ j: demandEntryThinkingScs })
+      .from(demandEntryThinkingScs)
+      .innerJoin(demandEntries, eq(demandEntryThinkingScs.demandEntryId, demandEntries.id))
+      .where(and(
+        eq(demandEntries.studyId, studyId),
+        inArray(demandEntryThinkingScs.systemConditionId, [targetId, ...uniqueSources]),
+      ));
+    const groups = new Map<string, ThinkingScRow[]>();
+    for (const { j } of rows) {
+      const key = `${j.demandEntryId}::${j.thinkingId}`;
+      const g = groups.get(key);
+      if (g) g.push(j); else groups.set(key, [j]);
+    }
+    for (const group of groups.values()) {
+      const hasTarget = group.some((r) => r.systemConditionId === targetId);
+      const srcRows = group.filter((r) => sourceSet.has(r.systemConditionId));
+      if (srcRows.length === 0) continue;
+      if (hasTarget) {
+        for (const r of srcRows) {
+          await db.delete(demandEntryThinkingScs).where(eq(demandEntryThinkingScs.id, r.id));
+          movedThinkingScs.push({ a: 'restore', row: r });
+        }
+      } else {
+        const [keep, ...rest] = srcRows;
+        movedThinkingScs.push({ a: 'repoint', id: keep.id, from: keep.systemConditionId });
+        await db.update(demandEntryThinkingScs).set({ systemConditionId: targetId }).where(eq(demandEntryThinkingScs.id, keep.id));
+        for (const r of rest) {
+          await db.delete(demandEntryThinkingScs).where(eq(demandEntryThinkingScs.id, r.id));
+          movedThinkingScs.push({ a: 'restore', row: r });
+        }
+      }
+    }
+  }
+
+  // 3) work_description_blocks — one SC per block, just re-point.
+  {
+    const blocks = await db.select({ id: workDescriptionBlocks.id, scId: workDescriptionBlocks.systemConditionId })
+      .from(workDescriptionBlocks)
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(
+        eq(demandEntries.studyId, studyId),
+        inArray(workDescriptionBlocks.systemConditionId, uniqueSources),
+      ));
+    for (const b of blocks) {
+      if (!b.scId) continue;
+      movedBlocks.push({ id: b.id, from: b.scId });
+      await db.update(workDescriptionBlocks).set({ systemConditionId: targetId }).where(eq(workDescriptionBlocks.id, b.id));
+    }
+  }
+
+  // 4) optional rename of the surviving condition to the agreed common name.
+  let priorTargetLabel: string | null = null;
+  const trimmed = newLabel?.trim();
+  if (trimmed && trimmed !== target.label) {
+    priorTargetLabel = target.label;
+    await db.update(systemConditions).set({ label: trimmed }).where(eq(systemConditions.id, targetId));
+  }
+
+  // 5) soft-archive the sources.
+  const archivedAt = new Date();
+  await db.update(systemConditions)
+    .set({ archivedAt, mergedIntoId: targetId })
+    .where(inArray(systemConditions.id, uniqueSources));
+
+  // 6) audit row (written last so a partial failure leaves no phantom undo).
+  const mergeId = generateId();
+  await db.insert(systemConditionMerges).values({
+    id: mergeId,
+    studyId,
+    targetId,
+    sourceIds: JSON.stringify(uniqueSources),
+    movedJunctionIds: JSON.stringify(movedJunctions),
+    movedBlockIds: JSON.stringify(movedBlocks),
+    movedThinkingScs: JSON.stringify(movedThinkingScs),
+    priorTargetLabel,
+    createdAt: archivedAt,
+  });
+
+  return { mergeId, archivedCount: uniqueSources.length };
+}
+
+export async function undoSystemConditionMerge(studyId: string, mergeId: string) {
+  const [m] = await db.select().from(systemConditionMerges).where(and(
+    eq(systemConditionMerges.id, mergeId),
+    eq(systemConditionMerges.studyId, studyId),
+  ));
+  if (!m) throw new Error('Merge record not found');
+
+  const sourceIds: string[] = JSON.parse(m.sourceIds);
+  const movedJunctions: MovedJunction[] = JSON.parse(m.movedJunctionIds);
+  const movedThinkingScs: MovedThinkingSc[] = JSON.parse(m.movedThinkingScs);
+  const movedBlocks: MovedBlock[] = JSON.parse(m.movedBlockIds);
+
+  for (const mv of movedJunctions) {
+    if (mv.a === 'repoint') {
+      await db.update(demandEntrySystemConditions).set({ systemConditionId: mv.from }).where(eq(demandEntrySystemConditions.id, mv.id));
+    } else {
+      await db.insert(demandEntrySystemConditions).values(mv.row).onConflictDoNothing();
+    }
+  }
+  for (const mv of movedThinkingScs) {
+    if (mv.a === 'repoint') {
+      await db.update(demandEntryThinkingScs).set({ systemConditionId: mv.from }).where(eq(demandEntryThinkingScs.id, mv.id));
+    } else {
+      await db.insert(demandEntryThinkingScs).values(mv.row).onConflictDoNothing();
+    }
+  }
+  for (const mv of movedBlocks) {
+    await db.update(workDescriptionBlocks).set({ systemConditionId: mv.from }).where(eq(workDescriptionBlocks.id, mv.id));
+  }
+
+  // un-archive the sources (they return to the vocabulary).
+  await db.update(systemConditions).set({ archivedAt: null, mergedIntoId: null }).where(inArray(systemConditions.id, sourceIds));
+  // restore the surviving condition's label if the merge renamed it.
+  if (m.priorTargetLabel != null) {
+    await db.update(systemConditions).set({ label: m.priorTargetLabel }).where(eq(systemConditions.id, m.targetId));
+  }
+  await db.delete(systemConditionMerges).where(eq(systemConditionMerges.id, mergeId));
+  return { undone: true };
+}
+
+// Recent merges for the synthesis undo log, with source/target labels resolved
+// (sources are archived, so includeArchived is needed to name them).
+export async function getSystemConditionMerges(studyId: string) {
+  const merges = await db.select().from(systemConditionMerges)
+    .where(eq(systemConditionMerges.studyId, studyId))
+    .orderBy(desc(systemConditionMerges.createdAt));
+  if (merges.length === 0) return [];
+  const conds = await getSystemConditions(studyId, { includeArchived: true });
+  const labelOf = new Map(conds.map((c) => [c.id, c.label]));
+  return merges.map((m) => {
+    const sourceIds: string[] = JSON.parse(m.sourceIds);
+    return {
+      id: m.id,
+      createdAt: m.createdAt,
+      targetId: m.targetId,
+      targetLabel: labelOf.get(m.targetId) ?? '(deleted)',
+      sources: sourceIds.map((id) => ({ id, label: labelOf.get(id) ?? '(unknown)' })),
+    };
+  });
+}
+
+// Per-condition reference counts across entry attachments + flow work blocks —
+// feeds the synthesis histogram. Live (non-archived) conditions only; conditions
+// with zero references are still returned so unused labels can be cleaned up too.
+export async function getSystemConditionFrequencies(studyId: string) {
+  const conds = await getSystemConditions(studyId);
+  if (conds.length === 0) return [] as { id: string; label: string; count: number }[];
+
+  const junctionCounts = await db.select({
+    scId: demandEntrySystemConditions.systemConditionId,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntrySystemConditions)
+    .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+    .where(eq(demandEntries.studyId, studyId))
+    .groupBy(demandEntrySystemConditions.systemConditionId);
+
+  const blockCounts = await db.select({
+    scId: workDescriptionBlocks.systemConditionId,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.systemConditionId} is not null`))
+    .groupBy(workDescriptionBlocks.systemConditionId);
+
+  const tally = new Map<string, number>();
+  for (const r of junctionCounts) if (r.scId) tally.set(r.scId, (tally.get(r.scId) ?? 0) + r.count);
+  for (const r of blockCounts) if (r.scId) tally.set(r.scId, (tally.get(r.scId) ?? 0) + r.count);
+
+  return conds
+    .map((c) => ({ id: c.id, label: c.label, count: tally.get(c.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
 // --- Thinkings (mirrors System Conditions) ---

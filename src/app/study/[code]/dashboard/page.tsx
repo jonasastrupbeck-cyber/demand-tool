@@ -15,6 +15,7 @@ import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
+import SystemConditionSynthesis from '@/components/SystemConditionSynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 
 const THEME = {
@@ -41,7 +42,7 @@ const tooltipStyle = {
 
 type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
-type DashboardView = 'demand' | 'work' | 'overview' | 'capability';
+type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis';
 
 export default function DashboardPage() {
   const params = useParams();
@@ -76,6 +77,9 @@ export default function DashboardPage() {
   // Capability / lead-time (2026-06-18): event-pair pickers + XmR chart data.
   const [systemType, setSystemType] = useState<string | null>(null); // R7: flow → capability-only
   const [caseTrackingEnabled, setCaseTrackingEnabled] = useState(false);
+  // Synthesis (0028): gates the "Synthesise system conditions" tab.
+  const [systemConditionsEnabled, setSystemConditionsEnabled] = useState(false);
+  const [synthesisEnabled, setSynthesisEnabled] = useState(false);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   // R11: the flow capability view is a stack of independent <CapabilityChart>s.
@@ -146,6 +150,8 @@ export default function DashboardPage() {
         setWorkTrackingEnabled(s.workTrackingEnabled);
         setDemandTypesEnabled(s.demandTypesEnabled ?? false);
         setCaseTrackingEnabled(s.caseTrackingEnabled ?? false);
+        setSystemConditionsEnabled(s.systemConditionsEnabled ?? false);
+        setSynthesisEnabled(s.synthesisEnabled ?? false);
         setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -184,6 +190,9 @@ export default function DashboardPage() {
   const capabilityAvailable = caseTrackingEnabled && (decisionPointTypes.length > 0 || milestones.length > 0);
   // R7: flow studies get a capability-only dashboard (demand widgets stripped).
   const isFlow = systemType === 'flow';
+  // Synthesis (0028): the "Synthesise system conditions" tab is available once
+  // the study manages a system-conditions vocabulary and the toggle is on.
+  const synthesisAvailable = synthesisEnabled && systemConditionsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
     const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
     const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
@@ -490,10 +499,37 @@ export default function DashboardPage() {
             'demand',
             ...((hasWork ? ['work', 'overview'] : []) as DashboardView[]),
             ...((capabilityAvailable ? ['capability'] : []) as DashboardView[]),
+            ...((synthesisAvailable ? ['synthesis'] : []) as DashboardView[]),
           ];
           if (tabs.length <= 1) return null;
-          const tabLabel = (v: DashboardView) => v === 'demand' ? t('dashboard.demandTab') : v === 'work' ? t('dashboard.workTab') : v === 'overview' ? t('dashboard.overview') : t('dashboard.capabilityTab');
-          const help = dashboardView === 'demand' ? t('dashboard.demandTabHelp') : dashboardView === 'work' ? t('dashboard.workTabHelp') : dashboardView === 'overview' ? t('dashboard.overviewTabHelp') : t('dashboard.capabilityTabHelp');
+          const tabLabel = (v: DashboardView) => v === 'demand' ? t('dashboard.demandTab') : v === 'work' ? t('dashboard.workTab') : v === 'overview' ? t('dashboard.overview') : v === 'synthesis' ? t('dashboard.synthesisTab') : t('dashboard.capabilityTab');
+          const help = dashboardView === 'demand' ? t('dashboard.demandTabHelp') : dashboardView === 'work' ? t('dashboard.workTabHelp') : dashboardView === 'overview' ? t('dashboard.overviewTabHelp') : dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : t('dashboard.capabilityTabHelp');
+          return (
+            <div>
+              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
+                {tabs.map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setDashboardView(view)}
+                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
+                      dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {tabLabel(view)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">{help}</p>
+            </div>
+          );
+        })()}
+
+        {/* Flow tab bar (0028): flow studies are capability-only by default; when
+            synthesis is on, offer a Capability ↔ Synthesise switch. */}
+        {isFlow && synthesisAvailable && (() => {
+          const tabs: DashboardView[] = ['capability', 'synthesis'];
+          const tabLabel = (v: DashboardView) => v === 'synthesis' ? t('dashboard.synthesisTab') : t('dashboard.capabilityTab');
+          const help = dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : t('dashboard.capabilityTabHelp');
           return (
             <div>
               <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
@@ -1364,7 +1400,7 @@ export default function DashboardPage() {
           </ChartCard>
         )}
         {/* ── CAPABILITY / LEAD-TIME VIEW (R11: stacked, independent charts) ── */}
-        {(isFlow || dashboardView === 'capability') && (() => {
+        {((isFlow && dashboardView !== 'synthesis') || dashboardView === 'capability') && (() => {
           const capRange = getDateRangeParams();
           return (
           <div className="space-y-4">
@@ -1385,6 +1421,11 @@ export default function DashboardPage() {
           </div>
           );
         })()}
+
+        {/* Synthesise system conditions (0028) */}
+        {dashboardView === 'synthesis' && synthesisAvailable && (
+          <SystemConditionSynthesis code={code} />
+        )}
 
         {/* Raw entries list */}
         {!isFlow && dashboardView === 'demand' && data.totalEntries > 0 && (

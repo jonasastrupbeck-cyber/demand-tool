@@ -91,6 +91,8 @@ interface StudyData {
   systemType: 'transactional' | 'flow';
   // Decision points (Skipton dotted box, 2026-06-12).
   decisionPointsEnabled: boolean;
+  // Synthesis surface (migration 0028, 2026-06-24).
+  synthesisEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];

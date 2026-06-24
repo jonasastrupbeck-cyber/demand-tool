@@ -106,6 +106,8 @@ export async function PUT(
   if (body.caseTrackingEnabled !== undefined) updates.caseTrackingEnabled = body.caseTrackingEnabled;
   // Decision points toggle (Skipton dotted box, 2026-06-12).
   if (body.decisionPointsEnabled !== undefined) updates.decisionPointsEnabled = body.decisionPointsEnabled;
+  // Synthesis surface toggle (migration 0028, 2026-06-24).
+  if (body.synthesisEnabled !== undefined) updates.synthesisEnabled = body.synthesisEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.
