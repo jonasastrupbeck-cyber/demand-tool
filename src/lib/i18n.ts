@@ -1076,6 +1076,18 @@ const translations = {
     sv: 'Studera de fångade systemvillkoren och slå ihop dem som egentligen är samma till ett överenskommet namn.',
     de: 'Studieren Sie die erfassten Systembedingungen und führen Sie die wirklich gleichen unter einem vereinbarten Namen zusammen.',
   },
+  'dashboard.analyticsTab': {
+    en: 'Analytics',
+    da: 'Analyse',
+    sv: 'Analys',
+    de: 'Analyse',
+  },
+  'dashboard.analyticsTabHelp': {
+    en: 'The work picture for this flow — value vs failure work, work types, and how the work splits over time.',
+    da: 'Arbejdsbilledet for dette flow — værdiskabende vs. ikke-værdiskabende arbejde, arbejdstyper, og hvordan arbejdet fordeler sig over tid.',
+    sv: 'Arbetsbilden för detta flöde — värdeskapande vs. icke-värdeskapande arbete, arbetstyper, och hur arbetet fördelar sig över tid.',
+    de: 'Das Arbeitsbild für diesen Flow — wertschöpfende vs. fehlerhafte Arbeit, Arbeitstypen und wie sich die Arbeit über die Zeit verteilt.',
+  },
   'synthesis.heading': {
     en: 'Synthesise system conditions',
     da: 'Syntetisér systemforhold',
@@ -3276,6 +3288,12 @@ const translations = {
     da: 'Syntetisér systemforhold',
     sv: 'Syntetisera systemvillkor',
     de: 'Systembedingungen zusammenführen',
+  },
+  'capture.toggles.flowAnalytics': {
+    en: 'Flow analytics dashboard',
+    da: 'Flow-analyseoverblik',
+    sv: 'Flödesanalysöversikt',
+    de: 'Flow-Analyse-Dashboard',
   },
   'capture.toggles.lifeProblems': {
     en: 'Capture life problems',

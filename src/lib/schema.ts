@@ -81,6 +81,10 @@ export const studies = pgTable('studies', {
   // sames+similars in place (the change cascades to every linked record).
   // Default false; only meaningful alongside systemConditionsEnabled.
   synthesisEnabled: boolean('synthesis_enabled').notNull().default(false),
+  // Flow analytics (migration 0029, 2026-06-24): opt-in "Analytics" tab on the
+  // flow dashboard surfacing the demand-style measures (already computed by
+  // getDashboardData) for flow studies. Default false.
+  flowAnalyticsEnabled: boolean('flow_analytics_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),

@@ -87,6 +87,8 @@ interface StudyData {
   decisionPointsEnabled: boolean;
   // Synthesis surface (migration 0028, 2026-06-24).
   synthesisEnabled: boolean;
+  // Flow analytics tab (migration 0029, 2026-06-24).
+  flowAnalyticsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];

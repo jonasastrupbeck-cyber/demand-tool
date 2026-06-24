@@ -42,7 +42,7 @@ const tooltipStyle = {
 
 type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
-type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis';
+type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis' | 'analytics';
 
 export default function DashboardPage() {
   const params = useParams();
@@ -80,6 +80,8 @@ export default function DashboardPage() {
   // Synthesis (0028): gates the "Synthesise system conditions" tab.
   const [systemConditionsEnabled, setSystemConditionsEnabled] = useState(false);
   const [synthesisEnabled, setSynthesisEnabled] = useState(false);
+  // Flow analytics (0029): gates the demand-style "Analytics" tab on flow dashboards.
+  const [flowAnalyticsEnabled, setFlowAnalyticsEnabled] = useState(false);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   // R11: the flow capability view is a stack of independent <CapabilityChart>s.
@@ -152,6 +154,7 @@ export default function DashboardPage() {
         setCaseTrackingEnabled(s.caseTrackingEnabled ?? false);
         setSystemConditionsEnabled(s.systemConditionsEnabled ?? false);
         setSynthesisEnabled(s.synthesisEnabled ?? false);
+        setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
         setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -193,6 +196,8 @@ export default function DashboardPage() {
   // Synthesis (0028): the "Synthesise system conditions" tab is available once
   // the study manages a system-conditions vocabulary and the toggle is on.
   const synthesisAvailable = synthesisEnabled && systemConditionsEnabled;
+  // Flow analytics (0029): the demand-style "Analytics" tab, opt-in per study.
+  const flowAnalyticsAvailable = isFlow && flowAnalyticsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
     const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
     const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
@@ -524,12 +529,16 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Flow tab bar (0028): flow studies are capability-only by default; when
-            synthesis is on, offer a Capability ↔ Synthesise switch. */}
-        {isFlow && synthesisAvailable && (() => {
-          const tabs: DashboardView[] = ['capability', 'synthesis'];
-          const tabLabel = (v: DashboardView) => v === 'synthesis' ? t('dashboard.synthesisTab') : t('dashboard.capabilityTab');
-          const help = dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : t('dashboard.capabilityTabHelp');
+        {/* Flow tab bar (0028/0029): flow studies are capability-only by default;
+            optional Analytics and Synthesise tabs appear when their toggles are on. */}
+        {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (() => {
+          const tabs: DashboardView[] = [
+            'capability',
+            ...((flowAnalyticsAvailable ? ['analytics'] : []) as DashboardView[]),
+            ...((synthesisAvailable ? ['synthesis'] : []) as DashboardView[]),
+          ];
+          const tabLabel = (v: DashboardView) => v === 'synthesis' ? t('dashboard.synthesisTab') : v === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab');
+          const help = dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : dashboardView === 'analytics' ? t('dashboard.analyticsTabHelp') : t('dashboard.capabilityTabHelp');
           return (
             <div>
               <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
@@ -1400,7 +1409,7 @@ export default function DashboardPage() {
           </ChartCard>
         )}
         {/* ── CAPABILITY / LEAD-TIME VIEW (R11: stacked, independent charts) ── */}
-        {((isFlow && dashboardView !== 'synthesis') || dashboardView === 'capability') && (() => {
+        {dashboardView === 'capability' && (() => {
           const capRange = getDateRangeParams();
           return (
           <div className="space-y-4">
@@ -1425,6 +1434,129 @@ export default function DashboardPage() {
         {/* Synthesise system conditions (0028) */}
         {dashboardView === 'synthesis' && synthesisAvailable && (
           <SystemConditionSynthesis code={code} />
+        )}
+
+        {/* Flow analytics (0029): the WORK picture for a flow study. Flow capture
+            is work-only, so this surfaces the work measures already computed by
+            getDashboardData (the same widgets as the non-flow Work view). Each
+            card self-gates on its data. */}
+        {isFlow && dashboardView === 'analytics' && flowAnalyticsAvailable && (
+          data.workCount === 0 ? (
+            <div className="rounded-xl p-8 text-center bg-white border border-gray-200">
+              <p className="text-lg font-semibold text-gray-700 mb-2">{t('dashboard.noEntries')}</p>
+              <p className="text-sm text-gray-500">{t('dashboard.noEntriesHint')}</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card label={t('dashboard.workEntries')} value={data.workCount} />
+                <Card label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
+                <Card label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
+                {data.workSequenceCount > 0 && (
+                  <Card label={t('capture.classificationWorkSequence')} value={data.workSequenceCount} color={COLORS.sequence} />
+                )}
+                {data.workUnknownCount > 0 && (
+                  <Card label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
+                )}
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <ChartCard title={t('dashboard.workAnalysis')}>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={(() => {
+                          const slices: Array<{ name: string; value: number; fill: string }> = [
+                            { name: t('capture.value'), value: data.workValueCount, fill: COLORS.value },
+                            { name: t('capture.failure'), value: data.workFailureCount, fill: COLORS.failure },
+                          ];
+                          if (data.workSequenceCount > 0) slices.push({ name: t('capture.classificationWorkSequence'), value: data.workSequenceCount, fill: COLORS.sequence });
+                          if (data.workUnknownCount > 0) slices.push({ name: '?', value: data.workUnknownCount, fill: '#f59e0b' });
+                          return slices;
+                        })()}
+                        cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
+                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={{ strokeWidth: 1 }}
+                      />
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+
+                {data.workTypesByClassification && data.workTypesByClassification.length > 0 && (() => {
+                  const hasSequence = data.workTypesByClassification.some(d => d.sequenceCount > 0);
+                  const translated = data.workTypesByClassification.map(d => ({
+                    label: tl(d.label),
+                    [t('capture.value')]: d.valueCount,
+                    [t('capture.classificationWorkSequence')]: d.sequenceCount,
+                    [t('capture.failure')]: d.failureCount,
+                    total: d.valueCount + d.failureCount + d.sequenceCount,
+                  }));
+                  return (
+                    <ChartCard title={t('dashboard.workTypesByClass')}>
+                      <ResponsiveContainer width="100%" height={Math.max(220, translated.length * 45 + 40)}>
+                        <BarChart data={translated} layout="vertical" margin={{ left: 10, right: 60 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                          <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                          <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                          <Tooltip {...tooltipStyle} />
+                          <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                          <Bar dataKey={t('capture.value')} stackId="a" fill={COLORS.value} radius={[0, 0, 0, 0]} />
+                          {hasSequence && <Bar dataKey={t('capture.classificationWorkSequence')} stackId="a" fill={COLORS.sequence} radius={[0, 0, 0, 0]} />}
+                          <Bar dataKey={t('capture.failure')} stackId="a" fill={COLORS.failure} radius={[0, 4, 4, 0]}>
+                            <LabelList dataKey="total" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  );
+                })()}
+              </div>
+
+              {data.workTypeCounts.length > 0 && (
+                <ChartCard title={t('dashboard.workTypes')}>
+                  <ResponsiveContainer width="100%" height={Math.max(200, data.workTypeCounts.length * 40 + 40)}>
+                    <BarChart data={(() => {
+                      const totalWork = data.workTypeCounts.reduce((s, d) => s + d.count, 0);
+                      return data.workTypeCounts.map(d => ({
+                        ...d,
+                        label: tl(d.label),
+                        pct: totalWork > 0 ? `${Math.round((d.count / totalWork) * 100)}%` : '0%',
+                      }));
+                    })()} layout="vertical" margin={{ left: 10, right: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="count" fill="#f59e0b" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
+              {data.workOverTime.length > 1 && (
+                <ChartCard title={t('dashboard.workOverTime')}>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={data.workOverTime}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis dataKey="date" tick={tickStyle} />
+                      <YAxis allowDecimals={false} tick={tickStyle} />
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ color: THEME.textSecondary }} />
+                      <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
+                      {data.workOverTime.some(d => d.sequenceCount > 0) && (
+                        <Line type="monotone" dataKey="sequenceCount" name={t('capture.classificationWorkSequence')} stroke={COLORS.sequence} strokeWidth={2} dot={{ r: 4 }} />
+                      )}
+                      <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+            </div>
+          )
         )}
 
         {/* Raw entries list */}

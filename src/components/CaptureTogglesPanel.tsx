@@ -22,7 +22,9 @@ type ToggleField =
   // Decision points (Skipton dotted box, 2026-06-12).
   | 'decisionPointsEnabled'
   // Synthesis surface (migration 0028, 2026-06-24).
-  | 'synthesisEnabled';
+  | 'synthesisEnabled'
+  // Flow analytics tab (migration 0029, 2026-06-24).
+  | 'flowAnalyticsEnabled';
 
 // Virtual toggle — the UI renders it as a plain on/off row, but it writes to
 // studies.workClassificationMode (text enum) rather than a boolean column.
@@ -52,6 +54,8 @@ export interface CaptureTogglesPanelStudy {
   decisionPointsEnabled: boolean;
   // Synthesis surface (migration 0028, 2026-06-24).
   synthesisEnabled: boolean;
+  // Flow analytics tab (migration 0029, 2026-06-24).
+  flowAnalyticsEnabled: boolean;
   // Work-tab classification preset (migration 0016). Drives the "Capture
   // sequence work" virtual toggle — derived from this, not a column of its own.
   workClassificationMode: 'value-sequence-failure-unknown' | 'value-failure-unknown';
@@ -172,6 +176,8 @@ export default function CaptureTogglesPanel({ code, study, onChange, showHeader 
     { kind: 'toggle', key: 'thinkingsEnabled', label: t('capture.toggles.thinkings'), value: study.thinkingsEnabled },
     // Synthesis surface — study + merge captured system conditions (0028).
     { kind: 'toggle', key: 'synthesisEnabled', label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
+    // Flow analytics tab — demand-style measures on the flow dashboard (0029).
+    { kind: 'toggle', key: 'flowAnalyticsEnabled', label: t('capture.toggles.flowAnalytics'), value: study.flowAnalyticsEnabled },
   ];
 
   const list = (
