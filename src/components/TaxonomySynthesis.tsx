@@ -111,7 +111,9 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true 
     try {
       const res = await fetch(`${apiBase}/${id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label }),
+        // mergeOnCollision: in the synthesis surface, renaming to an existing
+        // live name means "these are the same" → merge rather than duplicate.
+        body: JSON.stringify({ label, mergeOnCollision: true }),
       });
       if (!res.ok) { setError(labels.renameFailed); return; }
       setEditingId(null);

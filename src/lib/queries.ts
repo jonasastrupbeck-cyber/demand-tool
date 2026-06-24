@@ -899,6 +899,15 @@ export async function getTaxonomyMerges(studyId: string, tax: SingleFkTaxonomy) 
 
 export async function renameTaxonomyType(studyId: string, tax: SingleFkTaxonomy, id: string, label: string) {
   const tt = taxConfig(tax).typesTable as typeof workTypes;
+  // Synthesis intent: renaming a type to a name a LIVE sibling already has means
+  // "these are the same" → merge this one into the existing one instead of
+  // creating a duplicate label. Otherwise just relabel.
+  const live = await getTaxonomyTypes(studyId, tax);
+  const dup = live.find((t) => t.id !== id && t.label === label);
+  if (dup) {
+    await mergeTaxonomy(studyId, tax, { targetId: dup.id, sourceIds: [id] });
+    return;
+  }
   await db.update(tt).set({ label }).where(and(eq(tt.id, id), eq(tt.studyId, studyId)));
 }
 

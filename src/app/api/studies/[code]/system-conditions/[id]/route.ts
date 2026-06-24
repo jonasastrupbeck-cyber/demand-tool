@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, deleteSystemCondition, updateSystemCondition } from '@/lib/queries';
+import { getStudyByCode, deleteSystemCondition, updateSystemCondition, getSystemConditions, mergeSystemConditions } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -13,6 +13,17 @@ export async function PATCH(
   const updates: { label?: string; operationalDefinition?: string | null } = {};
   if (typeof body.label === 'string' && body.label.trim()) updates.label = body.label.trim();
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
+
+  // Synthesis intent (mergeOnCollision): renaming a condition to a name a LIVE
+  // sibling already has means "these are the same" → merge into the existing
+  // one rather than create a duplicate label. Settings rename omits the flag.
+  if (body.mergeOnCollision === true && updates.label) {
+    const dup = (await getSystemConditions(study.id)).find((c) => c.id !== id && c.label === updates.label);
+    if (dup) {
+      await mergeSystemConditions(study.id, { targetId: dup.id, sourceIds: [id] });
+      return NextResponse.json({ success: true, merged: true });
+    }
+  }
 
   await updateSystemCondition(id, updates);
   return NextResponse.json({ success: true });
