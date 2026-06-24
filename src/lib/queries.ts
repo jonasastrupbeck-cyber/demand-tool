@@ -1,6 +1,6 @@
 import { db } from './db';
 import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
-import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
 import { STANDARD_LIFECYCLE_STAGES } from './ai/classify-lifecycle';
@@ -493,6 +493,16 @@ type MovedThinkingSc =
   | { a: 'restore'; row: ThinkingScRow };
 type MovedBlock = { id: string; from: string };
 
+// Every link-row id a SC merge touched (re-pointed or deleted-then-restored).
+// Used to detect overlap with later merges so undo stays reverse-ordered.
+function scMergeRowIds(j: MovedJunction[], t: MovedThinkingSc[], b: MovedBlock[]): string[] {
+  const ids: string[] = [];
+  for (const mv of j) ids.push(mv.a === 'repoint' ? mv.id : mv.row.id);
+  for (const mv of t) ids.push(mv.a === 'repoint' ? mv.id : mv.row.id);
+  for (const mv of b) ids.push(mv.id);
+  return ids;
+}
+
 export async function mergeSystemConditions(
   studyId: string,
   { targetId, sourceIds, newLabel }: { targetId: string; sourceIds: string[]; newLabel?: string },
@@ -651,6 +661,17 @@ export async function undoSystemConditionMerge(studyId: string, mergeId: string)
   const movedJunctions: MovedJunction[] = JSON.parse(m.movedJunctionIds);
   const movedThinkingScs: MovedThinkingSc[] = JSON.parse(m.movedThinkingScs);
   const movedBlocks: MovedBlock[] = JSON.parse(m.movedBlockIds);
+
+  // Chained-merge safety: if a LATER merge re-pointed any of the same rows, undoing
+  // this one first would corrupt the later merge. Require reverse-order undo.
+  const myRowIds = new Set(scMergeRowIds(movedJunctions, movedThinkingScs, movedBlocks));
+  const later = await db.select({ mj: systemConditionMerges.movedJunctionIds, mt: systemConditionMerges.movedThinkingScs, mb: systemConditionMerges.movedBlockIds })
+    .from(systemConditionMerges)
+    .where(and(eq(systemConditionMerges.studyId, studyId), gt(systemConditionMerges.createdAt, m.createdAt)));
+  for (const l of later) {
+    const ids = scMergeRowIds(JSON.parse(l.mj), JSON.parse(l.mt), JSON.parse(l.mb));
+    if (ids.some((id) => myRowIds.has(id))) throw new Error('Undo more recent merges first.');
+  }
 
   for (const mv of movedJunctions) {
     if (mv.a === 'repoint') {
@@ -930,8 +951,18 @@ export async function undoTaxonomyMerge(studyId: string, tax: SingleFkTaxonomy, 
     eq(taxonomyMerges.id, mergeId), eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax),
   ));
   if (!m) throw new Error('Merge record not found');
-  const sourceIds: string[] = JSON.parse(m.sourceIds);
   const moved: { id: string; from: string }[] = JSON.parse(m.moved);
+
+  // Chained-merge safety: block if a later merge re-pointed any of the same rows.
+  const myRowIds = new Set(moved.map((x) => x.id));
+  const later = await db.select({ moved: taxonomyMerges.moved }).from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax), gt(taxonomyMerges.createdAt, m.createdAt)));
+  for (const l of later) {
+    const ids: { id: string }[] = JSON.parse(l.moved);
+    if (ids.some((x) => myRowIds.has(x.id))) throw new Error('Undo more recent merges first.');
+  }
+
+  const sourceIds: string[] = JSON.parse(m.sourceIds);
   for (const mv of moved) await cfg.setLink(mv.id, mv.from);
   await db.update(tt).set({ archivedAt: null, mergedIntoId: null }).where(inArray(tt.id, sourceIds));
   if (m.priorTargetLabel != null) await db.update(tt).set({ label: m.priorTargetLabel }).where(eq(tt.id, m.targetId));
