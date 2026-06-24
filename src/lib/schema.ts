@@ -174,6 +174,9 @@ export const workTypes = pgTable('work_types', {
   lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
   lifecycleAiSuggestion: text('lifecycle_ai_suggestion'),
   lifecycleClassifiedAt: timestamp('lifecycle_classified_at', { withTimezone: true }),
+  // Synthesis soft-archive (migration 0030) — see systemConditions.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
 });
 
 // Phase 4 (2026-04-16) — managed taxonomy for Flow block step descriptions.
@@ -191,6 +194,25 @@ export const workStepTypes = pgTable('work_step_types', {
   tag: text('tag').$type<'value' | 'sequence' | 'failure'>().notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Synthesis soft-archive (migration 0030) — see systemConditions.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
+});
+
+// Generic audit log for single-FK taxonomy merges (migration 0030): work types
+// and work step types (and any future single-FK taxonomy). `taxonomy` is the
+// discriminator; `moved` is a JSON array of {id, from} for the re-pointed link
+// rows so a merge can be undone. (System conditions keep their own richer
+// systemConditionMerges table because of the junction + helps/hinders dedupe.)
+export const taxonomyMerges = pgTable('taxonomy_merges', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  taxonomy: text('taxonomy').notNull().$type<'work_type' | 'work_step_type'>(),
+  targetId: text('target_id').notNull(),
+  sourceIds: text('source_ids').notNull(),
+  moved: text('moved').notNull(),
+  priorTargetLabel: text('prior_target_label'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
 
 // Case stitching (Skipton slice 1, 2026-06-11). A case is a CONTAINER: each

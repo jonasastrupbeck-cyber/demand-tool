@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, systemConditionMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, desc, asc, sql, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -762,16 +762,181 @@ export async function getSystemConditionOverTime(studyId: string) {
 
   const live = await getSystemConditions(studyId);
   const liveIds = new Set(live.map((c) => c.id));
-  const tally = new Map<string, { date: string; systemConditionId: string; count: number }>();
+  const tally = new Map<string, { date: string; id: string; count: number }>();
   const add = (date: string, scId: string | null, count: number) => {
     if (!scId || !liveIds.has(scId)) return;
     const key = `${date}::${scId}`;
     const cur = tally.get(key);
-    if (cur) cur.count += count; else tally.set(key, { date, systemConditionId: scId, count });
+    if (cur) cur.count += count; else tally.set(key, { date, id: scId, count });
   };
   for (const r of junction) add(r.date, r.scId, r.count);
   for (const r of blocks) add(r.date, r.scId, r.count);
   return [...tally.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// ── Generic single-FK taxonomy synthesis (migration 0030) ────────────────────
+// Work types + work step types are each linked by ONE foreign key per record,
+// so merge is "re-point every linked row from the sources to the survivor, then
+// soft-archive the sources" — no junction, no dedupe. One config object per
+// taxonomy supplies the concrete table/column queries; everything else is shared.
+
+export type SingleFkTaxonomy = 'work_type' | 'work_step_type';
+
+// Maps the URL segment (/synthesis/<param>/…) to the taxonomy slug.
+export function resolveSingleFkTaxonomy(param: string): SingleFkTaxonomy | null {
+  if (param === 'work-types') return 'work_type';
+  if (param === 'work-step-types') return 'work_step_type';
+  return null;
+}
+
+function taxConfig(tax: SingleFkTaxonomy) {
+  if (tax === 'work_type') {
+    return {
+      typesTable: workTypes,
+      fetchLinks: async (studyId: string, ids: string[]) =>
+        (await db.select({ id: demandEntries.id, from: demandEntries.workTypeId })
+          .from(demandEntries)
+          .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntries.workTypeId, ids))))
+          .map((r) => ({ id: r.id, from: r.from as string })),
+      setLink: (id: string, value: string) =>
+        db.update(demandEntries).set({ workTypeId: value }).where(eq(demandEntries.id, id)),
+      countByType: () => db.select({ typeId: demandEntries.workTypeId, count: sql<number>`count(*)::int` })
+        .from(demandEntries),
+      timeRows: () => db.select({ date: sql<string>`${demandEntries.createdAt}::date`, typeId: demandEntries.workTypeId, count: sql<number>`count(*)::int` })
+        .from(demandEntries),
+      countWhere: (studyId: string) => and(eq(demandEntries.studyId, studyId), sql`${demandEntries.workTypeId} is not null`),
+      countGroup: demandEntries.workTypeId,
+      timeGroup: [sql`${demandEntries.createdAt}::date`, demandEntries.workTypeId] as const,
+    };
+  }
+  return {
+    typesTable: workStepTypes,
+    fetchLinks: async (studyId: string, ids: string[]) =>
+      (await db.select({ id: workDescriptionBlocks.id, from: workDescriptionBlocks.workStepTypeId })
+        .from(workDescriptionBlocks)
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .where(and(eq(demandEntries.studyId, studyId), inArray(workDescriptionBlocks.workStepTypeId, ids))))
+        .map((r) => ({ id: r.id, from: r.from as string })),
+    setLink: (id: string, value: string) =>
+      db.update(workDescriptionBlocks).set({ workStepTypeId: value }).where(eq(workDescriptionBlocks.id, id)),
+    countByType: () => db.select({ typeId: workDescriptionBlocks.workStepTypeId, count: sql<number>`count(*)::int` })
+      .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id)),
+    timeRows: () => db.select({ date: sql<string>`${demandEntries.createdAt}::date`, typeId: workDescriptionBlocks.workStepTypeId, count: sql<number>`count(*)::int` })
+      .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id)),
+    countWhere: (studyId: string) => and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.workStepTypeId} is not null`),
+    countGroup: workDescriptionBlocks.workStepTypeId,
+    timeGroup: [sql`${demandEntries.createdAt}::date`, workDescriptionBlocks.workStepTypeId] as const,
+  };
+}
+
+export async function getTaxonomyTypes(studyId: string, tax: SingleFkTaxonomy, opts?: { includeArchived?: boolean }) {
+  const tt = taxConfig(tax).typesTable as typeof workTypes;
+  const conds = [eq(tt.studyId, studyId)];
+  if (!opts?.includeArchived) conds.push(isNull(tt.archivedAt));
+  return db.select({ id: tt.id, label: tt.label, archivedAt: tt.archivedAt, mergedIntoId: tt.mergedIntoId, sortOrder: tt.sortOrder })
+    .from(tt).where(and(...conds)).orderBy(asc(tt.sortOrder));
+}
+
+export async function getTaxonomyFrequencies(studyId: string, tax: SingleFkTaxonomy) {
+  const cfg = taxConfig(tax);
+  const live = await getTaxonomyTypes(studyId, tax);
+  if (live.length === 0) return [] as { id: string; label: string; count: number }[];
+  const counts = await cfg.countByType().where(cfg.countWhere(studyId)).groupBy(cfg.countGroup);
+  const tally = new Map<string, number>();
+  for (const c of counts) if (c.typeId) tally.set(c.typeId, c.count);
+  return live.map((t) => ({ id: t.id, label: t.label, count: tally.get(t.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function getTaxonomyOverTime(studyId: string, tax: SingleFkTaxonomy) {
+  const cfg = taxConfig(tax);
+  const liveIds = new Set((await getTaxonomyTypes(studyId, tax)).map((t) => t.id));
+  const rows = await cfg.timeRows().where(cfg.countWhere(studyId)).groupBy(...cfg.timeGroup);
+  return rows.filter((r) => r.typeId && liveIds.has(r.typeId))
+    .map((r) => ({ date: r.date, id: r.typeId as string, count: r.count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function getTaxonomyMerges(studyId: string, tax: SingleFkTaxonomy) {
+  const merges = await db.select().from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax)))
+    .orderBy(desc(taxonomyMerges.createdAt));
+  if (merges.length === 0) return [];
+  const all = await getTaxonomyTypes(studyId, tax, { includeArchived: true });
+  const labelOf = new Map(all.map((t) => [t.id, t.label]));
+  return merges.map((m) => {
+    const sourceIds: string[] = JSON.parse(m.sourceIds);
+    return {
+      id: m.id,
+      createdAt: m.createdAt,
+      targetId: m.targetId,
+      targetLabel: labelOf.get(m.targetId) ?? '(deleted)',
+      sources: sourceIds.map((id) => ({ id, label: labelOf.get(id) ?? '(unknown)' })),
+    };
+  });
+}
+
+export async function renameTaxonomyType(studyId: string, tax: SingleFkTaxonomy, id: string, label: string) {
+  const tt = taxConfig(tax).typesTable as typeof workTypes;
+  await db.update(tt).set({ label }).where(and(eq(tt.id, id), eq(tt.studyId, studyId)));
+}
+
+export async function mergeTaxonomy(studyId: string, tax: SingleFkTaxonomy, { targetId, sourceIds, newLabel }: { targetId: string; sourceIds: string[]; newLabel?: string }) {
+  const cfg = taxConfig(tax);
+  const tt = cfg.typesTable as typeof workTypes;
+  const uniqueSources = [...new Set(sourceIds)].filter((id) => id !== targetId);
+  if (uniqueSources.length === 0) throw new Error('No source types to merge');
+
+  const all = await db.select({ id: tt.id, label: tt.label, archivedAt: tt.archivedAt })
+    .from(tt).where(and(eq(tt.studyId, studyId), inArray(tt.id, [targetId, ...uniqueSources])));
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const target = byId.get(targetId);
+  if (!target) throw new Error('Target type not found in study');
+  if (target.archivedAt) throw new Error('Target type is archived');
+  for (const sid of uniqueSources) {
+    const s = byId.get(sid);
+    if (!s) throw new Error('Source type not found in study');
+    if (s.archivedAt) throw new Error('Source type already archived');
+  }
+
+  // Re-point every linked record (single FK), recording each move for undo.
+  const moved = await cfg.fetchLinks(studyId, uniqueSources);
+  for (const m of moved) await cfg.setLink(m.id, targetId);
+
+  let priorTargetLabel: string | null = null;
+  const trimmed = newLabel?.trim();
+  if (trimmed && trimmed !== target.label) {
+    priorTargetLabel = target.label;
+    await db.update(tt).set({ label: trimmed }).where(eq(tt.id, targetId));
+  }
+
+  const archivedAt = new Date();
+  await db.update(tt).set({ archivedAt, mergedIntoId: targetId }).where(inArray(tt.id, uniqueSources));
+
+  const mergeId = generateId();
+  await db.insert(taxonomyMerges).values({
+    id: mergeId, studyId, taxonomy: tax, targetId,
+    sourceIds: JSON.stringify(uniqueSources),
+    moved: JSON.stringify(moved),
+    priorTargetLabel, createdAt: archivedAt,
+  });
+  return { mergeId, archivedCount: uniqueSources.length };
+}
+
+export async function undoTaxonomyMerge(studyId: string, tax: SingleFkTaxonomy, mergeId: string) {
+  const cfg = taxConfig(tax);
+  const tt = cfg.typesTable as typeof workTypes;
+  const [m] = await db.select().from(taxonomyMerges).where(and(
+    eq(taxonomyMerges.id, mergeId), eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax),
+  ));
+  if (!m) throw new Error('Merge record not found');
+  const sourceIds: string[] = JSON.parse(m.sourceIds);
+  const moved: { id: string; from: string }[] = JSON.parse(m.moved);
+  for (const mv of moved) await cfg.setLink(mv.id, mv.from);
+  await db.update(tt).set({ archivedAt: null, mergedIntoId: null }).where(inArray(tt.id, sourceIds));
+  if (m.priorTargetLabel != null) await db.update(tt).set({ label: m.priorTargetLabel }).where(eq(tt.id, m.targetId));
+  await db.delete(taxonomyMerges).where(eq(taxonomyMerges.id, mergeId));
+  return { undone: true };
 }
 
 // --- Thinkings (mirrors System Conditions) ---

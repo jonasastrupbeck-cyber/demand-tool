@@ -15,7 +15,7 @@ import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
-import SystemConditionSynthesis from '@/components/SystemConditionSynthesis';
+import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 
 const THEME = {
@@ -77,9 +77,12 @@ export default function DashboardPage() {
   // Capability / lead-time (2026-06-18): event-pair pickers + XmR chart data.
   const [systemType, setSystemType] = useState<string | null>(null); // R7: flow → capability-only
   const [caseTrackingEnabled, setCaseTrackingEnabled] = useState(false);
-  // Synthesis (0028): gates the "Synthesise system conditions" tab.
+  // Synthesis (0028/0030): gates the "Synthesise" tab + which taxonomies it covers.
   const [systemConditionsEnabled, setSystemConditionsEnabled] = useState(false);
   const [synthesisEnabled, setSynthesisEnabled] = useState(false);
+  const [workTypesEnabled, setWorkTypesEnabled] = useState(false);
+  const [workStepTypesEnabled, setWorkStepTypesEnabled] = useState(false);
+  const [synthTax, setSynthTax] = useState<'sc' | 'wt' | 'wst'>('sc');
   // Flow analytics (0029): gates the demand-style "Analytics" tab on flow dashboards.
   const [flowAnalyticsEnabled, setFlowAnalyticsEnabled] = useState(false);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
@@ -154,6 +157,8 @@ export default function DashboardPage() {
         setCaseTrackingEnabled(s.caseTrackingEnabled ?? false);
         setSystemConditionsEnabled(s.systemConditionsEnabled ?? false);
         setSynthesisEnabled(s.synthesisEnabled ?? false);
+        setWorkTypesEnabled(s.workTypesEnabled ?? false);
+        setWorkStepTypesEnabled(s.workStepTypesEnabled ?? false);
         setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
         setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
@@ -193,9 +198,10 @@ export default function DashboardPage() {
   const capabilityAvailable = caseTrackingEnabled && (decisionPointTypes.length > 0 || milestones.length > 0);
   // R7: flow studies get a capability-only dashboard (demand widgets stripped).
   const isFlow = systemType === 'flow';
-  // Synthesis (0028): the "Synthesise system conditions" tab is available once
-  // the study manages a system-conditions vocabulary and the toggle is on.
-  const synthesisAvailable = synthesisEnabled && systemConditionsEnabled;
+  // Synthesis (0028/0030): the "Synthesise" tab is available once the toggle is
+  // on and there's at least one synthesisable taxonomy (system conditions, work
+  // types, or work step types).
+  const synthesisAvailable = synthesisEnabled && (systemConditionsEnabled || workTypesEnabled || workStepTypesEnabled);
   // Flow analytics (0029): the demand-style "Analytics" tab, opt-in per study.
   const flowAnalyticsAvailable = isFlow && flowAnalyticsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
@@ -1431,10 +1437,60 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Synthesise system conditions (0028) */}
-        {dashboardView === 'synthesis' && synthesisAvailable && (
-          <SystemConditionSynthesis code={code} />
-        )}
+        {/* Synthesise (0028/0030): one surface, switchable across the taxonomies
+            the study manages (system conditions, work types, work steps). */}
+        {dashboardView === 'synthesis' && synthesisAvailable && (() => {
+          const taxes: { key: 'sc' | 'wt' | 'wst'; label: string }[] = [
+            ...((systemConditionsEnabled ? [{ key: 'sc', label: t('synthesis.taxSc') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
+            ...((workTypesEnabled ? [{ key: 'wt', label: t('synthesis.taxWt') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
+            ...((workStepTypesEnabled ? [{ key: 'wst', label: t('synthesis.taxWst') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
+          ];
+          const active = taxes.find((x) => x.key === synthTax)?.key ?? taxes[0].key;
+          const labelsFor = (kind: 'sc' | 'wt' | 'wst'): SynthesisLabels => ({
+            heading: t(kind === 'sc' ? 'synthesis.heading' : kind === 'wt' ? 'synthesis.wtHeading' : 'synthesis.wstHeading'),
+            intro: t(kind === 'sc' ? 'synthesis.intro' : kind === 'wt' ? 'synthesis.wtIntro' : 'synthesis.wstIntro'),
+            empty: t(kind === 'sc' ? 'synthesis.empty' : kind === 'wt' ? 'synthesis.wtEmpty' : 'synthesis.wstEmpty'),
+            selectHint: t('synthesis.selectHint'),
+            distributionTitle: t('synthesis.distributionTitle'),
+            pieTitle: t('synthesis.pieTitle'),
+            overTimeTitle: t('synthesis.overTimeTitle'),
+            overTimeTopN: t('synthesis.overTimeTopN'),
+            mergeInto: t('synthesis.mergeInto'),
+            renameOptional: t('synthesis.renameOptional'),
+            mergeButton: t('synthesis.mergeButton'),
+            cancel: t('synthesis.cancel'),
+            rename: t('synthesis.rename'),
+            recentMerges: t('synthesis.recentMerges'),
+            undo: t('synthesis.undo'),
+            loading: t('capture.loading'),
+            mergeFailed: t('synthesis.mergeFailed'),
+            renameFailed: t('synthesis.renameFailed'),
+            undoFailed: t('synthesis.undoFailed'),
+          });
+          const apiBase = active === 'sc'
+            ? `/api/studies/${encodeURIComponent(code)}/system-conditions`
+            : `/api/studies/${encodeURIComponent(code)}/synthesis/${active === 'wt' ? 'work-types' : 'work-step-types'}`;
+          return (
+            <div className="space-y-4">
+              {taxes.length > 1 && (
+                <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
+                  {taxes.map((x) => (
+                    <button
+                      key={x.key}
+                      onClick={() => setSynthTax(x.key)}
+                      className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+                        active === x.key ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {x.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} />
+            </div>
+          );
+        })()}
 
         {/* Flow analytics (0029): the WORK picture for a flow study. Flow capture
             is work-only, so this surfaces the work measures already computed by
