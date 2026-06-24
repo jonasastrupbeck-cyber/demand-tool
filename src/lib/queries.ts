@@ -735,6 +735,45 @@ export async function getSystemConditionFrequencies(studyId: string) {
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+// System conditions over time — occurrences per calendar day, per condition.
+// Counts entry attachments + flow work blocks, both bucketed by the entry's
+// created day (blocks inherit their entry's date, mirroring demandOverTime).
+// Live (non-archived) conditions only; flat rows, the client pivots for the chart.
+export async function getSystemConditionOverTime(studyId: string) {
+  const junction = await db.select({
+    date: sql<string>`${demandEntries.createdAt}::date`,
+    scId: demandEntrySystemConditions.systemConditionId,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntrySystemConditions)
+    .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
+    .where(eq(demandEntries.studyId, studyId))
+    .groupBy(sql`${demandEntries.createdAt}::date`, demandEntrySystemConditions.systemConditionId);
+
+  const blocks = await db.select({
+    date: sql<string>`${demandEntries.createdAt}::date`,
+    scId: workDescriptionBlocks.systemConditionId,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.systemConditionId} is not null`))
+    .groupBy(sql`${demandEntries.createdAt}::date`, workDescriptionBlocks.systemConditionId);
+
+  const live = await getSystemConditions(studyId);
+  const liveIds = new Set(live.map((c) => c.id));
+  const tally = new Map<string, { date: string; systemConditionId: string; count: number }>();
+  const add = (date: string, scId: string | null, count: number) => {
+    if (!scId || !liveIds.has(scId)) return;
+    const key = `${date}::${scId}`;
+    const cur = tally.get(key);
+    if (cur) cur.count += count; else tally.set(key, { date, systemConditionId: scId, count });
+  };
+  for (const r of junction) add(r.date, r.scId, r.count);
+  for (const r of blocks) add(r.date, r.scId, r.count);
+  return [...tally.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // --- Thinkings (mirrors System Conditions) ---
 
 export async function getThinkings(studyId: string) {

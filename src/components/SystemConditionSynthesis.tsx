@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { useLocale } from '@/lib/locale-context';
 import InfoPopover from '@/components/InfoPopover';
 
@@ -13,8 +13,13 @@ import InfoPopover from '@/components/InfoPopover';
 const SKY = '#0ea5e9'; // sky-500 — the system-conditions strand (design-system §2)
 const GRID = '#e5e7eb';
 const TEXT_SECONDARY = '#6b7280';
+// Sky/blue/indigo family for multi-series charts — stays in the SC strand and
+// never collides with the green(value)/red(failure) classification semantics.
+const PALETTE = ['#0ea5e9', '#3b82f6', '#6366f1', '#0891b2', '#2563eb', '#7c3aed', '#0284c7', '#4f46e5'];
+const OVER_TIME_TOP_N = 8;
 
 type Freq = { id: string; label: string; count: number };
+type OverTimeRow = { date: string; systemConditionId: string; count: number };
 type MergeRow = {
   id: string;
   createdAt: string;
@@ -26,6 +31,7 @@ type MergeRow = {
 export default function SystemConditionSynthesis({ code }: { code: string }) {
   const { t, tl } = useLocale();
   const [freqs, setFreqs] = useState<Freq[]>([]);
+  const [overTime, setOverTime] = useState<OverTimeRow[]>([]);
   const [merges, setMerges] = useState<MergeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -41,12 +47,14 @@ export default function SystemConditionSynthesis({ code }: { code: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [fRes, mRes] = await Promise.all([
+      const [fRes, mRes, oRes] = await Promise.all([
         fetch(`${base}/frequencies`).then((r) => (r.ok ? r.json() : [])),
         fetch(`${base}/merge`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`${base}/over-time`).then((r) => (r.ok ? r.json() : [])),
       ]);
       setFreqs(Array.isArray(fRes) ? fRes : []);
       setMerges(Array.isArray(mRes) ? mRes : []);
+      setOverTime(Array.isArray(oRes) ? oRes : []);
     } finally {
       setLoading(false);
     }
@@ -128,7 +136,21 @@ export default function SystemConditionSynthesis({ code }: { code: string }) {
     return <div className="text-sm text-gray-400 py-8 text-center">{t('capture.loading')}</div>;
   }
 
-  const chartData = rows.filter((r) => r.count > 0);
+  const chartData = rows.filter((r) => r.count > 0); // rows are count-desc from the API
+
+  // Over-time: chart the top-N conditions (by total), pivoted to one field per
+  // condition id, so labels with identical text can't collide.
+  const topConds = chartData.slice(0, OVER_TIME_TOP_N);
+  const topIds = new Set(topConds.map((c) => c.id));
+  const otTruncated = chartData.length > OVER_TIME_TOP_N;
+  const byDate = new Map<string, Record<string, number | string>>();
+  for (const r of overTime) {
+    if (!topIds.has(r.systemConditionId)) continue;
+    let row = byDate.get(r.date);
+    if (!row) { row = { date: r.date }; byDate.set(r.date, row); }
+    row[r.systemConditionId] = ((row[r.systemConditionId] as number) || 0) + r.count;
+  }
+  const lineData = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
   return (
     <div className="space-y-5">
@@ -172,6 +194,56 @@ export default function SystemConditionSynthesis({ code }: { code: string }) {
                     <LabelList dataKey="count" position="right" style={{ fill: TEXT_SECONDARY, fontSize: 11 }} />
                   </Bar>
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Proportion pie (same data as the histogram, as a share-of-whole view) */}
+          {chartData.length > 0 && (
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('synthesis.pieTitle')}</h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={32}
+                    dataKey="count"
+                    nameKey="display"
+                    label={(p) => `${((p.percent || 0) * 100).toFixed(0)}%`}
+                    labelLine={{ strokeWidth: 1 }}
+                  >
+                    {chartData.map((_, i) => (<Cell key={i} fill={PALETTE[i % PALETTE.length]} />))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: TEXT_SECONDARY }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* System conditions over time — top-N conditions as lines by day */}
+          {lineData.length > 1 && (
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">{t('synthesis.overTimeTitle')}</h3>
+              {otTruncated && <p className="text-xs text-gray-400 mb-2">{t('synthesis.overTimeTopN')}</p>}
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={lineData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: TEXT_SECONDARY }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: TEXT_SECONDARY }} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: TEXT_SECONDARY }} />
+                  {topConds.map((c, i) => (
+                    <Line key={c.id} type="monotone" dataKey={c.id} name={c.display} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                  ))}
+                </LineChart>
               </ResponsiveContainer>
             </div>
           )}

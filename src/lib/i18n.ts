@@ -1100,6 +1100,24 @@ const translations = {
     sv: 'Hur ofta varje villkor förekommer',
     de: 'Wie oft jede Bedingung vorkommt',
   },
+  'synthesis.pieTitle': {
+    en: 'Share of each condition',
+    da: 'Hvert forholds andel',
+    sv: 'Varje villkors andel',
+    de: 'Anteil jeder Bedingung',
+  },
+  'synthesis.overTimeTitle': {
+    en: 'System conditions over time',
+    da: 'Systemforhold over tid',
+    sv: 'Systemvillkor över tid',
+    de: 'Systembedingungen im Zeitverlauf',
+  },
+  'synthesis.overTimeTopN': {
+    en: 'Showing the most frequent conditions; less frequent ones are not plotted.',
+    da: 'Viser de hyppigste forhold; mindre hyppige er ikke vist.',
+    sv: 'Visar de vanligaste villkoren; mindre vanliga visas inte.',
+    de: 'Zeigt die häufigsten Bedingungen; seltenere werden nicht dargestellt.',
+  },
   'synthesis.mergeInto': {
     en: 'Keep as one condition',
     da: 'Behold som ét forhold',
