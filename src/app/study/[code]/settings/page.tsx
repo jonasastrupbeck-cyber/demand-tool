@@ -1104,6 +1104,43 @@ export default function SettingsPage() {
           />
         </div>}
 
+        {/* Dashboard features (0029/0030): flow studies hide the strand-toggle
+            panel (R9 — strands are preset), but Synthesise + Flow analytics are
+            dashboard/analysis views the consultant DOES choose, so surface just
+            those two here for flow. Non-flow studies get them in the panel above. */}
+        {isFlow && <div className={cardCls}>
+          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.dashboardFeaturesTitle')}</h2>
+          <p className="text-sm text-gray-600 mb-3">{t('settings.dashboardFeaturesDesc')}</p>
+          <div className="flex flex-col items-center gap-3">
+            {([
+              { field: 'synthesisEnabled' as const, label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
+              { field: 'flowAnalyticsEnabled' as const, label: t('capture.toggles.flowAnalytics'), value: study.flowAnalyticsEnabled },
+            ]).map((row) => (
+              <button
+                key={row.field}
+                type="button"
+                role="switch"
+                aria-checked={row.value}
+                onClick={() => {
+                  const next = !row.value;
+                  setStudy((s) => s ? { ...s, [row.field]: next } : s);
+                  mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ [row.field]: next }),
+                  }));
+                }}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors text-left ${
+                  row.value
+                    ? 'bg-gray-200 text-gray-900 border-gray-400 hover:bg-gray-300'
+                    : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+                }`}
+              >
+                {row.label}
+              </button>
+            ))}
+          </div>
+        </div>}
+
         {/* Access code */}
         <div className={cardCls}>
           <h2 className="text-base font-semibold mb-3 text-gray-900">{t('settings.accessCode')}</h2>

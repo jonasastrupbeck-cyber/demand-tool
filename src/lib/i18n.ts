@@ -2888,6 +2888,18 @@ const translations = {
     sv: 'Systemtyp',
     de: 'Systemtyp',
   },
+  'settings.dashboardFeaturesTitle': {
+    en: 'Dashboard features',
+    da: 'Dashboard-funktioner',
+    sv: 'Dashboardfunktioner',
+    de: 'Dashboard-Funktionen',
+  },
+  'settings.dashboardFeaturesDesc': {
+    en: 'Optional analysis views on the dashboard for this flow.',
+    da: 'Valgfrie analysevisninger på dashboardet for dette flow.',
+    sv: 'Valfria analysvyer på dashboarden för detta flöde.',
+    de: 'Optionale Analyseansichten im Dashboard für diesen Flow.',
+  },
   'settings.systemTypeDesc': {
     en: 'How the capture page is shaped. Flow-based leads with the case; transactional captures complete entries one by one. Switching never deletes anything.',
     da: 'Hvordan registreringssiden er formet. Flowbaseret tager udgangspunkt i sagen; transaktionsbaseret registrerer komplette registreringer én ad gangen. Et skift sletter aldrig noget.',
