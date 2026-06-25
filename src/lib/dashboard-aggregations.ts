@@ -1,13 +1,26 @@
 import { db } from './db';
 import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, capabilityAnnotations } from './schema';
-import { eq, and, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData } from '@/types';
 
-export async function getDashboardData(studyId: string, from?: Date, to?: Date): Promise<DashboardData> {
+export async function getDashboardData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<DashboardData> {
   const baseConditions = [eq(demandEntries.studyId, studyId)];
   if (from) baseConditions.push(gte(demandEntries.createdAt, from));
   if (to) baseConditions.push(lte(demandEntries.createdAt, to));
+
+  // P2BS (life problem) scope. In flow the life problem lives on the case
+  // (entries carry caseId but NULL lifeProblemId), so match entries whose case
+  // has it OR (transactional) whose own lifeProblemId matches. Cascades into
+  // demandWhere + workWhere below, so every aggregation is scoped.
+  if (lifeProblemId) {
+    const caseRows = await db.select({ id: cases.id })
+      .from(cases).where(and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId)));
+    const caseIds = caseRows.map((c) => c.id);
+    baseConditions.push(caseIds.length
+      ? or(eq(demandEntries.lifeProblemId, lifeProblemId), inArray(demandEntries.caseId, caseIds))!
+      : eq(demandEntries.lifeProblemId, lifeProblemId));
+  }
 
   // Demand-only conditions (filter out work entries from all existing queries)
   const demandConditions = [...baseConditions, eq(demandEntries.entryType, 'demand')];
@@ -758,12 +771,17 @@ export async function getCapabilityData(
   dateTo?: Date,
   sort: 'start' | 'closed' = 'start',
   metric: 'leadTime' | 'touches' = 'leadTime',
+  lifeProblemId?: string,
 ): Promise<CapabilityData> {
   const unit = metric === 'touches' ? 'touches' : 'days';
   const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
 
+  // P2BS scope: capability is case-level, so filter the case set directly.
+  const caseWhere = lifeProblemId
+    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
+    : eq(cases.studyId, studyId);
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
-    .from(cases).where(eq(cases.studyId, studyId));
+    .from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
   const caseIds = caseRows.map((c) => c.id);
 

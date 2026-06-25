@@ -34,13 +34,14 @@ function Card({ label, value, sub, color }: { label: string; value: string | num
 }
 
 export default function CapabilityChart({
-  code, eventOptions, studyName, dateFrom, dateTo, onRemove,
+  code, eventOptions, studyName, dateFrom, dateTo, lifeProblemId, onRemove,
 }: {
   code: string;
   eventOptions: PillSelectOption[];
   studyName: string;
   dateFrom?: string;
   dateTo?: string;
+  lifeProblemId?: string | null;
   onRemove?: () => void;
 }) {
   const { t } = useLocale();
@@ -78,11 +79,12 @@ export default function CapabilityChart({
     const qp = new URLSearchParams({ fromEvent: capFrom, toEvent: capTo, sort: capSort, metric: capMetric });
     if (dateFrom) qp.set('dateFrom', dateFrom);
     if (dateTo) qp.set('dateTo', dateTo);
+    if (lifeProblemId) qp.set('p2bs', lifeProblemId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/capability?${qp}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, dateFrom, dateTo, capTick, capSort, capMetric]);
+  }, [capFrom, capTo, code, dateFrom, dateTo, lifeProblemId, capTick, capSort, capMetric]);
 
   const handleExportImage = useCallback(async () => {
     if (!capExportRef.current || capExporting) return;

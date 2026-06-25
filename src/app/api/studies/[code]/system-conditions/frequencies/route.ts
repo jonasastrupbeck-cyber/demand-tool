@@ -11,6 +11,7 @@ export async function GET(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
-  const frequencies = await getSystemConditionFrequencies(study.id);
+  const p2bs = new URL(request.url).searchParams.get('p2bs') || undefined;
+  const frequencies = await getSystemConditionFrequencies(study.id, p2bs);
   return NextResponse.json(frequencies);
 }

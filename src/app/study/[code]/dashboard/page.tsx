@@ -85,6 +85,11 @@ export default function DashboardPage() {
   const [synthTax, setSynthTax] = useState<'sc' | 'wt' | 'wst'>('sc');
   // Flow analytics (0029): gates the demand-style "Analytics" tab on flow dashboards.
   const [flowAnalyticsEnabled, setFlowAnalyticsEnabled] = useState(false);
+  // P2BS data-scope filter (null = all data) + collapsed coverage box.
+  const [lifeProblemFilter, setLifeProblemFilter] = useState<string | null>(null);
+  const [showCoverage, setShowCoverage] = useState(false);
+  const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
+  const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   // R11: the flow capability view is a stack of independent <CapabilityChart>s.
@@ -130,6 +135,7 @@ export default function DashboardPage() {
     const queryParams: string[] = [];
     if (range.from) queryParams.push(`from=${range.from}`);
     if (range.to) queryParams.push(`to=${range.to}`);
+    if (lifeProblemFilter) queryParams.push(`p2bs=${encodeURIComponent(lifeProblemFilter)}`);
     if (queryParams.length) url += '?' + queryParams.join('&');
 
     const res = await fetch(url);
@@ -137,7 +143,7 @@ export default function DashboardPage() {
       setData(await res.json());
     }
     setLoading(false);
-  }, [code, getDateRangeParams]);
+  }, [code, getDateRangeParams, lifeProblemFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -160,6 +166,8 @@ export default function DashboardPage() {
         setWorkTypesEnabled(s.workTypesEnabled ?? false);
         setWorkStepTypesEnabled(s.workStepTypesEnabled ?? false);
         setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
+        setLifeProblemsEnabled(s.lifeProblemsEnabled ?? false);
+        setLifeProblems(Array.isArray(s.lifeProblems) ? s.lifeProblems : []);
         setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -564,6 +572,35 @@ export default function DashboardPage() {
             </div>
           );
         })()}
+
+        {/* P2BS data-scope selector (flow): scope every view to one life problem.
+            All data by default; sits directly under the view tabs. */}
+        {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">{t('capture.caseTableP2bs')}:</span>
+            <div className="flex flex-wrap gap-1 rounded-lg p-1 bg-white border border-gray-200">
+              <button
+                onClick={() => setLifeProblemFilter(null)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  lifeProblemFilter === null ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {t('dashboard.scopeAll')}
+              </button>
+              {lifeProblems.map((lp) => (
+                <button
+                  key={lp.id}
+                  onClick={() => setLifeProblemFilter(lp.id)}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    lifeProblemFilter === lp.id ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tl(lp.label)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Summary cards */}
         {!isFlow && dashboardView === 'demand' && (
@@ -1385,34 +1422,46 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Data collection coverage (shown on all views) */}
+        {/* Data collection coverage (shown on all views) — collapsed by default
+            with a + to expand; it was taking up too much space open. */}
         {data.collectorCounts && data.collectorCounts.length > 0 && (
-          <ChartCard title={t('dashboard.collectionCoverage')}>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-              <div className="text-center p-2 rounded-lg bg-blue-50">
-                <p className="text-lg font-bold text-blue-700">{data.collectorCounts.length}</p>
-                <p className="text-xs text-gray-500">{t('dashboard.collectors')}</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-blue-50">
-                <p className="text-lg font-bold text-blue-700">{data.collectorCounts.reduce((s, c) => s + c.count, 0)}</p>
-                <p className="text-xs text-gray-500">{t('dashboard.totalCaptures')}</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-blue-50">
-                <p className="text-lg font-bold text-blue-700">
-                  {data.collectorCounts.length > 0 ? data.collectorCounts.sort((a, b) => b.lastActive.localeCompare(a.lastActive))[0].lastActive : '—'}
-                </p>
-                <p className="text-xs text-gray-500">{t('dashboard.lastCapture')}</p>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              {data.collectorCounts.map((c, i) => (
-                <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded bg-gray-50 text-sm">
-                  <span className="text-gray-700">{c.name}</span>
-                  <span className="text-xs text-gray-400">{t('dashboard.lastActive')}: {c.lastActive}</span>
+          <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
+            <button
+              onClick={() => setShowCoverage(!showCoverage)}
+              className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors"
+            >
+              <h3 className="text-sm font-semibold text-gray-700">{t('dashboard.collectionCoverage')} ({data.collectorCounts.length})</h3>
+              <span className="text-gray-400 text-lg leading-none">{showCoverage ? '−' : '+'}</span>
+            </button>
+            {showCoverage && (
+              <div className="border-t border-gray-200 px-5 py-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <div className="text-center p-2 rounded-lg bg-blue-50">
+                    <p className="text-lg font-bold text-blue-700">{data.collectorCounts.length}</p>
+                    <p className="text-xs text-gray-500">{t('dashboard.collectors')}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-blue-50">
+                    <p className="text-lg font-bold text-blue-700">{data.collectorCounts.reduce((s, c) => s + c.count, 0)}</p>
+                    <p className="text-xs text-gray-500">{t('dashboard.totalCaptures')}</p>
+                  </div>
+                  <div className="text-center p-2 rounded-lg bg-blue-50">
+                    <p className="text-lg font-bold text-blue-700">
+                      {data.collectorCounts.length > 0 ? data.collectorCounts.sort((a, b) => b.lastActive.localeCompare(a.lastActive))[0].lastActive : '—'}
+                    </p>
+                    <p className="text-xs text-gray-500">{t('dashboard.lastCapture')}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </ChartCard>
+                <div className="space-y-1.5">
+                  {data.collectorCounts.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between py-1.5 px-3 rounded bg-gray-50 text-sm">
+                      <span className="text-gray-700">{c.name}</span>
+                      <span className="text-xs text-gray-400">{t('dashboard.lastActive')}: {c.lastActive}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
         {/* ── CAPABILITY / LEAD-TIME VIEW (R11: stacked, independent charts) ── */}
         {dashboardView === 'capability' && (() => {
@@ -1427,6 +1476,7 @@ export default function DashboardPage() {
                 studyName={studyName}
                 dateFrom={capRange.from}
                 dateTo={capRange.to}
+                lifeProblemId={lifeProblemFilter}
                 onRemove={chartIds.length > 1 ? () => removeChart(id) : undefined}
               />
             ))}
@@ -1487,7 +1537,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
-              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} />
+              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} lifeProblemId={lifeProblemFilter} />
             </div>
           );
         })()}

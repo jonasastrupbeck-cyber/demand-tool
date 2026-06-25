@@ -32,10 +32,11 @@ type MergeRow = {
   sources: { id: string; label: string }[];
 };
 
-export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true }: {
+export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true, lifeProblemId }: {
   apiBase: string;
   labels: SynthesisLabels;
   hasOverTime?: boolean;
+  lifeProblemId?: string | null;
 }) {
   const { tl } = useLocale();
   const [freqs, setFreqs] = useState<Freq[]>([]);
@@ -52,11 +53,14 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true 
 
   const load = useCallback(async () => {
     setLoading(true);
+    // P2BS scope applies to the distribution reads (frequencies + over-time) only;
+    // the merge log stays study-wide (a category is shared across all P2BS).
+    const q = lifeProblemId ? `?p2bs=${encodeURIComponent(lifeProblemId)}` : '';
     try {
       const [fRes, mRes, oRes] = await Promise.all([
-        fetch(`${apiBase}/frequencies`).then((r) => (r.ok ? r.json() : [])),
+        fetch(`${apiBase}/frequencies${q}`).then((r) => (r.ok ? r.json() : [])),
         fetch(`${apiBase}/merge`).then((r) => (r.ok ? r.json() : [])),
-        hasOverTime ? fetch(`${apiBase}/over-time`).then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]),
+        hasOverTime ? fetch(`${apiBase}/over-time${q}`).then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]),
       ]);
       setFreqs(Array.isArray(fRes) ? fRes : []);
       setMerges(Array.isArray(mRes) ? mRes : []);
@@ -64,7 +68,7 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true 
     } finally {
       setLoading(false);
     }
-  }, [apiBase, hasOverTime]);
+  }, [apiBase, hasOverTime, lifeProblemId]);
 
   useEffect(() => { load(); }, [load]);
 

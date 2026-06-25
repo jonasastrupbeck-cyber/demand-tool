@@ -17,7 +17,8 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
+  const p2bs = searchParams.get('p2bs') || undefined;
 
-  const data = await getDashboardData(study.id, from, to);
+  const data = await getDashboardData(study.id, from, to, p2bs);
   return NextResponse.json(data);
 }

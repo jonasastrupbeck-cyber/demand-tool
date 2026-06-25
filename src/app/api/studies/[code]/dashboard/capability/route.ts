@@ -22,7 +22,8 @@ export async function GET(
   const dateTo = sp.get('dateTo') ? new Date(sp.get('dateTo')!) : undefined;
   const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
   const metric = sp.get('metric') === 'touches' ? 'touches' : 'leadTime';
+  const p2bs = sp.get('p2bs') || undefined;
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, p2bs);
   return NextResponse.json(data);
 }

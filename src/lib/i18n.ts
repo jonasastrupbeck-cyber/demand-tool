@@ -1082,6 +1082,12 @@ const translations = {
     sv: 'Analys',
     de: 'Analyse',
   },
+  'dashboard.scopeAll': {
+    en: 'All data',
+    da: 'Alle data',
+    sv: 'Alla data',
+    de: 'Alle Daten',
+  },
   'dashboard.analyticsTabHelp': {
     en: 'The work picture for this flow — value vs failure work, work types, and how the work splits over time.',
     da: 'Arbejdsbilledet for dette flow — værdiskabende vs. ikke-værdiskabende arbejde, arbejdstyper, og hvordan arbejdet fordeler sig over tid.',
