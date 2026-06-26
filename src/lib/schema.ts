@@ -392,6 +392,10 @@ export const demandEntries = pgTable('demand_entries', {
   // internal/partner handoff? Defaults from the chosen COR's customerFacing but
   // is overridable per touch. Null = not asked / legacy entries.
   customerFelt: boolean('customer_felt'),
+  // Drag-reorder position within a case's flow timeline (migration 0034, 2026-06-26).
+  // NULL = never reordered → the timeline falls back to created_at order. Set for
+  // every entry in a case once the user drags to reorder its touches.
+  sortOrder: integer('sort_order'),
 });
 
 export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {

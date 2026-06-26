@@ -47,6 +47,10 @@ interface CaseEntry {
   // 2026-06-18: distinct non-null system-condition ids on this touch's work
   // blocks (comma-joined by getCaseEntries), shown on top of the saved card.
   systemConditionIds?: string | null;
+  // Drag-reorder (migration 0034): explicit position + effective date (earliest
+  // block date, else created_at) — what the rail displays and orders by.
+  sortOrder?: number | null;
+  effectiveAt?: string;
 }
 
 interface Props {
@@ -109,6 +113,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const [attaching, setAttaching] = useState(false);
   // Previous touches collapse to the latest by default; expand reveals history.
   const [touchesExpanded, setTouchesExpanded] = useState(false);
+  // Drag-reorder of saved touches (migration 0034). `dragId` = the touch being
+  // dragged; `pendingReorder` holds the proposed new order + the moved touch's
+  // chosen date while the date-confirm panel is open (nothing is persisted or
+  // optimistically reordered until Save, so Cancel needs no revert).
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [pendingReorder, setPendingReorder] = useState<{ orderedIds: string[]; movedId: string; date: string } | null>(null);
+  const [reorderSaving, setReorderSaving] = useState(false);
   // Flow entry (2026-06-14): one unified type-ahead reference field. The
   // composer stays hidden until a customer is open. caseList backs the
   // combobox's recent-open list and its autocomplete matches.
@@ -135,10 +146,42 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
 
   // Refetch the timeline when the active case changes or an entry was saved.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!activeCaseId) { setCaseRow(null); setEntries([]); return; }
     loadCase(activeCaseId);
   }, [activeCaseId, refreshSignal, loadCase]);
+
+  // Drop the dragged touch BEFORE the target touch, then open the date-confirm
+  // panel pre-filled with a sensible guess (the date of the touch it now sits
+  // after; else the one it now precedes; else today). Order isn't applied until Save.
+  const isoDay = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const handleTouchDrop = (targetId: string) => {
+    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    const moved = dragId;
+    const ids = entries.map((e) => e.id).filter((id) => id !== moved);
+    const at = ids.indexOf(targetId);
+    if (at < 0) { setDragId(null); return; }
+    ids.splice(at, 0, moved);
+    const idx = ids.indexOf(moved);
+    const effOf = (id: string | undefined) => (id ? entries.find((e) => e.id === id)?.effectiveAt : undefined);
+    const guess = isoDay(effOf(ids[idx - 1]) ?? effOf(ids[idx + 1]));
+    setPendingReorder({ orderedIds: ids, movedId: moved, date: guess });
+    setDragId(null);
+  };
+
+  const saveReorder = async () => {
+    if (!pendingReorder || !activeCaseId) return;
+    setReorderSaving(true);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(activeCaseId)}/entries/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pendingReorder),
+      });
+      if (res.ok) { setPendingReorder(null); await loadCase(activeCaseId); }
+    } finally {
+      setReorderSaving(false);
+    }
+  };
 
   // After the case/touches load (or a new touch is added), scroll the work area
   // so the composer is fully in view at the left of the viewport — captured
@@ -163,7 +206,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
 
   useEffect(() => {
     if (!enabled || systemType !== 'flow' || activeCaseId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCaseList();
   }, [enabled, systemType, activeCaseId, refreshSignal, loadCaseList]);
 
@@ -475,7 +517,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       className="w-full flex items-center gap-2 text-xs bg-white rounded-lg border border-gray-200 px-2 py-1.5 text-left hover:border-gray-400 hover:bg-gray-50 transition-colors"
     >
       <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
-      <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+      <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
       {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
       <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
       {handlingLabel(e.handlingTypeId) && (
@@ -554,7 +596,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           {sepHeader(t('capture.touchSecCor'))}
           <div className="flex flex-wrap items-center gap-1.5">
             {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
-            <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.createdAt).toLocaleDateString()}</span>
+            <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
             {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
           </div>
         </div>
@@ -609,6 +651,29 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     </div>
   );
 
+  // Date-confirm panel shown after a drag-reorder (migration 0034). Rendered in
+  // BOTH the flow and non-flow returns; positioned fixed so it's never clipped
+  // by the horizontal-scroll touch rail.
+  const reorderPanel = pendingReorder && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => !reorderSaving && setPendingReorder(null)}>
+      <div className="w-full max-w-xs rounded-xl bg-white border border-gray-300 shadow-lg p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm font-semibold text-gray-900">{t('capture.reorderDateTitle')}</p>
+        <p className="text-xs text-gray-500">{t('capture.reorderDateHint')}</p>
+        <input
+          type="date"
+          value={pendingReorder.date}
+          onChange={(e) => setPendingReorder((p) => p ? { ...p, date: e.target.value } : p)}
+          className="w-full px-2 py-1.5 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+          autoFocus
+        />
+        <div className="flex gap-2 justify-end">
+          <button type="button" onClick={() => setPendingReorder(null)} disabled={reorderSaving} className="px-3 py-1.5 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-50">{t('capture.reorderCancel')}</button>
+          <button type="button" onClick={saveReorder} disabled={reorderSaving || !pendingReorder.date} className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50">{reorderSaving ? '…' : t('capture.reorderSave')}</button>
+        </div>
+      </div>
+    </div>
+  );
+
   // C5 (2026-06-17): wide-screen freeze-pane layout. Two frozen panes —
   // customer context (left) and decision milestones (right) — with the touch
   // rail scrolling horizontally between them, the composer as the newest column.
@@ -616,12 +681,11 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // flow, so capture logic is identical.
   if (isFlow) {
     return (
-      // Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
-      // columns (customer left · touch rail + composer middle · decisions right).
-      // Below lg it stacks vertically — capture-first order: context → composer →
-      // touches → decisions — so nothing collapses or scrolls off on a phone.
-      // R2: lg:items-start so each pane is content-height. R5: dashed boundaries
-      // (lg only — they read as zone separators across, not stacked).
+      <>
+      {/* Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
+          columns (customer left · touch rail + composer middle · decisions right).
+          Below lg it stacks vertically — capture-first order: context → composer →
+          touches → decisions. R2: lg:items-start; R5: dashed zone boundaries. */}
       <div className="flex flex-col gap-3 md:flex-row md:gap-0 md:items-stretch min-h-[24rem]">
         {/* PINNED LEFT — the customer. Always visible. */}
         <aside className="order-1 w-full md:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
@@ -663,11 +727,22 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             scroll left within this group for the captured touches. */}
         <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[42rem] md:overflow-x-auto">
           <div className="flex flex-col gap-3 md:flex-row md:gap-3 md:min-w-min md:items-stretch pb-2">
-            {entries.map((e) => (
-              <div key={e.id} className="order-2 md:order-1 w-full md:w-36 shrink-0 flex">
-                {renderTouchFull(e)}
-              </div>
-            ))}
+            {entries.map((e) => {
+              const canDrag = entries.length >= 2;
+              return (
+                <div
+                  key={e.id}
+                  className={`order-2 md:order-1 w-full md:w-36 shrink-0 flex ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === e.id ? 'opacity-50' : ''}`}
+                  draggable={canDrag}
+                  onDragStart={canDrag ? () => setDragId(e.id) : undefined}
+                  onDragEnd={canDrag ? () => setDragId(null) : undefined}
+                  onDragOver={canDrag ? (ev) => ev.preventDefault() : undefined}
+                  onDrop={canDrag ? (ev) => { ev.preventDefault(); handleTouchDrop(e.id); } : undefined}
+                >
+                  {renderTouchFull(e)}
+                </div>
+              );
+            })}
             {children && (
               <div ref={composerColRef} className="order-1 md:order-2 w-full md:w-fit md:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
                 <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
@@ -737,6 +812,8 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           </div>
         </div>
       </div>
+      {reorderPanel}
+      </>
     );
   }
 
@@ -751,6 +828,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       {caseFooter}
     </div>
     {children}
+    {reorderPanel}
     </>
   );
 }

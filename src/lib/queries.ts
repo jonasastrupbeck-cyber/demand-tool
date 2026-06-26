@@ -1523,10 +1523,39 @@ export async function getCaseEntries(caseId: string) {
     collectorName: demandEntries.collectorName,
     customerFelt: demandEntries.customerFelt,
     systemConditionIds: sql<string | null>`(select string_agg(distinct wbsc.system_condition_id, ',') from work_block_system_conditions wbsc join work_description_blocks wdb on wdb.id = wbsc.work_block_id where wdb.demand_entry_id = demand_entries.id)`,
+    // Explicit drag-reorder position (migration 0034). NULL = never reordered.
+    sortOrder: demandEntries.sortOrder,
+    // The touch's effective date = earliest block date, else created_at — what the
+    // timeline displays/orders by and what capability/over-time charts bucket on.
+    effectiveAt: sql<string>`coalesce((select min(wdb.block_date) from work_description_blocks wdb where wdb.demand_entry_id = demand_entries.id), demand_entries.created_at)`,
   })
     .from(demandEntries)
     .where(eq(demandEntries.caseId, caseId))
-    .orderBy(asc(demandEntries.createdAt));
+    // sort_order drives the order once a case has been reordered; NULLS LAST keeps
+    // un-reordered cases (all-NULL) in created_at order, and a touch captured after
+    // a reorder (NULL) sorts last = rightmost/newest.
+    .orderBy(sql`${demandEntries.sortOrder} asc nulls last`, asc(demandEntries.createdAt));
+}
+
+// Drag-reorder a flow case's touches (migration 0034). Renumbers sort_order for
+// every entry in the case to match orderedIds, and — when a touch was moved — sets
+// its effective date by writing the chosen day to ALL its work blocks' block_date
+// (a multi-day touch collapses to one day; the edit modal stays the finer tool).
+// created_at is left untouched (immutable audit timestamp).
+export async function reorderCaseEntries(
+  caseId: string,
+  orderedIds: string[],
+  moved?: { id: string; date: string },
+) {
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(demandEntries).set({ sortOrder: i })
+      .where(and(eq(demandEntries.id, orderedIds[i]), eq(demandEntries.caseId, caseId)));
+  }
+  if (moved) {
+    await db.update(workDescriptionBlocks)
+      .set({ blockDate: new Date(moved.date) })
+      .where(eq(workDescriptionBlocks.demandEntryId, moved.id));
+  }
 }
 
 export async function updateCase(caseId: string, data: {

@@ -848,6 +848,31 @@ const translations = {
     sv: 'Stegdatum',
     de: 'Schrittdatum',
   },
+  // Drag-reorder of saved touches (migration 0034): the date-confirm panel.
+  'capture.reorderDateTitle': {
+    en: 'Date for this touch',
+    da: 'Dato for denne kontakt',
+    sv: 'Datum för denna kontakt',
+    de: 'Datum für diesen Kontakt',
+  },
+  'capture.reorderDateHint': {
+    en: 'Set the date so it fits its new place in the sequence.',
+    da: 'Sæt datoen, så den passer til den nye placering i rækkefølgen.',
+    sv: 'Ange datumet så att det passar dess nya plats i sekvensen.',
+    de: 'Lege das Datum fest, damit es an die neue Position in der Abfolge passt.',
+  },
+  'capture.reorderSave': {
+    en: 'Save',
+    da: 'Gem',
+    sv: 'Spara',
+    de: 'Speichern',
+  },
+  'capture.reorderCancel': {
+    en: 'Cancel',
+    da: 'Annullér',
+    sv: 'Avbryt',
+    de: 'Abbrechen',
+  },
   'capture.workBlockTagValue': {
     en: 'Value',
     da: 'V\u00e6rdi',
