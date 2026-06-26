@@ -1643,6 +1643,32 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
+              {/* Failure demand captured in flow (migration 0033, slice 2):
+                  type + frequency of failure demand hitting during the flow,
+                  P2BS-scoped via the life-problem filter above. */}
+              {data.flowFailureDemandTypeCounts.length > 0 && (
+                <ChartCard title={t('dashboard.flowFailureDemand')}>
+                  <ResponsiveContainer width="100%" height={Math.max(200, data.flowFailureDemandTypeCounts.length * 40 + 40)}>
+                    <BarChart data={(() => {
+                      const total = data.flowFailureDemandTypeCounts.reduce((s, d) => s + d.count, 0);
+                      return data.flowFailureDemandTypeCounts.map(d => ({
+                        ...d,
+                        label: tl(d.label),
+                        pct: total > 0 ? `${Math.round((d.count / total) * 100)}%` : '0%',
+                      }));
+                    })()} layout="vertical" margin={{ left: 10, right: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="count" name={t('dashboard.flowFailureDemand')} fill="#e11d48" radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
               {data.workOverTime.length > 1 && (
                 <ChartCard title={t('dashboard.workOverTime')}>
                   <ResponsiveContainer width="100%" height={300}>

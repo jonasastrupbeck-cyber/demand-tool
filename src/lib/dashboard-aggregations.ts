@@ -37,6 +37,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   const workStepTypesEnabled = study[0]?.workStepTypesEnabled ?? false;
   const systemConditionsEnabled = study[0]?.systemConditionsEnabled ?? false;
   const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
+  const flowFailureDemandTypesEnabled = study[0]?.flowFailureDemandTypesEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
   //
@@ -637,6 +638,25 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     }));
   }
 
+  // ── FLOW FAILURE-DEMAND TYPES (migration 0033, slice 2) ──
+  // Type + frequency of failure demand captured inline in flow, counted from
+  // failure_demand work blocks. P2BS-scoped via baseConditions (the flow life
+  // problem lives on the case). Only when the per-study feature is on.
+  let flowFailureDemandTypeCounts: Array<{ label: string; count: number }> = [];
+  if (flowFailureDemandTypesEnabled) {
+    const rows = await db.select({
+      label: demandTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .innerJoin(demandTypes, eq(workDescriptionBlocks.demandTypeId, demandTypes.id))
+      .where(and(...baseConditions, eq(workDescriptionBlocks.tag, 'failure_demand')))
+      .groupBy(demandTypes.id, demandTypes.label)
+      .orderBy(desc(sql`count(*)`));
+    flowFailureDemandTypeCounts = rows.map(r => ({ label: r.label, count: r.count }));
+  }
+
   return {
     totalEntries,
     valueCount,
@@ -674,6 +694,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     workStepByDemandType,
     workStepByLifeProblem,
     capabilityByDemandType,
+    flowFailureDemandTypeCounts,
   };
 }
 

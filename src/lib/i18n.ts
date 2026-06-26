@@ -2018,6 +2018,13 @@ const translations = {
     sv: 'Arbete över tid',
     de: 'Arbeit im Zeitverlauf',
   },
+  // Slice 2: type + frequency of failure demand captured inline in flow.
+  'dashboard.flowFailureDemand': {
+    en: 'Failure demand (captured in flow)',
+    da: 'Ikke-værdiskabende efterspørgsel (fanget i flow)',
+    sv: 'Icke-värdeskapande efterfrågan (fångad i flöde)',
+    de: 'Fehlernachfrage (im Flow erfasst)',
+  },
   'dashboard.totalCapacity': {
     en: 'Total Capacity',
     da: 'Total kapacitet',

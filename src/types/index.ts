@@ -171,6 +171,10 @@ export interface DashboardData {
   workStepByDemandType: Array<{ demandTypeLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }>;
   workStepByLifeProblem: Array<{ lifeProblemLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }>;
   capabilityByDemandType: Array<{ demandTypeLabel: string; valueBlocks: number; failureBlocks: number; pctValue: number }>;
+  // Flow failure-demand types (migration 0033, slice 2): type + frequency of
+  // failure demand captured inline in flow (from failure_demand work blocks).
+  // P2BS-scoped. Empty unless the per-study feature is enabled.
+  flowFailureDemandTypeCounts: Array<{ label: string; count: number }>;
 }
 
 export interface CreateEntryInput {
