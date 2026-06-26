@@ -812,10 +812,17 @@ export async function getCapabilityData(
   const annoByCase = new Map<string, { excluded: boolean; note: string | null }>();
   for (const a of annoRows) annoByCase.set(a.caseId, { excluded: a.excluded, note: a.note });
 
-  // Flat reads, one per event source. first contact = earliest entry per case.
+  // Flat reads, one per event source. first contact = earliest EFFECTIVE touch
+  // date per case. Effective date = COALESCE(block_date, entry.created_at): when
+  // a case is entered retrospectively the work-block dates are backdated to when
+  // the touch really happened, while entry.created_at is the data-entry day. Using
+  // created_at alone made first contact land "today", after backdated milestones/
+  // decisions → negative window → the case was silently dropped. Mirrors the
+  // over-time charts' COALESCE(blockDate, createdAt) bucketing (migration 0031).
   const [fcRows, decRows, msRows] = await Promise.all([
-    db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(${demandEntries.createdAt})` })
+    db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))` })
       .from(demandEntries)
+      .leftJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
       .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)))
       .groupBy(demandEntries.caseId),
     db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId, decidedAt: caseDecisionPoints.decidedAt })
@@ -841,13 +848,18 @@ export async function getCapabilityData(
   // every entry timestamp once and bucket by case (only when needed).
   const entriesByCase = new Map<string, Date[]>();
   if (metric === 'touches') {
-    const entryRows = await db.select({ caseId: demandEntries.caseId, createdAt: demandEntries.createdAt })
+    // One row per entry, dated by its effective date (earliest block date, else
+    // created_at) so backdated touches land in the right window — same reason as
+    // first contact above.
+    const entryRows = await db.select({ caseId: demandEntries.caseId, eff: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))` })
       .from(demandEntries)
-      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)));
+      .leftJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)))
+      .groupBy(demandEntries.caseId, demandEntries.id);
     for (const r of entryRows) {
       if (!r.caseId) continue;
       if (!entriesByCase.has(r.caseId)) entriesByCase.set(r.caseId, []);
-      entriesByCase.get(r.caseId)!.push(new Date(r.createdAt as unknown as string));
+      entriesByCase.get(r.caseId)!.push(new Date(r.eff));
     }
   }
 
