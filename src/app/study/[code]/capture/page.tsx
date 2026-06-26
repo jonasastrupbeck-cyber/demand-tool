@@ -1464,9 +1464,17 @@ export default function CapturePage() {
                   // customer says, with the type + SC boxes alongside.
                   const showFreeText = block.tag === 'failure_demand' || !pickerOn || (!hasStep && (block.freeText || block.text !== ''));
                   const showPicker = pickerOn && !hasStep && !showFreeText;
+                  // Side panel (SC + type boxes) sits to the RIGHT of the block's
+                  // content on lg+ so tagging doesn't push the toggle down. Only
+                  // shown when a box will actually render; value blocks have none
+                  // and keep their original width.
+                  const hasSidePanel = flowWorkPath && (
+                    (study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand'))
+                    || (study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand')
+                  );
 
                   return (
-                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? (hasSidePanel ? 'w-full lg:flex-none' : 'w-full lg:flex-none lg:w-72') : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Insert a step BEFORE this one (flow only) — for backfilling a
                           missed step between existing ones. Append button stays at the end. */}
                       {flowWorkPath && (
@@ -1493,9 +1501,15 @@ export default function CapturePage() {
                           />
                         </label>
                       )}
-                      {/* Per-block system condition (2026-06-12; moved to TOP of the
-                          block 2026-06-18): for flow-mode sequence/failure work, ask
-                          what's driving THIS block. Sits above the tag toggle/step. */}
+                      {/* Content + side panel. On lg+ the SC / type boxes sit to the
+                          RIGHT of the main content (placed via flex `order`, not source
+                          order) so tagging a block doesn't push the toggle down; on
+                          small screens they stack below it. */}
+                      <div className={flowWorkPath ? 'flex flex-col gap-2 lg:flex-row lg:items-start' : 'contents'}>
+                      {hasSidePanel && (
+                      <div className="flex flex-col gap-2 w-full lg:w-56 lg:shrink-0 min-w-0 order-2">
+                      {/* Per-block system condition (2026-06-12): for flow-mode
+                          sequence/failure work, ask what's driving THIS block. */}
                       {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand') && (
                         <div className={`p-2 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                           <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
@@ -1550,6 +1564,9 @@ export default function CapturePage() {
                           </div>
                         </div>
                       )}
+                      </div>
+                      )}
+                      <div className={flowWorkPath ? (hasSidePanel ? 'flex flex-col gap-2 w-full lg:w-72 lg:shrink-0 min-w-0 order-1' : 'flex flex-col gap-2 w-full min-w-0 order-1') : 'contents'}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1667,6 +1684,8 @@ export default function CapturePage() {
                           />
                         </>
                       )}
+                      </div>{/* main content column */}
+                      </div>{/* content + side-panel row */}
 
                     </div>
                   );
