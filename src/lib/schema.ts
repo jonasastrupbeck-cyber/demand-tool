@@ -421,6 +421,9 @@ export const systemConditionMerges = pgTable('system_condition_merges', {
   movedJunctionIds: text('moved_junction_ids').notNull(),
   movedBlockIds: text('moved_block_ids').notNull(),
   movedThinkingScs: text('moved_thinking_scs').notNull().default('[]'),
+  // Junction-based block-SC moves (migration 0032). Legacy movedBlockIds kept
+  // for pre-0032 merge records; new merges record block moves here.
+  movedBlockScs: text('moved_block_scs').notNull().default('[]'),
   priorTargetLabel: text('prior_target_label'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 });
@@ -499,3 +502,14 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // rows + normal capture). Over-time charts bucket by COALESCE(blockDate, entry.createdAt).
   blockDate: timestamp('block_date', { withTimezone: true }),
 });
+
+// Block ↔ system-condition junction (migration 0032): a flow work block can be
+// driven by several system conditions. Mirrors demand_entry_system_conditions.
+// Supersedes work_description_blocks.system_condition_id (kept, now unread).
+export const workBlockSystemConditions = pgTable('work_block_system_conditions', {
+  id: text('id').primaryKey(),
+  workBlockId: text('work_block_id').notNull().references(() => workDescriptionBlocks.id, { onDelete: 'cascade' }),
+  systemConditionId: text('system_condition_id').notNull().references(() => systemConditions.id),
+}, (t) => ({
+  uniqBlockSc: unique('work_block_system_conditions_unique').on(t.workBlockId, t.systemConditionId),
+}));

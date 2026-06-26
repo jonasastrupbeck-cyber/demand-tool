@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -485,21 +485,26 @@ export async function getSystemConditionsForEntry(entryId: string) {
 
 type EntryScRow = typeof demandEntrySystemConditions.$inferSelect;
 type ThinkingScRow = typeof demandEntryThinkingScs.$inferSelect;
+type WorkBlockScRow = typeof workBlockSystemConditions.$inferSelect;
 type MovedJunction =
   | { a: 'repoint'; id: string; from: string }
   | { a: 'restore'; row: EntryScRow };
 type MovedThinkingSc =
   | { a: 'repoint'; id: string; from: string }
   | { a: 'restore'; row: ThinkingScRow };
-type MovedBlock = { id: string; from: string };
+type MovedBlockSc =
+  | { a: 'repoint'; id: string; from: string }
+  | { a: 'restore'; row: WorkBlockScRow };
+type MovedBlock = { id: string; from: string }; // legacy (pre-0032) audit shape
 
 // Every link-row id a SC merge touched (re-pointed or deleted-then-restored).
 // Used to detect overlap with later merges so undo stays reverse-ordered.
-function scMergeRowIds(j: MovedJunction[], t: MovedThinkingSc[], b: MovedBlock[]): string[] {
+function scMergeRowIds(j: MovedJunction[], t: MovedThinkingSc[], blockScs: MovedBlockSc[], legacyBlocks: MovedBlock[]): string[] {
   const ids: string[] = [];
   for (const mv of j) ids.push(mv.a === 'repoint' ? mv.id : mv.row.id);
   for (const mv of t) ids.push(mv.a === 'repoint' ? mv.id : mv.row.id);
-  for (const mv of b) ids.push(mv.id);
+  for (const mv of blockScs) ids.push(mv.a === 'repoint' ? mv.id : mv.row.id);
+  for (const mv of legacyBlocks) ids.push(mv.id);
   return ids;
 }
 
@@ -528,7 +533,8 @@ export async function mergeSystemConditions(
   const sourceSet = new Set(uniqueSources);
   const movedJunctions: MovedJunction[] = [];
   const movedThinkingScs: MovedThinkingSc[] = [];
-  const movedBlocks: MovedBlock[] = [];
+  const movedBlocks: MovedBlock[] = []; // legacy column; new merges record block moves in movedBlockScs
+  const movedBlockScs: MovedBlockSc[] = [];
 
   // 1) demand_entry_system_conditions — group per entry; if the entry already
   // links the target, the source rows are duplicates (delete + record for undo);
@@ -603,19 +609,41 @@ export async function mergeSystemConditions(
     }
   }
 
-  // 3) work_description_blocks — one SC per block, just re-point.
+  // 3) work_block_system_conditions junction (0032) — same dedupe as the entry-SC
+  // junction, grouped per block: if the block already links the target, source
+  // rows are duplicates (delete + record); else re-point the first and drop the rest.
   {
-    const blocks = await db.select({ id: workDescriptionBlocks.id, scId: workDescriptionBlocks.systemConditionId })
-      .from(workDescriptionBlocks)
+    const rows = await db.select({ j: workBlockSystemConditions })
+      .from(workBlockSystemConditions)
+      .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
       .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
       .where(and(
         eq(demandEntries.studyId, studyId),
-        inArray(workDescriptionBlocks.systemConditionId, uniqueSources),
+        inArray(workBlockSystemConditions.systemConditionId, [targetId, ...uniqueSources]),
       ));
-    for (const b of blocks) {
-      if (!b.scId) continue;
-      movedBlocks.push({ id: b.id, from: b.scId });
-      await db.update(workDescriptionBlocks).set({ systemConditionId: targetId }).where(eq(workDescriptionBlocks.id, b.id));
+    const groups = new Map<string, WorkBlockScRow[]>();
+    for (const { j } of rows) {
+      const g = groups.get(j.workBlockId);
+      if (g) g.push(j); else groups.set(j.workBlockId, [j]);
+    }
+    for (const group of groups.values()) {
+      const hasTarget = group.some((r) => r.systemConditionId === targetId);
+      const srcRows = group.filter((r) => sourceSet.has(r.systemConditionId));
+      if (srcRows.length === 0) continue;
+      if (hasTarget) {
+        for (const r of srcRows) {
+          await db.delete(workBlockSystemConditions).where(eq(workBlockSystemConditions.id, r.id));
+          movedBlockScs.push({ a: 'restore', row: r });
+        }
+      } else {
+        const [keep, ...rest] = srcRows;
+        movedBlockScs.push({ a: 'repoint', id: keep.id, from: keep.systemConditionId });
+        await db.update(workBlockSystemConditions).set({ systemConditionId: targetId }).where(eq(workBlockSystemConditions.id, keep.id));
+        for (const r of rest) {
+          await db.delete(workBlockSystemConditions).where(eq(workBlockSystemConditions.id, r.id));
+          movedBlockScs.push({ a: 'restore', row: r });
+        }
+      }
     }
   }
 
@@ -643,6 +671,7 @@ export async function mergeSystemConditions(
     movedJunctionIds: JSON.stringify(movedJunctions),
     movedBlockIds: JSON.stringify(movedBlocks),
     movedThinkingScs: JSON.stringify(movedThinkingScs),
+    movedBlockScs: JSON.stringify(movedBlockScs),
     priorTargetLabel,
     createdAt: archivedAt,
   });
@@ -660,16 +689,17 @@ export async function undoSystemConditionMerge(studyId: string, mergeId: string)
   const sourceIds: string[] = JSON.parse(m.sourceIds);
   const movedJunctions: MovedJunction[] = JSON.parse(m.movedJunctionIds);
   const movedThinkingScs: MovedThinkingSc[] = JSON.parse(m.movedThinkingScs);
-  const movedBlocks: MovedBlock[] = JSON.parse(m.movedBlockIds);
+  const movedBlocks: MovedBlock[] = JSON.parse(m.movedBlockIds); // legacy (pre-0032 records)
+  const movedBlockScs: MovedBlockSc[] = JSON.parse(m.movedBlockScs);
 
   // Chained-merge safety: if a LATER merge re-pointed any of the same rows, undoing
   // this one first would corrupt the later merge. Require reverse-order undo.
-  const myRowIds = new Set(scMergeRowIds(movedJunctions, movedThinkingScs, movedBlocks));
-  const later = await db.select({ mj: systemConditionMerges.movedJunctionIds, mt: systemConditionMerges.movedThinkingScs, mb: systemConditionMerges.movedBlockIds })
+  const myRowIds = new Set(scMergeRowIds(movedJunctions, movedThinkingScs, movedBlockScs, movedBlocks));
+  const later = await db.select({ mj: systemConditionMerges.movedJunctionIds, mt: systemConditionMerges.movedThinkingScs, mb: systemConditionMerges.movedBlockIds, mbs: systemConditionMerges.movedBlockScs })
     .from(systemConditionMerges)
     .where(and(eq(systemConditionMerges.studyId, studyId), gt(systemConditionMerges.createdAt, m.createdAt)));
   for (const l of later) {
-    const ids = scMergeRowIds(JSON.parse(l.mj), JSON.parse(l.mt), JSON.parse(l.mb));
+    const ids = scMergeRowIds(JSON.parse(l.mj), JSON.parse(l.mt), JSON.parse(l.mbs), JSON.parse(l.mb));
     if (ids.some((id) => myRowIds.has(id))) throw new Error('Undo more recent merges first.');
   }
 
@@ -688,7 +718,15 @@ export async function undoSystemConditionMerge(studyId: string, mergeId: string)
     }
   }
   for (const mv of movedBlocks) {
+    // legacy single-FK block re-point (pre-0032 merge records)
     await db.update(workDescriptionBlocks).set({ systemConditionId: mv.from }).where(eq(workDescriptionBlocks.id, mv.id));
+  }
+  for (const mv of movedBlockScs) {
+    if (mv.a === 'repoint') {
+      await db.update(workBlockSystemConditions).set({ systemConditionId: mv.from }).where(eq(workBlockSystemConditions.id, mv.id));
+    } else {
+      await db.insert(workBlockSystemConditions).values(mv.row).onConflictDoNothing();
+    }
   }
 
   // un-archive the sources (they return to the vocabulary).
@@ -754,13 +792,14 @@ export async function getSystemConditionFrequencies(studyId: string, lifeProblem
     .groupBy(demandEntrySystemConditions.systemConditionId);
 
   const blockCounts = await db.select({
-    scId: workDescriptionBlocks.systemConditionId,
+    scId: workBlockSystemConditions.systemConditionId,
     count: sql<number>`count(*)::int`,
   })
-    .from(workDescriptionBlocks)
+    .from(workBlockSystemConditions)
+    .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.systemConditionId} is not null`, lpf))
-    .groupBy(workDescriptionBlocks.systemConditionId);
+    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .groupBy(workBlockSystemConditions.systemConditionId);
 
   const tally = new Map<string, number>();
   for (const r of junctionCounts) if (r.scId) tally.set(r.scId, (tally.get(r.scId) ?? 0) + r.count);
@@ -789,13 +828,14 @@ export async function getSystemConditionOverTime(studyId: string, lifeProblemId?
 
   const blocks = await db.select({
     date: sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`,
-    scId: workDescriptionBlocks.systemConditionId,
+    scId: workBlockSystemConditions.systemConditionId,
     count: sql<number>`count(*)::int`,
   })
-    .from(workDescriptionBlocks)
+    .from(workBlockSystemConditions)
+    .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.systemConditionId} is not null`, lpf))
-    .groupBy(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, workDescriptionBlocks.systemConditionId);
+    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .groupBy(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, workBlockSystemConditions.systemConditionId);
 
   const live = await getSystemConditions(studyId);
   const liveIds = new Set(live.map((c) => c.id));
@@ -1257,7 +1297,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; date?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
@@ -1369,16 +1409,21 @@ export async function createEntry(studyId: string, data: {
   if (workBlocks.length > 0) {
     let order = 0;
     for (const block of workBlocks) {
+      const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
+      const blockId = generateId();
       await db.insert(workDescriptionBlocks).values({
-        id: generateId(),
+        id: blockId,
         demandEntryId: id,
         tag: block.tag,
         text: block.text,
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
-        systemConditionId: block.systemConditionId ?? null,
+        systemConditionId: scIds[0] ?? null, // legacy column kept for back-compat; junction is source of truth
         blockDate: block.date ? new Date(block.date) : null,
       });
+      for (const scId of scIds) {
+        await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
+      }
     }
   }
 
@@ -1472,7 +1517,7 @@ export async function getCaseEntries(caseId: string) {
     handlingTypeId: demandEntries.handlingTypeId,
     collectorName: demandEntries.collectorName,
     customerFelt: demandEntries.customerFelt,
-    systemConditionIds: sql<string | null>`(select string_agg(distinct wdb.system_condition_id, ',') from work_description_blocks wdb where wdb.demand_entry_id = demand_entries.id and wdb.system_condition_id is not null)`,
+    systemConditionIds: sql<string | null>`(select string_agg(distinct wbsc.system_condition_id, ',') from work_block_system_conditions wbsc join work_description_blocks wdb on wdb.id = wbsc.work_block_id where wdb.demand_entry_id = demand_entries.id)`,
   })
     .from(demandEntries)
     .where(eq(demandEntries.caseId, caseId))
@@ -1849,7 +1894,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; date?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch?
@@ -1951,16 +1996,21 @@ export async function updateEntry(entryId: string, data: {
     await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
     let order = 0;
     for (const block of workBlocks) {
+      const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
+      const blockId = generateId();
       await db.insert(workDescriptionBlocks).values({
-        id: generateId(),
+        id: blockId,
         demandEntryId: entryId,
         tag: block.tag,
         text: block.text,
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
-        systemConditionId: block.systemConditionId ?? null,
+        systemConditionId: scIds[0] ?? null,
         blockDate: block.date ? new Date(block.date) : null,
       });
+      for (const scId of scIds) {
+        await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
+      }
     }
   }
 }
@@ -1976,6 +2026,14 @@ export async function getWorkBlocksForEntries(entryIds: string[]) {
   return db.select().from(workDescriptionBlocks)
     .where(inArray(workDescriptionBlocks.demandEntryId, entryIds))
     .orderBy(asc(workDescriptionBlocks.sortOrder));
+}
+
+// All SC ids per block (0032 junction), for repopulating the multi-select on edit.
+export async function getBlockSystemConditions(blockIds: string[]) {
+  if (blockIds.length === 0) return [] as { workBlockId: string; systemConditionId: string }[];
+  return db.select({ workBlockId: workBlockSystemConditions.workBlockId, systemConditionId: workBlockSystemConditions.systemConditionId })
+    .from(workBlockSystemConditions)
+    .where(inArray(workBlockSystemConditions.workBlockId, blockIds));
 }
 
 export async function deleteEntry(entryId: string) {

@@ -214,7 +214,7 @@ export default function CapturePage() {
   // is on but no step is picked. Not persisted to the DB.
   // `systemConditionId` (2026-06-12): per-block system condition, set when the
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null; date: string }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; date: string }[]>([]);
   // Which block's "+ add new system condition" was clicked — the shared inline
   // adder writes the created SC back into this block (addingType is global).
   const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
@@ -311,7 +311,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }]);
     }
   }, [loading, study, entryType]);
 
@@ -397,7 +397,7 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }] : []);
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -556,7 +556,7 @@ export default function CapturePage() {
     // Work tab: send workBlocks; server auto-populates verbatim from them.
     // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionId, date }) => ({ tag, text, workStepTypeId, systemConditionId, date }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, date }) => ({ tag, text, workStepTypeId, systemConditionIds, date }));
     }
 
     // Handling — only when the toggle is on.
@@ -1460,7 +1460,7 @@ export default function CapturePage() {
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }, ...prev.slice(idx)])}
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }, ...prev.slice(idx)])}
                           className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
@@ -1487,17 +1487,29 @@ export default function CapturePage() {
                       {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure') && (
                         <div className={`p-2 rounded-md border ${block.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                           <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
-                          <PillSelect
-                            ariaLabel={t('capture.flowScQuestion')}
-                            placeholder={t('capture.selectSystemCondition')}
-                            value={block.systemConditionId ?? ''}
-                            onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionId: id || null } : b))}
-                            options={study.systemConditions.map((sc) => ({ id: sc.id, label: tl(sc.label), operationalDefinition: sc.operationalDefinition ? tl(sc.operationalDefinition) : null }))}
-                            variant="add"
-                            fullWidth
-                            onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
-                            addNewLabel={t('capture.addNew')}
-                          />
+                          {/* Tap-to-toggle pills — several SCs can drive one step (0032). */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {study.systemConditions.map((sc) => {
+                              const on = block.systemConditionIds.includes(sc.id);
+                              return (
+                                <button
+                                  key={sc.id}
+                                  type="button"
+                                  onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: on ? b.systemConditionIds.filter((x) => x !== sc.id) : [...b.systemConditionIds, sc.id] } : b))}
+                                  className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-700 border-gray-300 hover:border-sky-400'}`}
+                                >
+                                  {tl(sc.label)}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-sky-300 text-sky-700 hover:bg-sky-50"
+                            >
+                              + {t('capture.addNew')}
+                            </button>
+                          </div>
                         </div>
                       )}
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
@@ -1587,7 +1599,7 @@ export default function CapturePage() {
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
-                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionId: v === 'value' ? null : b.systemConditionId } : b))}
+                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionIds: v === 'value' ? [] : b.systemConditionIds } : b))}
                               options={[
                                 { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
                                 { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
@@ -1621,7 +1633,7 @@ export default function CapturePage() {
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
@@ -1634,7 +1646,7 @@ export default function CapturePage() {
                 new SC lands in the block recorded in scAddTargetBlockIdx. Gated
                 on flowWorkPath so it never duplicates the transactional SC adder. */}
             {flowWorkPath && renderAddTypeInput('systemCondition', 'system-conditions', {}, (id) => {
-              setWorkBlocks((prev) => prev.map((b, i) => i === scAddTargetBlockIdx ? { ...b, systemConditionId: id } : b));
+              setWorkBlocks((prev) => prev.map((b, i) => i === scAddTargetBlockIdx ? { ...b, systemConditionIds: b.systemConditionIds.includes(id) ? b.systemConditionIds : [...b.systemConditionIds, id] } : b));
               setScAddTargetBlockIdx(null);
             }, { variant: 'sky' })}
           </div>
