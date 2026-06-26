@@ -627,6 +627,17 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       return (
                         <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                          {flowWorkPath && (
+                            <button
+                              type="button"
+                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }, ...prev.slice(idx)])}
+                              className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
+                              aria-label={t('capture.insertWorkBlock')}
+                              title={t('capture.insertWorkBlock')}
+                            >
+                              + {t('capture.insertWorkBlock')}
+                            </button>
+                          )}
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
                               <span className={`flex-1 min-w-0 px-2 py-1 rounded text-xs font-medium whitespace-normal break-words leading-snug ${step.tag === 'value' ? 'bg-green-600 text-white' : step.tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white'}`}>{tl(step.label)}</span>

@@ -836,6 +836,12 @@ const translations = {
     sv: '+ L\u00e4gg till block',
     de: '+ Block hinzuf\u00fcgen',
   },
+  'capture.insertWorkBlock': {
+    en: 'Insert step here',
+    da: 'Inds\u00e6t trin her',
+    sv: 'Infoga steg h\u00e4r',
+    de: 'Schritt hier einf\u00fcgen',
+  },
   'capture.workBlockTagValue': {
     en: 'Value',
     da: 'V\u00e6rdi',

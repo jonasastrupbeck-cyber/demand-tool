@@ -96,7 +96,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
   // Fixed-position coords for the portalled popover, so it floats above any
   // scroll/overflow container (e.g. the freeze-pane touch rail) instead of being
   // clipped inside the composer card.
-  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; width: number; maxHeight: number; top?: number; bottom?: number } | null>(null);
   const selected = options.find((o) => o.id === value) ?? null;
 
   const computePos = useRef(() => {
@@ -104,6 +104,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
     if (!btn) return;
     const r = btn.getBoundingClientRect();
     const margin = 8;
+    const gap = 6;
     // fullWidth pills match their trigger exactly (no 240px floor) so the
     // popover never exceeds the work block the pill sits in.
     const minWidth = fullWidth ? r.width : 240;
@@ -111,7 +112,18 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
     let left = r.left;
     if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
     if (left < margin) left = margin;
-    setPos({ left, top: r.bottom + 6, width });
+    // Vertical: open below by default, but flip ABOVE when below is cramped and
+    // there's more room up top (e.g. a pill near the bottom of a long page). Cap
+    // maxHeight to the available space so the menu always fits + scrolls instead
+    // of running off-screen. Anchoring above by `bottom` keeps it glued to the pill.
+    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const cap = Math.round(window.innerHeight * 0.6);
+    const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+    const avail = (placeAbove ? spaceAbove : spaceBelow) - gap;
+    const maxHeight = Math.max(120, Math.min(cap, avail));
+    if (placeAbove) setPos({ left, width, maxHeight, bottom: window.innerHeight - r.top + gap });
+    else setPos({ left, width, maxHeight, top: r.bottom + gap });
   });
 
   useLayoutEffect(() => {
@@ -175,8 +187,8 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
         <div
           ref={popoverRef}
           role="listbox"
-          style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width }}
-          className="z-50 max-h-[60vh] overflow-y-auto py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
+          style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
+          className="z-50 overflow-y-auto py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
         >
           {options.length === 0 && !onAddNew ? (
             <div className="px-3 py-2 text-sm text-gray-400">—</div>

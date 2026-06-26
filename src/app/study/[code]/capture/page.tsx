@@ -1452,6 +1452,19 @@ export default function CapturePage() {
 
                   return (
                     <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                      {/* Insert a step BEFORE this one (flow only) — for backfilling a
+                          missed step between existing ones. Append button stays at the end. */}
+                      {flowWorkPath && (
+                        <button
+                          type="button"
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }, ...prev.slice(idx)])}
+                          className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
+                          aria-label={t('capture.insertWorkBlock')}
+                          title={t('capture.insertWorkBlock')}
+                        >
+                          + {t('capture.insertWorkBlock')}
+                        </button>
+                      )}
                       {/* Per-block system condition (2026-06-12; moved to TOP of the
                           block 2026-06-18): for flow-mode sequence/failure work, ask
                           what's driving THIS block. Sits above the tag toggle/step. */}
