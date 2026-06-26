@@ -113,7 +113,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
   // Case stitching (Skipton slice 1): the case ref this entry belongs to,
   // looked up from caseId for read-only display. Re-assigning is a later slice.
   const [caseRef, setCaseRef] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; blockDate?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; blockDate?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
@@ -631,7 +631,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const valueSteps = (study.workStepTypes || []).filter(s => s.tag === 'value');
                       const sequenceSteps = (study.workStepTypes || []).filter(s => s.tag === 'sequence');
                       const failureSteps = (study.workStepTypes || []).filter(s => s.tag === 'failure');
-                      const showFreeText = !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
+                      // failure_demand has no managed work-step types — free-text only.
+                      const showFreeText = b.tag === 'failure_demand' || !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       return (
                         <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
@@ -671,10 +672,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             </div>
                           )}
                           {showPicker && (() => {
-                            const tagSteps = b.tag === 'value' ? valueSteps : b.tag === 'sequence' ? sequenceSteps : failureSteps;
-                            const pillClass = (tag: 'value' | 'sequence' | 'failure') => {
+                            const tagSteps = b.tag === 'value' ? valueSteps : b.tag === 'sequence' ? sequenceSteps : b.tag === 'failure' ? failureSteps : [];
+                            const pillClass = (tag: 'value' | 'sequence' | 'failure' | 'failure_demand') => {
                               const active = b.tag === tag;
-                              const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white';
+                              const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : tag === 'failure' ? 'bg-red-600 text-white' : 'bg-rose-600 text-white';
                               return `px-2 py-1 text-xs font-medium transition-colors ${active ? activeStyle : 'bg-white text-gray-700 hover:bg-gray-50'}`;
                             };
                             return (
@@ -683,7 +684,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
                                     <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'value', demandTypeId: null } : p))}>{t('capture.workBlockTagValue')}</button>
                                     <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'sequence', demandTypeId: null } : p))}>{t('capture.workBlockTagSequence')}</button>
-                                    <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure' } : p))}>{t('capture.workBlockTagFailure')}</button>
+                                    <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure', demandTypeId: null } : p))}>{t('capture.workBlockTagFailure')}</button>
+                                    <button type="button" className={pillClass('failure_demand')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure_demand', workStepTypeId: null, freeText: true } : p))}>{t('capture.workBlockTagFailureDemand')}</button>
                                   </div>
                                   <button
                                     type="button"
@@ -700,7 +702,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     <li key={s.id}>
                                       <button
                                         type="button"
-                                        onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false, demandTypeId: s.tag === 'failure' ? p.demandTypeId : null } : p))}
+                                        onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false, demandTypeId: null } : p))}
                                         className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                                       >
                                         <span className="block whitespace-normal leading-snug">{tl(s.label)}</span>
@@ -731,11 +733,12 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
                                     { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                                     { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                                    { value: 'failure_demand', label: t('capture.workBlockTagFailureDemand'), activeColor: 'rose' },
                                   ]}
                                   value={b.tag}
                                   onChange={(v) => {
-                                    const tag: 'value' | 'sequence' | 'failure' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : 'failure';
-                                    setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionIds: tag === 'value' ? [] : p.systemConditionIds, demandTypeId: tag === 'failure' ? p.demandTypeId : null } : p)));
+                                    const tag: 'value' | 'sequence' | 'failure' | 'failure_demand' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : v === 'failure_demand' ? 'failure_demand' : 'failure';
+                                    setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionIds: tag === 'value' ? [] : p.systemConditionIds, demandTypeId: tag === 'failure_demand' ? p.demandTypeId : null } : p)));
                                   }}
                                   ariaLabel={t('capture.workBlocksLabel')}
                                 />
@@ -752,7 +755,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   const v = e.target.value;
                                   setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, text: v } : p)));
                                 }}
-                                placeholder={t('capture.workBlockPlaceholder')}
+                                placeholder={b.tag === 'failure_demand' ? t('capture.failureDemandPlaceholder') : t('capture.workBlockPlaceholder')}
                                 rows={4}
                                 className="w-full px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none resize-none flex-1"
                               />
@@ -760,8 +763,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           )}
 
                           {/* Per-block system condition (2026-06-12), flow-work only. */}
-                          {flowWorkPath && study.systemConditionsEnabled && (b.tag === 'sequence' || b.tag === 'failure') && (
-                            <div className={`mt-1 p-2 rounded-md border ${b.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                          {flowWorkPath && study.systemConditionsEnabled && (b.tag === 'sequence' || b.tag === 'failure' || b.tag === 'failure_demand') && (
+                            <div className={`mt-1 p-2 rounded-md border ${(b.tag === 'failure' || b.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                               <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
                               {/* Tap-to-toggle pills — several SCs per step (0032). */}
                               <div className="flex flex-wrap gap-1.5">
@@ -781,11 +784,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               </div>
                             </div>
                           )}
-                          {/* Type of failure demand (migration 0033): flow failure
-                              steps capture WHAT KIND of failure demand hit here.
-                              Mirrors the entry-level demand-type picker, scoped to
-                              category='failure'. Gated by the study opt-in. */}
-                          {flowWorkPath && study.flowFailureDemandTypesEnabled && b.tag === 'failure' && (
+                          {/* Type of failure demand (migration 0033): a 'failure demand'
+                              step IS a demand hitting you — capture WHAT KIND.
+                              Mirrors the entry-level demand-type picker (category='failure').
+                              Gated by the study opt-in. */}
+                          {flowWorkPath && study.flowFailureDemandTypesEnabled && b.tag === 'failure_demand' && (
                             <div className="mt-1 p-2 rounded-md border bg-red-50 border-red-200">
                               <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
                               <div className="flex gap-2 items-center">

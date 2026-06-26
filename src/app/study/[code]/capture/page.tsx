@@ -218,7 +218,7 @@ export default function CapturePage() {
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
   // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
   // set only when the block's tag is 'failure' (flow work path). Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
   // Which block's "+ add new system condition" was clicked — the shared inline
   // adder writes the created SC back into this block (addingType is global).
   const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
@@ -537,7 +537,9 @@ export default function CapturePage() {
     let resolvedClassification = effectiveClassification;
     if (isFlowWorkSubmit) {
       const tags = validWorkBlocks.map((b) => b.tag);
-      resolvedClassification = tags.includes('failure') ? 'failure'
+      // failure_demand (a demand captured inline) counts as failure for the
+      // entry-level dot/guard; there is no separate demand classification enum.
+      resolvedClassification = (tags.includes('failure') || tags.includes('failure_demand')) ? 'failure'
         : tags.includes('sequence') ? 'sequence'
         : 'value';
     }
@@ -1457,7 +1459,10 @@ export default function CapturePage() {
                   //   B = badge (picker on, step picked)
                   //   A = picker (picker on, no step, user hasn't chosen free-text)
                   //   C = free-text (picker off OR user chose free-text OR legacy orphan with text)
-                  const showFreeText = !pickerOn || (!hasStep && (block.freeText || block.text !== ''));
+                  // failure_demand has no managed work-step types (those are work);
+                  // always go straight to free-text so you can write what the
+                  // customer says, with the type + SC boxes alongside.
+                  const showFreeText = block.tag === 'failure_demand' || !pickerOn || (!hasStep && (block.freeText || block.text !== ''));
                   const showPicker = pickerOn && !hasStep && !showFreeText;
 
                   return (
@@ -1491,8 +1496,8 @@ export default function CapturePage() {
                       {/* Per-block system condition (2026-06-12; moved to TOP of the
                           block 2026-06-18): for flow-mode sequence/failure work, ask
                           what's driving THIS block. Sits above the tag toggle/step. */}
-                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure') && (
-                        <div className={`p-2 rounded-md border ${block.tag === 'failure' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand') && (
+                        <div className={`p-2 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                           <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
                           {/* Tap-to-toggle pills — several SCs can drive one step (0032). */}
                           <div className="flex flex-wrap gap-1.5">
@@ -1519,11 +1524,11 @@ export default function CapturePage() {
                           </div>
                         </div>
                       )}
-                      {/* Type of failure demand (migration 0033): for a flow step
-                          tagged failure, capture WHAT KIND of failure demand hit
-                          here — mirrors the transactional demand-type picker,
-                          scoped to category='failure'. Gated by the study opt-in. */}
-                      {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure' && (
+                      {/* Type of failure demand (migration 0033): a flow step tagged
+                          'failure demand' IS a demand hitting you — capture WHAT KIND
+                          (mirrors the transactional demand-type picker, category='failure').
+                          Gated by the study opt-in. */}
+                      {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand' && (
                         <div className="p-2 rounded-md border bg-red-50 border-red-200">
                           <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
                           <div className="flex gap-2 items-center">
@@ -1571,10 +1576,10 @@ export default function CapturePage() {
                            (not as an absolute popover) avoids the outer
                            overflow-x-auto clipping and lets the card grow to fit. */}
                       {showPicker && (() => {
-                        const tagSteps = block.tag === 'value' ? valueSteps : block.tag === 'sequence' ? sequenceSteps : failureSteps;
-                        const pillClass = (tag: 'value' | 'sequence' | 'failure') => {
+                        const tagSteps = block.tag === 'value' ? valueSteps : block.tag === 'sequence' ? sequenceSteps : block.tag === 'failure' ? failureSteps : [];
+                        const pillClass = (tag: 'value' | 'sequence' | 'failure' | 'failure_demand') => {
                           const active = block.tag === tag;
-                          const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : 'bg-red-600 text-white';
+                          const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : tag === 'failure' ? 'bg-red-600 text-white' : 'bg-rose-600 text-white';
                           return `px-2 py-1 text-xs font-medium transition-colors ${active ? activeStyle : 'bg-white text-gray-700 hover:bg-gray-50'}`;
                         };
                         return (
@@ -1583,7 +1588,8 @@ export default function CapturePage() {
                               <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
                                 <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'value', demandTypeId: null } : b))}>{t('capture.workBlockTagValue')}</button>
                                 <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'sequence', demandTypeId: null } : b))}>{t('capture.workBlockTagSequence')}</button>
-                                <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'failure' } : b))}>{t('capture.workBlockTagFailure')}</button>
+                                <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'failure', demandTypeId: null } : b))}>{t('capture.workBlockTagFailure')}</button>
+                                <button type="button" className={pillClass('failure_demand')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'failure_demand', workStepTypeId: null, freeText: true } : b))}>{t('capture.workBlockTagFailureDemand')}</button>
                               </div>
                               <button
                                 type="button"
@@ -1602,7 +1608,7 @@ export default function CapturePage() {
                                 <li key={s.id}>
                                   <button
                                     type="button"
-                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false, demandTypeId: s.tag === 'failure' ? b.demandTypeId : null } : b))}
+                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false, demandTypeId: null } : b))}
                                     className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
                                     <span className="block whitespace-normal leading-snug">{tl(s.label)}</span>
@@ -1632,11 +1638,12 @@ export default function CapturePage() {
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
-                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionIds: v === 'value' ? [] : b.systemConditionIds, demandTypeId: v === 'failure' ? b.demandTypeId : null } : b))}
+                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' | 'failure_demand', systemConditionIds: v === 'value' ? [] : b.systemConditionIds, demandTypeId: v === 'failure_demand' ? b.demandTypeId : null } : b))}
                               options={[
                                 { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
                                 { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
                                 { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
+                                { value: 'failure_demand', label: t('capture.workBlockTagFailureDemand'), activeColor: 'rose' },
                               ]}
                             />
                             <button
@@ -1651,7 +1658,7 @@ export default function CapturePage() {
                           <textarea
                             value={block.text}
                             onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, text: e.target.value } : b))}
-                            placeholder={t('capture.workBlockPlaceholder')}
+                            placeholder={block.tag === 'failure_demand' ? t('capture.failureDemandPlaceholder') : t('capture.workBlockPlaceholder')}
                             rows={4}
                             /* R1 (2026-06-17): grow with typing (field-sizing where
                                supported) + a taller min-height + manual resize so

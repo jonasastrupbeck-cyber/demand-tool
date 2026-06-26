@@ -262,7 +262,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         if (!c.lastEntryAt) return null;
         const text = (c.lastEntryVerbatim || '')
           .split('\n\n')
-          .map((s) => s.replace(/^\[(value|sequence|failure)\]\s*/, '').trim())
+          .map((s) => s.replace(/^\[(value|sequence|failure|failure_demand)\]\s*/, '').trim())
           .filter(Boolean)
           .join(' · ');
         const excerpt = text.length > 60 ? `${text.slice(0, 60)}…` : text;
@@ -495,11 +495,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     value: 'border-green-200 bg-green-50 text-green-800',
     sequence: 'border-emerald-200 bg-emerald-50 text-emerald-800',
     failure: 'border-red-200 bg-red-50 text-red-800',
+    // failure_demand (the demand hitting you) — rose, distinct from failure work.
+    failure_demand: 'border-rose-300 bg-rose-50 text-rose-800',
   };
   const renderTouchFull = (e: CaseEntry) => {
     const steps = e.verbatim.split('\n\n')
       .map((line) => {
-        const m = line.match(/^\[(value|sequence|failure)\]\s*([\s\S]*)$/);
+        const m = line.match(/^\[(value|sequence|failure|failure_demand)\]\s*([\s\S]*)$/);
         return m ? { tag: m[1], text: m[2] } : { tag: 'value', text: line };
       })
       .filter((s) => s.text.trim().length > 0);

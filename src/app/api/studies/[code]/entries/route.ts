@@ -40,7 +40,7 @@ export async function POST(
   const entryType = body.entryType === 'work' ? 'work' : 'demand';
   const workBlocksValid = Array.isArray(body.workBlocks) && body.workBlocks.every((b: unknown) =>
     b && typeof b === 'object'
-    && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure')
+    && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure' || (b as { tag?: unknown }).tag === 'failure_demand')
     && typeof (b as { text?: unknown }).text === 'string'
   );
   const hasWorkBlockText = workBlocksValid && body.workBlocks.some((b: { text: string }) => b.text.trim().length > 0);
@@ -126,7 +126,7 @@ export async function POST(
     // Case stitching (Skipton slice 1): ownership validated below before use.
     caseId: validatedCaseId,
     workBlocks: entryType === 'work' && workBlocksValid
-      ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
+      ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
           tag: b.tag,
           text: b.text,
           workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,

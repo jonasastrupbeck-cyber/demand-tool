@@ -54,7 +54,7 @@ export async function GET(
         .map((a) => ({ systemConditionId: a.systemConditionId })),
     })),
     workBlocks: wbRows.map((r) => ({
-      tag: (r.tag === 'value' ? 'value' : r.tag === 'sequence' ? 'sequence' : 'failure') as 'value' | 'sequence' | 'failure',
+      tag: (r.tag === 'value' ? 'value' : r.tag === 'sequence' ? 'sequence' : r.tag === 'failure_demand' ? 'failure_demand' : 'failure') as 'value' | 'sequence' | 'failure' | 'failure_demand',
       text: r.text,
       workStepTypeId: r.workStepTypeId ?? null,
       systemConditionId: r.systemConditionId ?? null,
@@ -142,12 +142,12 @@ export async function PATCH(
   if (body.workBlocks !== undefined) {
     if (!Array.isArray(body.workBlocks) || !body.workBlocks.every((b: unknown) =>
       b && typeof b === 'object'
-      && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure')
+      && ((b as { tag?: unknown }).tag === 'value' || (b as { tag?: unknown }).tag === 'sequence' || (b as { tag?: unknown }).tag === 'failure' || (b as { tag?: unknown }).tag === 'failure_demand')
       && typeof (b as { text?: unknown }).text === 'string'
     )) {
-      return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure", text: string }' }, { status: 400 });
+      return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure"|"failure_demand", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
       tag: b.tag,
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,

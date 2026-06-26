@@ -488,8 +488,10 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   // 'sequence' added 2026-04-22 — value-in-orientation work done at the wrong
-  // time or in the wrong way. No DB migration needed since tag is TEXT.
-  tag: text('tag').$type<'value' | 'sequence' | 'failure'>().notNull(),
+  // time or in the wrong way. 'failure_demand' added 2026-06-26 (migration 0033) —
+  // the step IS a failure demand hitting you (a demand), distinct from 'failure'
+  // (= failure WORK done in response). No DB migration needed since tag is TEXT.
+  tag: text('tag').$type<'value' | 'sequence' | 'failure' | 'failure_demand'>().notNull(),
   text: text('text').notNull(),
   sortOrder: integer('sort_order').notNull().default(0),
   // Phase 4 (2026-04-16): optional reference to a managed Work Step Type.

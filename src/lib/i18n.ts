@@ -866,11 +866,28 @@ const translations = {
     sv: 'Icke-värde',
     de: 'Fehler',
   },
+  // 4th flow step-kind: the step IS a failure demand (a demand hitting you),
+  // distinct from failure WORK above. DA/SV use the canonical IVS abbreviation
+  // (Ikke-værdiskabende / Icke-värdeskapande) per the glossary.
+  'capture.workBlockTagFailureDemand': {
+    en: 'Failure demand',
+    da: 'IVS-efterspørgsel',
+    sv: 'IVS-efterfrågan',
+    de: 'Fehlernachfrage',
+  },
   'capture.workBlockPlaceholder': {
     en: 'Describe this step...',
     da: 'Beskriv dette trin...',
     sv: 'Beskriv detta steg...',
     de: 'Beschreibe diesen Schritt...',
+  },
+  // Free-text placeholder on a 'failure demand' step — capture what the
+  // customer is coming to you about (the demand in their words).
+  'capture.failureDemandPlaceholder': {
+    en: 'What is the customer coming to you about?',
+    da: 'Hvad henvender kunden sig om?',
+    sv: 'Vad hör kunden av sig om?',
+    de: 'Worum geht es dem Kunden?',
   },
   // Phase 4 (2026-04-16) — picker option labels on each Flow block
   'capture.workStepPickerPlaceholder': {

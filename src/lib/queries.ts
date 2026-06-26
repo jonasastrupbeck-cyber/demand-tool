@@ -1210,8 +1210,11 @@ export async function getOrphanWorkBlocks(studyId: string) {
       eq(demandEntries.studyId, studyId),
       isNull(workDescriptionBlocks.workStepTypeId),
       sql`${workDescriptionBlocks.text} != ''`,
+      // failure_demand steps are demands, not work steps — never cluster them
+      // into Work Step Types (migration 0033).
+      sql`${workDescriptionBlocks.tag} != 'failure_demand'`,
     ));
-  return rows;
+  return rows as { id: string; text: string; tag: 'value' | 'sequence' | 'failure' }[];
 }
 
 // Promote a cluster to a new Work Step Type and bulk-update the matching
@@ -1257,7 +1260,7 @@ export async function seedDefaultWorkTypes(studyId: string, locale: Locale = 'en
   }
 }
 
-function concatWorkBlocks(blocks: { tag: 'value' | 'sequence' | 'failure'; text: string }[]): string {
+function concatWorkBlocks(blocks: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string }[]): string {
   return blocks
     .filter(b => b.text && b.text.trim().length > 0)
     .map(b => `[${b.tag}] ${b.text}`)
@@ -1297,7 +1300,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
@@ -1420,8 +1423,8 @@ export async function createEntry(studyId: string, data: {
         workStepTypeId: block.workStepTypeId ?? null,
         systemConditionId: scIds[0] ?? null, // legacy column kept for back-compat; junction is source of truth
         blockDate: block.date ? new Date(block.date) : null,
-        // Per-block failure-demand type (0033): only failure-tagged blocks carry one.
-        demandTypeId: block.tag === 'failure' ? (block.demandTypeId ?? null) : null,
+        // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
+        demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
       });
       for (const scId of scIds) {
         await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
@@ -1896,7 +1899,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch?
@@ -2009,8 +2012,8 @@ export async function updateEntry(entryId: string, data: {
         workStepTypeId: block.workStepTypeId ?? null,
         systemConditionId: scIds[0] ?? null,
         blockDate: block.date ? new Date(block.date) : null,
-        // Per-block failure-demand type (0033): only failure-tagged blocks carry one.
-        demandTypeId: block.tag === 'failure' ? (block.demandTypeId ?? null) : null,
+        // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
+        demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
       });
       for (const scId of scIds) {
         await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
