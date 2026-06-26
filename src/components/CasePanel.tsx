@@ -14,7 +14,7 @@
  * saved entry; `refreshSignal` bumps after each save so the timeline refetches.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
@@ -154,18 +154,58 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // panel pre-filled with a sensible guess (the date of the touch it now sits
   // after; else the one it now precedes; else today). Order isn't applied until Save.
   const isoDay = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+
+  // Edge auto-scroll: native HTML5 drag doesn't scroll the horizontal touch rail,
+  // so dragging to an off-screen target is impossible without this. While a drag
+  // is active and the pointer sits in the rail's left/right edge zone, nudge
+  // scrollLeft each frame via a rAF loop (a single dragover only fires on move,
+  // so a loop keeps scrolling while the pointer hovers at the edge).
+  const edgeDir = useRef(0);   // -1 left, 1 right, 0 none
+  const edgeRaf = useRef<number | null>(null);
+  const stepEdgeScroll = useCallback(() => {
+    const el = workScrollRef.current;
+    if (el && edgeDir.current !== 0) {
+      el.scrollLeft += edgeDir.current * 16;
+      edgeRaf.current = requestAnimationFrame(stepEdgeScroll);
+    } else {
+      edgeRaf.current = null;
+    }
+  }, []);
+  const stopEdgeScroll = useCallback(() => {
+    edgeDir.current = 0;
+    if (edgeRaf.current != null) { cancelAnimationFrame(edgeRaf.current); edgeRaf.current = null; }
+  }, []);
+  const onRailDragOver = (ev: ReactDragEvent) => {
+    if (!dragId) return;
+    ev.preventDefault();
+    const el = workScrollRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const EDGE = 72;
+    edgeDir.current = ev.clientX < r.left + EDGE ? -1 : ev.clientX > r.right - EDGE ? 1 : 0;
+    if (edgeDir.current !== 0) {
+      // Immediate nudge on this move, plus a rAF loop so it keeps scrolling
+      // while the pointer hovers at the edge without moving.
+      el.scrollLeft += edgeDir.current * 16;
+      if (edgeRaf.current == null) edgeRaf.current = requestAnimationFrame(stepEdgeScroll);
+    }
+  };
+  // Stop any running edge-scroll loop on unmount.
+  useEffect(() => stopEdgeScroll, [stopEdgeScroll]);
+
+  const endDrag = () => { setDragId(null); stopEdgeScroll(); };
   const handleTouchDrop = (targetId: string) => {
-    if (!dragId || dragId === targetId) { setDragId(null); return; }
+    if (!dragId || dragId === targetId) { endDrag(); return; }
     const moved = dragId;
     const ids = entries.map((e) => e.id).filter((id) => id !== moved);
     const at = ids.indexOf(targetId);
-    if (at < 0) { setDragId(null); return; }
+    if (at < 0) { endDrag(); return; }
     ids.splice(at, 0, moved);
     const idx = ids.indexOf(moved);
     const effOf = (id: string | undefined) => (id ? entries.find((e) => e.id === id)?.effectiveAt : undefined);
     const guess = isoDay(effOf(ids[idx - 1]) ?? effOf(ids[idx + 1]));
     setPendingReorder({ orderedIds: ids, movedId: moved, date: guess });
-    setDragId(null);
+    endDrag();
   };
 
   const saveReorder = async () => {
@@ -725,7 +765,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         {/* GROUP A — [ captured touches → composer ]. Own horizontal scroll with a
             min-width = the Work Entry box, so the composer is ALWAYS fully visible;
             scroll left within this group for the captured touches. */}
-        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[42rem] md:overflow-x-auto">
+        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[42rem] md:overflow-x-auto" onDragOver={onRailDragOver} onDrop={stopEdgeScroll}>
           <div className="flex flex-col gap-3 md:flex-row md:gap-3 md:min-w-min md:items-stretch pb-2">
             {entries.map((e) => {
               const canDrag = entries.length >= 2;
@@ -735,7 +775,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                   className={`order-2 md:order-1 w-full md:w-36 shrink-0 flex ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''} ${dragId === e.id ? 'opacity-50' : ''}`}
                   draggable={canDrag}
                   onDragStart={canDrag ? () => setDragId(e.id) : undefined}
-                  onDragEnd={canDrag ? () => setDragId(null) : undefined}
+                  onDragEnd={canDrag ? endDrag : undefined}
                   onDragOver={canDrag ? (ev) => ev.preventDefault() : undefined}
                   onDrop={canDrag ? (ev) => { ev.preventDefault(); handleTouchDrop(e.id); } : undefined}
                 >
