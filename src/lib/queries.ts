@@ -788,14 +788,14 @@ export async function getSystemConditionOverTime(studyId: string, lifeProblemId?
     .groupBy(sql`${demandEntries.createdAt}::date`, demandEntrySystemConditions.systemConditionId);
 
   const blocks = await db.select({
-    date: sql<string>`${demandEntries.createdAt}::date`,
+    date: sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`,
     scId: workDescriptionBlocks.systemConditionId,
     count: sql<number>`count(*)::int`,
   })
     .from(workDescriptionBlocks)
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
     .where(and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.systemConditionId} is not null`, lpf))
-    .groupBy(sql`${demandEntries.createdAt}::date`, workDescriptionBlocks.systemConditionId);
+    .groupBy(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, workDescriptionBlocks.systemConditionId);
 
   const live = await getSystemConditions(studyId);
   const liveIds = new Set(live.map((c) => c.id));
@@ -858,11 +858,11 @@ function taxConfig(tax: SingleFkTaxonomy) {
       db.update(workDescriptionBlocks).set({ workStepTypeId: value }).where(eq(workDescriptionBlocks.id, id)),
     countByType: () => db.select({ typeId: workDescriptionBlocks.workStepTypeId, count: sql<number>`count(*)::int` })
       .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id)),
-    timeRows: () => db.select({ date: sql<string>`${demandEntries.createdAt}::date`, typeId: workDescriptionBlocks.workStepTypeId, count: sql<number>`count(*)::int` })
+    timeRows: () => db.select({ date: sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, typeId: workDescriptionBlocks.workStepTypeId, count: sql<number>`count(*)::int` })
       .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id)),
     countWhere: (studyId: string) => and(eq(demandEntries.studyId, studyId), sql`${workDescriptionBlocks.workStepTypeId} is not null`),
     countGroup: workDescriptionBlocks.workStepTypeId,
-    timeGroup: [sql`${demandEntries.createdAt}::date`, workDescriptionBlocks.workStepTypeId] as const,
+    timeGroup: [sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, workDescriptionBlocks.workStepTypeId] as const,
   };
 }
 
@@ -1257,7 +1257,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
@@ -1377,6 +1377,7 @@ export async function createEntry(studyId: string, data: {
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
         systemConditionId: block.systemConditionId ?? null,
+        blockDate: block.date ? new Date(block.date) : null,
       });
     }
   }
@@ -1848,7 +1849,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch?
@@ -1958,6 +1959,7 @@ export async function updateEntry(entryId: string, data: {
         sortOrder: order++,
         workStepTypeId: block.workStepTypeId ?? null,
         systemConditionId: block.systemConditionId ?? null,
+        blockDate: block.date ? new Date(block.date) : null,
       });
     }
   }

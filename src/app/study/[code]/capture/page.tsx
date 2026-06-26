@@ -12,6 +12,9 @@ import InfoPopover from '@/components/InfoPopover';
 import PillSelect from '@/components/PillSelect';
 import CasePanel from '@/components/CasePanel';
 
+// Per-block date default (slice 2): today as YYYY-MM-DD for <input type="date">.
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 interface HandlingType {
   id: string;
   label: string;
@@ -211,7 +214,7 @@ export default function CapturePage() {
   // is on but no step is picked. Not persisted to the DB.
   // `systemConditionId` (2026-06-12): per-block system condition, set when the
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null; date: string }[]>([]);
   // Which block's "+ add new system condition" was clicked — the shared inline
   // adder writes the created SC back into this block (addingType is global).
   const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
@@ -308,7 +311,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }]);
     }
   }, [loading, study, entryType]);
 
@@ -394,7 +397,7 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }] : []);
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -553,7 +556,7 @@ export default function CapturePage() {
     // Work tab: send workBlocks; server auto-populates verbatim from them.
     // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionId }) => ({ tag, text, workStepTypeId, systemConditionId }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionId, date }) => ({ tag, text, workStepTypeId, systemConditionId, date }));
     }
 
     // Handling — only when the toggle is on.
@@ -1457,13 +1460,26 @@ export default function CapturePage() {
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }, ...prev.slice(idx)])}
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }, ...prev.slice(idx)])}
                           className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
                         >
                           + {t('capture.insertWorkBlock')}
                         </button>
+                      )}
+                      {/* Per-block date (slice 2): defaults today; set a past day to
+                          backfill a missed step with its real date. */}
+                      {flowWorkPath && (
+                        <label className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-medium text-gray-500">{t('capture.workBlockDate')}</span>
+                          <input
+                            type="date"
+                            value={block.date}
+                            onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, date: e.target.value } : b))}
+                            className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                          />
+                        </label>
                       )}
                       {/* Per-block system condition (2026-06-12; moved to TOP of the
                           block 2026-06-18): for flow-mode sequence/failure work, ask
@@ -1605,7 +1621,7 @@ export default function CapturePage() {
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >

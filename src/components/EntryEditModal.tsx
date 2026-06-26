@@ -8,6 +8,10 @@ import SegmentedToggle from './SegmentedToggle';
 import InfoPopover from './InfoPopover';
 import PillSelect from './PillSelect';
 
+// Per-block date (slice 2): YYYY-MM-DD helpers for <input type="date">.
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const isoDay = (v?: string | null) => (v ? new Date(v).toISOString().slice(0, 10) : '');
+
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
 interface ContactMethod { id: string; label: string }
@@ -107,7 +111,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionId: string | null; date: string }[]>([]);
   // Case stitching (Skipton slice 1): the case ref this entry belongs to,
   // looked up from caseId for read-only display. Re-assigning is a later slice.
   const [caseRef, setCaseRef] = useState<string | null>(null);
@@ -159,12 +163,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; blockDate?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
               freeText: !b.workStepTypeId && !!b.text,
               systemConditionId: b.systemConditionId ?? null,
+              date: isoDay(b.blockDate) || isoDay((data.entry as { createdAt?: string } | undefined)?.createdAt) || todayIso(),
             }))
           : []);
         // Auto-open the note disclosure if the field already has content.
@@ -197,7 +202,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       // Strip the UI-only freeText flag before PATCH.
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
-        .map(({ tag, text, workStepTypeId, systemConditionId }) => ({ tag, text, workStepTypeId, systemConditionId }));
+        .map(({ tag, text, workStepTypeId, systemConditionId, date }) => ({ tag, text, workStepTypeId, systemConditionId, date }));
     }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -630,13 +635,24 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           {flowWorkPath && (
                             <button
                               type="button"
-                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }, ...prev.slice(idx)])}
+                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }, ...prev.slice(idx)])}
                               className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                               aria-label={t('capture.insertWorkBlock')}
                               title={t('capture.insertWorkBlock')}
                             >
                               + {t('capture.insertWorkBlock')}
                             </button>
+                          )}
+                          {flowWorkPath && (
+                            <label className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-medium text-gray-500">{t('capture.workBlockDate')}</span>
+                              <input
+                                type="date"
+                                value={b.date}
+                                onChange={(e) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, date: e.target.value } : p))}
+                                className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                              />
+                            </label>
                           )}
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
@@ -759,7 +775,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionId: null, date: todayIso() }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >

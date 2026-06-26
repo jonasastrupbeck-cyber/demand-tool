@@ -842,6 +842,12 @@ const translations = {
     sv: 'Infoga steg h\u00e4r',
     de: 'Schritt hier einf\u00fcgen',
   },
+  'capture.workBlockDate': {
+    en: 'Step date',
+    da: 'Trindato',
+    sv: 'Stegdatum',
+    de: 'Schrittdatum',
+  },
   'capture.workBlockTagValue': {
     en: 'Value',
     da: 'V\u00e6rdi',

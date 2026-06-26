@@ -494,4 +494,8 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // rows have none). SET NULL mirrors workStepTypeId: deleting an SC keeps the
   // block's tag/text.
   systemConditionId: text('system_condition_id').references(() => systemConditions.id, { onDelete: 'set null' }),
+  // Per-block date (migration 0031, 2026-06-26): a step's own date, for
+  // backfilling a missed step. NULL = inherit the entry's createdAt (existing
+  // rows + normal capture). Over-time charts bucket by COALESCE(blockDate, entry.createdAt).
+  blockDate: timestamp('block_date', { withTimezone: true }),
 });

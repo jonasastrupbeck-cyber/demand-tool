@@ -51,6 +51,7 @@ export async function GET(
       text: r.text,
       workStepTypeId: r.workStepTypeId ?? null,
       systemConditionId: r.systemConditionId ?? null,
+      blockDate: r.blockDate ?? null,
     })),
   });
 }
@@ -137,11 +138,12 @@ export async function PATCH(
     )) {
       return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; date?: string | null }) => ({
       tag: b.tag,
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
       systemConditionId: typeof b.systemConditionId === 'string' ? b.systemConditionId : null,
+      date: typeof b.date === 'string' ? b.date : null,
     }));
   }
 
