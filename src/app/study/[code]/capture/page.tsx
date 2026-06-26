@@ -92,6 +92,8 @@ interface StudyData {
   synthesisEnabled: boolean;
   // Flow analytics tab (migration 0029, 2026-06-24).
   flowAnalyticsEnabled: boolean;
+  // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
+  flowFailureDemandTypesEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -214,10 +216,15 @@ export default function CapturePage() {
   // is on but no step is picked. Not persisted to the DB.
   // `systemConditionId` (2026-06-12): per-block system condition, set when the
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; date: string }[]>([]);
+  // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
+  // set only when the block's tag is 'failure' (flow work path). Null otherwise.
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
   // Which block's "+ add new system condition" was clicked — the shared inline
   // adder writes the created SC back into this block (addingType is global).
   const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
+  // Which block's "+ add new failure-demand type" was clicked — the shared
+  // inline demand-type adder writes the created type back into this block.
+  const [demandTypeAddTargetBlockIdx, setDemandTypeAddTargetBlockIdx] = useState<number | null>(null);
 
   // Inline type creation state
   const [addingType, setAddingType] = useState<'demand'|'work'|'handling'|'whatMatters'|'lifeProblem'|'systemCondition'|'thinking'|'originalValue'|null>(null);
@@ -311,7 +318,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }]);
     }
   }, [loading, study, entryType]);
 
@@ -397,7 +404,7 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }] : []);
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -556,7 +563,7 @@ export default function CapturePage() {
     // Work tab: send workBlocks; server auto-populates verbatim from them.
     // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, date }) => ({ tag, text, workStepTypeId, systemConditionIds, date }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }));
     }
 
     // Handling — only when the toggle is on.
@@ -1460,7 +1467,7 @@ export default function CapturePage() {
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }, ...prev.slice(idx)])}
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }, ...prev.slice(idx)])}
                           className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
@@ -1512,6 +1519,32 @@ export default function CapturePage() {
                           </div>
                         </div>
                       )}
+                      {/* Type of failure demand (migration 0033): for a flow step
+                          tagged failure, capture WHAT KIND of failure demand hit
+                          here — mirrors the transactional demand-type picker,
+                          scoped to category='failure'. Gated by the study opt-in. */}
+                      {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure' && (
+                        <div className="p-2 rounded-md border bg-red-50 border-red-200">
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
+                          <div className="flex gap-2 items-center">
+                            <PillSelect
+                              ariaLabel={t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}
+                              placeholder={t('capture.selectType')}
+                              value={block.demandTypeId ?? ''}
+                              onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, demandTypeId: id || null } : b))}
+                              options={study.demandTypes.filter((dt) => dt.category === 'failure').map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
+                              variant="failure"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setDemandTypeAddTargetBlockIdx(idx); setAddingType('demand'); setNewTypeLabel(''); }}
+                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              + {t('capture.addNew')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1548,8 +1581,8 @@ export default function CapturePage() {
                           <>
                             <div className="flex items-center justify-between gap-1">
                               <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
-                                <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'value' } : b))}>{t('capture.workBlockTagValue')}</button>
-                                <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'sequence' } : b))}>{t('capture.workBlockTagSequence')}</button>
+                                <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'value', demandTypeId: null } : b))}>{t('capture.workBlockTagValue')}</button>
+                                <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'sequence', demandTypeId: null } : b))}>{t('capture.workBlockTagSequence')}</button>
                                 <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: 'failure' } : b))}>{t('capture.workBlockTagFailure')}</button>
                               </div>
                               <button
@@ -1569,7 +1602,7 @@ export default function CapturePage() {
                                 <li key={s.id}>
                                   <button
                                     type="button"
-                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false } : b))}
+                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, workStepTypeId: s.id, tag: s.tag, text: tl(s.label), freeText: false, demandTypeId: s.tag === 'failure' ? b.demandTypeId : null } : b))}
                                     className="w-full text-left px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
                                   >
                                     <span className="block whitespace-normal leading-snug">{tl(s.label)}</span>
@@ -1599,7 +1632,7 @@ export default function CapturePage() {
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
-                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionIds: v === 'value' ? [] : b.systemConditionIds } : b))}
+                              onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure', systemConditionIds: v === 'value' ? [] : b.systemConditionIds, demandTypeId: v === 'failure' ? b.demandTypeId : null } : b))}
                               options={[
                                 { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
                                 { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
@@ -1633,7 +1666,7 @@ export default function CapturePage() {
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], date: todayIso() }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
@@ -1649,6 +1682,15 @@ export default function CapturePage() {
               setWorkBlocks((prev) => prev.map((b, i) => i === scAddTargetBlockIdx ? { ...b, systemConditionIds: b.systemConditionIds.includes(id) ? b.systemConditionIds : [...b.systemConditionIds, id] } : b));
               setScAddTargetBlockIdx(null);
             }, { variant: 'sky' })}
+            {/* Shared inline "create failure-demand type" input for flow-work
+                failure blocks (migration 0033). category='failure' so the new
+                type is tagged correctly; it lands in the block recorded in
+                demandTypeAddTargetBlockIdx. Gated on flowWorkPath so it never
+                duplicates the transactional demand-type adder. */}
+            {flowWorkPath && renderAddTypeInput('demand', 'demand-types', { category: 'failure' }, (id) => {
+              setWorkBlocks((prev) => prev.map((b, i) => i === demandTypeAddTargetBlockIdx ? { ...b, demandTypeId: id } : b));
+              setDemandTypeAddTargetBlockIdx(null);
+            }, { variant: 'red' })}
           </div>
         )}
 
@@ -2185,6 +2227,7 @@ export default function CapturePage() {
             flowDemandEnabled: study.flowDemandEnabled,
             flowWorkEnabled: study.flowWorkEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
+            flowFailureDemandTypesEnabled: study.flowFailureDemandTypesEnabled,
             whatMattersEnabled: study.whatMattersEnabled,
             thinkingsEnabled: study.thinkingsEnabled,
             lifeProblemsEnabled: study.lifeProblemsEnabled,

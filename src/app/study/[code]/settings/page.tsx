@@ -95,6 +95,8 @@ interface StudyData {
   synthesisEnabled: boolean;
   // Flow analytics tab (migration 0029, 2026-06-24).
   flowAnalyticsEnabled: boolean;
+  // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
+  flowFailureDemandTypesEnabled: boolean;
   consultantPin: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -1115,6 +1117,7 @@ export default function SettingsPage() {
             {([
               { field: 'synthesisEnabled' as const, label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
               { field: 'flowAnalyticsEnabled' as const, label: t('capture.toggles.flowAnalytics'), value: study.flowAnalyticsEnabled },
+              { field: 'flowFailureDemandTypesEnabled' as const, label: t('capture.toggles.flowFailureDemandTypes'), value: study.flowFailureDemandTypesEnabled },
             ]).map((row) => (
               <button
                 key={row.field}

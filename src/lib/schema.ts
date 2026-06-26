@@ -85,6 +85,11 @@ export const studies = pgTable('studies', {
   // flow dashboard surfacing the demand-style measures (already computed by
   // getDashboardData) for flow studies. Default false.
   flowAnalyticsEnabled: boolean('flow_analytics_enabled').notNull().default(false),
+  // Flow failure-demand types (migration 0033, 2026-06-26): opt-in per-block
+  // "Type of failure demand" picker on failure-tagged flow work blocks, so a
+  // step can record what kind of failure demand hit at that point. Default
+  // false so transactional / non-flow capture is unchanged.
+  flowFailureDemandTypesEnabled: boolean('flow_failure_demand_types_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -501,6 +506,11 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // backfilling a missed step. NULL = inherit the entry's createdAt (existing
   // rows + normal capture). Over-time charts bucket by COALESCE(blockDate, entry.createdAt).
   blockDate: timestamp('block_date', { withTimezone: true }),
+  // Per-block failure-demand type (migration 0033, 2026-06-26): single FK to a
+  // demand_types row (category='failure') for a flow work block tagged
+  // 'failure' — what kind of failure demand hit at this step. NULL for
+  // value/sequence blocks and all older rows. SET NULL mirrors workStepTypeId.
+  demandTypeId: text('demand_type_id').references(() => demandTypes.id, { onDelete: 'set null' }),
 });
 
 // Block ↔ system-condition junction (migration 0032): a flow work block can be

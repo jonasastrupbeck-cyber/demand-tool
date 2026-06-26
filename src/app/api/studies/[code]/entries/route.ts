@@ -126,12 +126,13 @@ export async function POST(
     // Case stitching (Skipton slice 1): ownership validated below before use.
     caseId: validatedCaseId,
     workBlocks: entryType === 'work' && workBlocksValid
-      ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; date?: string | null }) => ({
+      ? body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
           tag: b.tag,
           text: b.text,
           workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
           systemConditionId: typeof b.systemConditionId === 'string' ? b.systemConditionId : null,
           systemConditionIds: Array.isArray(b.systemConditionIds) ? b.systemConditionIds.filter((x): x is string => typeof x === 'string') : undefined,
+          demandTypeId: typeof b.demandTypeId === 'string' ? b.demandTypeId : null,
           date: typeof b.date === 'string' ? b.date : null,
         }))
       : undefined,

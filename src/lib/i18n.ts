@@ -3382,6 +3382,12 @@ const translations = {
     sv: 'Flödesanalysöversikt',
     de: 'Flow-Analyse-Dashboard',
   },
+  'capture.toggles.flowFailureDemandTypes': {
+    en: 'Failure-demand type per flow step',
+    da: 'Type af ikke-værdiskabende efterspørgsel pr. flow-trin',
+    sv: 'Typ av icke-värdeskapande efterfrågan per flödessteg',
+    de: 'Fehler-Nachfrage-Typ je Flow-Schritt',
+  },
   'capture.toggles.lifeProblems': {
     en: 'Capture life problems',
     da: 'Registrer livsproblemer',

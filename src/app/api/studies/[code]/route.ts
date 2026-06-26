@@ -110,6 +110,8 @@ export async function PUT(
   if (body.synthesisEnabled !== undefined) updates.synthesisEnabled = body.synthesisEnabled;
   // Flow analytics tab toggle (migration 0029, 2026-06-24).
   if (body.flowAnalyticsEnabled !== undefined) updates.flowAnalyticsEnabled = body.flowAnalyticsEnabled;
+  // Flow per-block failure-demand type picker toggle (migration 0033, 2026-06-26).
+  if (body.flowFailureDemandTypesEnabled !== undefined) updates.flowFailureDemandTypesEnabled = body.flowFailureDemandTypesEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.
