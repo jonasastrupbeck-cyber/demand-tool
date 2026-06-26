@@ -1459,6 +1459,37 @@ const translations = {
     sv: 'Poster per ärende',
     de: 'Einträge pro Fall',
   },
+  // Touches-over-time chart (per-day series, scoped, count/%).
+  'dashboard.touchesOverTime': {
+    en: 'Touches over time',
+    da: 'Registreringer over tid',
+    sv: 'Poster över tid',
+    de: 'Einträge über die Zeit',
+  },
+  'dashboard.touchesTotal': {
+    en: 'Total touches',
+    da: 'Registreringer i alt',
+    sv: 'Poster totalt',
+    de: 'Einträge gesamt',
+  },
+  'dashboard.scopeCase': {
+    en: 'Case',
+    da: 'Sag',
+    sv: 'Ärende',
+    de: 'Fall',
+  },
+  'dashboard.countMode': {
+    en: 'Count',
+    da: 'Antal',
+    sv: 'Antal',
+    de: 'Anzahl',
+  },
+  'dashboard.pctMode': {
+    en: '%',
+    da: '%',
+    sv: '%',
+    de: '%',
+  },
   // R7: capability point ordering + image export.
   'dashboard.sortLabel': {
     en: 'Order',

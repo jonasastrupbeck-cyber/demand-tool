@@ -126,6 +126,18 @@ export interface CapabilityData {
   nExcluded: number;
 }
 
+// One day's touch counts for the "Touches over time" chart. Bucketed by the
+// touch's EFFECTIVE date (min block_date, else created_at). total includes the
+// rare 'unknown'; the chart draws Total + value/failure/sequence.
+export interface TouchSeriesPoint {
+  date: string;
+  total: number;
+  valueCount: number;
+  failureCount: number;
+  sequenceCount: number;
+  unknownCount: number;
+}
+
 export interface DashboardData {
   totalEntries: number;
   valueCount: number;

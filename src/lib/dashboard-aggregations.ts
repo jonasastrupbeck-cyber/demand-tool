@@ -2,7 +2,8 @@ import { db } from './db';
 import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { DashboardData, CapabilityData } from '@/types';
+import type { DashboardData, CapabilityData, TouchSeriesPoint } from '@/types';
+import type { SQL } from 'drizzle-orm';
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<DashboardData> {
   const baseConditions = [eq(demandEntries.studyId, studyId)];
@@ -958,4 +959,62 @@ export async function getCapabilityData(
     n,
     nExcluded: raw.length - n,
   };
+}
+
+// "Touches over time" (per-day touch counts by classification). A touch = a work
+// entry with ≥1 work block (innerJoin enforces that). Bucketed by the touch's
+// EFFECTIVE date min(coalesce(block_date, created_at)) so backdated retrospective
+// touches land on their real day — matches getCapabilityData / over-time charts,
+// NOT raw created_at. Scope: case > life problem (P2BS, via the case) > all.
+export async function getTouchSeries(
+  studyId: string,
+  opts: { lifeProblemId?: string; caseId?: string; from?: Date; to?: Date } = {},
+): Promise<TouchSeriesPoint[]> {
+  const { lifeProblemId, caseId, from, to } = opts;
+
+  let scope: SQL | undefined;
+  if (caseId) {
+    scope = eq(demandEntries.caseId, caseId);
+  } else if (lifeProblemId) {
+    // P2BS lives on the case in flow (entries carry caseId, NULL lifeProblemId),
+    // so match entries whose case has it OR whose own lifeProblemId matches.
+    const caseRows = await db.select({ id: cases.id })
+      .from(cases).where(and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId)));
+    const caseIds = caseRows.map((c) => c.id);
+    scope = caseIds.length
+      ? or(eq(demandEntries.lifeProblemId, lifeProblemId), inArray(demandEntries.caseId, caseIds))
+      : eq(demandEntries.lifeProblemId, lifeProblemId);
+  }
+
+  // One row per touch: its classification + effective date.
+  const rows = await db.select({
+    classification: demandEntries.classification,
+    eff: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))`,
+  })
+    .from(demandEntries)
+    .innerJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), scope))
+    .groupBy(demandEntries.id, demandEntries.classification);
+
+  // Bucket by effective DAY; range-filter in JS (eff is an aggregate, not a column).
+  const fromMs = from ? from.getTime() : null;
+  const toMs = to ? to.getTime() : null;
+  const map = new Map<string, { total: number; valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }>();
+  for (const r of rows) {
+    if (!r.eff) continue;
+    const ms = new Date(r.eff).getTime();
+    if (fromMs !== null && ms < fromMs) continue;
+    if (toMs !== null && ms > toMs) continue;
+    const date = r.eff.slice(0, 10);
+    let e = map.get(date);
+    if (!e) { e = { total: 0, valueCount: 0, failureCount: 0, sequenceCount: 0, unknownCount: 0 }; map.set(date, e); }
+    e.total += 1;
+    if (r.classification === 'value') e.valueCount += 1;
+    else if (r.classification === 'failure') e.failureCount += 1;
+    else if (r.classification === 'sequence') e.sequenceCount += 1;
+    else e.unknownCount += 1;
+  }
+  return [...map.entries()]
+    .map(([date, c]) => ({ date, ...c }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }

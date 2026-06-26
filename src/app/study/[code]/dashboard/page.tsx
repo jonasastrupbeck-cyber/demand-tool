@@ -15,6 +15,7 @@ import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
+import TouchSeriesChart from '@/components/TouchSeriesChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 
@@ -90,6 +91,8 @@ export default function DashboardPage() {
   const [showCoverage, setShowCoverage] = useState(false);
   const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
+  // Case list for the Touches-over-time scope selector.
+  const [cases, setCases] = useState<{ id: string; caseRef: string }[]>([]);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   // R11: the flow capability view is a stack of independent <CapabilityChart>s.
@@ -181,6 +184,14 @@ export default function DashboardPage() {
         setFullStudy(s as EntryEditModalStudy);
       });
   }, [code]);
+
+  // Case list for the Touches-over-time scope selector (only when case tracking is on).
+  useEffect(() => {
+    if (!caseTrackingEnabled) return;
+    fetch(`/api/studies/${encodeURIComponent(code)}/cases`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((rows) => setCases(Array.isArray(rows) ? rows.map((c: { id: string; caseRef: string }) => ({ id: c.id, caseRef: c.caseRef })) : []));
+  }, [code, caseTrackingEnabled]);
 
   // Fetch system conditions when a Sankey flow link is clicked
   useEffect(() => {
@@ -1468,6 +1479,15 @@ export default function DashboardPage() {
           const capRange = getDateRangeParams();
           return (
           <div className="space-y-4">
+            {/* Touches over time — per-day counts, scoped + count/%. Needs only
+                cases + work entries (not milestones), so it shows for every flow study. */}
+            <TouchSeriesChart
+              code={code}
+              lifeProblems={lifeProblems}
+              cases={cases}
+              dateFrom={capRange.from}
+              dateTo={capRange.to}
+            />
             {chartIds.map((id) => (
               <CapabilityChart
                 key={id}
