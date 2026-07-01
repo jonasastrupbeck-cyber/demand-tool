@@ -567,9 +567,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // Shared sub-blocks — composed differently in flow vs transactional layouts.
   const headerRow = (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      {/* Flow shows the case number in the customer action bar above the board;
-          keep it in the header only for the transactional case card. */}
-      {!isFlow && <span className="font-semibold text-gray-900 text-xs">#{caseRow.caseRef}</span>}
+      <span className="font-semibold text-gray-900 text-xs">#{caseRow.caseRef}</span>
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
         isOpen ? 'border-green-300 bg-green-50 text-green-700' : 'bg-gray-200 border-gray-300 text-gray-600'
       }`}>
@@ -798,13 +796,12 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           set-aside, above the board so you can finish a customer and hop to the
           next in one click. Moved out of the green pane. */}
       <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-          <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">#{caseRow.caseRef}</span>
-          {!isOpen && <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
+          {/* Case number stays in the green pane; this bar is just the actions. */}
           <div ref={switcherRef} className="relative">
             <button
               type="button"
               onClick={() => setSwitcherOpen((o) => !o)}
-              className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-50 transition-colors"
+              className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
             >
               {t('capture.openExistingAccount')} ▾
             </button>
