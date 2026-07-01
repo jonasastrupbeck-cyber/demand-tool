@@ -764,10 +764,11 @@ export default function CapturePage() {
       setCustomerFelt(cor ? !!cor.customerFacing : null);
     };
     return (
-      <div className={freezeLayout ? 'max-w-[37rem] mx-auto' : undefined}>
+      <div className={freezeLayout ? 'max-w-[37rem]' : undefined}>
         {freezeLayout ? (
           // Freeze: the COR is a single dropdown pill, not a row of radio pills.
-          <div className="flex justify-center">
+          // Left-aligned so it sits at the start of the pinned action bar.
+          <div className="flex">
             <PillSelect
               ariaLabel={t('capture.handlingLabel')}
               placeholder={t('capture.addHandlingButton')}
@@ -800,6 +801,30 @@ export default function CapturePage() {
       </div>
     );
   })() : null;
+
+  // Submit + regret buttons, extracted so they render either in the flow
+  // composer's pinned action bar (compact, beside the COR) or in the non-flow
+  // fixed bottom footer (full-width). Same behaviour in both places.
+  const submitButton = (
+    <button
+      type="submit"
+      disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification && !flowWorkPath)}
+      className={`text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand ${flowWorkPath ? 'px-5 py-2.5 text-base whitespace-nowrap' : 'w-full py-4 text-lg'}`}
+    >
+      {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
+    </button>
+  );
+  // Regret (2026-06-18): abandon what's being typed (before saving). Shown only
+  // when the composer has content.
+  const regretButton = (verbatim.trim() || workBlocks.some((b) => b.text.trim().length > 0) || !!classification || !!demandTypeId) ? (
+    <button
+      type="button"
+      onClick={resetForm}
+      className={`rounded-lg font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors ${flowWorkPath ? 'px-3 py-1.5 text-sm whitespace-nowrap' : 'w-full mt-2 py-2 text-sm'}`}
+    >
+      {t('capture.regret')}
+    </button>
+  ) : null;
 
   return (
     <div className={freezeLayout ? 'max-w-none px-4 pb-6' : 'max-w-lg mx-auto p-4 pb-24'}>
@@ -1708,9 +1733,20 @@ export default function CapturePage() {
           </div>
         )}
 
-        {/* Flow composer (2026-06-18): COR sits BELOW the work blocks, just above
-            the Save Work Entry bar. */}
-        {flowWorkPath && corBlock}
+        {/* Flow composer: COR + Save sit BELOW the work blocks as a compact bar
+            pinned to the bottom-LEFT of the composer (sticky left-0). The block
+            row can grow very wide (blocks flow left→right), so a centred/inline
+            footer scrolls off-screen right — pinning keeps COR + Save visible
+            however many blocks are added or wherever the rail is scrolled. */}
+        {flowWorkPath && (
+          <div className="sticky left-0 z-[1] mt-3 w-fit max-w-full flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-3">
+              {corBlock}
+              {submitButton}
+            </div>
+            {regretButton}
+          </div>
+        )}
 
         {hasSystemStrand && sep(t('capture.strand.system'))}
         {/* System conditions / failure cause — failure (all), work+sequence, or value demand with non-one-stop capability.
@@ -1993,30 +2029,16 @@ export default function CapturePage() {
           );
         })()}
 
-        {/* Submit button. Freeze layout: inline within the composer column so it
-            doesn't overlap the horizontal touch rail. Otherwise: sticky at bottom. */}
-        <div className={freezeLayout ? 'mt-3' : 'fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200'}>
-          <div className={freezeLayout ? '' : 'max-w-lg mx-auto'}>
-            <button
-              type="submit"
-              disabled={submitting || (!study.volumeMode && !verbatim.trim() && !(entryType === 'work' && workBlocks.some((b) => b.text.trim().length > 0))) || (study.classificationEnabled && (isDemand || study.workClassificationEnabled) && !classification && !flowWorkPath)}
-              className="w-full py-4 text-white rounded-lg font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors bg-brand"
-            >
-              {submitting ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
-            </button>
-            {/* Regret (2026-06-18): abandon what's being typed (before saving).
-                Shown only when the composer has content. */}
-            {(verbatim.trim() || workBlocks.some((b) => b.text.trim().length > 0) || !!classification || !!demandTypeId) && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="w-full mt-2 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
-              >
-                {t('capture.regret')}
-              </button>
-            )}
+        {/* Non-flow submit footer: sticky bar fixed at the bottom of the screen.
+            Flow renders its Save inside the pinned COR + Save action bar above. */}
+        {!flowWorkPath && (
+          <div className="fixed bottom-0 left-0 right-0 p-4 border-t shadow-lg bg-white border-gray-200">
+            <div className="max-w-lg mx-auto">
+              {submitButton}
+              {regretButton}
+            </div>
           </div>
-        </div>
+        )}
       </form>
       </CasePanel>
 
