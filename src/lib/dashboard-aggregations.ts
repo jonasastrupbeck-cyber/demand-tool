@@ -770,13 +770,21 @@ export async function getFailureCausesForFlow(
 // across a study's cases, as an XmR individuals (capability) chart. Events:
 //   'caseOpen' | 'firstContact' | 'caseClose' | 'decision:<typeId>' | 'milestone:<id>'
 //   | 'whatMattersTarget:<typeId>'  (the customer's wanted date, 2026-07-01)
+//   | 'whatMattersAsap:<typeId>'    (ASAP anchor milestone reached, 2026-07-01)
 // All timestamps already captured — read-only analytics, no schema change.
 // Reads are kept FLAT and assembled in JS (Drizzle correlated-subquery gotcha).
 type EventToken = string;
 
 function eventTimestamp(
   token: EventToken,
-  ctx: { openedAt: Date; closedAt: Date | null; firstContactAt: Date | null; decisions: Map<string, Date>; milestones: Map<string, Date>; whatMattersTargets: Map<string, Date> },
+  ctx: {
+    openedAt: Date; closedAt: Date | null; firstContactAt: Date | null;
+    decisions: Map<string, Date>; milestones: Map<string, Date>;
+    whatMattersTargets: Map<string, Date>;
+    // Types this case selected + the study's typeId→anchorMilestoneId map, so the
+    // ASAP measure auto-scopes to cases that actually chose the ASAP factor.
+    whatMattersSelected: Set<string>; asapAnchors: Map<string, string>;
+  },
 ): Date | null {
   if (token === 'caseOpen') return ctx.openedAt;
   if (token === 'firstContact') return ctx.firstContactAt;
@@ -784,6 +792,12 @@ function eventTimestamp(
   if (token.startsWith('decision:')) return ctx.decisions.get(token.slice('decision:'.length)) ?? null;
   if (token.startsWith('milestone:')) return ctx.milestones.get(token.slice('milestone:'.length)) ?? null;
   if (token.startsWith('whatMattersTarget:')) return ctx.whatMattersTargets.get(token.slice('whatMattersTarget:'.length)) ?? null;
+  if (token.startsWith('whatMattersAsap:')) {
+    const typeId = token.slice('whatMattersAsap:'.length);
+    if (!ctx.whatMattersSelected.has(typeId)) return null; // only ASAP-tagged cases
+    const msId = ctx.asapAnchors.get(typeId);
+    return msId ? (ctx.milestones.get(msId) ?? null) : null;
+  }
   return null;
 }
 
@@ -823,16 +837,27 @@ export async function getCapabilityData(
   }
   const caseIds = caseRows.map((c) => c.id);
 
-  // Per-case 'by_date' what-matters target dates → whatMattersTarget:<typeId>.
-  const wmTargetRows = await db.select({ caseId: caseWhatMatters.caseId, whatMattersTypeId: caseWhatMatters.whatMattersTypeId, targetDate: caseWhatMatters.targetDate })
+  // All case what-matters selections → per-case target dates (by_date) AND the set
+  // of types each case selected (so the ASAP measure auto-scopes to ASAP cases).
+  const wmRows = await db.select({ caseId: caseWhatMatters.caseId, whatMattersTypeId: caseWhatMatters.whatMattersTypeId, targetDate: caseWhatMatters.targetDate })
     .from(caseWhatMatters)
-    .where(and(inArray(caseWhatMatters.caseId, caseIds), isNotNull(caseWhatMatters.targetDate)));
+    .where(inArray(caseWhatMatters.caseId, caseIds));
   const wmTargetByCase = new Map<string, Map<string, Date>>();
-  for (const r of wmTargetRows) {
-    if (!r.targetDate) continue;
-    if (!wmTargetByCase.has(r.caseId)) wmTargetByCase.set(r.caseId, new Map());
-    wmTargetByCase.get(r.caseId)!.set(r.whatMattersTypeId, new Date(r.targetDate as unknown as string));
+  const wmSelectedByCase = new Map<string, Set<string>>();
+  for (const r of wmRows) {
+    if (!wmSelectedByCase.has(r.caseId)) wmSelectedByCase.set(r.caseId, new Set());
+    wmSelectedByCase.get(r.caseId)!.add(r.whatMattersTypeId);
+    if (r.targetDate) {
+      if (!wmTargetByCase.has(r.caseId)) wmTargetByCase.set(r.caseId, new Map());
+      wmTargetByCase.get(r.caseId)!.set(r.whatMattersTypeId, new Date(r.targetDate as unknown as string));
+    }
   }
+  // Study-level typeId → anchor milestone (the ASAP type's measured-to milestone).
+  const anchorRows = await db.select({ id: whatMattersTypes.id, anchorMilestoneId: whatMattersTypes.anchorMilestoneId })
+    .from(whatMattersTypes)
+    .where(and(eq(whatMattersTypes.studyId, studyId), isNotNull(whatMattersTypes.anchorMilestoneId)));
+  const asapAnchors = new Map<string, string>();
+  for (const r of anchorRows) if (r.anchorMilestoneId) asapAnchors.set(r.id, r.anchorMilestoneId);
 
   // Per-measure annotations (exclude / note), keyed by caseId for this event-pair.
   const annoRows = await db.select().from(capabilityAnnotations)
@@ -902,6 +927,8 @@ export async function getCapabilityData(
       decisions: decByCase.get(c.id) ?? new Map<string, Date>(),
       milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
       whatMattersTargets: wmTargetByCase.get(c.id) ?? new Map<string, Date>(),
+      whatMattersSelected: wmSelectedByCase.get(c.id) ?? new Set<string>(),
+      asapAnchors,
     };
     const fromTs = eventTimestamp(fromEvent, ctx);
     const toTs = eventTimestamp(toEvent, ctx);

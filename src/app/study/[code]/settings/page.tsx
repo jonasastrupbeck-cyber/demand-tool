@@ -105,7 +105,7 @@ interface StudyData {
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null }[];
   milestones: { id: string; label: string; sortOrder: number }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
@@ -373,6 +373,17 @@ export default function SettingsPage() {
   function removeWhatMattersType(id: string) {
     setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.filter((w) => w.id !== id) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, { method: 'DELETE' }));
+  }
+
+  // Anchor milestone for the ASAP type: ASAP is measured case open → this
+  // milestone. Optimistic, mirrors assignDecisionToMilestone.
+  function setWhatMattersAnchor(id: string, milestoneId: string | null) {
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, anchorMilestoneId: milestoneId } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ anchorMilestoneId: milestoneId }),
+    }));
   }
 
   function addLifeProblemHandler(e: React.FormEvent) {
@@ -1596,12 +1607,28 @@ export default function SettingsPage() {
                     {wm.timing === 'by_date' ? <span aria-hidden>📅</span> : wm.timing === 'asap' ? <span aria-hidden>⏱</span> : null}
                     {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
                   </span>
-                  {/* The two standard timed types are protected — no delete, just a tag. */}
-                  {wm.timing ? (
-                    <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{t('settings.standardType')}</span>
-                  ) : (
-                    <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* ASAP is measured case open → this milestone (set once per study). */}
+                    {wm.timing === 'asap' && (
+                      <label className="flex items-center gap-1 text-xs text-gray-600">
+                        {t('settings.measuredToMilestone')}
+                        <select
+                          value={wm.anchorMilestoneId ?? ''}
+                          onChange={(e) => setWhatMattersAnchor(wm.id, e.target.value || null)}
+                          className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                        >
+                          <option value="">—</option>
+                          {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                        </select>
+                      </label>
+                    )}
+                    {/* The two standard timed types are protected — no delete, just a tag. */}
+                    {wm.timing ? (
+                      <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{t('settings.standardType')}</span>
+                    ) : (
+                      <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

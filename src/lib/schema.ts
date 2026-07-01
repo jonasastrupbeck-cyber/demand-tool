@@ -162,6 +162,10 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   // 'by_date' = customer wants it by a specific date (captured per case in
   // caseWhatMatters.targetDate); 'asap' = no date, clock runs from case open.
   timing: text('timing').$type<'by_date' | 'asap'>(),
+  // Anchor milestone (2026-07-01) for the 'asap' type: ASAP is measured as case
+  // open → this milestone reached. Set once per study in Settings. Plain id (no
+  // FK); a deleted milestone just resolves to no data.
+  anchorMilestoneId: text('anchor_milestone_id'),
 });
 
 export const lifeProblems = pgTable('life_problems', {

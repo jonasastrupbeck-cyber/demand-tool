@@ -646,6 +646,12 @@ const translations = {
     sv: 'standard',
     de: 'Standard',
   },
+  'settings.measuredToMilestone': {
+    en: 'Measured to',
+    da: 'Måles til',
+    sv: 'Mäts till',
+    de: 'Gemessen bis',
+  },
   'settings.add': {
     en: 'Add',
     da: 'Tilføj',

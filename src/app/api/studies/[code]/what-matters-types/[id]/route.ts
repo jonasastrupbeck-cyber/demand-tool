@@ -10,9 +10,11 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
-  const updates: { label?: string; operationalDefinition?: string | null } = {};
+  const updates: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null } = {};
   if (typeof body.label === 'string' && body.label.trim()) updates.label = body.label.trim();
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
+  // Anchor milestone for the ASAP type (case open → this milestone). Empty → clear.
+  if (body.anchorMilestoneId !== undefined) updates.anchorMilestoneId = body.anchorMilestoneId || null;
 
   await updateWhatMattersType(id, updates);
   return NextResponse.json({ success: true });
