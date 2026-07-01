@@ -34,8 +34,9 @@ export interface CaseDecision {
   id: string;
   decisionPointTypeId: string;
   outcome: 'positive' | 'negative';
-  cleanliness: 'clean' | 'dirty';
-  dirtyCause: string | null;
+  // Clean/dirty capture removed 2026-06-26 — optional/legacy on existing rows.
+  cleanliness?: 'clean' | 'dirty' | null;
+  dirtyCause?: string | null;
   decidedAt: string;
   // C9 (2026-06-17): affordability sub-states (person-kind milestones).
   willingnessToPay?: boolean | null;
@@ -81,8 +82,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   // The type whose mini-form is open; prefilled from its decision if decided.
   const [openTypeId, setOpenTypeId] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<'positive' | 'negative' | ''>('');
-  const [cleanliness, setCleanliness] = useState<'clean' | 'dirty' | ''>('');
-  const [dirtyCause, setDirtyCause] = useState('');
   const [decidedAt, setDecidedAt] = useState('');
   // C9 (2026-06-17): affordability sub-states ('' = unset, 'yes'/'no').
   const [willingnessToPay, setWillingnessToPay] = useState<'yes' | 'no' | ''>('');
@@ -106,15 +105,13 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     const existing = decisions.find((d) => d.decisionPointTypeId === type.id);
     setOpenTypeId(type.id);
     setOutcome(existing?.outcome ?? '');
-    setCleanliness(existing?.cleanliness ?? '');
-    setDirtyCause(existing?.dirtyCause ?? '');
     setDecidedAt((existing?.decidedAt ?? new Date().toISOString()).slice(0, 10));
     setWillingnessToPay(boolToTri(existing?.willingnessToPay));
     setAbilityToPay(boolToTri(existing?.abilityToPay));
   }
 
   async function save(type: DecisionPointType) {
-    if (!outcome || !cleanliness || saving) return;
+    if (!outcome || saving) return;
     setSaving(true);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/decisions`, {
       method: 'POST',
@@ -122,8 +119,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
       body: JSON.stringify({
         decisionPointTypeId: type.id,
         outcome,
-        cleanliness,
-        dirtyCause: cleanliness === 'dirty' ? dirtyCause.trim() || undefined : undefined,
         decidedAt: decidedAt ? `${decidedAt}T12:00:00.000Z` : undefined,
         recordedByCollector: collectorName || undefined,
         // C9: only send pay sub-states for person-kind milestones.
@@ -237,10 +232,9 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     const isActive = openTypeId === type.id;
     const focus = () => { if (openTypeId !== type.id) openForm(type); };
     const vOutcome = isActive ? outcome : (decision?.outcome ?? '');
-    const vClean = isActive ? cleanliness : (decision?.cleanliness ?? '');
     const vWilling = isActive ? willingnessToPay : boolToTri(decision?.willingnessToPay);
     const vAbility = isActive ? abilityToPay : boolToTri(decision?.abilityToPay);
-    const showSave = isActive && (!!outcome || !!cleanliness);
+    const showSave = isActive && !!outcome;
     return (
       <div key={type.id} className="rounded-lg bg-white border border-gray-200 p-2 space-y-1.5">
         <p className="text-xs font-medium text-gray-800 text-center">{tl(type.label)}</p>
@@ -289,29 +283,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
             ]}
           />
         </div>
-        <div className="flex justify-center">
-          <SegmentedToggle
-            ariaLabel={t('capture.dpCleanlinessAria')}
-            value={vClean}
-            compact
-            allowDeselect
-            onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty' | ''); }}
-            options={[
-              { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
-              { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
-            ]}
-          />
-        </div>
-        {isActive && cleanliness === 'dirty' && (
-          <input
-            type="text"
-            value={dirtyCause}
-            onChange={(e) => setDirtyCause(e.target.value)}
-            placeholder={t('capture.dpDirtyCausePlaceholder')}
-            aria-label={t('capture.dpDirtyCausePlaceholder')}
-            className="w-full px-2 py-1 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-400 outline-none"
-          />
-        )}
         {showSave && (
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-center">
@@ -326,7 +297,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               </label>
             </div>
             <div className="flex items-center justify-center gap-1.5">
-              <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+              <button type="button" onClick={() => save(type)} disabled={!outcome || saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
               {decision && (
                 <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
               )}
@@ -508,28 +479,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     ]}
                   />
                 </div>
-                <div className="flex justify-center">
-                  <SegmentedToggle
-                    ariaLabel={t('capture.dpCleanlinessAria')}
-                    value={cleanliness}
-                    allowDeselect
-                    onChange={(v) => setCleanliness(v as 'clean' | 'dirty' | '')}
-                    options={[
-                      { value: 'clean', label: t('capture.dpClean'), activeColor: 'green' },
-                      { value: 'dirty', label: t('capture.dpDirty'), activeColor: 'red' },
-                    ]}
-                  />
-                </div>
-                {cleanliness === 'dirty' && (
-                  <input
-                    type="text"
-                    value={dirtyCause}
-                    onChange={(e) => setDirtyCause(e.target.value)}
-                    placeholder={t('capture.dpDirtyCausePlaceholder')}
-                    aria-label={t('capture.dpDirtyCausePlaceholder')}
-                    className="w-full px-3 py-1.5 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-red-200 focus:ring-2 focus:ring-red-400 outline-none"
-                  />
-                )}
                 <div className="flex items-center justify-center gap-2">
                   <label className="flex items-center gap-1 text-xs text-gray-500">
                     {t('capture.dpDecidedAtLabel')}
@@ -545,7 +494,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   <button
                     type="button"
                     onClick={() => save(type)}
-                    disabled={!outcome || !cleanliness || saving}
+                    disabled={!outcome || saving}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
                   >
                     {t('settings.save')}
@@ -592,7 +541,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               key={type.id}
               type="button"
               onClick={() => openForm(type)}
-              title={decision.dirtyCause || undefined}
               className={`px-3 py-2 rounded-lg text-xs font-medium border text-left transition-colors ${
                 positive
                   ? 'border-green-300 bg-green-50 text-green-800 hover:bg-green-100'
@@ -604,13 +552,6 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                 {positive ? tl(type.positiveLabel) : tl(type.negativeLabel)}
                 <span className="text-gray-400">·</span>
                 {new Date(decision.decidedAt).toLocaleDateString()}
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] border ${
-                  decision.cleanliness === 'clean'
-                    ? 'border-green-300 bg-white text-green-700'
-                    : 'border-red-300 bg-white text-red-700'
-                }`}>
-                  {decision.cleanliness === 'clean' ? t('capture.dpClean') : t('capture.dpDirty')}
-                </span>
               </span>
             </button>
           );

@@ -1796,7 +1796,8 @@ export async function getCaseDecisions(caseId: string) {
 export async function upsertCaseDecision(caseId: string, data: {
   decisionPointTypeId: string;
   outcome: 'positive' | 'negative';
-  cleanliness: 'clean' | 'dirty';
+  // Clean/dirty capture removed 2026-06-26 (migration 0035) — now optional.
+  cleanliness?: 'clean' | 'dirty' | null;
   dirtyCause?: string | null;
   decidedAt?: Date;
   recordedByCollector?: string | null;
@@ -1809,8 +1810,8 @@ export async function upsertCaseDecision(caseId: string, data: {
     caseId,
     decisionPointTypeId: data.decisionPointTypeId,
     outcome: data.outcome,
-    cleanliness: data.cleanliness,
-    // Cause only makes sense for dirty decisions.
+    cleanliness: data.cleanliness ?? null,
+    // Cause only makes sense for dirty decisions (legacy); null otherwise.
     dirtyCause: data.cleanliness === 'dirty' ? (data.dirtyCause || null) : null,
     decidedAt: data.decidedAt || new Date(),
     recordedByCollector: data.recordedByCollector || null,

@@ -309,7 +309,9 @@ export const caseDecisionPoints = pgTable('case_decision_points', {
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
   outcome: text('outcome').$type<'positive' | 'negative'>().notNull(),
-  cleanliness: text('cleanliness').$type<'clean' | 'dirty'>().notNull(),
+  // Clean/dirty capture was removed 2026-06-26 (migration 0035) — now optional.
+  // Existing rows keep their value; new decisions leave it null.
+  cleanliness: text('cleanliness').$type<'clean' | 'dirty'>(),
   dirtyCause: text('dirty_cause'),
   decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
   recordedByCollector: text('recorded_by_collector'),

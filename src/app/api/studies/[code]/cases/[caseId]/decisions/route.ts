@@ -37,9 +37,9 @@ export async function POST(
   if (body.outcome !== 'positive' && body.outcome !== 'negative') {
     return NextResponse.json({ error: 'outcome must be "positive" or "negative"' }, { status: 400 });
   }
-  if (body.cleanliness !== 'clean' && body.cleanliness !== 'dirty') {
-    return NextResponse.json({ error: 'cleanliness must be "clean" or "dirty"' }, { status: 400 });
-  }
+  // Cleanliness is optional (clean/dirty capture removed 2026-06-26). Only accept
+  // it if explicitly 'clean'/'dirty' (legacy clients); otherwise leave it unset.
+  const cleanliness = body.cleanliness === 'clean' || body.cleanliness === 'dirty' ? body.cleanliness : null;
   let decidedAt: Date | undefined;
   if (body.decidedAt !== undefined) {
     const parsed = new Date(body.decidedAt);
@@ -52,7 +52,7 @@ export async function POST(
   const row = await upsertCaseDecision(caseId, {
     decisionPointTypeId: body.decisionPointTypeId,
     outcome: body.outcome,
-    cleanliness: body.cleanliness,
+    cleanliness,
     dirtyCause: typeof body.dirtyCause === 'string' ? body.dirtyCause.trim() || null : null,
     decidedAt,
     recordedByCollector: typeof body.recordedByCollector === 'string' ? body.recordedByCollector.trim() || null : null,
