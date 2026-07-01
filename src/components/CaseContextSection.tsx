@@ -120,7 +120,10 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
       {/* What matters — pills first (like the transactional tool): a leading
           "+ Add what matters" pill, then the selectable green chips. The
           free-text note is collapsed behind "+ Add note" — not a persistent box. */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      {/* Each pill is a vertical unit so a timed factor's date/hint pops out
+          DIRECTLY below its own box (not below the whole row). items-start so a
+          selected "When I want it" doesn't vertically shift the other pills. */}
+      <div className="flex flex-wrap items-start justify-center gap-2">
         <InlineTypeAdder
           code={code}
           apiPath="what-matters-types"
@@ -133,42 +136,37 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
         />
         {whatMattersTypes.map((wm) => {
           const on = whatMattersTypeIds.includes(wm.id);
+          const icon = wm.timing === 'by_date' ? '📅 ' : wm.timing === 'asap' ? '⏱ ' : '';
           return (
-            <button
-              key={wm.id}
-              type="button"
-              onClick={() => toggleWhatMatters(wm.id)}
-              className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
-                on
-                  ? 'bg-green-600 text-white border-green-600'
-                  : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
-              }`}
-            >
-              {wm.timing === 'by_date' ? '📅 ' : wm.timing === 'asap' ? '⏱ ' : ''}{tl(wm.label)}
-            </button>
+            <div key={wm.id} className="flex flex-col items-center gap-1">
+              <button
+                type="button"
+                onClick={() => toggleWhatMatters(wm.id)}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
+                  on
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                }`}
+              >
+                {icon}{tl(wm.label)}
+              </button>
+              {/* Wanted date pops out just below the "When I want it" box. */}
+              {on && wm.timing === 'by_date' && (
+                <input
+                  type="date"
+                  value={(whatMattersTargetDates?.[wm.id] || '').slice(0, 10)}
+                  onChange={(e) => onPatch({ whatMattersDate: { whatMattersTypeId: wm.id, date: e.target.value || null } })}
+                  aria-label={t('capture.whatMattersWhenLabel')}
+                  className="text-[11px] px-2 py-0.5 rounded border border-green-300 bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                />
+              )}
+              {on && wm.timing === 'asap' && (
+                <span className="text-[10px] text-green-700/70">{t('capture.whatMattersAsapHint')}</span>
+              )}
+            </div>
           );
         })}
       </div>
-
-      {/* Time-based what-matters: for a selected 'by_date' factor capture the
-          customer's wanted date; for 'asap' just note the clock runs from case
-          open. Free-form factors (timing null) show nothing here. */}
-      {whatMattersTypes.filter((wm) => wm.timing && whatMattersTypeIds.includes(wm.id)).map((wm) => (
-        wm.timing === 'by_date' ? (
-          <div key={wm.id} className="flex items-center justify-center gap-2">
-            <span className="text-[11px] font-medium text-green-700">📅 {t('capture.whatMattersWhenLabel')}</span>
-            <input
-              type="date"
-              value={(whatMattersTargetDates?.[wm.id] || '').slice(0, 10)}
-              onChange={(e) => onPatch({ whatMattersDate: { whatMattersTypeId: wm.id, date: e.target.value || null } })}
-              aria-label={t('capture.whatMattersWhenLabel')}
-              className="text-[11px] px-2 py-0.5 rounded border border-green-300 bg-white focus:ring-2 focus:ring-green-500 outline-none"
-            />
-          </div>
-        ) : (
-          <p key={wm.id} className="text-center text-[11px] text-green-700/70">⏱ {tl(wm.label)} — {t('capture.whatMattersAsapHint')}</p>
-        )
-      ))}
       {/* Collapsed free-text note — opt-in, mirrors transactional. */}
       {(noteOpen || (whatMatters ?? '').trim()) ? (
         <div>
