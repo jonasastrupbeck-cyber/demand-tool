@@ -160,12 +160,25 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     }
   }
 
+  // The latest decision date recorded within a milestone (its decision points'
+  // decidedAt), or null if none. ISO strings compare lexically.
+  function latestDecisionDateFor(milestoneId: string): string | null {
+    const typeIds = new Set(decisionPointTypes.filter((d) => d.milestoneId === milestoneId).map((d) => d.id));
+    const dates = decisions.filter((d) => typeIds.has(d.decisionPointTypeId)).map((d) => d.decidedAt);
+    return dates.length ? dates.reduce((max, d) => (d > max ? d : max)) : null;
+  }
+
   // --- Milestone outcome (2026-06-18): achieved / not_achieved + reached date ---
   function openMilestoneForm(m: Milestone) {
     const rec = caseMilestones.find((r) => r.milestoneId === m.id);
     setOpenMilestoneId(m.id);
     setMsOutcome(rec?.outcome ?? '');
-    setMsReachedAt((rec?.reachedAt ?? new Date().toISOString()).slice(0, 10));
+    // New milestone: default the reached date to the latest decision recorded in
+    // this milestone (so it reflects when it was actually reached, not "today"),
+    // falling back to today when no decisions are dated yet. Existing records keep
+    // their saved date (2026-07-01).
+    const fallback = latestDecisionDateFor(m.id) ?? new Date().toISOString();
+    setMsReachedAt((rec?.reachedAt ?? fallback).slice(0, 10));
   }
 
   async function saveMilestone(m: Milestone) {
