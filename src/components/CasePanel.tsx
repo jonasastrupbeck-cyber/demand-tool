@@ -949,7 +949,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         <div className="order-3 md:order-4 flex-1 min-w-0 min-[1600px]:flex-none md:ml-3 flex flex-col">
           {/* inner row is flex-1 so it fills Group B's (board-stretched) height,
               which lets the dashed line stretch to the SAME height as the left one. */}
-          <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch md:min-w-min md:overflow-x-auto">
+          <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch min-w-0 md:overflow-x-auto">
             {decisionPointsEnabled && (
               <div className="w-full md:w-64 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
