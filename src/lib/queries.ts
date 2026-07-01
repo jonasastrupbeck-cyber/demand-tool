@@ -392,7 +392,7 @@ export async function addWhatMattersType(studyId: string, label: string) {
   return row;
 }
 
-export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null }) {
+export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }) {
   await db.update(whatMattersTypes).set(data).where(eq(whatMattersTypes.id, id));
 }
 

@@ -95,7 +95,7 @@ export default function DashboardPage() {
   const [cases, setCases] = useState<{ id: string; caseRef: string }[]>([]);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
-  const [whatMattersTypes, setWhatMattersTypes] = useState<{ id: string; label: string; sortOrder: number; timing: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null }[]>([]);
+  const [whatMattersTypes, setWhatMattersTypes] = useState<{ id: string; label: string; sortOrder: number; timing: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }[]>([]);
   // What-matters scope (flow): restrict every capability chart to cases that
   // selected this timed factor (null = all). Gives the ASAP measure its meaning.
   const [whatMattersScope, setWhatMattersScope] = useState<string | null>(null);
@@ -235,10 +235,19 @@ export default function DashboardPage() {
     // wanted date). Pair it with a completion event + the "days early/late"
     // metric to measure whether we met the date.
     const wm = whatMattersTypes.filter((w) => w.timing === 'by_date').map((w) => ({ id: `whatMattersTarget:${w.id}`, label: `📅 ${tl(w.label)}` }));
-    // 'asap' types with an anchor milestone add a case-open → that-milestone
-    // event (auto-scoped to ASAP-tagged cases). Pair with case opened + Lead time.
-    const msLabel = (id: string) => { const m = milestones.find((x) => x.id === id); return m ? tl(m.label) : '?'; };
-    const wmAsap = whatMattersTypes.filter((w) => w.timing === 'asap' && w.anchorMilestoneId).map((w) => ({ id: `whatMattersAsap:${w.id}`, label: `⏱ ${tl(w.label)} → ${msLabel(w.anchorMilestoneId!)}` }));
+    // 'asap' types with an anchor (a milestone OR decision-point event token) add
+    // a case-open → that-event measure (auto-scoped to ASAP-tagged cases). Pair
+    // with case opened + Lead time.
+    const anchorLabel = (tok: string) => {
+      if (tok.startsWith('milestone:')) { const m = milestones.find((x) => x.id === tok.slice('milestone:'.length)); return m ? `◇ ${tl(m.label)}` : '?'; }
+      if (tok.startsWith('decision:')) { const d = decisionPointTypes.find((x) => x.id === tok.slice('decision:'.length)); return d ? tl(d.label) : '?'; }
+      return '?';
+    };
+    const wmAsap = whatMattersTypes
+      .filter((w) => w.timing === 'asap')
+      .map((w) => ({ w, tok: w.anchorEvent ?? (w.anchorMilestoneId ? `milestone:${w.anchorMilestoneId}` : null) }))
+      .filter((x) => x.tok)
+      .map((x) => ({ id: `whatMattersAsap:${x.w.id}`, label: `⏱ ${tl(x.w.label)} → ${anchorLabel(x.tok!)}` }));
     return [
       { id: 'caseOpen', label: t('dashboard.evCaseOpened') },
       { id: 'firstContact', label: t('dashboard.evFirstContact') },

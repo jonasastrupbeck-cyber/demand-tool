@@ -781,8 +781,8 @@ function eventTimestamp(
     openedAt: Date; closedAt: Date | null; firstContactAt: Date | null;
     decisions: Map<string, Date>; milestones: Map<string, Date>;
     whatMattersTargets: Map<string, Date>;
-    // Types this case selected + the study's typeId→anchorMilestoneId map, so the
-    // ASAP measure auto-scopes to cases that actually chose the ASAP factor.
+    // Types this case selected + the study's typeId→anchor-token map, so the ASAP
+    // measure auto-scopes to cases that actually chose the ASAP factor.
     whatMattersSelected: Set<string>; asapAnchors: Map<string, string>;
   },
 ): Date | null {
@@ -795,8 +795,10 @@ function eventTimestamp(
   if (token.startsWith('whatMattersAsap:')) {
     const typeId = token.slice('whatMattersAsap:'.length);
     if (!ctx.whatMattersSelected.has(typeId)) return null; // only ASAP-tagged cases
-    const msId = ctx.asapAnchors.get(typeId);
-    return msId ? (ctx.milestones.get(msId) ?? null) : null;
+    const anchorToken = ctx.asapAnchors.get(typeId);
+    // The anchor is a 'milestone:<id>' / 'decision:<typeId>' token — resolve it
+    // with the same resolver (never itself a whatMattersAsap token, so no loop).
+    return anchorToken ? eventTimestamp(anchorToken, ctx) : null;
   }
   return null;
 }
@@ -852,12 +854,17 @@ export async function getCapabilityData(
       wmTargetByCase.get(r.caseId)!.set(r.whatMattersTypeId, new Date(r.targetDate as unknown as string));
     }
   }
-  // Study-level typeId → anchor milestone (the ASAP type's measured-to milestone).
-  const anchorRows = await db.select({ id: whatMattersTypes.id, anchorMilestoneId: whatMattersTypes.anchorMilestoneId })
+  // Study-level typeId → anchor event token (the ASAP type's measured-to event:
+  // a 'milestone:<id>' or 'decision:<typeId>' token). Falls back to the legacy
+  // milestone-only column.
+  const anchorRows = await db.select({ id: whatMattersTypes.id, anchorEvent: whatMattersTypes.anchorEvent, anchorMilestoneId: whatMattersTypes.anchorMilestoneId })
     .from(whatMattersTypes)
-    .where(and(eq(whatMattersTypes.studyId, studyId), isNotNull(whatMattersTypes.anchorMilestoneId)));
+    .where(eq(whatMattersTypes.studyId, studyId));
   const asapAnchors = new Map<string, string>();
-  for (const r of anchorRows) if (r.anchorMilestoneId) asapAnchors.set(r.id, r.anchorMilestoneId);
+  for (const r of anchorRows) {
+    const tok = r.anchorEvent ?? (r.anchorMilestoneId ? `milestone:${r.anchorMilestoneId}` : null);
+    if (tok) asapAnchors.set(r.id, tok);
+  }
 
   // Per-measure annotations (exclude / note), keyed by caseId for this event-pair.
   const annoRows = await db.select().from(capabilityAnnotations)

@@ -105,7 +105,7 @@ interface StudyData {
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null }[];
   milestones: { id: string; label: string; sortOrder: number }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
@@ -375,14 +375,14 @@ export default function SettingsPage() {
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, { method: 'DELETE' }));
   }
 
-  // Anchor milestone for the ASAP type: ASAP is measured case open → this
-  // milestone. Optimistic, mirrors assignDecisionToMilestone.
-  function setWhatMattersAnchor(id: string, milestoneId: string | null) {
-    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, anchorMilestoneId: milestoneId } : w)) } : s));
+  // ASAP anchor: case open → this event. `event` is a capability token
+  // ('milestone:<id>' | 'decision:<typeId>') or null. Optimistic.
+  function setWhatMattersAnchor(id: string, event: string | null) {
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, anchorEvent: event } : w)) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ anchorMilestoneId: milestoneId }),
+      body: JSON.stringify({ anchorEvent: event }),
     }));
   }
 
@@ -1608,17 +1608,23 @@ export default function SettingsPage() {
                     {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
-                    {/* ASAP is measured case open → this milestone (set once per study). */}
+                    {/* ASAP is measured case open → this event (a milestone OR a
+                        decision point), set once per study. Value is a token. */}
                     {wm.timing === 'asap' && (
                       <label className="flex items-center gap-1 text-xs text-gray-600">
                         {t('settings.measuredToMilestone')}
                         <select
-                          value={wm.anchorMilestoneId ?? ''}
+                          value={wm.anchorEvent ?? (wm.anchorMilestoneId ? `milestone:${wm.anchorMilestoneId}` : '')}
                           onChange={(e) => setWhatMattersAnchor(wm.id, e.target.value || null)}
                           className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                         >
                           <option value="">—</option>
-                          {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                          <optgroup label={t('settings.milestones')}>
+                            {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => <option key={m.id} value={`milestone:${m.id}`}>◇ {m.label}</option>)}
+                          </optgroup>
+                          <optgroup label={t('settings.decisionPointTypes')}>
+                            {[...(study.decisionPointTypes || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => <option key={d.id} value={`decision:${d.id}`}>{d.label}</option>)}
+                          </optgroup>
                         </select>
                       </label>
                     )}

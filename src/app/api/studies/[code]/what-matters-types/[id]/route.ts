@@ -10,10 +10,12 @@ export async function PATCH(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const body = await request.json();
-  const updates: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null } = {};
+  const updates: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null; anchorEvent?: string | null } = {};
   if (typeof body.label === 'string' && body.label.trim()) updates.label = body.label.trim();
   if (body.operationalDefinition !== undefined) updates.operationalDefinition = body.operationalDefinition || null;
-  // Anchor milestone for the ASAP type (case open → this milestone). Empty → clear.
+  // ASAP anchor (case open → this event) as a token 'milestone:<id>' | 'decision:<id>'.
+  // Empty → clear. anchorMilestoneId kept for the legacy milestone-only field.
+  if (body.anchorEvent !== undefined) updates.anchorEvent = body.anchorEvent || null;
   if (body.anchorMilestoneId !== undefined) updates.anchorMilestoneId = body.anchorMilestoneId || null;
 
   await updateWhatMattersType(id, updates);
