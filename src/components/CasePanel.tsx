@@ -567,7 +567,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // Shared sub-blocks — composed differently in flow vs transactional layouts.
   const headerRow = (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      <span className="font-semibold text-gray-900 text-xs">#{caseRow.caseRef}</span>
+      {/* Flow shows the case number in the customer action bar above the board;
+          keep it in the header only for the transactional case card. */}
+      {!isFlow && <span className="font-semibold text-gray-900 text-xs">#{caseRow.caseRef}</span>}
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
         isOpen ? 'border-green-300 bg-green-50 text-green-700' : 'bg-gray-200 border-gray-300 text-gray-600'
       }`}>
@@ -795,8 +797,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       {/* Customer action bar (2026-07-01): open-existing switcher + close /
           set-aside, above the board so you can finish a customer and hop to the
           next in one click. Moved out of the green pane. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
           <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">#{caseRow.caseRef}</span>
           {!isOpen && <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
           <div ref={switcherRef} className="relative">
@@ -853,9 +854,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               </div>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden sm:inline text-xs text-gray-400">{t('capture.customerAttachNote')}</span>
           <button
             type="button"
             onClick={() => patchCase({ status: isOpen ? 'closed' : 'open' })}
@@ -870,7 +868,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           >
             {t('capture.caseSetAside')}
           </button>
-        </div>
       </div>
       {/* Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
           columns (customer left · touch rail + composer middle · decisions right).
