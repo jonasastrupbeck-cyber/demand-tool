@@ -133,6 +133,31 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const workScrollRef = useRef<HTMLDivElement>(null);
   const composerColRef = useRef<HTMLDivElement>(null);
 
+  // Top mirror scrollbar (2026-07-01): the rail's native horizontal scrollbar
+  // sits at the BOTTOM, far down the page when touch cards / the composer are
+  // tall. Add a synced scrollbar at the TOP of the rail that appears only when
+  // the rail overflows horizontally. It's a thin element whose only content is a
+  // spacer as wide as the rail's scrollWidth; scrolling either drives the other.
+  const workScrollTopRef = useRef<HTMLDivElement>(null);
+  const [railContentWidth, setRailContentWidth] = useState(0);
+  const [railOverflow, setRailOverflow] = useState(false);
+  const measureRail = useCallback(() => {
+    const el = workScrollRef.current;
+    if (!el) return;
+    setRailContentWidth(el.scrollWidth);
+    setRailOverflow(el.scrollWidth > el.clientWidth + 1);
+  }, []);
+  // Mirror one element's scrollLeft onto the other. No flag/timer: if the two
+  // already match (within 1px) we bail, which stops the reflected scroll event
+  // from ping-ponging back — so a dropped rAF frame can never deadlock the sync.
+  const syncScroll = (from: HTMLDivElement | null, to: HTMLDivElement | null) => {
+    if (!from || !to) return;
+    if (Math.abs(to.scrollLeft - from.scrollLeft) < 1) return;
+    to.scrollLeft = from.scrollLeft;
+  };
+  const onRailScroll = () => syncScroll(workScrollRef.current, workScrollTopRef.current);
+  const onTopScroll = () => syncScroll(workScrollTopRef.current, workScrollRef.current);
+
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
     if (!res.ok) return;
@@ -234,6 +259,19 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     });
     return () => cancelAnimationFrame(id);
   }, [activeCaseId, caseRow?.id, entries.length]);
+
+  // Keep the top mirror scrollbar's width/visibility in sync with the rail:
+  // recompute after touches load/change, and whenever the rail container or its
+  // content resizes (viewport change, composer growing as blocks are added).
+  useEffect(() => {
+    measureRail();
+    const el = workScrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => measureRail());
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [measureRail, activeCaseId, caseRow?.id, entries.length]);
 
   // Flow chooser: load the customer (case) list so the chooser can show recent
   // open customers and enforce new-vs-existing. Reuses the existing list route.
@@ -765,7 +803,17 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         {/* GROUP A — [ captured touches → composer ]. Own horizontal scroll with a
             min-width = the Work Entry box, so the composer is ALWAYS fully visible;
             scroll left within this group for the captured touches. */}
-        <div ref={workScrollRef} className="order-2 md:order-3 flex-1 md:min-w-[42rem] md:overflow-x-auto" onDragOver={onRailDragOver} onDrop={stopEdgeScroll}>
+        <div className="order-2 md:order-3 flex-1 md:min-w-[42rem] min-w-0 flex flex-col">
+        {/* Top mirror scrollbar — desktop only, shown only on horizontal overflow. */}
+        <div
+          ref={workScrollTopRef}
+          onScroll={onTopScroll}
+          aria-hidden
+          className={`rail-topscroll overflow-x-auto overflow-y-hidden mb-1 ${railOverflow ? 'hidden md:block' : 'hidden'}`}
+        >
+          <div style={{ width: railContentWidth }} className="h-px" />
+        </div>
+        <div ref={workScrollRef} onScroll={onRailScroll} className="md:overflow-x-auto" onDragOver={onRailDragOver} onDrop={stopEdgeScroll}>
           <div className="flex flex-col gap-3 md:flex-row md:gap-3 md:min-w-min md:items-stretch pb-2">
             {entries.map((e) => {
               const canDrag = entries.length >= 2;
@@ -790,6 +838,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               </div>
             )}
           </div>
+        </div>
         </div>
 
         {/* GROUP B — [ decision box ┊ capability of response ]. Own horizontal
