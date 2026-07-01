@@ -497,7 +497,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // Shared sub-blocks — composed differently in flow vs transactional layouts.
   const headerRow = (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      <span className="font-semibold text-gray-900 text-sm">#{caseRow.caseRef}</span>
+      <span className="font-semibold text-gray-900 text-xs">#{caseRow.caseRef}</span>
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${
         isOpen ? 'border-green-300 bg-green-50 text-green-700' : 'bg-gray-200 border-gray-300 text-gray-600'
       }`}>
@@ -729,7 +729,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       <div className="flex flex-col gap-3 md:flex-row md:gap-0 md:items-stretch min-h-[24rem]">
         {/* PINNED LEFT — the customer. Always visible. */}
         <aside className="order-1 w-full md:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
-          {studyName && <p className="text-center text-sm font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
+          {studyName && <p className="text-center text-xs font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           <div className="flex justify-center mb-2">
             <button
               type="button"

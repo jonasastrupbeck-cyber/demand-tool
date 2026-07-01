@@ -70,12 +70,13 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
       //   green  = WM / Life Problem (dashed, positive)
       //   blue   = System Condition (sky)
       //   indigo = Thinking (deeper blue, visually distinct from SC)
+      const pillSize = compact ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1.5 text-sm';
       const pillClass =
         pillVariant === 'green'
-          ? 'px-3 py-1.5 rounded-full text-sm font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors'
+          ? `${pillSize} rounded-full font-medium bg-white text-green-700 border border-dashed border-green-300 hover:border-green-500 hover:bg-green-50 transition-colors`
         : pillVariant === 'thinking'
-          ? 'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors'
-        :   'px-3 py-1.5 rounded-full text-sm font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors';
+          ? `${pillSize} rounded-full font-medium border bg-white text-blue-700 border-blue-400 hover:border-blue-600 hover:bg-blue-50 transition-colors`
+        :   `${pillSize} rounded-full font-medium border bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50 transition-colors`;
       return (
         <button
           type="button"

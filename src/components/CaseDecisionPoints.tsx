@@ -251,6 +251,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               <SegmentedToggle
                 ariaLabel={t('capture.dpWillingnessToPay')}
                 value={vWilling}
+                compact
                 allowDeselect
                 onChange={(v) => { focus(); setWillingnessToPay(v as 'yes' | 'no' | ''); }}
                 options={[
@@ -264,6 +265,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               <SegmentedToggle
                 ariaLabel={t('capture.dpAbilityToPay')}
                 value={vAbility}
+                compact
                 allowDeselect
                 onChange={(v) => { focus(); setAbilityToPay(v as 'yes' | 'no' | ''); }}
                 options={[
@@ -278,6 +280,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
           <SegmentedToggle
             ariaLabel={t('capture.dpOutcomeAria')}
             value={vOutcome}
+            compact
             allowDeselect
             onChange={(v) => { focus(); setOrClearOutcome(decision, v); }}
             options={[
@@ -290,6 +293,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
           <SegmentedToggle
             ariaLabel={t('capture.dpCleanlinessAria')}
             value={vClean}
+            compact
             allowDeselect
             onChange={(v) => { focus(); setCleanliness(v as 'clean' | 'dirty' | ''); }}
             options={[
@@ -322,11 +326,11 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               </label>
             </div>
             <div className="flex items-center justify-center gap-1.5">
-              <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+              <button type="button" onClick={() => save(type)} disabled={!outcome || !cleanliness || saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
               {decision && (
-                <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
+                <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
               )}
-              <button type="button" onClick={() => setOpenTypeId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
+              <button type="button" onClick={() => setOpenTypeId(null)} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
             </div>
           </div>
         )}
@@ -402,6 +406,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                 <SegmentedToggle
                   ariaLabel={t('capture.milestoneOutcomeAria')}
                   value={vMsOutcome}
+                  compact
                   allowDeselect
                   onChange={(v) => { focusMs(); setOrClearMsOutcome(rec, v); }}
                   options={[
@@ -424,11 +429,11 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     </label>
                   </div>
                   <div className="flex items-center justify-center gap-1.5">
-                    <button type="button" onClick={() => saveMilestone(m)} disabled={!msOutcome || msSaving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+                    <button type="button" onClick={() => saveMilestone(m)} disabled={!msOutcome || msSaving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
                     {rec && (
-                      <button type="button" onClick={() => removeMilestone(rec.id)} disabled={msSaving} className="px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
+                      <button type="button" onClick={() => removeMilestone(rec.id)} disabled={msSaving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
                     )}
-                    <button type="button" onClick={() => setOpenMilestoneId(null)} className="px-2.5 py-1 rounded-lg text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
+                    <button type="button" onClick={() => setOpenMilestoneId(null)} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">{t('capture.dpCancel')}</button>
                   </div>
                 </div>
               )}

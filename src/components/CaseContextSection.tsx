@@ -71,6 +71,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           onChange={(id) => onPatch({ lifeProblemId: id || null })}
           options={lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label), operationalDefinition: lp.operationalDefinition ? tl(lp.operationalDefinition) : null }))}
           variant={lifeProblemId ? 'value' : 'valueLight'}
+          compact
         />
         <InlineTypeAdder
           code={code}
@@ -94,6 +95,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
             onChange={(id) => onPatch({ demandTypeId: id || null })}
             options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
             variant={demandTypeId ? 'value' : 'valueLight'}
+            compact
           />
         </div>
       )}
@@ -110,7 +112,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
         placeholder={t('capture.caseContextPlaceholder')}
         aria-label={t('capture.caseContextPlaceholder')}
         rows={2}
-        className="w-full px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+        className="w-full px-2 py-1.5 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
       />
 
       {/* What matters — pills first (like the transactional tool): a leading
@@ -125,6 +127,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           pillLabel={t('capture.addWhatMatters')}
           pillVariant="green"
           inputVariant="green"
+          compact
         />
         {whatMattersTypes.map((wm) => {
           const on = whatMattersTypeIds.includes(wm.id);
@@ -133,7 +136,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
               key={wm.id}
               type="button"
               onClick={() => toggleWhatMatters(wm.id)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
                 on
                   ? 'bg-green-600 text-white border-green-600'
                   : 'bg-white text-green-700 border-green-300 hover:bg-green-50'

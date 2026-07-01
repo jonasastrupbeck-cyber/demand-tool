@@ -46,6 +46,10 @@ interface Props {
    *  for the per-block system-condition picker so it never grows wider than the
    *  work block it's attached to. Default false = today's content-width pill. */
   fullWidth?: boolean;
+  /** Denser trigger for tight side-panels — `text-[11px] px-2 py-0.5` instead of
+   *  the default `text-sm px-3 py-1.5`. Matches the flow saved-touch card sizing.
+   *  The popover options stay readable. Default false. */
+  compact?: boolean;
 }
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
@@ -88,7 +92,7 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   return 'bg-white text-gray-500 border-gray-300 hover:border-gray-400';
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel, fullWidth = false }: Props) {
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel, fullWidth = false, compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -164,7 +168,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className={`${fullWidth ? 'flex w-full justify-between' : 'inline-flex'} items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${pillClasses(variant, Boolean(selected))}`}
+        className={`${fullWidth ? 'flex w-full justify-between' : 'inline-flex'} items-center gap-1.5 rounded-full font-medium border transition-colors ${compact ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1.5 text-sm'} ${pillClasses(variant, Boolean(selected))}`}
       >
         <span className={fullWidth ? 'min-w-0 truncate' : undefined}>{selected ? selected.label : placeholder}</span>
         <svg

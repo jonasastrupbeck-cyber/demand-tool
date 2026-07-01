@@ -21,6 +21,9 @@ interface Props {
    *  V/S/F, customer-felt) keep their current behaviour. Used by the decision
    *  points so a mis-click can be un-clicked. */
   allowDeselect?: boolean;
+  /** Denser buttons (`px-1.5 py-0.5 text-[11px]`) for tight side-panels, matching
+   *  the flow saved-touch card sizing. Default false = `px-2 py-1 text-xs`. */
+  compact?: boolean;
 }
 
 // Compact two-option (or N-option) toggle. Used by SC Helps/Hinders and
@@ -43,7 +46,7 @@ const ACTIVE_CLASSES: Record<ActiveColor, string> = {
   rose: 'bg-rose-600 text-white',
 };
 
-export default function SegmentedToggle({ options, value, onChange, ariaLabel, allowDeselect = false }: Props) {
+export default function SegmentedToggle({ options, value, onChange, ariaLabel, allowDeselect = false, compact = false }: Props) {
   return (
     <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={ariaLabel}>
       {options.map((opt) => {
@@ -54,7 +57,7 @@ export default function SegmentedToggle({ options, value, onChange, ariaLabel, a
             key={opt.value}
             type="button"
             onClick={() => onChange(allowDeselect && active ? '' : opt.value)}
-            className={`px-2 py-1 text-xs font-medium transition-colors ${
+            className={`font-medium transition-colors ${compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'} ${
               active
                 ? activeClass
                 : 'bg-white text-gray-700 hover:bg-gray-50'
