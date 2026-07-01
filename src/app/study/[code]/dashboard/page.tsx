@@ -473,9 +473,25 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Date range filter + export */}
+        {/* Date range + export. Flow (2026-07-02): the Capability / Analytics /
+            Synthesise view tabs sit to the LEFT of the date range on this same
+            row; the contextual help line drops just beneath the row. */}
+        <div>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
+            {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (
+              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200">
+                {(['capability', ...(flowAnalyticsAvailable ? ['analytics'] : []), ...(synthesisAvailable ? ['synthesis'] : [])] as DashboardView[]).map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setDashboardView(view)}
+                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    {view === 'synthesis' ? t('dashboard.synthesisTab') : view === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab')}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200">
               {(['all', 'today', '7d', '30d', 'custom'] as DateRange[]).map((range) => (
                 <button
@@ -538,6 +554,11 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+        {/* Contextual help for the active flow view — dropped beneath the row. */}
+        {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (
+          <p className="text-xs text-gray-400 mt-1.5">{dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : dashboardView === 'analytics' ? t('dashboard.analyticsTabHelp') : t('dashboard.capabilityTabHelp')}</p>
+        )}
+        </div>
 
         {uploadMessage && (
           <div className={`p-3 rounded-lg text-sm ${uploadMessage.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
@@ -578,38 +599,11 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Flow tab bar (0028/0029): flow studies are capability-only by default;
-            optional Analytics and Synthesise tabs appear when their toggles are on. */}
-        {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (() => {
-          const tabs: DashboardView[] = [
-            'capability',
-            ...((flowAnalyticsAvailable ? ['analytics'] : []) as DashboardView[]),
-            ...((synthesisAvailable ? ['synthesis'] : []) as DashboardView[]),
-          ];
-          const tabLabel = (v: DashboardView) => v === 'synthesis' ? t('dashboard.synthesisTab') : v === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab');
-          const help = dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : dashboardView === 'analytics' ? t('dashboard.analyticsTabHelp') : t('dashboard.capabilityTabHelp');
-          return (
-            <div>
-              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
-                {tabs.map((view) => (
-                  <button
-                    key={view}
-                    onClick={() => setDashboardView(view)}
-                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
-                      dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {tabLabel(view)}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">{help}</p>
-            </div>
-          );
-        })()}
-
-        {/* P2BS data-scope selector (flow): scope every view to one life problem.
-            All data by default; sits directly under the view tabs. */}
+        {/* Flow scope selectors, side by side (2026-07-02): Problems-to-be-solved
+            (life problem) on the left, What matters (timed factor) to its right;
+            they wrap under each other on narrow screens. */}
+        {isFlow && ((lifeProblemsEnabled && lifeProblems.length > 0) || whatMattersTypes.some((w) => w.timing)) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-start">
         {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-gray-500">{t('capture.caseTableP2bs')}:</span>
@@ -661,6 +655,8 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+        )}
+        </div>
         )}
 
         {/* Summary cards */}
@@ -1626,14 +1622,14 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card label={t('dashboard.workEntries')} value={data.workCount} />
-                <Card label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
-                <Card label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
+                <Card compact label={t('dashboard.workEntries')} value={data.workCount} />
+                <Card compact label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
+                <Card compact label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
                 {data.workSequenceCount > 0 && (
-                  <Card label={t('capture.classificationWorkSequence')} value={data.workSequenceCount} color={COLORS.sequence} />
+                  <Card compact label={t('capture.classificationWorkSequence')} value={data.workSequenceCount} color={COLORS.sequence} />
                 )}
                 {data.workUnknownCount > 0 && (
-                  <Card label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
+                  <Card compact label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
                 )}
               </div>
 
@@ -1898,11 +1894,13 @@ export default function DashboardPage() {
   );
 }
 
-function Card({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color?: string }) {
+function Card({ label, value, sub, color, compact }: { label: string; value: string | number; sub?: string; color?: string; compact?: boolean }) {
+  // `compact` (2026-07-02): a denser, ~half-height card — smaller padding + value.
+  // Used by the flow Analytics work stat cards; default keeps every other card as-is.
   return (
-    <div className="rounded-xl shadow-sm p-4 bg-white border border-gray-200">
+    <div className={`rounded-xl shadow-sm bg-white border border-gray-200 ${compact ? 'p-2.5' : 'p-4'}`}>
       <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
-      <p className="text-2xl font-bold mt-1" style={{ color: color || '#1f2937' }}>{value}</p>
+      <p className={`font-bold ${compact ? 'text-lg mt-0.5' : 'text-2xl mt-1'}`} style={{ color: color || '#1f2937' }}>{value}</p>
       {sub && <p className="text-xs mt-0.5 text-gray-400">{sub}</p>}
     </div>
   );
