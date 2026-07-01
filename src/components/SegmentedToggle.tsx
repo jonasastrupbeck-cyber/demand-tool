@@ -1,6 +1,6 @@
 'use client';
 
-type ActiveColor = 'burgundy' | 'green' | 'red' | 'emerald' | 'blue' | 'rose';
+type ActiveColor = 'burgundy' | 'green' | 'red' | 'emerald' | 'blue' | 'rose' | 'amber';
 
 interface SegmentedToggleOption {
   value: string;
@@ -44,6 +44,9 @@ const ACTIVE_CLASSES: Record<ActiveColor, string> = {
   // Rose — failure DEMAND (a demand hitting you): failure-adjacent red, kept
   // distinct from 'red' (failure work) and independent of the brand override.
   rose: 'bg-rose-600 text-white',
+  // Amber — a decision outcome that carries the case forward but imperfectly
+  // (a "variation" outcome), matching the sequence-work amber tone.
+  amber: 'bg-amber-500 text-white',
 };
 
 export default function SegmentedToggle({ options, value, onChange, ariaLabel, allowDeselect = false, compact = false }: Props) {

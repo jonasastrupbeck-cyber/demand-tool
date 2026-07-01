@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
+import InlineTypeAdder from '@/components/InlineTypeAdder';
 
 interface HandlingType {
   id: string;
@@ -103,7 +104,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[] }[];
   milestones: { id: string; label: string; sortOrder: number }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
@@ -486,14 +487,40 @@ export default function SettingsPage() {
     // Default a new decision point into the first milestone if one isn't picked.
     const milestoneId = newDpMilestoneId || study?.milestones?.[0]?.id || null;
     setNewDpLabel(''); setNewDpPos(''); setNewDpNeg('');
+    // Reload after add: the server seeds two outcomes (green + red) whose ids we
+    // need locally, so reconcile from the server rather than guessing them.
     mutateAdd(
       () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label, positiveLabel, negativeLabel, milestoneId }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, decisionPointTypes: [...s.decisionPointTypes, { id, label, positiveLabel, negativeLabel, sortOrder: s.decisionPointTypes.length, milestoneId }] } : s)),
+      () => loadStudy(),
     );
+  }
+
+  // --- Decision outcomes (2026-07-01): a decision point's list of answers. ---
+  // Update one outcome's local state (label or tone) under its parent dp.
+  function patchOutcomeLocal(dpId: string, outcomeId: string, patch: Partial<{ label: string; tone: 'on_target' | 'variation' | 'negative' }>) {
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, outcomes: (d.outcomes ?? []).map((o) => (o.id === outcomeId ? { ...o, ...patch } : o)) } : d)) } : s));
+  }
+
+  function patchDecisionOutcome(dpId: string, outcomeId: string, patch: { label?: string; tone?: 'on_target' | 'variation' | 'negative' }) {
+    const clean: typeof patch = {};
+    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
+    if (patch.tone) clean.tone = patch.tone;
+    if (Object.keys(clean).length === 0) return;
+    patchOutcomeLocal(dpId, outcomeId, clean);
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-outcome-types/${outcomeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clean),
+    }));
+  }
+
+  function removeDecisionOutcome(dpId: string, outcomeId: string) {
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, outcomes: (d.outcomes ?? []).filter((o) => o.id !== outcomeId) } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-outcome-types/${outcomeId}`, { method: 'DELETE' }));
   }
 
   function patchDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string }) {
@@ -1300,25 +1327,43 @@ export default function SettingsPage() {
                 />
                 <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="text-xs text-gray-500">
-                  {t('settings.dpPositiveLabel')}
-                  <input
-                    type="text"
-                    defaultValue={dp.positiveLabel}
-                    onBlur={(e) => patchDecisionPointType(dp.id, { positiveLabel: e.target.value })}
-                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-green-700 bg-white border border-green-200 focus:ring-2 focus:ring-green-500 outline-none"
-                  />
-                </label>
-                <label className="text-xs text-gray-500">
-                  {t('settings.dpNegativeLabel')}
-                  <input
-                    type="text"
-                    defaultValue={dp.negativeLabel}
-                    onBlur={(e) => patchDecisionPointType(dp.id, { negativeLabel: e.target.value })}
-                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-red-700 bg-white border border-red-200 focus:ring-2 focus:ring-red-500 outline-none"
-                  />
-                </label>
+              <div className="space-y-1.5">
+                <p className="text-xs text-gray-500">{t('settings.decisionOutcomes')}</p>
+                {[...(dp.outcomes ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => (
+                  <div key={o.id} className="p-1.5 rounded border border-gray-200 bg-gray-50/60 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        defaultValue={o.label}
+                        aria-label={t('settings.decisionOutcomes')}
+                        onBlur={(e) => patchDecisionOutcome(dp.id, o.id, { label: e.target.value })}
+                        className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                      <button type="button" onClick={() => removeDecisionOutcome(dp.id, o.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
+                    </div>
+                    <SegmentedToggle
+                      compact
+                      ariaLabel={t('settings.decisionOutcomes')}
+                      value={o.tone}
+                      onChange={(v) => patchDecisionOutcome(dp.id, o.id, { tone: v as 'on_target' | 'variation' | 'negative' })}
+                      options={[
+                        { value: 'on_target', label: t('settings.toneOnTarget'), activeColor: 'green' },
+                        { value: 'variation', label: t('settings.toneVariation'), activeColor: 'amber' },
+                        { value: 'negative', label: t('settings.toneNegative'), activeColor: 'red' },
+                      ]}
+                    />
+                  </div>
+                ))}
+                <InlineTypeAdder
+                  code={code}
+                  apiPath={`decision-point-types/${dp.id}/outcomes`}
+                  extraBody={{ tone: 'on_target' }}
+                  compact
+                  inputVariant="green"
+                  inputPlaceholder={t('settings.addOutcome')}
+                  onCreated={() => {}}
+                  onRefresh={loadStudy}
+                />
               </div>
               {orderedMs.length > 0 && (
                 <label className="block mt-1.5 text-xs text-gray-500">

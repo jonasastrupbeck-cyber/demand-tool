@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, seedDefaultDecisionPointTypes, getMilestones } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, getDecisionOutcomeTypes, seedDefaultDecisionPointTypes, getMilestones } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, dpTypes, msTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, dpTypes, msTypes, doTypes] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -27,7 +27,17 @@ export async function GET(
     getLifeProblems(study.id),
     getDecisionPointTypes(study.id),
     getMilestones(study.id),
+    getDecisionOutcomeTypes(study.id),
   ]);
+
+  // Nest each decision point's outcomes under it (ordered) for the UI.
+  const outcomesByType = new Map<string, typeof doTypes>();
+  for (const o of doTypes) {
+    const list = outcomesByType.get(o.decisionPointTypeId) ?? [];
+    list.push(o);
+    outcomesByType.set(o.decisionPointTypeId, list);
+  }
+  const dpTypesWithOutcomes = dpTypes.map((d) => ({ ...d, outcomes: outcomesByType.get(d.id) ?? [] }));
 
   return NextResponse.json({
     ...study,
@@ -43,7 +53,7 @@ export async function GET(
     thinkings: thTypes,
     lifecycleStages: lcStages,
     lifeProblems: lpTypes,
-    decisionPointTypes: dpTypes,
+    decisionPointTypes: dpTypesWithOutcomes,
     milestones: msTypes,
   });
 }

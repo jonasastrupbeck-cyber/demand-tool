@@ -18,6 +18,17 @@ import { useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import SegmentedToggle from '@/components/SegmentedToggle';
 
+// 2026-07-01: a decision point's possible answers. tone drives colour AND
+// polarity: on_target (green) / variation (amber) are positive (carry the case
+// forward); negative (red) does not.
+export type OutcomeTone = 'on_target' | 'variation' | 'negative';
+export interface DecisionOutcomeType {
+  id: string;
+  label: string;
+  tone: OutcomeTone;
+  sortOrder: number;
+}
+
 export interface DecisionPointType {
   id: string;
   label: string;
@@ -28,12 +39,16 @@ export interface DecisionPointType {
   kind?: string | null;
   // 2026-06-18: the milestone this decision point belongs to.
   milestoneId?: string | null;
+  // 2026-07-01: the list of outcomes (green/amber/red) to pick from at capture.
+  outcomes?: DecisionOutcomeType[];
 }
 
 export interface CaseDecision {
   id: string;
   decisionPointTypeId: string;
   outcome: 'positive' | 'negative';
+  // 2026-07-01: which specific outcome was chosen (null on legacy rows).
+  decisionOutcomeTypeId?: string | null;
   // Clean/dirty capture removed 2026-06-26 — optional/legacy on existing rows.
   cleanliness?: 'clean' | 'dirty' | null;
   dirtyCause?: string | null;
@@ -42,6 +57,44 @@ export interface CaseDecision {
   willingnessToPay?: boolean | null;
   abilityToPay?: boolean | null;
 }
+
+// Tone → Tailwind classes. SELECTED = solid; RESTING = tinted outline (the
+// unpicked option); CARD = the decided compact-card colour.
+const TONE_SELECTED: Record<OutcomeTone, string> = {
+  on_target: 'bg-green-600 text-white border-green-600',
+  variation: 'bg-amber-500 text-white border-amber-500',
+  negative: 'bg-red-600 text-white border-red-600',
+};
+const TONE_RESTING: Record<OutcomeTone, string> = {
+  on_target: 'border-green-300 text-green-800 bg-green-50 hover:bg-green-100',
+  variation: 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100',
+  negative: 'border-red-300 text-red-800 bg-red-50 hover:bg-red-100',
+};
+const TONE_CARD: Record<OutcomeTone, string> = {
+  on_target: 'border-green-300 bg-green-50 text-green-800 hover:bg-green-100',
+  variation: 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100',
+  negative: 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100',
+};
+
+const sortedOutcomes = (type: DecisionPointType): DecisionOutcomeType[] =>
+  [...(type.outcomes ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+
+// The outcome a decision currently points at. Falls back for legacy rows with
+// no outcome id: match the first outcome whose polarity equals the coarse
+// positive/negative `outcome`.
+function chosenOutcome(type: DecisionPointType, decision: CaseDecision | undefined): DecisionOutcomeType | undefined {
+  if (!decision) return undefined;
+  const outs = sortedOutcomes(type);
+  if (decision.decisionOutcomeTypeId) {
+    const byId = outs.find((o) => o.id === decision.decisionOutcomeTypeId);
+    if (byId) return byId;
+  }
+  return decision.outcome === 'negative'
+    ? outs.find((o) => o.tone === 'negative')
+    : outs.find((o) => o.tone !== 'negative');
+}
+const resolveOutcomeId = (type: DecisionPointType, decision: CaseDecision | undefined): string =>
+  chosenOutcome(type, decision)?.id ?? '';
 
 // 2026-06-18: a milestone (ordered container above decision points) and its
 // per-case outcome.
@@ -81,7 +134,8 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
 
   // The type whose mini-form is open; prefilled from its decision if decided.
   const [openTypeId, setOpenTypeId] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<'positive' | 'negative' | ''>('');
+  // 2026-07-01: the chosen outcome id (was a positive/negative string).
+  const [outcomeId, setOutcomeId] = useState<string>('');
   const [decidedAt, setDecidedAt] = useState('');
   // C9 (2026-06-17): affordability sub-states ('' = unset, 'yes'/'no').
   const [willingnessToPay, setWillingnessToPay] = useState<'yes' | 'no' | ''>('');
@@ -104,21 +158,21 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   function openForm(type: DecisionPointType) {
     const existing = decisions.find((d) => d.decisionPointTypeId === type.id);
     setOpenTypeId(type.id);
-    setOutcome(existing?.outcome ?? '');
+    setOutcomeId(resolveOutcomeId(type, existing));
     setDecidedAt((existing?.decidedAt ?? new Date().toISOString()).slice(0, 10));
     setWillingnessToPay(boolToTri(existing?.willingnessToPay));
     setAbilityToPay(boolToTri(existing?.abilityToPay));
   }
 
   async function save(type: DecisionPointType) {
-    if (!outcome || saving) return;
+    if (!outcomeId || saving) return;
     setSaving(true);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         decisionPointTypeId: type.id,
-        outcome,
+        decisionOutcomeTypeId: outcomeId,
         decidedAt: decidedAt ? `${decidedAt}T12:00:00.000Z` : undefined,
         recordedByCollector: collectorName || undefined,
         // C9: only send pay sub-states for person-kind milestones.
@@ -151,14 +205,44 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   // reopens the case (handled in deleteCaseDecision). On an unsaved/in-progress
   // decision it just clears local state. Sub-fields (cleanliness / willingness /
   // ability) clear locally and re-persist on Save.
-  function setOrClearOutcome(decision: CaseDecision | undefined, v: string) {
-    if (v === '') {
-      setOutcome('');
+  function setOrClearOutcome(decision: CaseDecision | undefined, id: string) {
+    if (id === '') {
+      setOutcomeId('');
       if (decision) void remove(decision.id);
     } else {
-      setOutcome(v as 'positive' | 'negative');
+      setOutcomeId(id);
     }
   }
+
+  // The outcome selector: a wrapping row of pills built from the type's
+  // outcomes, each toned green/amber/red. Single-select; clicking the selected
+  // pill clears it (→ removes the decision, like the old deselect behaviour).
+  const renderOutcomePills = (
+    type: DecisionPointType,
+    selectedId: string,
+    onPick: (id: string) => void,
+    compact: boolean,
+  ) => {
+    const outs = sortedOutcomes(type);
+    if (outs.length === 0) return null;
+    return (
+      <div className="flex flex-wrap justify-center gap-1" role="group" aria-label={t('capture.dpOutcomeAria')}>
+        {outs.map((o) => {
+          const active = o.id === selectedId;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onPick(active ? '' : o.id)}
+              className={`rounded-lg font-medium border transition-colors ${compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'} ${active ? TONE_SELECTED[o.tone] : TONE_RESTING[o.tone]}`}
+            >
+              {tl(o.label)}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   // The latest decision date recorded within a milestone (its decision points'
   // decidedAt), or null if none. ISO strings compare lexically.
@@ -244,10 +328,10 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     const decision = decisions.find((d) => d.decisionPointTypeId === type.id);
     const isActive = openTypeId === type.id;
     const focus = () => { if (openTypeId !== type.id) openForm(type); };
-    const vOutcome = isActive ? outcome : (decision?.outcome ?? '');
+    const vOutcomeId = isActive ? outcomeId : resolveOutcomeId(type, decision);
     const vWilling = isActive ? willingnessToPay : boolToTri(decision?.willingnessToPay);
     const vAbility = isActive ? abilityToPay : boolToTri(decision?.abilityToPay);
-    const showSave = isActive && !!outcome;
+    const showSave = isActive && !!outcomeId;
     return (
       <div key={type.id} className="rounded-lg bg-white border border-gray-200 p-2 space-y-1.5">
         <p className="text-xs font-medium text-gray-800 text-center">{tl(type.label)}</p>
@@ -283,19 +367,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
             </div>
           </>
         )}
-        <div className="flex justify-center">
-          <SegmentedToggle
-            ariaLabel={t('capture.dpOutcomeAria')}
-            value={vOutcome}
-            compact
-            allowDeselect
-            onChange={(v) => { focus(); setOrClearOutcome(decision, v); }}
-            options={[
-              { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
-              { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
-            ]}
-          />
-        </div>
+        {renderOutcomePills(type, vOutcomeId, (id) => { focus(); setOrClearOutcome(decision, id); }, true)}
         {showSave && (
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-center">
@@ -310,7 +382,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
               </label>
             </div>
             <div className="flex items-center justify-center gap-1.5">
-              <button type="button" onClick={() => save(type)} disabled={!outcome || saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+              <button type="button" onClick={() => save(type)} disabled={!outcomeId || saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
               {decision && (
                 <button type="button" onClick={() => remove(decision.id)} disabled={saving} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors">{t('settings.remove')}</button>
               )}
@@ -480,18 +552,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                     </div>
                   </>
                 )}
-                <div className="flex justify-center">
-                  <SegmentedToggle
-                    ariaLabel={t('capture.dpOutcomeAria')}
-                    value={outcome}
-                    allowDeselect
-                    onChange={(v) => setOrClearOutcome(decision, v)}
-                    options={[
-                      { value: 'positive', label: tl(type.positiveLabel), activeColor: 'green' },
-                      { value: 'negative', label: tl(type.negativeLabel), activeColor: 'red' },
-                    ]}
-                  />
-                </div>
+                {renderOutcomePills(type, outcomeId, (id) => setOrClearOutcome(decision, id), false)}
                 <div className="flex items-center justify-center gap-2">
                   <label className="flex items-center gap-1 text-xs text-gray-500">
                     {t('capture.dpDecidedAtLabel')}
@@ -507,7 +568,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   <button
                     type="button"
                     onClick={() => save(type)}
-                    disabled={!outcome || saving}
+                    disabled={!outcomeId || saving}
                     className="px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
                   >
                     {t('settings.save')}
@@ -548,21 +609,21 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
             );
           }
 
-          const positive = decision.outcome === 'positive';
+          // Colour + label from the chosen outcome's tone (green/amber/red),
+          // falling back to positive/negative labels for legacy rows.
+          const chosen = chosenOutcome(type, decision);
+          const tone: OutcomeTone = chosen?.tone ?? (decision.outcome === 'negative' ? 'negative' : 'on_target');
+          const chosenLabel = chosen ? tl(chosen.label) : (decision.outcome === 'positive' ? tl(type.positiveLabel) : tl(type.negativeLabel));
           return (
             <button
               key={type.id}
               type="button"
               onClick={() => openForm(type)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium border text-left transition-colors ${
-                positive
-                  ? 'border-green-300 bg-green-50 text-green-800 hover:bg-green-100'
-                  : 'border-red-300 bg-red-50 text-red-800 hover:bg-red-100'
-              }`}
+              className={`px-3 py-2 rounded-lg text-xs font-medium border text-left transition-colors ${TONE_CARD[tone]}`}
             >
               <span className="block font-semibold">{tl(type.label)}</span>
               <span className="flex items-center gap-1.5 mt-0.5">
-                {positive ? tl(type.positiveLabel) : tl(type.negativeLabel)}
+                {chosenLabel}
                 <span className="text-gray-400">·</span>
                 {new Date(decision.decidedAt).toLocaleDateString()}
               </span>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseDecisions, upsertCaseDecision, getDecisionPointTypes } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseDecisions, upsertCaseDecision, getDecisionPointTypes, getDecisionOutcomeTypes } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -34,8 +34,25 @@ export async function POST(
   if (typeof body.decisionPointTypeId !== 'string' || !types.some((t) => t.id === body.decisionPointTypeId)) {
     return NextResponse.json({ error: 'decisionPointTypeId must be a decision point of this study' }, { status: 400 });
   }
-  if (body.outcome !== 'positive' && body.outcome !== 'negative') {
-    return NextResponse.json({ error: 'outcome must be "positive" or "negative"' }, { status: 400 });
+
+  // 2026-07-01: prefer an explicit outcome id (which decision answer was chosen);
+  // it must belong to the posted decision point, and it DERIVES the coarse
+  // positive/negative `outcome` (on_target/variation → positive, negative → red).
+  // Fall back to the bare `outcome` field for legacy/compat callers.
+  let decisionOutcomeTypeId: string | null = null;
+  let outcome: 'positive' | 'negative';
+  if (typeof body.decisionOutcomeTypeId === 'string' && body.decisionOutcomeTypeId) {
+    const outcomes = await getDecisionOutcomeTypes(study.id);
+    const chosen = outcomes.find((o) => o.id === body.decisionOutcomeTypeId && o.decisionPointTypeId === body.decisionPointTypeId);
+    if (!chosen) {
+      return NextResponse.json({ error: 'decisionOutcomeTypeId must be an outcome of this decision point' }, { status: 400 });
+    }
+    decisionOutcomeTypeId = chosen.id;
+    outcome = chosen.tone === 'negative' ? 'negative' : 'positive';
+  } else if (body.outcome === 'positive' || body.outcome === 'negative') {
+    outcome = body.outcome;
+  } else {
+    return NextResponse.json({ error: 'decisionOutcomeTypeId or outcome ("positive"/"negative") is required' }, { status: 400 });
   }
   // Cleanliness is optional (clean/dirty capture removed 2026-06-26). Only accept
   // it if explicitly 'clean'/'dirty' (legacy clients); otherwise leave it unset.
@@ -51,7 +68,8 @@ export async function POST(
 
   const row = await upsertCaseDecision(caseId, {
     decisionPointTypeId: body.decisionPointTypeId,
-    outcome: body.outcome,
+    outcome,
+    decisionOutcomeTypeId,
     cleanliness,
     dirtyCause: typeof body.dirtyCause === 'string' ? body.dirtyCause.trim() || null : null,
     decidedAt,

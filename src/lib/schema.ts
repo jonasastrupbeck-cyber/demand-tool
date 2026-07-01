@@ -312,6 +312,23 @@ export const decisionPointTypes = pgTable('decision_point_types', {
   milestoneId: text('milestone_id').references(() => milestones.id, { onDelete: 'set null' }),
 });
 
+// Outcomes for a decision point (2026-07-01). A decision can be reached in more
+// than one way, and not all positives are equal: "money moved on the day" is
+// on-target (green); "moved early"/"moved late" still carry the case forward but
+// imperfectly (amber, the sequence-work tone); "didn't move" is negative (red).
+// `tone` drives colour AND polarity — on_target/variation are positive (advance
+// the case), negative is not. A per-study taxonomy child of decisionPointTypes:
+// deleting a point takes its outcomes with it. Migration 0039 seeds every
+// existing point with one on_target (= positiveLabel) + one negative
+// (= negativeLabel) outcome, so untouched points behave exactly as before.
+export const decisionOutcomeTypes = pgTable('decision_outcome_types', {
+  id: text('id').primaryKey(),
+  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  tone: text('tone').$type<'on_target' | 'variation' | 'negative'>().notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 // One row per decided point per case; pending points simply have no row.
 // E2E time per point = decidedAt − cases.openedAt, always computed, never
 // stored. Cleanliness is captured HERE and only here (per Skipton req 7:
@@ -323,6 +340,11 @@ export const caseDecisionPoints = pgTable('case_decision_points', {
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
   outcome: text('outcome').$type<'positive' | 'negative'>().notNull(),
+  // 2026-07-01: which specific outcome (decisionOutcomeTypes) was chosen. Nullable
+  // — legacy rows fall back to `outcome` + the type's positive/negative label.
+  // SET NULL on outcome delete: retiring an outcome in Settings keeps the case
+  // record (its coarse positive/negative `outcome` above still stands).
+  decisionOutcomeTypeId: text('decision_outcome_type_id').references(() => decisionOutcomeTypes.id, { onDelete: 'set null' }),
   // Clean/dirty capture was removed 2026-06-26 (migration 0035) — now optional.
   // Existing rows keep their value; new decisions leave it null.
   cleanliness: text('cleanliness').$type<'clean' | 'dirty'>(),

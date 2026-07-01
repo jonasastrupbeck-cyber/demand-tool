@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, decisionOutcomeTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1674,8 +1674,9 @@ export async function seedDefaultDecisionPointTypes(studyId: string, locale: Loc
   await db.insert(milestones).values({ id: milestoneId, studyId, label: DEFAULT_MILESTONE_LABEL[locale], sortOrder: 0 });
   const defaults = DEFAULT_DECISION_POINT_TYPES[locale];
   for (let i = 0; i < defaults.length; i++) {
+    const dptId = generateId();
     await db.insert(decisionPointTypes).values({
-      id: generateId(),
+      id: dptId,
       studyId,
       label: defaults[i].label,
       positiveLabel: defaults[i].positiveLabel,
@@ -1684,7 +1685,18 @@ export async function seedDefaultDecisionPointTypes(studyId: string, locale: Loc
       kind: defaults[i].kind ?? null,
       milestoneId,
     });
+    await seedDefaultDecisionOutcomes(dptId, defaults[i].positiveLabel, defaults[i].negativeLabel);
   }
+}
+
+// A fresh decision point gets one on_target (green) + one negative (red)
+// outcome from its positive/negative labels — the same two-outcome shape the
+// 0039 migration seeds onto existing points, so new and old behave identically.
+async function seedDefaultDecisionOutcomes(decisionPointTypeId: string, positiveLabel: string, negativeLabel: string) {
+  await db.insert(decisionOutcomeTypes).values([
+    { id: generateId(), decisionPointTypeId, label: positiveLabel, tone: 'on_target', sortOrder: 0 },
+    { id: generateId(), decisionPointTypeId, label: negativeLabel, tone: 'negative', sortOrder: 1 },
+  ]);
 }
 
 export async function getDecisionPointTypes(studyId: string) {
@@ -1696,6 +1708,7 @@ export async function addDecisionPointType(studyId: string, label: string, posit
   const existing = await getDecisionPointTypes(studyId);
   const row = { id, studyId, label, positiveLabel, negativeLabel, sortOrder: existing.length, milestoneId: milestoneId ?? null };
   await db.insert(decisionPointTypes).values(row);
+  await seedDefaultDecisionOutcomes(id, positiveLabel, negativeLabel);
   return row;
 }
 
@@ -1715,6 +1728,76 @@ export async function updateDecisionPointType(id: string, data: { label?: string
 export async function deleteDecisionPointType(id: string) {
   // case_decision_points rows cascade (deliberate; see schema comment).
   await db.delete(decisionPointTypes).where(eq(decisionPointTypes.id, id));
+}
+
+// --- Decision outcomes (2026-07-01) — a decision point's list of possible
+// answers, each toned on_target (green) / variation (amber) / negative (red). ---
+
+export type OutcomeTone = 'on_target' | 'variation' | 'negative';
+
+// All outcomes across a study's decision points, ordered — the study payload
+// nests these under each decisionPointType.
+export async function getDecisionOutcomeTypes(studyId: string) {
+  return db
+    .select({
+      id: decisionOutcomeTypes.id,
+      decisionPointTypeId: decisionOutcomeTypes.decisionPointTypeId,
+      label: decisionOutcomeTypes.label,
+      tone: decisionOutcomeTypes.tone,
+      sortOrder: decisionOutcomeTypes.sortOrder,
+    })
+    .from(decisionOutcomeTypes)
+    .innerJoin(decisionPointTypes, eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypes.id))
+    .where(eq(decisionPointTypes.studyId, studyId))
+    .orderBy(asc(decisionOutcomeTypes.sortOrder));
+}
+
+// Keep the type's positive_label / negative_label columns in sync with its
+// outcomes: they mirror the FIRST positive (on_target/variation) and FIRST
+// negative outcome, so legacy readers (and case rows lacking an outcome id)
+// still get sensible labels. Only overwrites a side when one exists — never
+// blanks the NOT NULL columns.
+async function syncDecisionPointLabels(decisionPointTypeId: string) {
+  const outcomes = await db.select().from(decisionOutcomeTypes)
+    .where(eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypeId))
+    .orderBy(asc(decisionOutcomeTypes.sortOrder));
+  const positive = outcomes.find((o) => o.tone !== 'negative');
+  const negative = outcomes.find((o) => o.tone === 'negative');
+  const set: Record<string, string> = {};
+  if (positive) set.positiveLabel = positive.label;
+  if (negative) set.negativeLabel = negative.label;
+  if (Object.keys(set).length > 0) {
+    await db.update(decisionPointTypes).set(set).where(eq(decisionPointTypes.id, decisionPointTypeId));
+  }
+}
+
+export async function addDecisionOutcomeType(decisionPointTypeId: string, label: string, tone: OutcomeTone) {
+  const id = generateId();
+  const existing = await db.select().from(decisionOutcomeTypes)
+    .where(eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypeId));
+  const row = { id, decisionPointTypeId, label, tone, sortOrder: existing.length };
+  await db.insert(decisionOutcomeTypes).values(row);
+  await syncDecisionPointLabels(decisionPointTypeId);
+  return row;
+}
+
+export async function updateDecisionOutcomeType(id: string, data: { label?: string; tone?: OutcomeTone; sortOrder?: number }) {
+  const updateFields: Record<string, unknown> = {};
+  if (data.label !== undefined) updateFields.label = data.label;
+  if (data.tone !== undefined) updateFields.tone = data.tone;
+  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  if (Object.keys(updateFields).length === 0) return;
+  await db.update(decisionOutcomeTypes).set(updateFields).where(eq(decisionOutcomeTypes.id, id));
+  const rows = await db.select().from(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
+  if (rows[0]) await syncDecisionPointLabels(rows[0].decisionPointTypeId);
+}
+
+export async function deleteDecisionOutcomeType(id: string) {
+  const rows = await db.select().from(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
+  // case_decision_points.decision_outcome_type_id is SET NULL (case records
+  // survive; their coarse positive/negative outcome stands).
+  await db.delete(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
+  if (rows[0]) await syncDecisionPointLabels(rows[0].decisionPointTypeId);
 }
 
 // --- Milestones (2026-06-18) — ordered containers above decision points ---
@@ -1854,6 +1937,9 @@ export async function getCaseDecisions(caseId: string) {
 export async function upsertCaseDecision(caseId: string, data: {
   decisionPointTypeId: string;
   outcome: 'positive' | 'negative';
+  // 2026-07-01: the specific outcome chosen (drives the coarse positive/negative
+  // `outcome` above). Null for legacy/compat callers that send only `outcome`.
+  decisionOutcomeTypeId?: string | null;
   // Clean/dirty capture removed 2026-06-26 (migration 0035) — now optional.
   cleanliness?: 'clean' | 'dirty' | null;
   dirtyCause?: string | null;
@@ -1868,6 +1954,7 @@ export async function upsertCaseDecision(caseId: string, data: {
     caseId,
     decisionPointTypeId: data.decisionPointTypeId,
     outcome: data.outcome,
+    decisionOutcomeTypeId: data.decisionOutcomeTypeId ?? null,
     cleanliness: data.cleanliness ?? null,
     // Cause only makes sense for dirty decisions (legacy); null otherwise.
     dirtyCause: data.cleanliness === 'dirty' ? (data.dirtyCause || null) : null,
@@ -1880,6 +1967,7 @@ export async function upsertCaseDecision(caseId: string, data: {
     target: [caseDecisionPoints.caseId, caseDecisionPoints.decisionPointTypeId],
     set: {
       outcome: values.outcome,
+      decisionOutcomeTypeId: values.decisionOutcomeTypeId,
       cleanliness: values.cleanliness,
       dirtyCause: values.dirtyCause,
       decidedAt: values.decidedAt,

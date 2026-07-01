@@ -106,7 +106,7 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null; milestoneId?: string | null }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null; milestoneId?: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[] }[];
   milestones: { id: string; label: string; sortOrder: number }[];
 }
 

@@ -3189,6 +3189,36 @@ const translations = {
     sv: 'Negativt utfall',
     de: 'Negatives Ergebnis',
   },
+  'settings.decisionOutcomes': {
+    en: 'Outcomes',
+    da: 'Udfald',
+    sv: 'Utfall',
+    de: 'Ergebnisse',
+  },
+  'settings.addOutcome': {
+    en: 'Add outcome',
+    da: 'Tilføj udfald',
+    sv: 'Lägg till utfall',
+    de: 'Ergebnis hinzufügen',
+  },
+  'settings.toneOnTarget': {
+    en: 'On target',
+    da: 'Som ønsket',
+    sv: 'Som önskat',
+    de: 'Wie gewünscht',
+  },
+  'settings.toneVariation': {
+    en: 'Variation',
+    da: 'Variation',
+    sv: 'Variation',
+    de: 'Variation',
+  },
+  'settings.toneNegative': {
+    en: 'Negative',
+    da: 'Negativt',
+    sv: 'Negativt',
+    de: 'Negativ',
+  },
   'settings.milestones': {
     en: 'Milestones',
     da: 'Milepæle',
