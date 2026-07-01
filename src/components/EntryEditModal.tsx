@@ -762,25 +762,45 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                             </>
                           )}
 
-                          {/* Per-block system condition (2026-06-12), flow-work only. */}
+                          {/* Per-block system condition (2026-06-12), flow-work only.
+                              Chips for chosen SCs + an "add" dropdown to add more / create
+                              new — same pattern as the capture composer. */}
                           {flowWorkPath && study.systemConditionsEnabled && (b.tag === 'sequence' || b.tag === 'failure' || b.tag === 'failure_demand') && (
                             <div className={`mt-1 p-2 rounded-md border ${(b.tag === 'failure' || b.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
                               <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
-                              {/* Tap-to-toggle pills — several SCs per step (0032). */}
-                              <div className="flex flex-wrap gap-1.5">
-                                {study.systemConditions.map((sc) => {
-                                  const on = b.systemConditionIds.includes(sc.id);
+                              <div className="flex flex-wrap gap-1.5 items-center">
+                                {b.systemConditionIds.map((scId) => {
+                                  const sc = study.systemConditions.find((s) => s.id === scId);
+                                  if (!sc) return null;
                                   return (
-                                    <button
-                                      key={sc.id}
-                                      type="button"
-                                      onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: on ? p.systemConditionIds.filter((x) => x !== sc.id) : [...p.systemConditionIds, sc.id] } : p))}
-                                      className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-700 border-gray-300 hover:border-sky-400'}`}
-                                    >
+                                    <span key={scId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-sky-600 text-white">
                                       {tl(sc.label)}
-                                    </button>
+                                      <button
+                                        type="button"
+                                        aria-label={t('capture.removeSystemCondition')}
+                                        onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: p.systemConditionIds.filter((x) => x !== scId) } : p))}
+                                        className="text-sky-100 hover:text-white leading-none"
+                                      >
+                                        &times;
+                                      </button>
+                                    </span>
                                   );
                                 })}
+                                <PillSelect
+                                  variant="add"
+                                  value=""
+                                  ariaLabel={t('capture.flowScQuestion')}
+                                  placeholder={t('capture.addSystemConditionButton')}
+                                  options={study.systemConditions.filter((sc) => !b.systemConditionIds.includes(sc.id)).map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
+                                  onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: p.systemConditionIds.includes(id) ? p.systemConditionIds : [...p.systemConditionIds, id] } : p))}
+                                />
+                                <InlineTypeAdder
+                                  code={code}
+                                  apiPath="system-conditions"
+                                  onRefresh={onStudyRefresh}
+                                  onCreated={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: p.systemConditionIds.includes(id) ? p.systemConditionIds : [...p.systemConditionIds, id] } : p))}
+                                  compact
+                                />
                               </div>
                             </div>
                           )}

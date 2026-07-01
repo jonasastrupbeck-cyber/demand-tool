@@ -824,6 +824,13 @@ const translations = {
     sv: '+ L\u00e4gg till systemvillkor',
     de: '+ Systemzustand hinzuf\u00fcgen',
   },
+  // aria label for the \u00d7 on a chosen system-condition chip.
+  'capture.removeSystemCondition': {
+    en: 'Remove system condition',
+    da: 'Fjern systemtilstand',
+    sv: 'Ta bort systemvillkor',
+    de: 'Systemzustand entfernen',
+  },
   'capture.selectSystemCondition': {
     en: 'Select system condition to add...',
     da: 'V\u00e6lg systemtilstand at tilføje...',

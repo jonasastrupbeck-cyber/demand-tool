@@ -1464,17 +1464,9 @@ export default function CapturePage() {
                   // customer says, with the type + SC boxes alongside.
                   const showFreeText = block.tag === 'failure_demand' || !pickerOn || (!hasStep && (block.freeText || block.text !== ''));
                   const showPicker = pickerOn && !hasStep && !showFreeText;
-                  // Side panel (SC + type boxes) sits to the RIGHT of the block's
-                  // content on lg+ so tagging doesn't push the toggle down. Only
-                  // shown when a box will actually render; value blocks have none
-                  // and keep their original width.
-                  const hasSidePanel = flowWorkPath && (
-                    (study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand'))
-                    || (study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand')
-                  );
 
                   return (
-                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? (hasSidePanel ? 'w-full lg:flex-none' : 'w-full lg:flex-none lg:w-72') : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Insert a step BEFORE this one (flow only) — for backfilling a
                           missed step between existing ones. Append button stays at the end. */}
                       {flowWorkPath && (
@@ -1501,72 +1493,6 @@ export default function CapturePage() {
                           />
                         </label>
                       )}
-                      {/* Content + side panel. On lg+ the SC / type boxes sit to the
-                          RIGHT of the main content (placed via flex `order`, not source
-                          order) so tagging a block doesn't push the toggle down; on
-                          small screens they stack below it. */}
-                      <div className={flowWorkPath ? 'flex flex-col gap-2 lg:flex-row lg:items-start' : 'contents'}>
-                      {hasSidePanel && (
-                      <div className="flex flex-col gap-2 w-full lg:w-56 lg:shrink-0 min-w-0 order-2">
-                      {/* Per-block system condition (2026-06-12): for flow-mode
-                          sequence/failure work, ask what's driving THIS block. */}
-                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand') && (
-                        <div className={`p-2 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
-                          {/* Tap-to-toggle pills — several SCs can drive one step (0032). */}
-                          <div className="flex flex-wrap gap-1.5">
-                            {study.systemConditions.map((sc) => {
-                              const on = block.systemConditionIds.includes(sc.id);
-                              return (
-                                <button
-                                  key={sc.id}
-                                  type="button"
-                                  onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: on ? b.systemConditionIds.filter((x) => x !== sc.id) : [...b.systemConditionIds, sc.id] } : b))}
-                                  className={`px-2 py-1 rounded-full text-xs font-medium border transition-colors ${on ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-700 border-gray-300 hover:border-sky-400'}`}
-                                >
-                                  {tl(sc.label)}
-                                </button>
-                              );
-                            })}
-                            <button
-                              type="button"
-                              onClick={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
-                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-sky-300 text-sky-700 hover:bg-sky-50"
-                            >
-                              + {t('capture.addNew')}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {/* Type of failure demand (migration 0033): a flow step tagged
-                          'failure demand' IS a demand hitting you — capture WHAT KIND
-                          (mirrors the transactional demand-type picker, category='failure').
-                          Gated by the study opt-in. */}
-                      {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand' && (
-                        <div className="p-2 rounded-md border bg-red-50 border-red-200">
-                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
-                          <div className="flex gap-2 items-center">
-                            <PillSelect
-                              ariaLabel={t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}
-                              placeholder={t('capture.selectType')}
-                              value={block.demandTypeId ?? ''}
-                              onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, demandTypeId: id || null } : b))}
-                              options={study.demandTypes.filter((dt) => dt.category === 'failure').map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
-                              variant="failure"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => { setDemandTypeAddTargetBlockIdx(idx); setAddingType('demand'); setNewTypeLabel(''); }}
-                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-red-300 text-red-700 hover:bg-red-50"
-                            >
-                              + {t('capture.addNew')}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      </div>
-                      )}
-                      <div className={flowWorkPath ? (hasSidePanel ? 'flex flex-col gap-2 w-full lg:w-72 lg:shrink-0 min-w-0 order-1' : 'flex flex-col gap-2 w-full min-w-0 order-1') : 'contents'}>
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
                            before horizontal scroll kicks in. */}
@@ -1684,8 +1610,70 @@ export default function CapturePage() {
                           />
                         </>
                       )}
-                      </div>{/* main content column */}
-                      </div>{/* content + side-panel row */}
+
+                      {/* Per-block system condition, BELOW the description so it never
+                          shifts the toggle. Add via a dropdown; chosen SCs show as
+                          removable chips; the "+ add" pill stays to add more (0032). */}
+                      {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand') && (
+                        <div className={`p-2 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            {block.systemConditionIds.map((scId) => {
+                              const sc = study.systemConditions.find((s) => s.id === scId);
+                              if (!sc) return null;
+                              return (
+                                <span key={scId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-sky-600 text-white">
+                                  {tl(sc.label)}
+                                  <button
+                                    type="button"
+                                    aria-label={t('capture.removeSystemCondition')}
+                                    onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: b.systemConditionIds.filter((x) => x !== scId) } : b))}
+                                    className="text-sky-100 hover:text-white leading-none"
+                                  >
+                                    &times;
+                                  </button>
+                                </span>
+                              );
+                            })}
+                            <PillSelect
+                              variant="add"
+                              value=""
+                              ariaLabel={t('capture.flowScQuestion')}
+                              placeholder={t('capture.addSystemConditionButton')}
+                              options={study.systemConditions.filter((sc) => !block.systemConditionIds.includes(sc.id)).map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
+                              onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: b.systemConditionIds.includes(id) ? b.systemConditionIds : [...b.systemConditionIds, id] } : b))}
+                              onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
+                              addNewLabel={t('capture.addNew')}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {/* Type of failure demand (migration 0033): a flow step tagged
+                          'failure demand' IS a demand hitting you — capture WHAT KIND
+                          (mirrors the transactional demand-type picker, category='failure').
+                          Below the description too. Gated by the study opt-in. */}
+                      {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand' && (
+                        <div className="p-2 rounded-md border bg-red-50 border-red-200">
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
+                          <div className="flex gap-2 items-center">
+                            <PillSelect
+                              ariaLabel={t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}
+                              placeholder={t('capture.selectType')}
+                              value={block.demandTypeId ?? ''}
+                              onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, demandTypeId: id || null } : b))}
+                              options={study.demandTypes.filter((dt) => dt.category === 'failure').map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
+                              variant="failure"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setDemandTypeAddTargetBlockIdx(idx); setAddingType('demand'); setNewTypeLabel(''); }}
+                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-red-300 text-red-700 hover:bg-red-50"
+                            >
+                              + {t('capture.addNew')}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                     </div>
                   );
