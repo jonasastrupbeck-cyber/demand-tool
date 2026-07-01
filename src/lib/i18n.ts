@@ -3359,6 +3359,12 @@ const translations = {
     sv: 'Öppna nytt kontoreferensnummer',
     de: 'Neue Kontoreferenznummer öffnen',
   },
+  'capture.openExistingAccount': {
+    en: 'Open existing account',
+    da: 'Åbn eksisterende konto',
+    sv: 'Öppna befintligt konto',
+    de: 'Bestehendes Konto öffnen',
+  },
   // C5 case-search table (2026-06-17): the "Which customer is this?" overview.
   'capture.caseTableAccount': {
     en: 'Account Number',

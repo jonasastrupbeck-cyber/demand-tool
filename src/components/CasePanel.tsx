@@ -286,9 +286,33 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   }, [code]);
 
   useEffect(() => {
-    if (!enabled || systemType !== 'flow' || activeCaseId) return;
+    // Load the recent-customers list for BOTH the cold-start chooser AND the
+    // "Open existing account" switcher shown while a case is open (2026-07-01).
+    if (!enabled || systemType !== 'flow') return;
     loadCaseList();
   }, [enabled, systemType, activeCaseId, refreshSignal, loadCaseList]);
+
+  // "Open existing account" switcher (2026-07-01): a popover above the board to
+  // jump to a recent customer or open a new ref without the full-screen chooser.
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!switcherOpen) return;
+    const onDown = (e: PointerEvent) => { if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) setSwitcherOpen(false); };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [switcherOpen]);
+
+  // Recent-customer row helpers, shared by the cold-start chooser and the
+  // "Open existing account" switcher popover. A one-line summary uses demand,
+  // else life problem, else what-matters — whatever the study populates.
+  const dtLabel = (id: string | null) => { const x = demandTypes.find((d) => d.id === id); return x ? tl(x.label) : ''; };
+  const lpLabel = (id: string | null) => { const x = lifeProblems.find((l) => l.id === id); return x ? tl(x.label) : ''; };
+  const wmLabel = (ids: string | null) => (ids || '').split(',').filter(Boolean)
+    .map((i) => { const x = whatMattersTypes.find((w) => w.id === i); return x ? tl(x.label) : null; })
+    .filter(Boolean).join(', ');
+  const summary = (c: typeof caseList[number]) => dtLabel(c.demandTypeId) || lpLabel(c.lifeProblemId) || wmLabel(c.whatMattersTypeIds);
+  const touchLabel = (n: number) => n === 1 ? t('capture.customerTouchOne') : t('capture.customerTouches', { n: String(n) });
 
   async function openCase(refArg?: string) {
     const ref = (refArg ?? refInput).trim();
@@ -382,15 +406,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       // new-case and resume paths the user types the same thing (the reference);
       // the screen decides new-vs-resume from whether it already exists — no
       // search-vs-create lane choice. Replaces the sparse 4-column table.
-      const dtLabel = (id: string | null) => { const x = demandTypes.find((d) => d.id === id); return x ? tl(x.label) : ''; };
-      const lpLabel = (id: string | null) => { const x = lifeProblems.find((l) => l.id === id); return x ? tl(x.label) : ''; };
-      const wmLabel = (ids: string | null) => (ids || '').split(',').filter(Boolean)
-        .map((i) => { const x = whatMattersTypes.find((w) => w.id === i); return x ? tl(x.label) : null; })
-        .filter(Boolean).join(', ');
-      // A one-line summary for a recent row / the found line: demand, else the
-      // life problem, else what-matters (whatever the study actually populates).
-      const summary = (c: typeof caseList[number]) => dtLabel(c.demandTypeId) || lpLabel(c.lifeProblemId) || wmLabel(c.whatMattersTypeIds);
-      const touchLabel = (n: number) => n === 1 ? t('capture.customerTouchOne') : t('capture.customerTouches', { n: String(n) });
+      // (summary/touchLabel hoisted to component scope — shared with the switcher.)
       // Last touch (2026-06-18): date + a clean excerpt of the latest entry's
       // work description (strip the [value]/[sequence]/[failure] block tags) so
       // users recognise the case. Null when the case has no entries yet.
@@ -776,6 +792,86 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   if (isFlow) {
     return (
       <>
+      {/* Customer action bar (2026-07-01): open-existing switcher + close /
+          set-aside, above the board so you can finish a customer and hop to the
+          next in one click. Moved out of the green pane. */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm font-semibold text-gray-900 tabular-nums whitespace-nowrap">#{caseRow.caseRef}</span>
+          {!isOpen && <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
+          <div ref={switcherRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setSwitcherOpen((o) => !o)}
+              className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              {t('capture.openExistingAccount')} ▾
+            </button>
+            {switcherOpen && (
+              <div className="absolute left-0 top-full mt-1 z-20 w-72 rounded-xl border border-gray-200 bg-white shadow-lg p-2">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={refInput}
+                    onChange={(e) => setRefInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && refInput.trim()) { e.preventDefault(); setSwitcherOpen(false); openCase(refInput.trim()); } }}
+                    placeholder={t('capture.caseSearchPlaceholder')}
+                    aria-label={t('capture.caseSearchPlaceholder')}
+                    className="flex-1 min-w-0 px-2 py-1.5 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={!refInput.trim() || opening}
+                    onClick={() => { setSwitcherOpen(false); openCase(refInput.trim()); }}
+                    className="shrink-0 px-2.5 py-1.5 rounded-lg text-sm font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors"
+                  >+</button>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                  {(() => {
+                    const list = [...caseList].filter((c) => c.id !== activeCaseId)
+                      .sort((a, b) => (a.status === b.status ? 0 : a.status === 'open' ? -1 : 1)).slice(0, 8);
+                    if (list.length === 0) return <p className="px-2 py-3 text-center text-xs text-gray-400">{t('capture.caseTableEmpty')}</p>;
+                    return list.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        disabled={opening}
+                        onClick={() => { setSwitcherOpen(false); openCase(c.caseRef); }}
+                        className="w-full flex items-center gap-2 px-2 py-2 text-left hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <span className="font-medium text-gray-900 tabular-nums text-sm min-w-[3.5rem] whitespace-nowrap">
+                          #{c.caseRef}
+                          {c.status === 'closed' && <span className="ml-1 px-1 py-0.5 rounded-full text-[9px] bg-gray-200 text-gray-500">{t('capture.caseStatusClosed')}</span>}
+                        </span>
+                        <span className="flex-1 min-w-0 truncate text-xs text-gray-500">{summary(c)}</span>
+                        <span className="shrink-0 text-[11px] text-gray-400 tabular-nums">{touchLabel(c.entryCount)}</span>
+                      </button>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-xs text-gray-400">{t('capture.customerAttachNote')}</span>
+          <button
+            type="button"
+            onClick={() => patchCase({ status: isOpen ? 'closed' : 'open' })}
+            className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+          >
+            {isOpen ? t('capture.customerCloseBtn') : t('capture.caseReopenBtn')}
+          </button>
+          <button
+            type="button"
+            onClick={() => onActiveCaseChange(null)}
+            className="text-xs px-2.5 py-1 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:border-gray-400 transition-colors"
+          >
+            {t('capture.caseSetAside')}
+          </button>
+        </div>
+      </div>
       {/* Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
           columns (customer left · touch rail + composer middle · decisions right).
           Below lg it stacks vertically — capture-first order: context → composer →
@@ -784,15 +880,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         {/* PINNED LEFT — the customer. Always visible. */}
         <aside className="order-1 w-full md:w-64 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
           {studyName && <p className="text-center text-xs font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
-          <div className="flex justify-center mb-2">
-            <button
-              type="button"
-              onClick={() => onActiveCaseChange(null)}
-              className="text-xs px-3 py-1.5 rounded-full font-medium border border-dashed border-gray-400 bg-white text-gray-700 hover:border-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              + {t('capture.openNewReference')}
-            </button>
-          </div>
+          {/* Open-new / close / set-aside moved to the customer action bar above. */}
           {headerRow}
           <CaseContextSection
             code={code}
@@ -809,7 +897,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             onTypesChanged={onTypesChanged}
           />
           {attachLastChip}
-          <div className="mt-3 pt-2 border-t border-green-200/70">{caseFooter}</div>
         </aside>
 
         {/* ┊ LEFT dashed line — full board height (matches the right one). */}
