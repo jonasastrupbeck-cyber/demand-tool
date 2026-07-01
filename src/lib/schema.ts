@@ -158,6 +158,10 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   label: text('label').notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Time-based "what matters" (2026-07-01). null = ordinary free-form factor.
+  // 'by_date' = customer wants it by a specific date (captured per case in
+  // caseWhatMatters.targetDate); 'asap' = no date, clock runs from case open.
+  timing: text('timing').$type<'by_date' | 'asap'>(),
 });
 
 export const lifeProblems = pgTable('life_problems', {
@@ -259,6 +263,8 @@ export const caseWhatMatters = pgTable('case_what_matters', {
   id: text('id').primaryKey(),
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
+  // Customer's wanted date, only for a 'by_date' what-matters type (2026-07-01).
+  targetDate: timestamp('target_date', { withTimezone: true }),
 }, (t) => ({
   uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
 }));

@@ -68,7 +68,7 @@ interface Props {
   // (context & situation, P2BS, what matters) via CaseContextSection.
   systemType: 'transactional' | 'flow';
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null }[];
   // 2026-06-18: SC taxonomy for the id→label lookup on the saved-touch card.
   systemConditions: { id: string; label: string }[];
   onTypesChanged?: () => Promise<void> | void;
@@ -108,6 +108,8 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const [caseRow, setCaseRow] = useState<CaseRow | null>(null);
   const [entries, setEntries] = useState<CaseEntry[]>([]);
   const [wmIds, setWmIds] = useState<string[]>([]);
+  // Per-'by_date' what-matters target dates on this case (typeId → ISO date).
+  const [wmTargetDates, setWmTargetDates] = useState<Record<string, string>>({});
   const [decisions, setDecisions] = useState<CaseDecision[]>([]);
   const [caseMilestones, setCaseMilestones] = useState<CaseMilestone[]>([]);
   const [attaching, setAttaching] = useState(false);
@@ -165,6 +167,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     setCaseRow(data);
     setEntries(data.entries || []);
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
+    setWmTargetDates(data.whatMattersTargetDates && typeof data.whatMattersTargetDates === 'object' ? data.whatMattersTargetDates : {});
     setDecisions(Array.isArray(data.decisions) ? data.decisions : []);
     setCaseMilestones(Array.isArray(data.milestones) ? data.milestones : []);
   }, [code]);
@@ -312,8 +315,21 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     if (!caseRow) return;
     // Optimistic local update; refetch on failure to re-sync. The what-matters
     // set lives in its own state (junction-backed), the rest on caseRow.
-    const { whatMattersTypeIds: nextWmIds, ...rowFields } = body as { whatMattersTypeIds?: string[] } & Record<string, unknown>;
+    const { whatMattersTypeIds: nextWmIds, whatMattersDate, ...rowFields } = body as { whatMattersTypeIds?: string[]; whatMattersDate?: { whatMattersTypeId: string; date: string | null } } & Record<string, unknown>;
     if (nextWmIds !== undefined) setWmIds(nextWmIds);
+    if (whatMattersDate) {
+      // Optimistically reflect the set/cleared target date (junction-backed).
+      setWmTargetDates((prev) => {
+        const next = { ...prev };
+        if (whatMattersDate.date) next[whatMattersDate.whatMattersTypeId] = whatMattersDate.date;
+        else delete next[whatMattersDate.whatMattersTypeId];
+        return next;
+      });
+      // A date can also select the type; keep the pill in sync.
+      if (whatMattersDate.date && !wmIds.includes(whatMattersDate.whatMattersTypeId)) {
+        setWmIds([...wmIds, whatMattersDate.whatMattersTypeId]);
+      }
+    }
     if (Object.keys(rowFields).length > 0) setCaseRow({ ...caseRow, ...rowFields } as CaseRow);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseRow.id)}`, {
       method: 'PATCH',
@@ -784,6 +800,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             lifeProblemId={caseRow.lifeProblemId}
             whatMatters={caseRow.whatMatters}
             whatMattersTypeIds={wmIds}
+            whatMattersTargetDates={wmTargetDates}
             lifeProblems={lifeProblems}
             whatMattersTypes={whatMattersTypes}
             demandTypeId={caseRow.demandTypeId}

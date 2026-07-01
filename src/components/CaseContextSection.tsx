@@ -22,8 +22,10 @@ interface Props {
   lifeProblemId: string | null;
   whatMatters: string | null;
   whatMattersTypeIds: string[];
+  /** Per-'by_date' what-matters target dates on this case (typeId → ISO date). */
+  whatMattersTargetDates?: Record<string, string>;
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null }[];
   // Value demand (2026-06-12): in flow mode the demand the customer places on
   // the system lives here, right below the life problem it flows from — the
   // Vanguard causal order (life problem → value demand). Patched on the case.
@@ -34,7 +36,7 @@ interface Props {
   onTypesChanged?: () => Promise<void> | void;
 }
 
-export default function CaseContextSection({ code, contextSituation, lifeProblemId, whatMatters, whatMattersTypeIds, lifeProblems, whatMattersTypes, demandTypeId, valueDemandTypes, onPatch, onTypesChanged }: Props) {
+export default function CaseContextSection({ code, contextSituation, lifeProblemId, whatMatters, whatMattersTypeIds, whatMattersTargetDates, lifeProblems, whatMattersTypes, demandTypeId, valueDemandTypes, onPatch, onTypesChanged }: Props) {
   const { t, tl } = useLocale();
 
   // Local draft for the free-text fields; saved on blur. Re-sync when another
@@ -142,11 +144,31 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
                   : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
               }`}
             >
-              {tl(wm.label)}
+              {wm.timing === 'by_date' ? '📅 ' : wm.timing === 'asap' ? '⏱ ' : ''}{tl(wm.label)}
             </button>
           );
         })}
       </div>
+
+      {/* Time-based what-matters: for a selected 'by_date' factor capture the
+          customer's wanted date; for 'asap' just note the clock runs from case
+          open. Free-form factors (timing null) show nothing here. */}
+      {whatMattersTypes.filter((wm) => wm.timing && whatMattersTypeIds.includes(wm.id)).map((wm) => (
+        wm.timing === 'by_date' ? (
+          <div key={wm.id} className="flex items-center justify-center gap-2">
+            <span className="text-[11px] font-medium text-green-700">📅 {t('capture.whatMattersWhenLabel')}</span>
+            <input
+              type="date"
+              value={(whatMattersTargetDates?.[wm.id] || '').slice(0, 10)}
+              onChange={(e) => onPatch({ whatMattersDate: { whatMattersTypeId: wm.id, date: e.target.value || null } })}
+              aria-label={t('capture.whatMattersWhenLabel')}
+              className="text-[11px] px-2 py-0.5 rounded border border-green-300 bg-white focus:ring-2 focus:ring-green-500 outline-none"
+            />
+          </div>
+        ) : (
+          <p key={wm.id} className="text-center text-[11px] text-green-700/70">⏱ {tl(wm.label)} — {t('capture.whatMattersAsapHint')}</p>
+        )
+      ))}
       {/* Collapsed free-text note — opt-in, mirrors transactional. */}
       {(noteOpen || (whatMatters ?? '').trim()) ? (
         <div>

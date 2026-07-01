@@ -273,9 +273,11 @@ export async function createStudy(name: string, description: string = '', locale
     }
   }
 
-  // Flow studies start with the three decision points seeded (dotted box).
+  // Flow studies start with the three decision points seeded (dotted box) and
+  // the two standard time-based what-matters types ("When I want it" / "ASAP").
   if (isFlow) {
     await seedDefaultDecisionPointTypes(id, locale);
+    await ensureStandardWhatMattersTypes(id);
   }
 
   return { id, accessCode };
@@ -396,6 +398,33 @@ export async function updateWhatMattersType(id: string, data: { label?: string; 
 
 export async function deleteWhatMattersType(id: string) {
   await db.delete(whatMattersTypes).where(eq(whatMattersTypes.id, id));
+}
+
+// Two standard time-based what-matters types for flow studies (2026-07-01),
+// seeded alongside any free-form factors. 'by_date' captures a target date per
+// case (case_what_matters.target_date); 'asap' measures from case open.
+export const STANDARD_TIMED_WHAT_MATTERS: { label: string; timing: 'by_date' | 'asap' }[] = [
+  { label: 'When I want it', timing: 'by_date' },
+  { label: 'As soon as possible', timing: 'asap' },
+];
+
+// Idempotent: add either standard timed type only if a same-`timing` row is
+// absent. Safe to re-run (used both at flow-study creation and to backfill
+// existing flow studies).
+export async function ensureStandardWhatMattersTypes(studyId: string) {
+  const existing = await db.select().from(whatMattersTypes).where(eq(whatMattersTypes.studyId, studyId));
+  let nextSort = existing.length;
+  for (const std of STANDARD_TIMED_WHAT_MATTERS) {
+    if (existing.some((w) => w.timing === std.timing)) continue;
+    await db.insert(whatMattersTypes).values({
+      id: generateId(),
+      studyId,
+      label: std.label,
+      operationalDefinition: null,
+      sortOrder: nextSort++,
+      timing: std.timing,
+    });
+  }
 }
 
 // --- Life Problems (Phase 2 item 1: "Life Problem To Be Solved") ---
@@ -1587,21 +1616,39 @@ export async function updateCase(caseId: string, data: {
   if (Object.keys(updateFields).length > 0) {
     await db.update(cases).set(updateFields).where(eq(cases.id, caseId));
   }
-  // Replace-set semantics, mirroring entry-level what-matters handling.
+  // DIFF-set semantics (2026-07-01): delete only removed types and insert only
+  // added ones, so a kept row's target_date survives toggling other pills.
+  // (Was delete-all + reinsert, which wiped every captured date on any toggle.)
   if (data.whatMattersTypeIds !== undefined) {
-    await db.delete(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+    const desired = new Set(data.whatMattersTypeIds);
+    const current = await db.select().from(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+    const currentIds = new Set(current.map((r) => r.whatMattersTypeId));
+    for (const r of current) {
+      if (!desired.has(r.whatMattersTypeId)) {
+        await db.delete(caseWhatMatters).where(eq(caseWhatMatters.id, r.id));
+      }
+    }
     for (const wmtId of data.whatMattersTypeIds) {
-      await db.insert(caseWhatMatters).values({
-        id: generateId(),
-        caseId,
-        whatMattersTypeId: wmtId,
-      });
+      if (currentIds.has(wmtId)) continue;
+      await db.insert(caseWhatMatters).values({ id: generateId(), caseId, whatMattersTypeId: wmtId });
     }
   }
 }
 
 export async function getCaseWhatMatters(caseId: string) {
   return db.select().from(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+}
+
+// Set (or clear) the customer's wanted date for one 'by_date' what-matters type
+// on a case. Upserts the junction row so setting a date also selects the type.
+export async function setCaseWhatMattersDate(caseId: string, whatMattersTypeId: string, date: Date | null) {
+  const existing = await db.select().from(caseWhatMatters)
+    .where(and(eq(caseWhatMatters.caseId, caseId), eq(caseWhatMatters.whatMattersTypeId, whatMattersTypeId)));
+  if (existing.length) {
+    await db.update(caseWhatMatters).set({ targetDate: date }).where(eq(caseWhatMatters.id, existing[0].id));
+  } else {
+    await db.insert(caseWhatMatters).values({ id: generateId(), caseId, whatMattersTypeId, targetDate: date });
+  }
 }
 
 // --- Decision points (Skipton dotted box, 2026-06-12) ---

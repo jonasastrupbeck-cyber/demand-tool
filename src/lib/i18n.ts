@@ -2604,6 +2604,18 @@ const translations = {
     sv: '+ Vad är viktigt',
     de: '+ Was wichtig ist',
   },
+  'capture.whatMattersWhenLabel': {
+    en: 'When do you want it?',
+    da: 'Hvornår vil du have det?',
+    sv: 'När vill du ha det?',
+    de: 'Wann möchten Sie es?',
+  },
+  'capture.whatMattersAsapHint': {
+    en: 'from case open',
+    da: 'fra sagen åbnes',
+    sv: 'från att ärendet öppnas',
+    de: 'ab Fallöffnung',
+  },
   'capture.addLifeProblem': {
     en: '+ Life problem to be solved',
     da: '+ Livsproblem der skal løses',

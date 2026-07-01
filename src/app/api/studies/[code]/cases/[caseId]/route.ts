@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, getCaseDecisions, getCaseMilestones } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, getCaseDecisions, getCaseMilestones } from '@/lib/queries';
+
+// Build the { whatMattersTypeId → ISO target date } map from junction rows.
+function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
+  return Object.fromEntries(wmRows.filter((r) => r.targetDate).map((r) => [r.whatMattersTypeId, r.targetDate]));
+}
 
 // Case detail + its timeline of touches (oldest first). The timeline ordered
 // by createdAt IS the repeatable Capability-of-Response sequence.
@@ -22,7 +27,7 @@ export async function GET(
     getCaseDecisions(caseId),
     getCaseMilestones(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), decisions, milestones });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), decisions, milestones });
 }
 
 export async function PATCH(
@@ -78,7 +83,27 @@ export async function PATCH(
     data.whatMattersTypeIds = body.whatMattersTypeIds;
   }
 
+  // Set/clear the customer's wanted date for one 'by_date' what-matters type.
+  // date === null (or '') clears it; a bad date string is rejected.
+  let wmDate: { whatMattersTypeId: string; date: Date | null } | null = null;
+  if (body.whatMattersDate !== undefined) {
+    const wd = body.whatMattersDate;
+    if (!wd || typeof wd.whatMattersTypeId !== 'string') {
+      return NextResponse.json({ error: 'whatMattersDate needs a whatMattersTypeId' }, { status: 400 });
+    }
+    let d: Date | null = null;
+    if (wd.date !== null && wd.date !== undefined && wd.date !== '') {
+      const parsed = new Date(wd.date);
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: 'whatMattersDate.date is not a valid date' }, { status: 400 });
+      }
+      d = parsed;
+    }
+    wmDate = { whatMattersTypeId: wd.whatMattersTypeId, date: d };
+  }
+
   await updateCase(caseId, data);
+  if (wmDate) await setCaseWhatMattersDate(caseId, wmDate.whatMattersTypeId, wmDate.date);
   const [updated, wmRows] = await Promise.all([getCase(caseId), getCaseWhatMatters(caseId)]);
-  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId) });
+  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows) });
 }
