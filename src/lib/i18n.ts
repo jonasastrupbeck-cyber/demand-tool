@@ -1460,6 +1460,42 @@ const translations = {
     sv: 'Poster',
     de: 'Einträge',
   },
+  'dashboard.metricVariance': {
+    en: 'Early/late',
+    da: 'Før/efter',
+    sv: 'Före/efter',
+    de: 'Früher/später',
+  },
+  'dashboard.metricVarianceAxis': {
+    en: 'Days early (−) / late (+)',
+    da: 'Dage før (−) / efter (+)',
+    sv: 'Dagar före (−) / efter (+)',
+    de: 'Tage früher (−) / später (+)',
+  },
+  'dashboard.scopeWhatMatters': {
+    en: 'What matters',
+    da: 'Hvad betyder noget',
+    sv: 'Vad är viktigt',
+    de: 'Was wichtig ist',
+  },
+  'dashboard.wmMetOnTime': {
+    en: 'Met the date',
+    da: 'Nåede datoen',
+    sv: 'Klarade datumet',
+    de: 'Termin gehalten',
+  },
+  'dashboard.wmMissedLate': {
+    en: 'Missed (late)',
+    da: 'Overskredet',
+    sv: 'Missade (sent)',
+    de: 'Verpasst (spät)',
+  },
+  'dashboard.wmAvgDaysLate': {
+    en: 'Avg days late',
+    da: 'Gns. dage forsinket',
+    sv: 'Snitt dagar sent',
+    de: 'Ø Tage verspätet',
+  },
   'dashboard.touchesPerCase': {
     en: 'Touches per case',
     da: 'Registreringer pr. sag',

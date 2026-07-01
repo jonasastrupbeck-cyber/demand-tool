@@ -21,9 +21,11 @@ export async function GET(
   const dateFrom = sp.get('dateFrom') ? new Date(sp.get('dateFrom')!) : undefined;
   const dateTo = sp.get('dateTo') ? new Date(sp.get('dateTo')!) : undefined;
   const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
-  const metric = sp.get('metric') === 'touches' ? 'touches' : 'leadTime';
+  const metricParam = sp.get('metric');
+  const metric = metricParam === 'touches' ? 'touches' : metricParam === 'variance' ? 'variance' : 'leadTime';
   const p2bs = sp.get('p2bs') || undefined;
+  const wmScope = sp.get('wmScope') || undefined;
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, p2bs);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, p2bs, wmScope);
   return NextResponse.json(data);
 }

@@ -34,7 +34,7 @@ function Card({ label, value, sub, color }: { label: string; value: string | num
 }
 
 export default function CapabilityChart({
-  code, eventOptions, studyName, dateFrom, dateTo, lifeProblemId, onRemove,
+  code, eventOptions, studyName, dateFrom, dateTo, lifeProblemId, whatMattersScopeTypeId, onRemove,
 }: {
   code: string;
   eventOptions: PillSelectOption[];
@@ -42,13 +42,17 @@ export default function CapabilityChart({
   dateFrom?: string;
   dateTo?: string;
   lifeProblemId?: string | null;
+  whatMattersScopeTypeId?: string | null;
   onRemove?: () => void;
 }) {
   const { t } = useLocale();
   const [capFrom, setCapFrom] = useState('');
   const [capTo, setCapTo] = useState('');
   const [capSort, setCapSort] = useState<'start' | 'closed'>('start');
-  const [capMetric, setCapMetric] = useState<'leadTime' | 'touches'>('leadTime');
+  const [capMetric, setCapMetric] = useState<'leadTime' | 'touches' | 'variance'>('leadTime');
+  // Picking the customer's-date event switches to the signed "days early/late"
+  // metric (leadTime would drop cases finished before the date as negatives).
+  const pickFrom = (v: string) => { setCapFrom(v); if (v.startsWith('whatMattersTarget:')) setCapMetric('variance'); };
   const [capData, setCapData] = useState<CapabilityData | null>(null);
   const [capLoading, setCapLoading] = useState(false);
   const [capTick, setCapTick] = useState(0);
@@ -80,11 +84,12 @@ export default function CapabilityChart({
     if (dateFrom) qp.set('dateFrom', dateFrom);
     if (dateTo) qp.set('dateTo', dateTo);
     if (lifeProblemId) qp.set('p2bs', lifeProblemId);
+    if (whatMattersScopeTypeId) qp.set('wmScope', whatMattersScopeTypeId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/capability?${qp}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, dateFrom, dateTo, lifeProblemId, capTick, capSort, capMetric]);
+  }, [capFrom, capTo, code, dateFrom, dateTo, lifeProblemId, whatMattersScopeTypeId, capTick, capSort, capMetric]);
 
   const handleExportImage = useCallback(async () => {
     if (!capExportRef.current || capExporting) return;
@@ -125,15 +130,15 @@ export default function CapabilityChart({
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-xs font-medium text-gray-500">{t('dashboard.eventFrom')}</span>
-        <PillSelect value={capFrom} onChange={setCapFrom} options={eventOptions} placeholder={t('dashboard.eventFrom')} ariaLabel={t('dashboard.eventFrom')} />
+        <PillSelect value={capFrom} onChange={pickFrom} options={eventOptions} placeholder={t('dashboard.eventFrom')} ariaLabel={t('dashboard.eventFrom')} />
         <span className="text-gray-400" aria-hidden="true">→</span>
         <span className="text-xs font-medium text-gray-500">{t('dashboard.eventTo')}</span>
         <PillSelect value={capTo} onChange={setCapTo} options={eventOptions} placeholder={t('dashboard.eventTo')} ariaLabel={t('dashboard.eventTo')} />
         <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.metricLabel')}</span>
         <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
-          {(['leadTime', 'touches'] as const).map((m) => (
+          {(['leadTime', 'touches', 'variance'] as const).map((m) => (
             <button key={m} type="button" onClick={() => setCapMetric(m)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${capMetric === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {m === 'leadTime' ? t('dashboard.metricLeadTime') : t('dashboard.metricTouches')}
+              {m === 'leadTime' ? t('dashboard.metricLeadTime') : m === 'touches' ? t('dashboard.metricTouches') : t('dashboard.metricVariance')}
             </button>
           ))}
         </div>
@@ -161,8 +166,10 @@ export default function CapabilityChart({
         const fromLabel = (eventOptions.find((o) => o.id === capFrom)?.label || capFrom).replace(/^◇ /, '');
         const toLabel = (eventOptions.find((o) => o.id === capTo)?.label || capTo).replace(/^◇ /, '');
         const isTouches = data.unit === 'touches';
-        const valueLabel = isTouches ? t('dashboard.touchesPerCase') : t('dashboard.leadTimeDays');
-        const fmtValue = (v: number | null) => v == null ? '—' : (isTouches ? `${v}` : `${v} ${t('dashboard.daysShort')}`);
+        const isVariance = capMetric === 'variance';
+        const valueLabel = isTouches ? t('dashboard.touchesPerCase') : isVariance ? t('dashboard.metricVarianceAxis') : t('dashboard.leadTimeDays');
+        // Variance is signed: +n = n days late, -n = n days early.
+        const fmtValue = (v: number | null) => v == null ? '—' : (isTouches ? `${v}` : `${isVariance && v > 0 ? '+' : ''}${v} ${t('dashboard.daysShort')}`);
         const subtitle = `${fromLabel} → ${toLabel} · ${valueLabel} · ${t('dashboard.sortLabel')}: ${capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.sortStart')}`;
         return (
         <>
@@ -248,6 +255,23 @@ export default function CapabilityChart({
               <Card label={t('dashboard.lowerLimit')} value={fmtValue(data.lnpl)} color={COLORS.failure} />
               <Card label={t('dashboard.signals')} value={data.points.filter((p) => p.special).length} color={data.points.some((p) => p.special) ? COLORS.failure : COLORS.value} />
             </div>
+            {/* Met-the-date summary (variance only): met = finished on/before the
+                customer's date (value ≤ 0), missed = late (value > 0). */}
+            {isVariance && (() => {
+              const vals = data.points.filter((p) => !p.excluded).map((p) => p.leadTime);
+              const tot = vals.length;
+              const met = vals.filter((v) => v <= 0).length;
+              const late = vals.filter((v) => v > 0);
+              const avgLate = late.length ? Math.round((late.reduce((s, v) => s + v, 0) / late.length) * 10) / 10 : 0;
+              const pct = (x: number) => tot ? Math.round((x / tot) * 100) : 0;
+              return (
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <Card label={t('dashboard.wmMetOnTime')} value={`${met}`} sub={`${pct(met)}%`} color={COLORS.value} />
+                  <Card label={t('dashboard.wmMissedLate')} value={`${late.length}`} sub={`${pct(late.length)}%`} color={COLORS.failure} />
+                  <Card label={t('dashboard.wmAvgDaysLate')} value={late.length ? `${avgLate} ${t('dashboard.daysShort')}` : '—'} />
+                </div>
+              );
+            })()}
           </div>{/* end export region */}
           <p className="mt-2 text-center text-[11px] text-gray-400">{t('dashboard.capabilityInspectHint')}</p>
 

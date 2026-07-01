@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, capabilityAnnotations } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations } from './schema';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData, TouchSeriesPoint } from '@/types';
@@ -769,19 +769,21 @@ export async function getFailureCausesForFlow(
 // Capability / lead-time (2026-06-18): the time between any two chosen events
 // across a study's cases, as an XmR individuals (capability) chart. Events:
 //   'caseOpen' | 'firstContact' | 'caseClose' | 'decision:<typeId>' | 'milestone:<id>'
+//   | 'whatMattersTarget:<typeId>'  (the customer's wanted date, 2026-07-01)
 // All timestamps already captured — read-only analytics, no schema change.
 // Reads are kept FLAT and assembled in JS (Drizzle correlated-subquery gotcha).
 type EventToken = string;
 
 function eventTimestamp(
   token: EventToken,
-  ctx: { openedAt: Date; closedAt: Date | null; firstContactAt: Date | null; decisions: Map<string, Date>; milestones: Map<string, Date> },
+  ctx: { openedAt: Date; closedAt: Date | null; firstContactAt: Date | null; decisions: Map<string, Date>; milestones: Map<string, Date>; whatMattersTargets: Map<string, Date> },
 ): Date | null {
   if (token === 'caseOpen') return ctx.openedAt;
   if (token === 'firstContact') return ctx.firstContactAt;
   if (token === 'caseClose') return ctx.closedAt;
   if (token.startsWith('decision:')) return ctx.decisions.get(token.slice('decision:'.length)) ?? null;
   if (token.startsWith('milestone:')) return ctx.milestones.get(token.slice('milestone:'.length)) ?? null;
+  if (token.startsWith('whatMattersTarget:')) return ctx.whatMattersTargets.get(token.slice('whatMattersTarget:'.length)) ?? null;
   return null;
 }
 
@@ -792,8 +794,12 @@ export async function getCapabilityData(
   dateFrom?: Date,
   dateTo?: Date,
   sort: 'start' | 'closed' = 'start',
-  metric: 'leadTime' | 'touches' = 'leadTime',
+  metric: 'leadTime' | 'touches' | 'variance' = 'leadTime',
   lifeProblemId?: string,
+  // Optional what-matters scope: restrict to cases that selected this type.
+  // Gives the "ASAP" measure its meaning (scope to the asap type, then read
+  // case-open → completion lead time).
+  whatMattersScopeTypeId?: string,
 ): Promise<CapabilityData> {
   const unit = metric === 'touches' ? 'touches' : 'days';
   const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
@@ -802,10 +808,31 @@ export async function getCapabilityData(
   const caseWhere = lifeProblemId
     ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
     : eq(cases.studyId, studyId);
-  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
+  let caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
     .from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
+
+  // What-matters scope: keep only cases that selected the given type.
+  if (whatMattersScopeTypeId) {
+    const scopeRows = await db.select({ caseId: caseWhatMatters.caseId })
+      .from(caseWhatMatters)
+      .where(and(inArray(caseWhatMatters.caseId, caseRows.map((c) => c.id)), eq(caseWhatMatters.whatMattersTypeId, whatMattersScopeTypeId)));
+    const scopeSet = new Set(scopeRows.map((r) => r.caseId));
+    caseRows = caseRows.filter((c) => scopeSet.has(c.id));
+    if (caseRows.length === 0) return empty;
+  }
   const caseIds = caseRows.map((c) => c.id);
+
+  // Per-case 'by_date' what-matters target dates → whatMattersTarget:<typeId>.
+  const wmTargetRows = await db.select({ caseId: caseWhatMatters.caseId, whatMattersTypeId: caseWhatMatters.whatMattersTypeId, targetDate: caseWhatMatters.targetDate })
+    .from(caseWhatMatters)
+    .where(and(inArray(caseWhatMatters.caseId, caseIds), isNotNull(caseWhatMatters.targetDate)));
+  const wmTargetByCase = new Map<string, Map<string, Date>>();
+  for (const r of wmTargetRows) {
+    if (!r.targetDate) continue;
+    if (!wmTargetByCase.has(r.caseId)) wmTargetByCase.set(r.caseId, new Map());
+    wmTargetByCase.get(r.caseId)!.set(r.whatMattersTypeId, new Date(r.targetDate as unknown as string));
+  }
 
   // Per-measure annotations (exclude / note), keyed by caseId for this event-pair.
   const annoRows = await db.select().from(capabilityAnnotations)
@@ -874,6 +901,7 @@ export async function getCapabilityData(
       firstContactAt: fcMap.get(c.id) ?? null,
       decisions: decByCase.get(c.id) ?? new Map<string, Date>(),
       milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
+      whatMattersTargets: wmTargetByCase.get(c.id) ?? new Map<string, Date>(),
     };
     const fromTs = eventTimestamp(fromEvent, ctx);
     const toTs = eventTimestamp(toEvent, ctx);
@@ -887,7 +915,10 @@ export async function getCapabilityData(
     const dayIndex = (d: Date) => Math.floor(d.getTime() / 86_400_000);
     const fromDay = dayIndex(fromTs);
     const toDay = dayIndex(toTs);
-    if (toDay < fromDay) continue;
+    // 'variance' (days early/late vs the customer's date) is SIGNED — a case
+    // that finished before the target (toDay < fromDay = early) is kept as a
+    // negative. Other metrics drop that as a spurious negative window.
+    if (metric !== 'variance' && toDay < fromDay) continue;
     if (dateFrom && fromTs.getTime() < dateFrom.getTime()) continue;
     if (dateTo && fromTs.getTime() > dateTo.getTime()) continue;
     // The plotted value: whole-day lead time, or the count of touches in the
@@ -934,7 +965,9 @@ export async function getCapabilityData(
     for (let i = 1; i < values.length; i++) mrSum += Math.abs(values[i] - values[i - 1]);
     const mrBar = mrSum / (values.length - 1);
     unpl = mean + 2.66 * mrBar;
-    lnpl = Math.max(0, mean - 2.66 * mrBar); // lead time can't be negative
+    // Lead time / touches can't be negative (floor at 0); variance is signed,
+    // so its lower limit may legitimately be negative (delivered early).
+    lnpl = metric === 'variance' ? mean - 2.66 * mrBar : Math.max(0, mean - 2.66 * mrBar);
   }
 
   const round1 = (x: number) => Math.round(x * 10) / 10;

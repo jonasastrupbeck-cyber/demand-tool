@@ -95,6 +95,10 @@ export default function DashboardPage() {
   const [cases, setCases] = useState<{ id: string; caseRef: string }[]>([]);
   const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
+  const [whatMattersTypes, setWhatMattersTypes] = useState<{ id: string; label: string; sortOrder: number; timing: 'by_date' | 'asap' | null }[]>([]);
+  // What-matters scope (flow): restrict every capability chart to cases that
+  // selected this timed factor (null = all). Gives the ASAP measure its meaning.
+  const [whatMattersScope, setWhatMattersScope] = useState<string | null>(null);
   // R11: the flow capability view is a stack of independent <CapabilityChart>s.
   // Each owns its own measure + data + inspector + export region. ids are a plain
   // counter (no Date/random — keeps SSR/build deterministic).
@@ -173,6 +177,7 @@ export default function DashboardPage() {
         setLifeProblems(Array.isArray(s.lifeProblems) ? s.lifeProblems : []);
         setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
+        setWhatMattersTypes(Array.isArray(s.whatMattersTypes) ? s.whatMattersTypes : []);
         // Derive effective layer from the capture toggles so the dashboard
         // gates stay in sync with what the team chose to capture.
         let effective = 1;
@@ -226,14 +231,19 @@ export default function DashboardPage() {
   const eventOptions: PillSelectOption[] = useMemo(() => {
     const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
     const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
+    // 'by_date' what-matters types add a target-date event (the customer's
+    // wanted date). Pair it with a completion event + the "days early/late"
+    // metric to measure whether we met the date.
+    const wm = whatMattersTypes.filter((w) => w.timing === 'by_date').map((w) => ({ id: `whatMattersTarget:${w.id}`, label: `📅 ${tl(w.label)}` }));
     return [
       { id: 'caseOpen', label: t('dashboard.evCaseOpened') },
       { id: 'firstContact', label: t('dashboard.evFirstContact') },
       ...ms,
       ...dp,
+      ...wm,
       { id: 'caseClose', label: t('dashboard.evCaseClosed') },
     ];
-  }, [milestones, decisionPointTypes, t, tl]);
+  }, [milestones, decisionPointTypes, whatMattersTypes, t, tl]);
 
   // R7: flow studies show only the capability view.
   useEffect(() => {
@@ -607,6 +617,32 @@ export default function DashboardPage() {
                   }`}
                 >
                   {tl(lp.label)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* What-matters scope (flow): restrict every capability chart to cases
+            that selected a timed factor. "As soon as possible" + case-open →
+            completion lead time = the ASAP measure. */}
+        {isFlow && whatMattersTypes.some((w) => w.timing) && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-gray-500">{t('dashboard.scopeWhatMatters')}:</span>
+            <div className="flex flex-wrap gap-1 rounded-lg p-1 bg-white border border-gray-200">
+              <button
+                onClick={() => setWhatMattersScope(null)}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${whatMattersScope === null ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              >
+                {t('dashboard.scopeAll')}
+              </button>
+              {whatMattersTypes.filter((w) => w.timing).map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => setWhatMattersScope(w.id)}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${whatMattersScope === w.id ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  {w.timing === 'by_date' ? '📅 ' : '⏱ '}{tl(w.label)}
                 </button>
               ))}
             </div>
@@ -1497,6 +1533,7 @@ export default function DashboardPage() {
                 dateFrom={capRange.from}
                 dateTo={capRange.to}
                 lifeProblemId={lifeProblemFilter}
+                whatMattersScopeTypeId={whatMattersScope}
                 onRemove={chartIds.length > 1 ? () => removeChart(id) : undefined}
               />
             ))}
