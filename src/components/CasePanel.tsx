@@ -940,8 +940,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         </div>
 
         {/* GROUP B — [ decision box ┊ capability of response ]. Own horizontal
-            scroll; scroll right within it to reach capability of response. */}
-        <div className="order-3 md:order-4 flex-1 min-w-0 md:ml-3 flex flex-col">
+            scroll; scroll right within it to reach capability of response.
+            2026-07-01: on wide screens (≥1600px) it stops growing (flex-none) and
+            takes only its content width, so it hugs the right edge instead of
+            leaving whitespace to the right of capability — the surplus goes to
+            GROUP A (the work rail, the sole remaining flex-1). Below 1600px it
+            keeps flex-1 + internal scroll (no regression, no page h-scroll). */}
+        <div className="order-3 md:order-4 flex-1 min-w-0 min-[1600px]:flex-none md:ml-3 flex flex-col">
           {/* inner row is flex-1 so it fills Group B's (board-stretched) height,
               which lets the dashed line stretch to the SAME height as the left one. */}
           <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch md:min-w-min md:overflow-x-auto">
