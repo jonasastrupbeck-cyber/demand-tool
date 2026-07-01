@@ -218,7 +218,11 @@ export default function CapturePage() {
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
   // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
   // set only when the block's tag is 'failure' (flow work path). Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null }[]>([]);
+  // One date for the WHOLE work entry (2026-07-02): flow work used to carry a
+  // per-block "Step date"; now a single date near Save applies to every block.
+  // Defaults today; set a past day to backdate a retrospectively-captured touch.
+  const [workEntryDate, setWorkEntryDate] = useState(todayIso());
   // Which block's "+ add new system condition" was clicked — the shared inline
   // adder writes the created SC back into this block (addingType is global).
   const [scAddTargetBlockIdx, setScAddTargetBlockIdx] = useState<number | null>(null);
@@ -318,7 +322,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }]);
     }
   }, [loading, study, entryType]);
 
@@ -404,7 +408,9 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }] : []);
+    // Next entry defaults back to today (the previous entry may have backdated it).
+    setWorkEntryDate(todayIso());
     setError('');
     // Keep entryType sticky for batch entry
   }
@@ -565,7 +571,7 @@ export default function CapturePage() {
     // Work tab: send workBlocks; server auto-populates verbatim from them.
     // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date: workEntryDate }));
     }
 
     // Handling — only when the toggle is on.
@@ -1497,26 +1503,13 @@ export default function CapturePage() {
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }, ...prev.slice(idx)])}
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }, ...prev.slice(idx)])}
                           className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
                         >
                           + {t('capture.insertWorkBlock')}
                         </button>
-                      )}
-                      {/* Per-block date (slice 2): defaults today; set a past day to
-                          backfill a missed step with its real date. */}
-                      {flowWorkPath && (
-                        <label className="flex items-center gap-1.5">
-                          <span className="text-[11px] font-medium text-gray-500">{t('capture.workBlockDate')}</span>
-                          <input
-                            type="date"
-                            value={block.date}
-                            onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, date: e.target.value } : b))}
-                            className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
-                          />
-                        </label>
                       )}
                       {/* Mode B — badge (step picked). Narrower card + wrapping badge
                            so filled blocks are roughly square and more fit on one row
@@ -1705,7 +1698,7 @@ export default function CapturePage() {
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
@@ -1744,6 +1737,17 @@ export default function CapturePage() {
             placeholder) once that block scrolls into view. */}
         {flowWorkPath && (
           <div className="sticky right-0 ml-auto lg:mr-[18.5rem] z-[1] mt-3 w-fit max-w-full flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+            {/* One date for the whole work entry — defaults today; change it to
+                backdate a retrospectively-captured touch before saving. */}
+            <label className="flex items-center justify-end gap-1.5">
+              <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
+              <input
+                type="date"
+                value={workEntryDate}
+                onChange={(e) => setWorkEntryDate(e.target.value)}
+                className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+              />
+            </label>
             <div className="flex items-center gap-3">
               {corBlock}
               {submitButton}

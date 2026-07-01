@@ -867,6 +867,13 @@ const translations = {
     sv: 'Stegdatum',
     de: 'Schrittdatum',
   },
+  // One date for the whole work entry (2026-07-02) — replaces the per-block date.
+  'capture.workEntryDate': {
+    en: 'Date',
+    da: 'Dato',
+    sv: 'Datum',
+    de: 'Datum',
+  },
   // Drag-reorder of saved touches (migration 0034): the date-confirm panel.
   'capture.reorderDateTitle': {
     en: 'Date for this touch',

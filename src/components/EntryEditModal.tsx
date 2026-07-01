@@ -113,7 +113,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; date: string }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null }[]>([]);
+  // One date for the whole work entry (2026-07-02) — mirrors the capture composer.
+  // Initialised from the entry on load; on save it's written to every block.
+  const [entryDate, setEntryDate] = useState(todayIso());
   // Case stitching (Skipton slice 1): the case ref this entry belongs to,
   // looked up from caseId for read-only display. Re-assigning is a later slice.
   const [caseRef, setCaseRef] = useState<string | null>(null);
@@ -165,16 +168,23 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; blockDate?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
               freeText: !b.workStepTypeId && !!b.text,
               systemConditionIds: Array.isArray(b.systemConditionIds) ? b.systemConditionIds : (b.systemConditionId ? [b.systemConditionId] : []),
               demandTypeId: b.demandTypeId ?? null,
-              date: isoDay(b.blockDate) || isoDay((data.entry as { createdAt?: string } | undefined)?.createdAt) || todayIso(),
             }))
           : []);
+        // The entry's single date = earliest block date (matches effectiveAt),
+        // else the entry's createdAt, else today. Legacy multi-date entries
+        // collapse to their earliest on the next save.
+        const blockDays: string[] = Array.isArray(data.workBlocks)
+          ? data.workBlocks.map((b: { blockDate?: string | null }) => isoDay(b.blockDate)).filter((d: string) => !!d)
+          : [];
+        const earliest = blockDays.length ? blockDays.reduce((m, d) => (d < m ? d : m)) : '';
+        setEntryDate(earliest || isoDay((data.entry as { createdAt?: string } | undefined)?.createdAt) || todayIso());
         // Auto-open the note disclosure if the field already has content.
         setWhatMattersNoteOpen(Boolean(data.entry?.whatMatters && data.entry.whatMatters.trim()));
       }
@@ -205,7 +215,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       // Strip the UI-only freeText flag before PATCH.
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
-        .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date }));
+        .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date: entryDate }));
     }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -639,24 +649,13 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           {flowWorkPath && (
                             <button
                               type="button"
-                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }, ...prev.slice(idx)])}
+                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }, ...prev.slice(idx)])}
                               className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                               aria-label={t('capture.insertWorkBlock')}
                               title={t('capture.insertWorkBlock')}
                             >
                               + {t('capture.insertWorkBlock')}
                             </button>
-                          )}
-                          {flowWorkPath && (
-                            <label className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-medium text-gray-500">{t('capture.workBlockDate')}</span>
-                              <input
-                                type="date"
-                                value={b.date}
-                                onChange={(e) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, date: e.target.value } : p))}
-                                className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
-                              />
-                            </label>
                           )}
                           {hasStep && step && (
                             <div className="flex items-start justify-between gap-1">
@@ -836,7 +835,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, date: todayIso() }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >
@@ -1111,7 +1110,20 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
           </div>
         )}
 
-        <div className="p-5 border-t border-gray-200 flex gap-3 sticky bottom-0 bg-white">
+        <div className="p-5 border-t border-gray-200 flex flex-col gap-3 sticky bottom-0 bg-white">
+          {/* One date for the whole work entry (flow) — applied to every block on save. */}
+          {flowWorkPath && (
+            <label className="flex items-center justify-end gap-1.5">
+              <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
+              <input
+                type="date"
+                value={entryDate}
+                onChange={(e) => setEntryDate(e.target.value)}
+                className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+              />
+            </label>
+          )}
+          <div className="flex gap-3">
           {confirmingDelete ? (
             <button
               onClick={handleDelete}
@@ -1143,6 +1155,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
           >
             {saving ? t('capture.saving') : isDemand ? t('capture.save') : t('capture.saveWork')}
           </button>
+          </div>
         </div>
       </div>
     </div>
