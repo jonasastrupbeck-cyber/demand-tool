@@ -728,7 +728,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           touches → decisions. R2: lg:items-start; R5: dashed zone boundaries. */}
       <div className="flex flex-col gap-3 md:flex-row md:gap-0 md:items-stretch min-h-[24rem]">
         {/* PINNED LEFT — the customer. Always visible. */}
-        <aside className="order-1 w-full md:w-80 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
+        <aside className="order-1 w-full md:w-64 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
           {studyName && <p className="text-center text-xs font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           <div className="flex justify-center mb-2">
             <button
@@ -799,7 +799,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               which lets the dashed line stretch to the SAME height as the left one. */}
           <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch md:min-w-min md:overflow-x-auto">
             {decisionPointsEnabled && (
-              <div className="w-full md:w-80 shrink-0">
+              <div className="w-full md:w-64 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
                   <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                     {t('capture.caseDecisionsHeading')}
