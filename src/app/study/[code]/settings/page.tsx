@@ -105,7 +105,7 @@ interface StudyData {
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null }[];
   milestones: { id: string; label: string; sortOrder: number }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
@@ -1592,8 +1592,16 @@ export default function SettingsPage() {
             <ul className="space-y-2 mb-4">
               {study.whatMattersTypes.map((wm) => (
                 <li key={wm.id} className={`${itemCls} bg-blue-50`}>
-                  {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
-                  <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    {wm.timing === 'by_date' ? <span aria-hidden>📅</span> : wm.timing === 'asap' ? <span aria-hidden>⏱</span> : null}
+                    {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
+                  </span>
+                  {/* The two standard timed types are protected — no delete, just a tag. */}
+                  {wm.timing ? (
+                    <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{t('settings.standardType')}</span>
+                  ) : (
+                    <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                  )}
                 </li>
               ))}
             </ul>

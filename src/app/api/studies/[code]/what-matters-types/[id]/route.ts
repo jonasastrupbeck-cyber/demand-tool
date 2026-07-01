@@ -26,6 +26,14 @@ export async function DELETE(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
-  await deleteWhatMattersType(id);
+  try {
+    await deleteWhatMattersType(id);
+  } catch (err) {
+    // The two standard timed types are protected (see deleteWhatMattersType).
+    if (err instanceof Error && err.message === 'PROTECTED_STANDARD_TYPE') {
+      return NextResponse.json({ error: 'This is a standard type and cannot be deleted.' }, { status: 409 });
+    }
+    throw err;
+  }
   return new Response(null, { status: 204 });
 }

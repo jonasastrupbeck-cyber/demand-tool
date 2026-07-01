@@ -397,6 +397,17 @@ export async function updateWhatMattersType(id: string, data: { label?: string; 
 }
 
 export async function deleteWhatMattersType(id: string) {
+  // The two standard timed types ("When I want it" / "As soon as possible") are
+  // protected — they carry a `timing` value and must not be deleted.
+  const [row] = await db.select().from(whatMattersTypes).where(eq(whatMattersTypes.id, id));
+  if (!row) return;
+  if (row.timing) throw new Error('PROTECTED_STANDARD_TYPE');
+  // The junction FKs are RESTRICT, so a bare delete fails once the type has been
+  // selected on a case or entry. Cascade the selections first (the pill is going
+  // away, so its selections go with it), then delete the type.
+  await db.delete(caseWhatMatters).where(eq(caseWhatMatters.whatMattersTypeId, id));
+  await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.whatMattersTypeId, id));
+  await db.update(demandEntries).set({ whatMattersTypeId: null }).where(eq(demandEntries.whatMattersTypeId, id));
   await db.delete(whatMattersTypes).where(eq(whatMattersTypes.id, id));
 }
 

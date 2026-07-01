@@ -640,6 +640,12 @@ const translations = {
     sv: 'Ta bort',
     de: 'Entfernen',
   },
+  'settings.standardType': {
+    en: 'standard',
+    da: 'standard',
+    sv: 'standard',
+    de: 'Standard',
+  },
   'settings.add': {
     en: 'Add',
     da: 'Tilføj',
