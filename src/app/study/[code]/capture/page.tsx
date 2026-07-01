@@ -1734,12 +1734,14 @@ export default function CapturePage() {
         )}
 
         {/* Flow composer: COR + Save sit BELOW the work blocks as a compact bar
-            pinned to the bottom-LEFT of the composer (sticky left-0). The block
-            row can grow very wide (blocks flow left→right), so a centred/inline
-            footer scrolls off-screen right — pinning keeps COR + Save visible
-            however many blocks are added or wherever the rail is scrolled. */}
+            that floats at the RIGHT edge of the composer viewport (sticky
+            right-0, right-aligned via ml-auto). The block row can grow very wide
+            (blocks flow left→right), so a centred/inline footer scrolls
+            off-screen — pinning it right keeps COR + Save beside the newest work
+            step (where the user is adding/editing) and always visible however far
+            the rail is scrolled. */}
         {flowWorkPath && (
-          <div className="sticky left-0 z-[1] mt-3 w-fit max-w-full flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+          <div className="sticky right-0 ml-auto z-[1] mt-3 w-fit max-w-full flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
             <div className="flex items-center gap-3">
               {corBlock}
               {submitButton}
