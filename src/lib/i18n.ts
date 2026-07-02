@@ -1340,10 +1340,10 @@ const translations = {
     de: 'Noch keine Arbeitsschritte erfasst.',
   },
   'dashboard.capabilityLeadTime': {
-    en: 'Capability — lead time between events',
-    da: 'Kapabilitet — gennemløbstid mellem hændelser',
-    sv: 'Kapabilitet — ledtid mellan händelser',
-    de: 'Kapabilität — Durchlaufzeit zwischen Ereignissen',
+    en: 'Capability — E2E time between events',
+    da: 'Kapabilitet — E2E-tid mellem hændelser',
+    sv: 'Kapabilitet — E2E-tid mellan händelser',
+    de: 'Kapabilität — E2E-Zeit zwischen Ereignissen',
   },
   'dashboard.eventFrom': {
     en: 'From',
@@ -1400,10 +1400,10 @@ const translations = {
     de: 'Spezielle Ursachen',
   },
   'dashboard.leadTimeDays': {
-    en: 'Lead time (days)',
-    da: 'Gennemløbstid (dage)',
-    sv: 'Ledtid (dagar)',
-    de: 'Durchlaufzeit (Tage)',
+    en: 'E2E time (days)',
+    da: 'E2E-tid (dage)',
+    sv: 'E2E-tid (dagar)',
+    de: 'E2E-Zeit (Tage)',
   },
   'dashboard.daysShort': {
     en: 'd',
@@ -1468,10 +1468,10 @@ const translations = {
     de: 'Maß',
   },
   'dashboard.metricLeadTime': {
-    en: 'Lead time',
-    da: 'Gennemløbstid',
-    sv: 'Ledtid',
-    de: 'Durchlaufzeit',
+    en: 'E2E time',
+    da: 'E2E-tid',
+    sv: 'E2E-tid',
+    de: 'E2E-Zeit',
   },
   'dashboard.metricTouches': {
     en: 'Touches',
@@ -1613,6 +1613,12 @@ const translations = {
     da: 'Note',
     sv: 'Notis',
     de: 'Notiz',
+  },
+  'dashboard.capabilityNotesList': {
+    en: 'Notes & exclusions',
+    da: 'Noter & udeladelser',
+    sv: 'Noteringar & undantag',
+    de: 'Notizen & Ausschlüsse',
   },
   'dashboard.capabilityNotePh': {
     en: 'Add a note about this case…',

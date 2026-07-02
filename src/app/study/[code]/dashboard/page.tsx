@@ -554,9 +554,10 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
-        {/* Contextual help for the active flow view — dropped beneath the row. */}
-        {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (
-          <p className="text-xs text-gray-400 mt-1.5">{dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : dashboardView === 'analytics' ? t('dashboard.analyticsTabHelp') : t('dashboard.capabilityTabHelp')}</p>
+        {/* Contextual help for Analytics / Synthesise only — the Capability view
+            is self-explanatory, so no explainer there (2026-07-02). */}
+        {isFlow && (dashboardView === 'analytics' || dashboardView === 'synthesis') && (
+          <p className="text-xs text-gray-400 mt-1.5">{dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : t('dashboard.analyticsTabHelp')}</p>
         )}
         </div>
 
@@ -605,9 +606,9 @@ export default function DashboardPage() {
         {isFlow && ((lifeProblemsEnabled && lifeProblems.length > 0) || whatMattersTypes.some((w) => w.timing)) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-start">
         {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">{t('capture.caseTableP2bs')}:</span>
-            <div className="flex flex-wrap gap-1 rounded-lg p-1 bg-white border border-gray-200">
+          <div className="rounded-lg border border-gray-200 bg-white p-2">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('capture.caseTableP2bs')}</p>
+            <div className="flex flex-wrap gap-1">
               <button
                 onClick={() => setLifeProblemFilter(null)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
@@ -635,9 +636,9 @@ export default function DashboardPage() {
             that selected a timed factor. "As soon as possible" + case-open →
             completion lead time = the ASAP measure. */}
         {isFlow && whatMattersTypes.some((w) => w.timing) && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">{t('dashboard.scopeWhatMatters')}:</span>
-            <div className="flex flex-wrap gap-1 rounded-lg p-1 bg-white border border-gray-200">
+          <div className="rounded-lg border border-gray-200 bg-white p-2">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.scopeWhatMatters')}</p>
+            <div className="flex flex-wrap gap-1">
               <button
                 onClick={() => setWhatMattersScope(null)}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${whatMattersScope === null ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
