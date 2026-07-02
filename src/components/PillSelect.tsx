@@ -39,6 +39,11 @@ interface Props {
    *  fires this callback instead of selecting an option. Lets the same pill drive
    *  both "pick existing" and "create new" flows without a separate "+" button. */
   onAddNew?: () => void;
+  /** When provided, the "+ new" row becomes an INLINE create field: the user
+   *  types a label directly in the popover and submits, and this is called to
+   *  create the option. Resolve with the new option id (selected automatically)
+   *  or null on failure. Takes precedence over onAddNew. */
+  onCreate?: (label: string) => Promise<string | null>;
   /** Label for the "+ new" action row in the popover. */
   addNewLabel?: string;
   /** When true, the pill fills its container's width (trigger `w-full`, label
@@ -92,8 +97,15 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   return 'bg-white text-gray-500 border-gray-300 hover:border-gray-400';
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, addNewLabel, fullWidth = false, compact = false }: Props) {
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, onCreate, addNewLabel, fullWidth = false, compact = false }: Props) {
   const [open, setOpen] = useState(false);
+  // Inline-create state (only used when onCreate is provided).
+  const [adding, setAdding] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [creating, setCreating] = useState(false);
+  // Green accent for the create affordance on green pills (life problem / value
+  // demand); sky elsewhere — matches the strand the pill belongs to.
+  const greenAdd = variant === 'value' || variant === 'valueLight';
   const wrapperRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -133,6 +145,25 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
   useLayoutEffect(() => {
     if (open) computePos.current();
   }, [open]);
+
+  // Reset the inline-create field whenever the popover closes.
+  useEffect(() => {
+    if (!open) { setAdding(false); setNewLabel(''); }
+  }, [open]);
+
+  async function submitCreate() {
+    const trimmed = newLabel.trim();
+    if (!trimmed || !onCreate || creating) return;
+    setCreating(true);
+    try {
+      const id = await onCreate(trimmed);
+      if (id) { onChange(id); setOpen(false); }
+    } finally {
+      setCreating(false);
+      setNewLabel('');
+      setAdding(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -194,7 +225,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
           style={{ position: 'fixed', left: pos.left, top: pos.top, bottom: pos.bottom, width: pos.width, maxHeight: pos.maxHeight }}
           className="z-50 overflow-y-auto py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
         >
-          {options.length === 0 && !onAddNew ? (
+          {options.length === 0 && !onAddNew && !onCreate ? (
             <div className="px-3 py-2 text-sm text-gray-400">—</div>
           ) : (
             <>
@@ -226,19 +257,58 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                   </button>
                 );
               })}
-              {onAddNew && (
+              {(onCreate || onAddNew) && (
                 <>
                   {options.length > 0 && <div className="border-t border-gray-100 my-1" />}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onAddNew();
-                      setOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 transition-colors"
-                  >
-                    + {addNewLabel ?? 'Add new'}
-                  </button>
+                  {onCreate ? (
+                    adding ? (
+                      <div className="flex items-center gap-1 px-2 py-1.5">
+                        <input
+                          type="text"
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          placeholder={addNewLabel ?? 'Add new'}
+                          aria-label={addNewLabel ?? 'Add new'}
+                          autoFocus
+                          disabled={creating}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); submitCreate(); }
+                            // Cancel the inline field without closing the popover.
+                            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setAdding(false); setNewLabel(''); }
+                          }}
+                          className={`flex-1 min-w-0 px-2 py-1 rounded border border-gray-300 text-sm text-gray-900 outline-none focus:ring-2 ${greenAdd ? 'focus:ring-green-500 focus:border-green-500' : 'focus:ring-sky-500 focus:border-sky-500'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={submitCreate}
+                          disabled={!newLabel.trim() || creating}
+                          aria-label={addNewLabel ?? 'Add new'}
+                          className={`shrink-0 px-2 py-1 rounded text-sm font-medium text-white disabled:opacity-50 ${greenAdd ? 'bg-green-600 hover:bg-green-700' : 'bg-sky-600 hover:bg-sky-700'}`}
+                        >
+                          {creating ? '…' : '✓'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setAdding(true); setNewLabel(''); }}
+                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${greenAdd ? 'text-green-700 hover:bg-green-50' : 'text-sky-700 hover:bg-sky-50'}`}
+                      >
+                        + {addNewLabel ?? 'Add new'}
+                      </button>
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onAddNew!();
+                        setOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 transition-colors"
+                    >
+                      + {addNewLabel ?? 'Add new'}
+                    </button>
+                  )}
                 </>
               )}
             </>

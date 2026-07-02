@@ -59,6 +59,26 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
     onPatch({ whatMattersTypeIds: next });
   }
 
+  // Create a new taxonomy type inline from a PillSelect's "+ new" field, then
+  // refresh study taxonomies so the fresh option is in the list before the
+  // caller selects it. Returns the new id (or null on failure).
+  async function createType(apiPath: string, body: Record<string, unknown>): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/${apiPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) return null;
+      const { id } = await res.json();
+      if (!id) return null;
+      await onTypesChanged?.();
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
   // Small category divider, mirroring the saved-touch section headers
   // (CasePanel sepHeader): centred small-caps label flanked by hairlines.
   const sectionHeader = (label: string) => (
@@ -85,15 +105,9 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
             onChange={(id) => onPatch({ lifeProblemId: id || null })}
             options={lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label), operationalDefinition: lp.operationalDefinition ? tl(lp.operationalDefinition) : null }))}
             variant={lifeProblemId ? 'value' : 'valueLight'}
+            onCreate={(label) => createType('life-problems', { label })}
+            addNewLabel={t('capture.lifeProblemLabel')}
             compact
-          />
-          <InlineTypeAdder
-            code={code}
-            apiPath="life-problems"
-            onCreated={(id) => onPatch({ lifeProblemId: id })}
-            onRefresh={onTypesChanged}
-            compact
-            inputVariant="green"
           />
         </div>
       </div>
@@ -112,6 +126,8 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
               onChange={(id) => onPatch({ demandTypeId: id || null })}
               options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
               variant={demandTypeId ? 'value' : 'valueLight'}
+              onCreate={(label) => createType('demand-types', { label, category: 'value' })}
+              addNewLabel={t('capture.valueDemandHeader')}
               compact
             />
           </div>
