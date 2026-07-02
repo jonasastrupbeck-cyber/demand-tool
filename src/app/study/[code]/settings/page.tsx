@@ -1931,7 +1931,27 @@ export default function SettingsPage() {
                               className="max-w-[14rem] truncate px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                             >
                               <option value="">—</option>
-                              {[...(study.decisionPointTypes || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                              {/* Decisions grouped under their milestone (same
+                                  visual language as the ASAP anchor select) so
+                                  they're findable in a milestone-structured
+                                  journey. A DECISION is always what's picked —
+                                  the milestone name is just the group label. */}
+                              {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => {
+                                const dps = (study.decisionPointTypes || []).filter((d) => d.milestoneId === m.id).sort((a, b) => a.sortOrder - b.sortOrder);
+                                return dps.length > 0 ? (
+                                  <optgroup key={m.id} label={`◇ ${m.label}`}>
+                                    {dps.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                                  </optgroup>
+                                ) : null;
+                              })}
+                              {(() => {
+                                const unassigned = (study.decisionPointTypes || []).filter((d) => !d.milestoneId).sort((a, b) => a.sortOrder - b.sortOrder);
+                                return unassigned.length > 0 ? (
+                                  <optgroup label={t('settings.unassignedDecisions')}>
+                                    {unassigned.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                                  </optgroup>
+                                ) : null;
+                              })()}
                             </select>
                           </label>
                           {!wm.timing && wm.valueKind === 'date_or_duration' && (

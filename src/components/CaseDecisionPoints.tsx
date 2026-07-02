@@ -374,7 +374,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     return { askText: text, met: v.met, badge: v.met ? t('capture.evalMet') : t('capture.evalNotMet') };
   };
 
-  const renderAskLine = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }) => {
+  const renderAskLine = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }, decisionRecorded: boolean) => {
     const v = evaluateField(f, d);
     if (!v) return null;
     const wmLabel = whatMattersTypes.find((w) => w.id === f.linkedWhatMattersTypeId)?.label;
@@ -386,6 +386,11 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
           <span className={`ml-1 font-medium ${v.met ? 'text-green-700' : 'text-red-600'}`}>
             {v.met ? '✓' : '✗'} {v.badge}
           </span>
+        )}
+        {/* Decision saved but the value box left empty: a quiet nudge — the
+            case is counted as "not captured" on the dashboard until filled. */}
+        {!v.badge && v.met === null && decisionRecorded && (
+          <span className="ml-1 text-gray-400 italic">— {t('capture.askValueMissing')}</span>
         )}
       </p>
     );
@@ -401,6 +406,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   const renderCaptureFields = (type: DecisionPointType, compact: boolean) => {
     const fields = [...(type.captureFields ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
     if (fields.length === 0) return null;
+    const decisionRecorded = decisions.some((dec) => dec.decisionPointTypeId === type.id);
     const inputCls = compact
       ? 'px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none'
       : 'px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none';
@@ -440,7 +446,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   })}
                 </div>
               )}
-              {renderAskLine(f, d)}
+              {renderAskLine(f, d, decisionRecorded)}
             </div>
           );
         })}

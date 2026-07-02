@@ -1008,6 +1008,20 @@ const translations = {
     sv: 'Snitt avvikelse',
     de: 'Ø Abweichung',
   },
+  // Ask + recorded decision but no delivered value — a capture miss, surfaced
+  // rather than silently excluded (2026-07-02).
+  'dashboard.askNotCaptured': {
+    en: 'Not captured',
+    da: 'Ikke registreret',
+    sv: 'Ej registrerat',
+    de: 'Nicht erfasst',
+  },
+  'capture.askValueMissing': {
+    en: 'value not captured',
+    da: 'værdi ikke registreret',
+    sv: 'värde ej registrerat',
+    de: 'Wert nicht erfasst',
+  },
   // Small category dividers in the green customer-context box (flow capture).
   // Canonical Vanguard terms sourced from the glossary / existing keys.
   'capture.valueDemandHeader': {

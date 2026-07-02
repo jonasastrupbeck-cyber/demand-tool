@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [flowCausesLoading, setFlowCausesLoading] = useState(false);
   // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
   // mattered, per linked capture field. Fetched when the Analytics tab opens.
-  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null }> | null>(null);
+  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null }> | null>(null);
   const [showEntries, setShowEntries] = useState(false);
   const [entries, setEntries] = useState<Array<{ id: string; verbatim: string; classification: string; createdAt: string; demandTypeId: string | null; entryType: string; collectorName: string | null }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
@@ -1784,7 +1784,9 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
                   <div className="space-y-2">
                     {askDelivery.map((r) => {
-                      const pct = Math.round((r.metCount / r.n) * 100);
+                      // pct over EVALUATED cases only; a row can exist purely on
+                      // notCaptured (ask + decision recorded, value box empty).
+                      const pct = r.n > 0 ? Math.round((r.metCount / r.n) * 100) : null;
                       const notMet = r.n - r.metCount;
                       return (
                         <div key={r.fieldId} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
@@ -1793,11 +1795,14 @@ export default function DashboardPage() {
                             <p className="text-[11px] text-gray-500 break-words">{tl(r.fieldLabel)} · {tl(r.decisionLabel)}</p>
                           </div>
                           <div className="flex items-center gap-3 shrink-0 text-sm">
-                            <span className={`font-semibold ${pct >= 100 ? 'text-green-700' : notMet > 0 ? 'text-gray-800' : 'text-green-700'}`}>
-                              {r.metCount}/{r.n} <span className="font-normal text-gray-500">({pct}%)</span>
+                            <span className={`font-semibold ${pct !== null && notMet === 0 ? 'text-green-700' : 'text-gray-800'}`}>
+                              {r.metCount}/{r.n} <span className="font-normal text-gray-500">({pct !== null ? `${pct}%` : '—'})</span>
                             </span>
                             <span className="text-[11px] text-green-700">✓ {t('capture.evalMet')} {r.metCount}</span>
                             {notMet > 0 && <span className="text-[11px] text-red-600">✗ {t('capture.evalNotMet')} {notMet}</span>}
+                            {r.notCaptured > 0 && (
+                              <span className="text-[11px] text-gray-500">{t('dashboard.askNotCaptured')}: {r.notCaptured}</span>
+                            )}
                             {r.kind === 'date' && r.avgDaysLate !== null && (
                               <span className="text-[11px] text-red-600">{t('dashboard.wmAvgDaysLate')}: {r.avgDaysLate}</span>
                             )}

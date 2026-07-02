@@ -1093,7 +1093,9 @@ export async function getTouchSeries(
 // recorded decision value, using the shared rules in ask-verdict.ts (the same
 // rules the capture-side live evaluation shows). P2BS scope filters the case
 // set by its primary life problem (like getCapabilityData); the from/to range
-// filters on the decision's decidedAt.
+// filters on the decision's decidedAt. Cases whose decision is recorded but
+// whose value box was left empty are surfaced as notCaptured — a capture miss
+// is itself a finding, not something to hide.
 export interface AskDeliveryRow {
   fieldId: string;
   fieldLabel: string;
@@ -1103,6 +1105,7 @@ export interface AskDeliveryRow {
   kind: 'amount' | 'date' | 'duration' | 'choice';
   n: number;          // cases evaluated (ask + delivered value present)
   metCount: number;
+  notCaptured: number; // ask + recorded decision, but no usable delivered value
   lateCount: number;  // date kind only: not-met cases
   avgDaysLate: number | null; // date kind only: mean days late among lateCount
   avgDiffMonths: number | null; // duration kind only: mean |diff| among not-met
@@ -1143,10 +1146,17 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
   if (to) decisionConds.push(lte(caseDecisionPoints.decidedAt, to));
   const decisionRows = await db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId })
     .from(caseDecisionPoints).where(and(...decisionConds));
-  const decided = new Set(decisionRows.map((d) => `${d.caseId}:${d.decisionPointTypeId}`));
+  // Per decision point type: the cases with a recorded decision (in range).
+  const decidedCasesByType = new Map<string, string[]>();
+  for (const d of decisionRows) {
+    const list = decidedCasesByType.get(d.decisionPointTypeId) ?? [];
+    list.push(d.caseId);
+    decidedCasesByType.set(d.decisionPointTypeId, list);
+  }
 
   const valueRows = await db.select().from(caseDecisionValues)
     .where(and(inArray(caseDecisionValues.caseId, caseIds), inArray(caseDecisionValues.fieldId, fields.map((f) => f.id))));
+  const valuesByCaseField = new Map(valueRows.map((v) => [`${v.caseId}:${v.fieldId}`, v]));
   const askRows = await db.select().from(caseWhatMatters)
     .where(and(inArray(caseWhatMatters.caseId, caseIds), inArray(caseWhatMatters.whatMattersTypeId, wmTypeIds)));
   const asksByCaseType = new Map(askRows.map((a) => [`${a.caseId}:${a.whatMattersTypeId}`, a]));
@@ -1159,15 +1169,17 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
   for (const f of fields.sort((a, b) => a.decisionSort - b.decisionSort || a.sortOrder - b.sortOrder)) {
     let n = 0;
     let metCount = 0;
+    let notCaptured = 0;
     let lateCount = 0;
     let lateDaysSum = 0;
     let diffMonthsSum = 0;
     let diffMonthsN = 0;
-    for (const v of valueRows) {
-      if (v.fieldId !== f.id) continue;
-      if (!decided.has(`${v.caseId}:${f.decisionPointTypeId}`)) continue;
-      const ask = asksByCaseType.get(`${v.caseId}:${f.linkedWhatMattersTypeId}`);
+    // Iterate DECIDED cases (not value rows): a decision saved without any
+    // value row must still count — as notCaptured, when the ask exists.
+    for (const caseId of decidedCasesByType.get(f.decisionPointTypeId) ?? []) {
+      const ask = asksByCaseType.get(`${caseId}:${f.linkedWhatMattersTypeId}`);
       if (!ask) continue;
+      const v = valuesByCaseField.get(`${caseId}:${f.id}`);
       const verdict = askVerdict(f.kind, {
         targetDate: ask.targetDate,
         amountSpecific: ask.amountSpecific,
@@ -1176,12 +1188,16 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
         termYears: ask.termYears,
         termMonths: ask.termMonths,
       }, {
-        valueNumber: v.valueNumber,
-        valueDate: v.valueDate,
-        valueYears: v.valueYears,
-        valueMonths: v.valueMonths,
+        valueNumber: v?.valueNumber ?? null,
+        valueDate: v?.valueDate ?? null,
+        valueYears: v?.valueYears ?? null,
+        valueMonths: v?.valueMonths ?? null,
       });
-      if (!verdict.comparable || verdict.met === null) continue;
+      if (!verdict.comparable) continue; // ask in a shape this field can't compare
+      if (verdict.met === null) {
+        notCaptured += 1;
+        continue;
+      }
       n += 1;
       if (verdict.met) metCount += 1;
       else if (f.kind === 'date' && verdict.diffDays !== null) {
@@ -1192,7 +1208,8 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
         diffMonthsN += 1;
       }
     }
-    if (n === 0) continue;
+    // A field with ONLY uncaptured cases must surface — that's the point.
+    if (n === 0 && notCaptured === 0) continue;
     rows.push({
       fieldId: f.id,
       fieldLabel: f.label,
@@ -1202,6 +1219,7 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
       kind: f.kind,
       n,
       metCount,
+      notCaptured,
       lateCount,
       avgDaysLate: lateCount > 0 ? Math.round((lateDaysSum / lateCount) * 10) / 10 : null,
       avgDiffMonths: diffMonthsN > 0 ? Math.round((diffMonthsSum / diffMonthsN) * 10) / 10 : null,
