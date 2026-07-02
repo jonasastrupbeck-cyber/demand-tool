@@ -105,7 +105,7 @@ interface StudyData {
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
   decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[]; captureFields?: { id: string; label: string; kind: 'amount' | 'date' | 'duration' | 'choice'; choiceOptions: string | null; linkedWhatMattersTypeId: string | null; sortOrder: number }[] }[];
-  milestones: { id: string; label: string; sortOrder: number }[];
+  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -157,6 +157,11 @@ export default function SettingsPage() {
   const [fieldAdderDpId, setFieldAdderDpId] = useState<string | null>(null);
   const [newFieldLabel, setNewFieldLabel] = useState('');
   const [newFieldKind, setNewFieldKind] = useState<'amount' | 'date' | 'duration' | 'choice'>('amount');
+  // Decision-box redesign (0042): subquestion add form, one open per milestone.
+  // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
+  const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
+  const [newSubqLabel, setNewSubqLabel] = useState('');
+  const [newSubqKind, setNewSubqKind] = useState<'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'>('choice');
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -513,6 +518,57 @@ export default function SettingsPage() {
     );
   }
 
+  // ── Subquestions on milestones (0042) — optimistic where the id is stable ──
+  const patchMsSubqs = (msId: string, fn: (subs: StudyData['milestones'][number]['subquestions']) => StudyData['milestones'][number]['subquestions']) =>
+    setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === msId ? { ...m, subquestions: fn(m.subquestions) } : m)) } : s));
+
+  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null }) {
+    const clean: typeof patch = {};
+    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
+    if (typeof patch.required === 'boolean') clean.required = patch.required;
+    if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
+    if (Object.keys(clean).length === 0) return;
+    patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, ...clean } : f)));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean),
+    }));
+  }
+
+  function removeSubquestion(msId: string, sqId: string) {
+    patchMsSubqs(msId, (subs) => subs.filter((f) => f.id !== sqId));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}`, { method: 'DELETE' }));
+  }
+
+  function addSubquestionHandler(msId: string) {
+    const label = newSubqLabel.trim();
+    if (!label) return;
+    setNewSubqLabel('');
+    setSubqAdderMsId(null);
+    const kind = newSubqKind;
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${msId}/subquestions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, kind }),
+      }),
+      () => loadStudy(),
+    );
+  }
+
+  function patchOption(msId: string, sqId: string, optId: string, patch: { label?: string; polarity?: 'positive' | 'negative' | null }) {
+    const clean: typeof patch = {};
+    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
+    if (patch.polarity !== undefined) clean.polarity = patch.polarity;
+    if (Object.keys(clean).length === 0) return;
+    patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, options: f.options.map((o) => (o.id === optId ? { ...o, ...clean } : o)) } : f)));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestion-options/${optId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean),
+    }));
+  }
+
+  function removeOption(msId: string, sqId: string, optId: string) {
+    patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, options: f.options.filter((o) => o.id !== optId) } : f)));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestion-options/${optId}`, { method: 'DELETE' }));
+  }
+
   function addLifeProblemHandler(e: React.FormEvent) {
     e.preventDefault();
     const label = newLifeProblem.trim();
@@ -666,7 +722,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length }] } : s)),
+      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, subquestions: [] }] } : s)),
     );
   }
 
@@ -1411,167 +1467,95 @@ export default function SettingsPage() {
           </form>
         </div>}
 
-        {/* Decision points — gated on decisionPointsEnabled (Skipton dotted box).
-            Each type carries its own outcome wording; rows edit on blur. */}
+        {/* Decision box (redesigned 0042): milestones hold SUBQUESTIONS directly.
+            Completion is implicit — every REQUIRED subquestion answered — so
+            there are no outcome pills and no achieved/not-achieved toggle. A
+            choice option can carry positive/negative polarity (negative prompts
+            to close the case at capture). */}
         {study.decisionPointsEnabled && (() => {
           const orderedMs = [...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder);
-          const dpsIn = (mid: string | null) => (study.decisionPointTypes || []).filter((d) => d.milestoneId === mid);
-          const unassigned = (study.decisionPointTypes || []).filter((d) => !d.milestoneId);
-          // A single decision-point editor row, reused inside each milestone and
-          // in the unassigned group. The milestone <select> moves it between groups.
-          const renderDpRow = (dp: typeof study.decisionPointTypes[number]) => (
-            <li key={dp.id} className="p-2 rounded-lg bg-white border border-gray-200">
-              <div className="flex items-center justify-between gap-2 mb-1.5">
+          const kindLabel = (k: string) =>
+            k === 'amount' ? t('settings.captureFieldKindAmount')
+            : k === 'number' ? t('settings.subquestionKindNumber')
+            : k === 'date' ? t('settings.captureFieldKindDate')
+            : k === 'duration' ? t('settings.captureFieldKindDuration')
+            : k === 'text' ? t('settings.subquestionKindText')
+            : t('settings.captureFieldKindChoice');
+          const canLink = (k: string) => k === 'amount' || k === 'number' || k === 'date' || k === 'duration';
+          const renderSubqRow = (msId: string, sq: StudyData['milestones'][number]['subquestions'][number]) => (
+            <li key={sq.id} className="p-2 rounded-lg bg-white border border-gray-200 space-y-1.5">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="text"
-                  defaultValue={dp.label}
-                  aria-label={t('settings.decisionPointTypes')}
-                  onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
+                  defaultValue={sq.label}
+                  aria-label={t('settings.subquestions')}
+                  onBlur={(e) => patchSubquestion(msId, sq.id, { label: e.target.value })}
                   className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                 />
-                {orderedMs.length > 0 && (
-                  <button type="button" onClick={() => setMovingDpId(movingDpId === dp.id ? null : dp.id)} className="text-xs text-gray-500 hover:text-gray-700 shrink-0">{t('settings.moveDecision')}</button>
-                )}
-                <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
+                <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{kindLabel(sq.kind)}</span>
+                <button onClick={() => removeSubquestion(msId, sq.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
               </div>
-              <div className="space-y-1.5">
-                <p className="text-xs text-gray-500">{t('settings.decisionOutcomes')}</p>
-                {[...(dp.outcomes ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => (
-                  <div key={o.id} className="p-1.5 rounded border border-gray-200 bg-gray-50/60 space-y-1">
-                    <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1 text-xs text-gray-500">
+                  <input type="checkbox" checked={sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: e.target.checked })} className="accent-brand" />
+                  {t('settings.subquestionRequired')}
+                </label>
+                {canLink(sq.kind) && (
+                  <label className="flex items-center gap-1 text-xs text-gray-500 flex-1 min-w-0">
+                    {t('settings.captureFieldLink')}
+                    <select
+                      value={sq.linkedWhatMattersTypeId ?? ''}
+                      onChange={(e) => patchSubquestion(msId, sq.id, { linkedWhatMattersTypeId: e.target.value || null })}
+                      className="flex-1 min-w-0 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                    >
+                      <option value="">—</option>
+                      {(study.whatMattersTypes || []).map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
+              {sq.kind === 'choice' && (
+                <div className="space-y-1 pl-1 border-l-2 border-gray-100">
+                  {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => (
+                    <div key={o.id} className="flex items-center gap-1.5">
                       <input
                         type="text"
                         defaultValue={o.label}
-                        aria-label={t('settings.decisionOutcomes')}
-                        onBlur={(e) => patchDecisionOutcome(dp.id, o.id, { label: e.target.value })}
-                        className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                        aria-label={t('settings.addOption')}
+                        onBlur={(e) => patchOption(msId, sq.id, o.id, { label: e.target.value })}
+                        className="flex-1 px-2 py-0.5 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                       />
-                      <button type="button" onClick={() => removeDecisionOutcome(dp.id, o.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
+                      <SegmentedToggle
+                        compact
+                        ariaLabel={t('settings.optionPolarity')}
+                        value={o.polarity ?? 'none'}
+                        onChange={(v) => patchOption(msId, sq.id, o.id, { polarity: v === 'none' ? null : (v as 'positive' | 'negative') })}
+                        options={[
+                          { value: 'positive', label: t('settings.polarityPositive'), activeColor: 'green' },
+                          { value: 'none', label: t('settings.polarityNone'), activeColor: 'blue' },
+                          { value: 'negative', label: t('settings.polarityNegative'), activeColor: 'red' },
+                        ]}
+                      />
+                      <button onClick={() => removeOption(msId, sq.id, o.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
                     </div>
-                    <SegmentedToggle
-                      compact
-                      ariaLabel={t('settings.decisionOutcomes')}
-                      value={o.tone}
-                      onChange={(v) => patchDecisionOutcome(dp.id, o.id, { tone: v as 'on_target' | 'variation' | 'negative' })}
-                      options={[
-                        { value: 'on_target', label: t('settings.toneOnTarget'), activeColor: 'green' },
-                        { value: 'variation', label: t('settings.toneVariation'), activeColor: 'amber' },
-                        { value: 'negative', label: t('settings.toneNegative'), activeColor: 'red' },
-                      ]}
-                    />
-                  </div>
-                ))}
-                <InlineTypeAdder
-                  code={code}
-                  apiPath={`decision-point-types/${dp.id}/outcomes`}
-                  extraBody={{ tone: 'on_target' }}
-                  compact
-                  inputVariant="green"
-                  inputPlaceholder={t('settings.addOutcome')}
-                  onCreated={() => {}}
-                  onRefresh={loadStudy}
-                />
-              </div>
-              {/* Capture fields (2026-07-02): the delivered values recorded at
-                  this decision, optionally linked to a what-matters ask. Kind
-                  is immutable after create; deleting a field takes its case
-                  values along (taxonomy-fix philosophy). */}
-              <div className="space-y-1.5 mt-2">
-                <p className="text-xs text-gray-500">{t('settings.decisionCaptureFields')}</p>
-                {[...(dp.captureFields ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((f) => (
-                  <div key={f.id} className="p-1.5 rounded border border-gray-200 bg-gray-50/60 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        defaultValue={f.label}
-                        aria-label={t('settings.decisionCaptureFields')}
-                        onBlur={(e) => patchCaptureField(dp.id, f.id, { label: e.target.value })}
-                        className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                      />
-                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
-                        {f.kind === 'amount' ? t('settings.captureFieldKindAmount') : f.kind === 'date' ? t('settings.captureFieldKindDate') : f.kind === 'duration' ? t('settings.captureFieldKindDuration') : t('settings.captureFieldKindChoice')}
-                      </span>
-                      <button type="button" onClick={() => removeCaptureField(dp.id, f.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
-                    </div>
-                    {f.kind === 'choice' && (
-                      <input
-                        type="text"
-                        defaultValue={f.choiceOptions ?? ''}
-                        placeholder={t('settings.captureFieldChoiceOptions')}
-                        aria-label={t('settings.captureFieldChoiceOptions')}
-                        onBlur={(e) => patchCaptureField(dp.id, f.id, { choiceOptions: e.target.value.trim() || null })}
-                        className="w-full px-2 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                      />
-                    )}
-                    <label className="flex items-center gap-1 text-xs text-gray-500">
-                      {t('settings.captureFieldLink')}
-                      <select
-                        value={f.linkedWhatMattersTypeId ?? ''}
-                        onChange={(e) => patchCaptureField(dp.id, f.id, { linkedWhatMattersTypeId: e.target.value || null })}
-                        className="flex-1 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                      >
-                        <option value="">—</option>
-                        {(study.whatMattersTypes || []).map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
-                      </select>
-                    </label>
-                  </div>
-                ))}
-                {fieldAdderDpId === dp.id ? (
-                  <div className="flex gap-1.5 items-center">
-                    <input
-                      type="text"
-                      value={newFieldLabel}
-                      onChange={(e) => setNewFieldLabel(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCaptureFieldHandler(dp.id); } if (e.key === 'Escape') { setFieldAdderDpId(null); setNewFieldLabel(''); } }}
-                      placeholder={t('settings.addCaptureField')}
-                      autoFocus
-                      className="flex-1 min-w-0 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                    />
-                    <select
-                      value={newFieldKind}
-                      onChange={(e) => setNewFieldKind(e.target.value as 'amount' | 'date' | 'duration' | 'choice')}
-                      aria-label={t('settings.wmValueKind')}
-                      className="shrink-0 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                    >
-                      <option value="amount">{t('settings.captureFieldKindAmount')}</option>
-                      <option value="date">{t('settings.captureFieldKindDate')}</option>
-                      <option value="duration">{t('settings.captureFieldKindDuration')}</option>
-                      <option value="choice">{t('settings.captureFieldKindChoice')}</option>
-                    </select>
-                    <button type="button" onClick={() => addCaptureFieldHandler(dp.id)} disabled={!newFieldLabel.trim()} className="shrink-0 px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-50 bg-brand">{t('settings.add')}</button>
-                    <button type="button" onClick={() => { setFieldAdderDpId(null); setNewFieldLabel(''); }} className="shrink-0 px-1 py-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { setFieldAdderDpId(dp.id); setNewFieldLabel(''); setNewFieldKind('amount'); }}
-                    className="px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
-                  >
-                    + {t('settings.addCaptureField')}
-                  </button>
-                )}
-              </div>
-              {orderedMs.length > 0 && movingDpId === dp.id && (
-                <label className="block mt-1.5 text-xs text-gray-500">
-                  {t('settings.assignToMilestone')}
-                  <select
-                    autoFocus
-                    value={dp.milestoneId ?? ''}
-                    onChange={(e) => { assignDecisionToMilestone(dp.id, e.target.value || null); setMovingDpId(null); }}
-                    onBlur={() => setMovingDpId(null)}
-                    className="w-full mt-0.5 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                  >
-                    {orderedMs.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                    <option value="">— {t('settings.unassignedDecisions')} —</option>
-                  </select>
-                </label>
+                  ))}
+                  <InlineTypeAdder
+                    code={code}
+                    apiPath={`subquestions/${sq.id}/options`}
+                    compact
+                    inputVariant="sky"
+                    inputPlaceholder={t('settings.addOption')}
+                    onCreated={() => {}}
+                    onRefresh={loadStudy}
+                  />
+                </div>
               )}
             </li>
           );
           return (
           <div className={cardCls}>
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.milestones')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.milestonesDesc')}</p>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.subquestionsDesc')}</p>
             <div className="space-y-3 mb-4">
               {orderedMs.map((m, idx) => (
                 <div key={m.id} className="rounded-lg border border-gray-200 bg-gray-100/70 p-2">
@@ -1588,50 +1572,55 @@ export default function SettingsPage() {
                     <button type="button" aria-label={t('settings.moveDown')} disabled={idx === orderedMs.length - 1} onClick={() => moveMilestone(m.id, 1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
                     <button type="button" onClick={() => removeMilestone(m.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
                   </div>
-                  <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.milestoneOutcomeLabel')}: {t('capture.milestoneAchieved')} / {t('capture.milestoneNotAchieved')}</p>
+                  {idx === orderedMs.length - 1 && orderedMs.length > 1 && (
+                    <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.finalMilestoneHint')}</p>
+                  )}
                   <ul className="space-y-2">
-                    {dpsIn(m.id).map(renderDpRow)}
+                    {[...m.subquestions].sort((a, b) => a.sortOrder - b.sortOrder).map((sq) => renderSubqRow(m.id, sq))}
                   </ul>
-                  <div className="mt-1.5">
-                    <InlineTypeAdder
-                      code={code}
-                      apiPath="decision-point-types"
-                      extraBody={{ milestoneId: m.id, positiveLabel: t('settings.toneOnTarget'), negativeLabel: t('settings.toneNegative') }}
-                      compact
-                      addLabel={t('settings.addDecision')}
-                      inputPlaceholder={t('settings.decisionPointTypes')}
-                      onCreated={() => {}}
-                      onRefresh={loadStudy}
-                    />
-                  </div>
+                  {subqAdderMsId === m.id ? (
+                    <div className="flex gap-1.5 items-center mt-1.5">
+                      <input
+                        type="text"
+                        value={newSubqLabel}
+                        onChange={(e) => setNewSubqLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSubquestionHandler(m.id); } if (e.key === 'Escape') { setSubqAdderMsId(null); setNewSubqLabel(''); } }}
+                        placeholder={t('settings.addSubquestion')}
+                        autoFocus
+                        className="flex-1 min-w-0 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                      <select
+                        value={newSubqKind}
+                        onChange={(e) => setNewSubqKind(e.target.value as typeof newSubqKind)}
+                        aria-label={t('settings.wmValueKind')}
+                        className="shrink-0 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      >
+                        <option value="choice">{t('settings.captureFieldKindChoice')}</option>
+                        <option value="amount">{t('settings.captureFieldKindAmount')}</option>
+                        <option value="number">{t('settings.subquestionKindNumber')}</option>
+                        <option value="date">{t('settings.captureFieldKindDate')}</option>
+                        <option value="duration">{t('settings.captureFieldKindDuration')}</option>
+                        <option value="text">{t('settings.subquestionKindText')}</option>
+                      </select>
+                      <button type="button" onClick={() => addSubquestionHandler(m.id)} disabled={!newSubqLabel.trim()} className="shrink-0 px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-50 bg-brand">{t('settings.add')}</button>
+                      <button type="button" onClick={() => { setSubqAdderMsId(null); setNewSubqLabel(''); }} className="shrink-0 px-1 py-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setSubqAdderMsId(m.id); setNewSubqLabel(''); setNewSubqKind('choice'); }}
+                      className="mt-1.5 px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
+                    >
+                      + {t('settings.addSubquestion')}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
-            <form onSubmit={addMilestoneHandler} className="flex gap-2 mb-5">
+            <form onSubmit={addMilestoneHandler} className="flex gap-2 mb-2">
               <input type="text" value={newMilestoneLabel} onChange={(e) => setNewMilestoneLabel(e.target.value)} placeholder={t('settings.milestoneLabel')} className={inputCls} />
               <button type="submit" disabled={!newMilestoneLabel.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.addMilestone')}</button>
             </form>
-
-            {(unassigned.length > 0 || orderedMs.length === 0) && (
-              <div className="rounded-lg border border-dashed border-gray-300 p-2 mb-4">
-                <p className="text-xs font-medium text-gray-500 mb-2">{t('settings.unassignedDecisions')}</p>
-                <ul className="space-y-2">{unassigned.map(renderDpRow)}</ul>
-                {orderedMs.length === 0 && (
-                  <div className="mt-1.5">
-                    <InlineTypeAdder
-                      code={code}
-                      apiPath="decision-point-types"
-                      extraBody={{ positiveLabel: t('settings.toneOnTarget'), negativeLabel: t('settings.toneNegative') }}
-                      compact
-                      addLabel={t('settings.addDecision')}
-                      inputPlaceholder={t('settings.decisionPointTypes')}
-                      onCreated={() => {}}
-                      onRefresh={loadStudy}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
           );
         })()}
