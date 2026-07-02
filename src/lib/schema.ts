@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, unique } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, unique, doublePrecision } from 'drizzle-orm/pg-core';
 
 export const studies = pgTable('studies', {
   id: text('id').primaryKey(),
@@ -170,6 +170,15 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   // `anchorEvent` (left in place, additive; not read anymore).
   anchorMilestoneId: text('anchor_milestone_id'),
   anchorEvent: text('anchor_event'),
+  // 2026-07-02: per-type capture toggle. false hides the pill from NEW capture
+  // selection only — cases that already selected it keep their data, and
+  // dashboards read junction rows, not this flag.
+  enabled: boolean('enabled').notNull().default(true),
+  // Structured ask (2026-07-02). null = plain pill. 'amount' = a specific
+  // amount OR a lower/upper range ("Meet my budget"). 'date_or_duration' = an
+  // end date OR years+months ("I want my mortgage term to be…"). Only on
+  // non-timed types — the two standard timed types keep timing semantics.
+  valueKind: text('value_kind').$type<'amount' | 'date_or_duration'>(),
 });
 
 export const lifeProblems = pgTable('life_problems', {
@@ -272,7 +281,17 @@ export const caseWhatMatters = pgTable('case_what_matters', {
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
   // Customer's wanted date, only for a 'by_date' what-matters type (2026-07-01).
+  // Also the "date" half of a valueKind='date_or_duration' ask (2026-07-02).
   targetDate: timestamp('target_date', { withTimezone: true }),
+  // Structured ask values (2026-07-02), per the type's valueKind. Exactly one
+  // shape is populated per row — the setter always writes ALL of these columns
+  // from a full-object patch, so switching specific↔range or date↔duration
+  // atomically nulls the abandoned shape.
+  amountSpecific: doublePrecision('amount_specific'),
+  amountMin: doublePrecision('amount_min'),
+  amountMax: doublePrecision('amount_max'),
+  termYears: integer('term_years'),
+  termMonths: integer('term_months'),
 }, (t) => ({
   uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
 }));
@@ -350,6 +369,25 @@ export const decisionOutcomeTypes = pgTable('decision_outcome_types', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+// Capture fields on a decision point (2026-07-02): the DELIVERED values the
+// system agrees/produces at that decision — "Agreed monthly payment" (amount),
+// "Agreed mortgage term" (duration), "Current deal" (choice Fixed,Variable),
+// "Completion date on first CoT" (date). `linkedWhatMattersTypeId` closes the
+// loop to the customer's ASK (a structured what-matters value) so a later
+// slice can evaluate delivered vs asked. Kind is immutable after create (a
+// field's shape is fundamental; changing it would strand typed case values).
+// Cascade with the decision point; a deleted what-matters link SET NULLs.
+export const decisionCaptureFields = pgTable('decision_capture_fields', {
+  id: text('id').primaryKey(),
+  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  kind: text('kind').$type<'amount' | 'date' | 'duration' | 'choice'>().notNull(),
+  // Comma-separated option labels, only for kind='choice' (e.g. "Fixed,Variable").
+  choiceOptions: text('choice_options'),
+  linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
 // One row per decided point per case; pending points simply have no row.
 // E2E time per point = decidedAt − cases.openedAt, always computed, never
 // stored. Cleanliness is captured HERE and only here (per Skipton req 7:
@@ -380,6 +418,26 @@ export const caseDecisionPoints = pgTable('case_decision_points', {
 }, (t) => ({
   // Explicit short name (63-char identifier lesson, see 0019).
   uniqCaseDp: unique('case_decision_points_unique').on(t.caseId, t.decisionPointTypeId),
+}));
+
+// Per-case values for a decision point's capture fields (2026-07-02). One row
+// per case per field; the value lives in the column matching the field's kind
+// (amount → valueNumber, date → valueDate, duration → valueYears+valueMonths,
+// choice → valueChoice). The setter writes all five columns from a full-object
+// upsert. Field-FK cascades: deleting a capture field in Settings takes its
+// case values along (same taxonomy-fix philosophy as decision-point delete).
+export const caseDecisionValues = pgTable('case_decision_values', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  fieldId: text('field_id').notNull().references(() => decisionCaptureFields.id, { onDelete: 'cascade' }),
+  valueNumber: doublePrecision('value_number'),
+  valueDate: timestamp('value_date', { withTimezone: true }),
+  valueYears: integer('value_years'),
+  valueMonths: integer('value_months'),
+  valueChoice: text('value_choice'),
+}, (t) => ({
+  // Explicit short name (63-char identifier lesson, see 0019).
+  uniqCaseDv: unique('case_decision_values_unique').on(t.caseId, t.fieldId),
 }));
 
 // One row per achieved/not-achieved milestone per case (2026-06-18). The

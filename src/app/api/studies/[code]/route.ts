@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, getDecisionOutcomeTypes, seedDefaultDecisionPointTypes, getMilestones } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, getDecisionOutcomeTypes, getDecisionCaptureFields, seedDefaultDecisionPointTypes, getMilestones } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, dpTypes, msTypes, doTypes] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, dpTypes, msTypes, doTypes, dcFields] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -28,6 +28,7 @@ export async function GET(
     getDecisionPointTypes(study.id),
     getMilestones(study.id),
     getDecisionOutcomeTypes(study.id),
+    getDecisionCaptureFields(study.id),
   ]);
 
   // Nest each decision point's outcomes under it (ordered) for the UI.
@@ -37,7 +38,14 @@ export async function GET(
     list.push(o);
     outcomesByType.set(o.decisionPointTypeId, list);
   }
-  const dpTypesWithOutcomes = dpTypes.map((d) => ({ ...d, outcomes: outcomesByType.get(d.id) ?? [] }));
+  // Same nesting for capture fields (2026-07-02).
+  const fieldsByType = new Map<string, typeof dcFields>();
+  for (const f of dcFields) {
+    const list = fieldsByType.get(f.decisionPointTypeId) ?? [];
+    list.push(f);
+    fieldsByType.set(f.decisionPointTypeId, list);
+  }
+  const dpTypesWithOutcomes = dpTypes.map((d) => ({ ...d, outcomes: outcomesByType.get(d.id) ?? [], captureFields: fieldsByType.get(d.id) ?? [] }));
 
   return NextResponse.json({
     ...study,

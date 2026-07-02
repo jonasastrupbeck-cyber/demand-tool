@@ -44,6 +44,8 @@ interface WhatMattersType {
   id: string;
   label: string;
   operationalDefinition: string | null;
+  // 2026-07-02: capture toggle — disabled types are hidden for new selection.
+  enabled?: boolean;
 }
 
 interface WorkType {
@@ -1338,7 +1340,11 @@ export default function CapturePage() {
               >
                 {t('capture.addWhatMatters')}
               </button>
-              {study.whatMattersTypes.map((wm) => {
+              {study.whatMattersTypes
+                // Disabled types stay hidden for new selection but keep their
+                // pill while selected on this entry (2026-07-02).
+                .filter((wm) => wm.enabled !== false || whatMattersTypeIds.includes(wm.id))
+                .map((wm) => {
                 const isSelected = whatMattersTypeIds.includes(wm.id);
                 return (
                   <button

@@ -1,9 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, getCaseDecisions, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseDecisions, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseDecisionValues, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
   return Object.fromEntries(wmRows.filter((r) => r.targetDate).map((r) => [r.whatMattersTypeId, r.targetDate]));
+}
+
+// Structured ask values (2026-07-02): { whatMattersTypeId → six-field value }.
+// A row is included when ANY of the six is set. whatMattersTargetDates above is
+// kept as-is (dashboard/asap consumers).
+type WmValueRow = { whatMattersTypeId: string; targetDate: Date | null; amountSpecific: number | null; amountMin: number | null; amountMax: number | null; termYears: number | null; termMonths: number | null };
+function wmValuesOf(wmRows: WmValueRow[]) {
+  return Object.fromEntries(
+    wmRows
+      .filter((r) => r.targetDate !== null || r.amountSpecific !== null || r.amountMin !== null || r.amountMax !== null || r.termYears !== null || r.termMonths !== null)
+      .map((r) => [r.whatMattersTypeId, {
+        targetDate: r.targetDate,
+        amountSpecific: r.amountSpecific,
+        amountMin: r.amountMin,
+        amountMax: r.amountMax,
+        termYears: r.termYears,
+        termMonths: r.termMonths,
+      }]),
+  );
 }
 
 // Case detail + its timeline of touches (oldest first). The timeline ordered
@@ -21,15 +40,16 @@ export async function GET(
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
 
-  const [entries, wmRows, decisions, milestones, lifeProblemIds, demandTypeIds] = await Promise.all([
+  const [entries, wmRows, decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues] = await Promise.all([
     getCaseEntries(caseId),
     getCaseWhatMatters(caseId),
     getCaseDecisions(caseId),
     getCaseMilestones(caseId),
     getCaseLifeProblemIds(caseId),
     getCaseDemandTypeIds(caseId),
+    getCaseDecisionValues(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), decisions, milestones, lifeProblemIds, demandTypeIds });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues });
 }
 
 export async function PATCH(
@@ -116,13 +136,45 @@ export async function PATCH(
     wmDate = { whatMattersTypeId: wd.whatMattersTypeId, date: d };
   }
 
+  // Structured ask value (2026-07-02): the full six-field object for one type.
+  // All six columns are written (nulls clear), so mode switches are atomic.
+  let wmValue: { whatMattersTypeId: string; value: CaseWhatMattersValue } | null = null;
+  if (body.whatMattersValue !== undefined) {
+    const wv = body.whatMattersValue;
+    if (!wv || typeof wv.whatMattersTypeId !== 'string') {
+      return NextResponse.json({ error: 'whatMattersValue needs a whatMattersTypeId' }, { status: 400 });
+    }
+    let d: Date | null = null;
+    if (wv.targetDate !== null && wv.targetDate !== undefined && wv.targetDate !== '') {
+      const parsed = new Date(wv.targetDate);
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: 'whatMattersValue.targetDate is not a valid date' }, { status: 400 });
+      }
+      d = parsed;
+    }
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+    const int = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) ? x : null);
+    wmValue = {
+      whatMattersTypeId: wv.whatMattersTypeId,
+      value: {
+        targetDate: d,
+        amountSpecific: num(wv.amountSpecific),
+        amountMin: num(wv.amountMin),
+        amountMax: num(wv.amountMax),
+        termYears: int(wv.termYears),
+        termMonths: int(wv.termMonths),
+      },
+    };
+  }
+
   await updateCase(caseId, data);
   if (wmDate) await setCaseWhatMattersDate(caseId, wmDate.whatMattersTypeId, wmDate.date);
+  if (wmValue) await setCaseWhatMattersValue(caseId, wmValue.whatMattersTypeId, wmValue.value);
   const [updated, wmRows, lifeProblemIds, demandTypeIds] = await Promise.all([
     getCase(caseId),
     getCaseWhatMatters(caseId),
     getCaseLifeProblemIds(caseId),
     getCaseDemandTypeIds(caseId),
   ]);
-  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), lifeProblemIds, demandTypeIds });
+  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), lifeProblemIds, demandTypeIds });
 }

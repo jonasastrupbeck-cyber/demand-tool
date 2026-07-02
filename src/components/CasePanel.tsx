@@ -18,8 +18,8 @@ import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEv
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
-import CaseContextSection from '@/components/CaseContextSection';
-import CaseDecisionPoints, { type CaseDecision, type DecisionPointType, type Milestone, type CaseMilestone } from '@/components/CaseDecisionPoints';
+import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
+import CaseDecisionPoints, { type CaseDecision, type DecisionPointType, type Milestone, type CaseMilestone, type CaseDecisionValue } from '@/components/CaseDecisionPoints';
 
 interface CaseRow {
   id: string;
@@ -72,7 +72,7 @@ interface Props {
   // (context & situation, P2BS, what matters) via CaseContextSection.
   systemType: 'transactional' | 'flow';
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   // 2026-06-18: SC taxonomy for the id→label lookup on the saved-touch card.
   systemConditions: { id: string; label: string }[];
   onTypesChanged?: () => Promise<void> | void;
@@ -114,6 +114,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const [wmIds, setWmIds] = useState<string[]>([]);
   // Per-'by_date' what-matters target dates on this case (typeId → ISO date).
   const [wmTargetDates, setWmTargetDates] = useState<Record<string, string>>({});
+  // Structured ask values per type (2026-07-02) + captured decision values.
+  const [wmValues, setWmValues] = useState<Record<string, WmValue>>({});
+  const [decisionValues, setDecisionValues] = useState<CaseDecisionValue[]>([]);
   const [decisions, setDecisions] = useState<CaseDecision[]>([]);
   const [caseMilestones, setCaseMilestones] = useState<CaseMilestone[]>([]);
   const [attaching, setAttaching] = useState(false);
@@ -172,6 +175,8 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     setEntries(data.entries || []);
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
     setWmTargetDates(data.whatMattersTargetDates && typeof data.whatMattersTargetDates === 'object' ? data.whatMattersTargetDates : {});
+    setWmValues(data.whatMattersValues && typeof data.whatMattersValues === 'object' ? data.whatMattersValues : {});
+    setDecisionValues(Array.isArray(data.decisionValues) ? data.decisionValues : []);
     setDecisions(Array.isArray(data.decisions) ? data.decisions : []);
     setCaseMilestones(Array.isArray(data.milestones) ? data.milestones : []);
   }, [code]);
@@ -343,8 +348,15 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     if (!caseRow) return;
     // Optimistic local update; refetch on failure to re-sync. The what-matters
     // set lives in its own state (junction-backed), the rest on caseRow.
-    const { whatMattersTypeIds: nextWmIds, whatMattersDate, ...rowFields } = body as { whatMattersTypeIds?: string[]; whatMattersDate?: { whatMattersTypeId: string; date: string | null } } & Record<string, unknown>;
+    const { whatMattersTypeIds: nextWmIds, whatMattersDate, whatMattersValue, ...rowFields } = body as { whatMattersTypeIds?: string[]; whatMattersDate?: { whatMattersTypeId: string; date: string | null }; whatMattersValue?: { whatMattersTypeId: string } & WmValue } & Record<string, unknown>;
     if (nextWmIds !== undefined) setWmIds(nextWmIds);
+    if (whatMattersValue) {
+      // Optimistically mirror the full six-field ask (junction-backed) and,
+      // like a date, a set value also selects the pill.
+      const { whatMattersTypeId, ...value } = whatMattersValue;
+      setWmValues((prev) => ({ ...prev, [whatMattersTypeId]: value }));
+      if (!wmIds.includes(whatMattersTypeId)) setWmIds([...wmIds, whatMattersTypeId]);
+    }
     if (whatMattersDate) {
       // Optimistically reflect the set/cleared target date (junction-backed).
       setWmTargetDates((prev) => {
@@ -887,6 +899,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             whatMatters={caseRow.whatMatters}
             whatMattersTypeIds={wmIds}
             whatMattersTargetDates={wmTargetDates}
+            whatMattersValues={wmValues}
             lifeProblems={lifeProblems}
             whatMattersTypes={whatMattersTypes}
             demandTypeIds={caseRow.demandTypeIds ?? []}
@@ -967,6 +980,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                     decisions={decisions}
                     milestones={milestones}
                     caseMilestones={caseMilestones}
+                    caseDecisionValues={decisionValues}
                     collectorName={collectorName}
                     variant="overview"
                     onChanged={() => loadCase(caseRow.id)}

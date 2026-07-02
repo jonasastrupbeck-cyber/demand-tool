@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, decisionCaptureFields, caseDecisionPoints, caseDecisionValues, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -387,12 +387,14 @@ export async function addWhatMattersType(studyId: string, label: string) {
     label,
     operationalDefinition: null as string | null,
     sortOrder: existing.length,
+    enabled: true,
+    valueKind: null as 'amount' | 'date_or_duration' | null,
   };
   await db.insert(whatMattersTypes).values(row);
   return row;
 }
 
-export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }) {
+export async function updateWhatMattersType(id: string, data: { label?: string; operationalDefinition?: string | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }) {
   await db.update(whatMattersTypes).set(data).where(eq(whatMattersTypes.id, id));
 }
 
@@ -1722,6 +1724,30 @@ export async function setCaseWhatMattersDate(caseId: string, whatMattersTypeId: 
   }
 }
 
+// Structured ask value for a valueKind what-matters type on a case (2026-07-02).
+// The client always sends the COMPLETE six-field object and all six columns are
+// written, so switching specific↔range or date↔duration atomically nulls the
+// abandoned shape. Upserts like setCaseWhatMattersDate — setting a value also
+// selects the pill.
+export interface CaseWhatMattersValue {
+  targetDate: Date | null;
+  amountSpecific: number | null;
+  amountMin: number | null;
+  amountMax: number | null;
+  termYears: number | null;
+  termMonths: number | null;
+}
+
+export async function setCaseWhatMattersValue(caseId: string, whatMattersTypeId: string, value: CaseWhatMattersValue) {
+  const existing = await db.select().from(caseWhatMatters)
+    .where(and(eq(caseWhatMatters.caseId, caseId), eq(caseWhatMatters.whatMattersTypeId, whatMattersTypeId)));
+  if (existing.length) {
+    await db.update(caseWhatMatters).set(value).where(eq(caseWhatMatters.id, existing[0].id));
+  } else {
+    await db.insert(caseWhatMatters).values({ id: generateId(), caseId, whatMattersTypeId, ...value });
+  }
+}
+
 // --- Decision points (Skipton dotted box, 2026-06-12) ---
 
 export async function seedDefaultDecisionPointTypes(studyId: string, locale: Locale = 'en') {
@@ -1858,6 +1884,86 @@ export async function deleteDecisionOutcomeType(id: string) {
   // survive; their coarse positive/negative outcome stands).
   await db.delete(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
   if (rows[0]) await syncDecisionPointLabels(rows[0].decisionPointTypeId);
+}
+
+// --- Decision capture fields (2026-07-02) — the delivered values recorded at a
+// decision, mirroring the outcomes taxonomy block above. ---
+
+export type CaptureFieldKind = 'amount' | 'date' | 'duration' | 'choice';
+
+export async function getDecisionCaptureFields(studyId: string) {
+  return db
+    .select({
+      id: decisionCaptureFields.id,
+      decisionPointTypeId: decisionCaptureFields.decisionPointTypeId,
+      label: decisionCaptureFields.label,
+      kind: decisionCaptureFields.kind,
+      choiceOptions: decisionCaptureFields.choiceOptions,
+      linkedWhatMattersTypeId: decisionCaptureFields.linkedWhatMattersTypeId,
+      sortOrder: decisionCaptureFields.sortOrder,
+    })
+    .from(decisionCaptureFields)
+    .innerJoin(decisionPointTypes, eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypes.id))
+    .where(eq(decisionPointTypes.studyId, studyId))
+    .orderBy(asc(decisionCaptureFields.sortOrder));
+}
+
+export async function addDecisionCaptureField(decisionPointTypeId: string, data: { label: string; kind: CaptureFieldKind; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null }) {
+  const id = generateId();
+  const existing = await db.select().from(decisionCaptureFields)
+    .where(eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypeId));
+  const row = {
+    id,
+    decisionPointTypeId,
+    label: data.label,
+    kind: data.kind,
+    choiceOptions: data.choiceOptions ?? null,
+    linkedWhatMattersTypeId: data.linkedWhatMattersTypeId ?? null,
+    sortOrder: existing.length,
+  };
+  await db.insert(decisionCaptureFields).values(row);
+  return row;
+}
+
+// Kind is immutable after create (like work-step tags): a field's shape is
+// fundamental, and changing it would strand typed case values.
+export async function updateDecisionCaptureField(id: string, data: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null; sortOrder?: number }) {
+  const updateFields: Record<string, unknown> = {};
+  if (data.label !== undefined) updateFields.label = data.label;
+  if (data.choiceOptions !== undefined) updateFields.choiceOptions = data.choiceOptions;
+  if (data.linkedWhatMattersTypeId !== undefined) updateFields.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
+  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  if (Object.keys(updateFields).length === 0) return;
+  await db.update(decisionCaptureFields).set(updateFields).where(eq(decisionCaptureFields.id, id));
+}
+
+export async function getDecisionCaptureFieldById(id: string) {
+  const rows = await db.select().from(decisionCaptureFields).where(eq(decisionCaptureFields.id, id));
+  return rows[0] || null;
+}
+
+export async function deleteDecisionCaptureField(id: string) {
+  // case_decision_values cascade at the DB level — deleting a field in
+  // Settings is a consultant taxonomy fix and takes its case values along.
+  await db.delete(decisionCaptureFields).where(eq(decisionCaptureFields.id, id));
+}
+
+export async function getCaseDecisionValues(caseId: string) {
+  return db.select().from(caseDecisionValues).where(eq(caseDecisionValues.caseId, caseId));
+}
+
+// Upsert per-case values for capture fields. Full-object rule: every row
+// carries all five value columns (unused ones null), so re-saving a decision
+// overwrites cleanly.
+export async function setCaseDecisionValues(caseId: string, values: { fieldId: string; valueNumber: number | null; valueDate: Date | null; valueYears: number | null; valueMonths: number | null; valueChoice: string | null }[]) {
+  for (const v of values) {
+    await db.insert(caseDecisionValues)
+      .values({ id: generateId(), caseId, ...v })
+      .onConflictDoUpdate({
+        target: [caseDecisionValues.caseId, caseDecisionValues.fieldId],
+        set: { valueNumber: v.valueNumber, valueDate: v.valueDate, valueYears: v.valueYears, valueMonths: v.valueMonths, valueChoice: v.valueChoice },
+      });
+  }
 }
 
 // --- Milestones (2026-06-18) — ordered containers above decision points ---
@@ -2050,6 +2156,20 @@ export async function upsertCaseDecision(caseId: string, data: {
 export async function deleteCaseDecision(id: string) {
   // 2026-06-18: deleting a decision no longer touches case status (milestone
   // outcomes are the single lever now — see deleteCaseMilestone).
+  // 2026-07-02: removing a decision also clears the case's captured values for
+  // that decision type's fields — the values are meaningless without the
+  // decision, and re-recording starts clean.
+  const rows = await db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
+  if (rows[0]) {
+    const fields = await db.select({ id: decisionCaptureFields.id }).from(decisionCaptureFields)
+      .where(eq(decisionCaptureFields.decisionPointTypeId, rows[0].decisionPointTypeId));
+    if (fields.length) {
+      await db.delete(caseDecisionValues).where(and(
+        eq(caseDecisionValues.caseId, rows[0].caseId),
+        inArray(caseDecisionValues.fieldId, fields.map((f) => f.id)),
+      ));
+    }
+  }
   await db.delete(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
 }
 

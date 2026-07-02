@@ -16,7 +16,7 @@ interface HandlingType { id: string; label: string; operationalDefinition?: stri
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
 interface ContactMethod { id: string; label: string }
 interface PointOfTransaction { id: string; label: string }
-interface WhatMattersType { id: string; label: string }
+interface WhatMattersType { id: string; label: string; enabled?: boolean }
 interface LifeProblem { id: string; label: string }
 interface WorkType { id: string; label: string }
 interface SystemCondition { id: string; label: string; operationalDefinition?: string | null }
@@ -459,7 +459,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               <div>
                 <label className={labelCls}>{t('capture.whatMattersSelect')}</label>
                 <div className="flex flex-wrap gap-2 items-center">
-                  {study.whatMattersTypes.map((wm) => {
+                  {study.whatMattersTypes
+                    // Disabled types stay hidden for new selection but keep
+                    // their pill while selected on this entry (2026-07-02).
+                    .filter((wm) => wm.enabled !== false || whatMattersTypeIds.includes(wm.id))
+                    .map((wm) => {
                     const selected = whatMattersTypeIds.includes(wm.id);
                     return (
                       <button

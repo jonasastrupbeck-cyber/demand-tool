@@ -16,6 +16,17 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InlineTypeAdder from '@/components/InlineTypeAdder';
 
+export interface WmValue {
+  targetDate: string | null;
+  amountSpecific: number | null;
+  amountMin: number | null;
+  amountMax: number | null;
+  termYears: number | null;
+  termMonths: number | null;
+}
+
+const EMPTY_WM_VALUE: WmValue = { targetDate: null, amountSpecific: null, amountMin: null, amountMax: null, termYears: null, termMonths: null };
+
 interface Props {
   code: string;
   contextSituation: string | null;
@@ -26,8 +37,11 @@ interface Props {
   whatMattersTypeIds: string[];
   /** Per-'by_date' what-matters target dates on this case (typeId → ISO date). */
   whatMattersTargetDates?: Record<string, string>;
+  /** Structured ask values per selected type (2026-07-02): the full six-field
+   *  object for valueKind types (amount specific/range, date-or-duration). */
+  whatMattersValues?: Record<string, WmValue>;
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition?: string | null; timing?: 'by_date' | 'asap' | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   // Value demand (2026-06-12): in flow mode the demand the customer places on
   // the system lives here, right below the life problem it flows from — the
   // Vanguard causal order (life problem → value demand). Patched on the case.
@@ -38,7 +52,7 @@ interface Props {
   onTypesChanged?: () => Promise<void> | void;
 }
 
-export default function CaseContextSection({ code, contextSituation, lifeProblemIds, whatMatters, whatMattersTypeIds, whatMattersTargetDates, lifeProblems, whatMattersTypes, demandTypeIds, valueDemandTypes, onPatch, onTypesChanged }: Props) {
+export default function CaseContextSection({ code, contextSituation, lifeProblemIds, whatMatters, whatMattersTypeIds, whatMattersTargetDates, whatMattersValues, lifeProblems, whatMattersTypes, demandTypeIds, valueDemandTypes, onPatch, onTypesChanged }: Props) {
   const { t, tl } = useLocale();
 
   // Local draft for the free-text fields; saved on blur. Re-sync when another
@@ -53,6 +67,76 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
     setContextDraft(contextSituation ?? '');
     setNoteDraft(whatMatters ?? '');
   }, [contextSituation, whatMatters]);
+
+  // Structured ask pop-outs (2026-07-02). Mode per type (specific/range,
+  // date/duration) is UI state defaulted from data; number inputs are string
+  // drafts saved on blur so typing isn't chatty. Drafts are derived LAZILY
+  // from server data (no re-seed effect): an effect keyed on whatMattersValues
+  // would clobber a sibling field's in-progress typing when the first field's
+  // blur-PATCH response refreshes the map (e.g. range lower saved → upper wiped).
+  const [wmMode, setWmMode] = useState<Record<string, 'specific' | 'range' | 'date' | 'duration'>>({});
+  const [wmDrafts, setWmDrafts] = useState<Record<string, { specific: string; min: string; max: string; years: string; months: string }>>({});
+
+  const wmValueOf = (typeId: string): WmValue => whatMattersValues?.[typeId] ?? EMPTY_WM_VALUE;
+  const draftOf = (typeId: string) => {
+    const touched = wmDrafts[typeId];
+    if (touched) return touched;
+    const v = wmValueOf(typeId);
+    return {
+      specific: v.amountSpecific != null ? String(v.amountSpecific) : '',
+      min: v.amountMin != null ? String(v.amountMin) : '',
+      max: v.amountMax != null ? String(v.amountMax) : '',
+      years: v.termYears != null ? String(v.termYears) : '',
+      months: v.termMonths != null ? String(v.termMonths) : '',
+    };
+  };
+  const modeOf = (typeId: string, kind: 'amount' | 'date_or_duration'): 'specific' | 'range' | 'date' | 'duration' => {
+    const explicit = wmMode[typeId];
+    if (explicit) return explicit;
+    const v = wmValueOf(typeId);
+    if (kind === 'amount') return v.amountMin != null || v.amountMax != null ? 'range' : 'specific';
+    return v.termYears != null || v.termMonths != null ? 'duration' : 'date';
+  };
+  const setDraft = (typeId: string, patch: Partial<{ specific: string; min: string; max: string; years: string; months: string }>) =>
+    setWmDrafts((prev) => ({ ...prev, [typeId]: { ...draftOf(typeId), ...patch } }));
+
+  // Persist the full six-field ask for one type — the abandoned shape is
+  // nulled server-side atomically (full-object rule). No-op patches are
+  // suppressed: a blur that changes nothing (or fires before values load)
+  // must never wipe a stored ask.
+  function patchWmValue(typeId: string, kind: 'amount' | 'date_or_duration', mode: 'specific' | 'range' | 'date' | 'duration', over?: { targetDate?: string | null }) {
+    const d = draftOf(typeId);
+    const num = (s: string) => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
+    const int = (s: string) => { const n = parseInt(s, 10); return Number.isInteger(n) ? n : null; };
+    const value: WmValue = { ...EMPTY_WM_VALUE };
+    if (kind === 'amount') {
+      if (mode === 'specific') value.amountSpecific = num(d.specific);
+      else { value.amountMin = num(d.min); value.amountMax = num(d.max); }
+    } else {
+      if (mode === 'date') value.targetDate = over?.targetDate !== undefined ? over.targetDate : wmValueOf(typeId).targetDate;
+      else { value.termYears = int(d.years); value.termMonths = int(d.months); }
+    }
+    const cur = wmValueOf(typeId);
+    const dateOf = (x: string | null) => (x ? x.slice(0, 10) : null);
+    // Guard 1 — a patch may only fire when the ACTIVE mode's fields carry a
+    // value, or previously did (explicit clearing). An empty blur in a
+    // freshly-switched mode must never wipe the other shape's stored ask.
+    const modeFields: (keyof WmValue)[] = kind === 'amount'
+      ? (mode === 'specific' ? ['amountSpecific'] : ['amountMin', 'amountMax'])
+      : (mode === 'date' ? ['targetDate'] : ['termYears', 'termMonths']);
+    const newModeHasValue = modeFields.some((f) => value[f] !== null);
+    const curModeHadValue = modeFields.some((f) => cur[f] !== null);
+    if (!newModeHasValue && !curModeHadValue) return;
+    // Guard 2 — skip no-op patches (blur without change).
+    const same = value.amountSpecific === cur.amountSpecific
+      && value.amountMin === cur.amountMin
+      && value.amountMax === cur.amountMax
+      && value.termYears === cur.termYears
+      && value.termMonths === cur.termMonths
+      && dateOf(value.targetDate) === dateOf(cur.targetDate);
+    if (same) return;
+    onPatch({ whatMattersValue: { whatMattersTypeId: typeId, ...value } });
+  }
 
   function toggleWhatMatters(id: string) {
     const next = whatMattersTypeIds.includes(id)
@@ -211,9 +295,34 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           inputVariant="green"
           compact
         />
-        {whatMattersTypes.map((wm) => {
+        {whatMattersTypes
+          // Disabled types are hidden for NEW selection, but one already
+          // selected on THIS case keeps its pill (history stays visible and
+          // deselectable); once deselected it disappears from the picker.
+          .filter((wm) => wm.enabled !== false || whatMattersTypeIds.includes(wm.id))
+          .map((wm) => {
           const on = whatMattersTypeIds.includes(wm.id);
           const icon = wm.timing === 'by_date' ? '📅 ' : wm.timing === 'asap' ? '⏱ ' : '';
+          const smallInput = 'text-[11px] px-2 py-0.5 rounded border border-green-300 bg-white focus:ring-2 focus:ring-green-500 outline-none';
+          const mode = wm.valueKind ? modeOf(wm.id, wm.valueKind) : null;
+          // Tiny [mode | mode] switch for the structured pop-outs. Purely
+          // local: the abandoned shape is only cleared when REAL data is
+          // saved in the new mode (full-object patch on blur) — so an
+          // accidental toggle can never wipe a stored ask.
+          const modeToggle = (a: { key: 'specific' | 'range' | 'date' | 'duration'; label: string }, b: { key: 'specific' | 'range' | 'date' | 'duration'; label: string }) => (
+            <div className="flex rounded overflow-hidden border border-green-300 text-[10px]">
+              {[a, b].map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setWmMode((prev) => ({ ...prev, [wm.id]: m.key }))}
+                  className={`px-1.5 py-0.5 ${mode === m.key ? 'bg-green-600 text-white' : 'bg-white text-green-700 hover:bg-green-50'}`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          );
           return (
             <div key={wm.id} className="flex flex-col items-center gap-1">
               <button
@@ -234,11 +343,86 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
                   value={(whatMattersTargetDates?.[wm.id] || '').slice(0, 10)}
                   onChange={(e) => onPatch({ whatMattersDate: { whatMattersTypeId: wm.id, date: e.target.value || null } })}
                   aria-label={t('capture.whatMattersWhenLabel')}
-                  className="text-[11px] px-2 py-0.5 rounded border border-green-300 bg-white focus:ring-2 focus:ring-green-500 outline-none"
+                  className={smallInput}
                 />
               )}
               {on && wm.timing === 'asap' && (
                 <span className="text-[10px] text-green-700/70">{t('capture.whatMattersAsapHint')}</span>
+              )}
+              {/* Structured ask (2026-07-02): amount = specific or range. */}
+              {on && wm.valueKind === 'amount' && (
+                <div className="flex flex-col items-center gap-1">
+                  {modeToggle({ key: 'specific', label: t('capture.wmAmountSpecific') }, { key: 'range', label: t('capture.wmAmountRange') })}
+                  {mode === 'specific' ? (
+                    <input
+                      type="number"
+                      value={draftOf(wm.id).specific}
+                      onChange={(e) => setDraft(wm.id, { specific: e.target.value })}
+                      onBlur={() => patchWmValue(wm.id, 'amount', 'specific')}
+                      placeholder={t('capture.wmAmountPlaceholder')}
+                      aria-label={t('capture.wmAmountPlaceholder')}
+                      className={`${smallInput} w-24`}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={draftOf(wm.id).min}
+                        onChange={(e) => setDraft(wm.id, { min: e.target.value })}
+                        onBlur={() => patchWmValue(wm.id, 'amount', 'range')}
+                        placeholder={t('capture.wmAmountMinPlaceholder')}
+                        aria-label={t('capture.wmAmountMinPlaceholder')}
+                        className={`${smallInput} w-20`}
+                      />
+                      <span className="text-[10px] text-green-700/70">–</span>
+                      <input
+                        type="number"
+                        value={draftOf(wm.id).max}
+                        onChange={(e) => setDraft(wm.id, { max: e.target.value })}
+                        onBlur={() => patchWmValue(wm.id, 'amount', 'range')}
+                        placeholder={t('capture.wmAmountMaxPlaceholder')}
+                        aria-label={t('capture.wmAmountMaxPlaceholder')}
+                        className={`${smallInput} w-20`}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Structured ask: an end date OR years+months. */}
+              {on && wm.valueKind === 'date_or_duration' && (
+                <div className="flex flex-col items-center gap-1">
+                  {modeToggle({ key: 'date', label: t('capture.wmModeDate') }, { key: 'duration', label: t('capture.wmModeDuration') })}
+                  {mode === 'date' ? (
+                    <input
+                      type="date"
+                      value={(wmValueOf(wm.id).targetDate || '').slice(0, 10)}
+                      onChange={(e) => patchWmValue(wm.id, 'date_or_duration', 'date', { targetDate: e.target.value || null })}
+                      aria-label={t('capture.wmModeDate')}
+                      className={smallInput}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={draftOf(wm.id).years}
+                        onChange={(e) => setDraft(wm.id, { years: e.target.value })}
+                        onBlur={() => patchWmValue(wm.id, 'date_or_duration', 'duration')}
+                        placeholder={t('capture.wmYearsPlaceholder')}
+                        aria-label={t('capture.wmYearsPlaceholder')}
+                        className={`${smallInput} w-14`}
+                      />
+                      <input
+                        type="number"
+                        value={draftOf(wm.id).months}
+                        onChange={(e) => setDraft(wm.id, { months: e.target.value })}
+                        onBlur={() => patchWmValue(wm.id, 'date_or_duration', 'duration')}
+                        placeholder={t('capture.wmMonthsPlaceholder')}
+                        aria-label={t('capture.wmMonthsPlaceholder')}
+                        className={`${smallInput} w-14`}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           );

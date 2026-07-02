@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseDecisions, upsertCaseDecision, getDecisionPointTypes, getDecisionOutcomeTypes } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseDecisions, upsertCaseDecision, getDecisionPointTypes, getDecisionOutcomeTypes, getDecisionCaptureFields, setCaseDecisionValues } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -66,6 +66,41 @@ export async function POST(
     decidedAt = parsed;
   }
 
+  // Capture-field values (2026-07-02): full objects per field, blanks as null.
+  // Every fieldId must belong to the posted decision point type.
+  let values: { fieldId: string; valueNumber: number | null; valueDate: Date | null; valueYears: number | null; valueMonths: number | null; valueChoice: string | null }[] | null = null;
+  if (body.values !== undefined) {
+    if (!Array.isArray(body.values)) {
+      return NextResponse.json({ error: 'values must be an array' }, { status: 400 });
+    }
+    const fields = await getDecisionCaptureFields(study.id);
+    const typeFieldIds = new Set(fields.filter((f) => f.decisionPointTypeId === body.decisionPointTypeId).map((f) => f.id));
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+    const int = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) ? x : null);
+    values = [];
+    for (const v of body.values) {
+      if (!v || typeof v.fieldId !== 'string' || !typeFieldIds.has(v.fieldId)) {
+        return NextResponse.json({ error: 'every values[].fieldId must be a capture field of this decision point' }, { status: 400 });
+      }
+      let d: Date | null = null;
+      if (v.valueDate !== null && v.valueDate !== undefined && v.valueDate !== '') {
+        const parsed = new Date(v.valueDate);
+        if (isNaN(parsed.getTime())) {
+          return NextResponse.json({ error: 'values[].valueDate is not a valid date' }, { status: 400 });
+        }
+        d = parsed;
+      }
+      values.push({
+        fieldId: v.fieldId,
+        valueNumber: num(v.valueNumber),
+        valueDate: d,
+        valueYears: int(v.valueYears),
+        valueMonths: int(v.valueMonths),
+        valueChoice: typeof v.valueChoice === 'string' && v.valueChoice.trim() ? v.valueChoice.trim() : null,
+      });
+    }
+  }
+
   const row = await upsertCaseDecision(caseId, {
     decisionPointTypeId: body.decisionPointTypeId,
     outcome,
@@ -78,5 +113,6 @@ export async function POST(
     willingnessToPay: typeof body.willingnessToPay === 'boolean' ? body.willingnessToPay : null,
     abilityToPay: typeof body.abilityToPay === 'boolean' ? body.abilityToPay : null,
   });
+  if (values) await setCaseDecisionValues(caseId, values);
   return NextResponse.json(row, { status: 201 });
 }

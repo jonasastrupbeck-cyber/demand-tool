@@ -104,9 +104,9 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[] }[];
+  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[]; captureFields?: { id: string; label: string; kind: 'amount' | 'date' | 'duration' | 'choice'; choiceOptions: string | null; linkedWhatMattersTypeId: string | null; sortOrder: number }[] }[];
   milestones: { id: string; label: string; sortOrder: number }[];
-  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }[];
+  whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
@@ -149,6 +149,11 @@ export default function SettingsPage() {
   const [newWorkSource, setNewWorkSource] = useState('');
   // Decision points: which row has its milestone picker open (Move link).
   const [movingDpId, setMovingDpId] = useState<string | null>(null);
+  // Capture-field add form (2026-07-02): one open at a time, keyed by DP id.
+  // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
+  const [fieldAdderDpId, setFieldAdderDpId] = useState<string | null>(null);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldKind, setNewFieldKind] = useState<'amount' | 'date' | 'duration' | 'choice'>('amount');
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -382,6 +387,65 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ anchorEvent: event }),
     }));
+  }
+
+  // Capture toggle (2026-07-02): off hides the pill from NEW capture selection
+  // only — history and dashboards are untouched. Optimistic.
+  function setWhatMattersEnabled(id: string, enabled: boolean) {
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, enabled } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }));
+  }
+
+  // Structured ask kind (2026-07-02): null = plain pill; 'amount' = specific or
+  // range; 'date_or_duration' = end date or years+months. Non-timed types only.
+  function setWhatMattersValueKind(id: string, kind: 'amount' | 'date_or_duration' | null) {
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, valueKind: kind } : w)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ valueKind: kind }),
+    }));
+  }
+
+  // Decision capture fields (2026-07-02) — optimistic, mirroring the outcome
+  // handlers below.
+  function patchCaptureField(dpId: string, fieldId: string, patch: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null }) {
+    const clean: typeof patch = {};
+    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
+    if (patch.choiceOptions !== undefined) clean.choiceOptions = patch.choiceOptions;
+    if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
+    if (Object.keys(clean).length === 0) return;
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, captureFields: (d.captureFields ?? []).map((f) => (f.id === fieldId ? { ...f, ...clean } : f)) } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${fieldId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clean),
+    }));
+  }
+
+  function removeCaptureField(dpId: string, fieldId: string) {
+    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, captureFields: (d.captureFields ?? []).filter((f) => f.id !== fieldId) } : d)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${fieldId}`, { method: 'DELETE' }));
+  }
+
+  function addCaptureFieldHandler(dpId: string) {
+    const label = newFieldLabel.trim();
+    if (!label) return;
+    setNewFieldLabel('');
+    setFieldAdderDpId(null);
+    // Reload after add so the new field's id is real (mirrors outcome adds).
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${dpId}/capture-fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label, kind: newFieldKind }),
+      }),
+      () => loadStudy(),
+    );
   }
 
   function addLifeProblemHandler(e: React.FormEvent) {
@@ -1343,6 +1407,85 @@ export default function SettingsPage() {
                   onRefresh={loadStudy}
                 />
               </div>
+              {/* Capture fields (2026-07-02): the delivered values recorded at
+                  this decision, optionally linked to a what-matters ask. Kind
+                  is immutable after create; deleting a field takes its case
+                  values along (taxonomy-fix philosophy). */}
+              <div className="space-y-1.5 mt-2">
+                <p className="text-xs text-gray-500">{t('settings.decisionCaptureFields')}</p>
+                {[...(dp.captureFields ?? [])].sort((a, b) => a.sortOrder - b.sortOrder).map((f) => (
+                  <div key={f.id} className="p-1.5 rounded border border-gray-200 bg-gray-50/60 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        defaultValue={f.label}
+                        aria-label={t('settings.decisionCaptureFields')}
+                        onBlur={(e) => patchCaptureField(dp.id, f.id, { label: e.target.value })}
+                        className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">
+                        {f.kind === 'amount' ? t('settings.captureFieldKindAmount') : f.kind === 'date' ? t('settings.captureFieldKindDate') : f.kind === 'duration' ? t('settings.captureFieldKindDuration') : t('settings.captureFieldKindChoice')}
+                      </span>
+                      <button type="button" onClick={() => removeCaptureField(dp.id, f.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
+                    </div>
+                    {f.kind === 'choice' && (
+                      <input
+                        type="text"
+                        defaultValue={f.choiceOptions ?? ''}
+                        placeholder={t('settings.captureFieldChoiceOptions')}
+                        aria-label={t('settings.captureFieldChoiceOptions')}
+                        onBlur={(e) => patchCaptureField(dp.id, f.id, { choiceOptions: e.target.value.trim() || null })}
+                        className="w-full px-2 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                    )}
+                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                      {t('settings.captureFieldLink')}
+                      <select
+                        value={f.linkedWhatMattersTypeId ?? ''}
+                        onChange={(e) => patchCaptureField(dp.id, f.id, { linkedWhatMattersTypeId: e.target.value || null })}
+                        className="flex-1 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      >
+                        <option value="">—</option>
+                        {(study.whatMattersTypes || []).map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                ))}
+                {fieldAdderDpId === dp.id ? (
+                  <div className="flex gap-1.5 items-center">
+                    <input
+                      type="text"
+                      value={newFieldLabel}
+                      onChange={(e) => setNewFieldLabel(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCaptureFieldHandler(dp.id); } if (e.key === 'Escape') { setFieldAdderDpId(null); setNewFieldLabel(''); } }}
+                      placeholder={t('settings.addCaptureField')}
+                      autoFocus
+                      className="flex-1 min-w-0 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                    />
+                    <select
+                      value={newFieldKind}
+                      onChange={(e) => setNewFieldKind(e.target.value as 'amount' | 'date' | 'duration' | 'choice')}
+                      aria-label={t('settings.wmValueKind')}
+                      className="shrink-0 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                    >
+                      <option value="amount">{t('settings.captureFieldKindAmount')}</option>
+                      <option value="date">{t('settings.captureFieldKindDate')}</option>
+                      <option value="duration">{t('settings.captureFieldKindDuration')}</option>
+                      <option value="choice">{t('settings.captureFieldKindChoice')}</option>
+                    </select>
+                    <button type="button" onClick={() => addCaptureFieldHandler(dp.id)} disabled={!newFieldLabel.trim()} className="shrink-0 px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-50 bg-brand">{t('settings.add')}</button>
+                    <button type="button" onClick={() => { setFieldAdderDpId(null); setNewFieldLabel(''); }} className="shrink-0 px-1 py-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setFieldAdderDpId(dp.id); setNewFieldLabel(''); setNewFieldKind('amount'); }}
+                    className="px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
+                  >
+                    + {t('settings.addCaptureField')}
+                  </button>
+                )}
+              </div>
               {orderedMs.length > 0 && movingDpId === dp.id && (
                 <label className="block mt-1.5 text-xs text-gray-500">
                   {t('settings.assignToMilestone')}
@@ -1642,6 +1785,33 @@ export default function SettingsPage() {
                     {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
+                    {/* Capture toggle (2026-07-02): off = pill hidden for NEW
+                        selection; history + dashboards untouched. */}
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={wm.enabled !== false}
+                        onChange={(e) => setWhatMattersEnabled(wm.id, e.target.checked)}
+                        className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand"
+                      />
+                      {t('settings.wmShowAtCapture')}
+                    </label>
+                    {/* Structured ask kind — non-timed types only (the two timed
+                        standard types keep their timing semantics). */}
+                    {!wm.timing && (
+                      <label className="flex items-center gap-1 text-xs text-gray-600">
+                        {t('settings.wmValueKind')}
+                        <select
+                          value={wm.valueKind ?? ''}
+                          onChange={(e) => setWhatMattersValueKind(wm.id, (e.target.value || null) as 'amount' | 'date_or_duration' | null)}
+                          className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                        >
+                          <option value="">{t('settings.wmValueKindNone')}</option>
+                          <option value="amount">{t('settings.wmValueKindAmount')}</option>
+                          <option value="date_or_duration">{t('settings.wmValueKindDateOrDuration')}</option>
+                        </select>
+                      </label>
+                    )}
                     {/* ASAP is measured case open → this event (a milestone OR a
                         decision point), set once per study. Value is a token. */}
                     {wm.timing === 'asap' && (

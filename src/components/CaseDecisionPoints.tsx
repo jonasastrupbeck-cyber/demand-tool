@@ -41,6 +41,29 @@ export interface DecisionPointType {
   milestoneId?: string | null;
   // 2026-07-01: the list of outcomes (green/amber/red) to pick from at capture.
   outcomes?: DecisionOutcomeType[];
+  // 2026-07-02: the delivered-value boxes recorded at this decision (agreed
+  // payment, agreed term, completion date…), optionally linked to a
+  // what-matters ask for a later evaluation slice.
+  captureFields?: DecisionCaptureField[];
+}
+
+// 2026-07-02: a typed capture field on a decision point + its per-case value.
+export type CaptureFieldKind = 'amount' | 'date' | 'duration' | 'choice';
+export interface DecisionCaptureField {
+  id: string;
+  label: string;
+  kind: CaptureFieldKind;
+  choiceOptions: string | null;
+  linkedWhatMattersTypeId: string | null;
+  sortOrder: number;
+}
+export interface CaseDecisionValue {
+  fieldId: string;
+  valueNumber: number | null;
+  valueDate: string | null;
+  valueYears: number | null;
+  valueMonths: number | null;
+  valueChoice: string | null;
 }
 
 export interface CaseDecision {
@@ -127,9 +150,12 @@ interface Props {
   // renders them as an ordered, chronological stepper with its own outcome.
   milestones?: Milestone[];
   caseMilestones?: CaseMilestone[];
+  // 2026-07-02: the case's current capture-field values (loaded back into the
+  // form when reopening a decided decision).
+  caseDecisionValues?: CaseDecisionValue[];
 }
 
-export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact', milestones = [], caseMilestones = [] }: Props) {
+export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact', milestones = [], caseMilestones = [], caseDecisionValues = [] }: Props) {
   const { t, tl } = useLocale();
 
   // The type whose mini-form is open; prefilled from its decision if decided.
@@ -140,6 +166,9 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
   // C9 (2026-06-17): affordability sub-states ('' = unset, 'yes'/'no').
   const [willingnessToPay, setWillingnessToPay] = useState<'yes' | 'no' | ''>('');
   const [abilityToPay, setAbilityToPay] = useState<'yes' | 'no' | ''>('');
+  // 2026-07-02: string drafts per capture field (parsed on save); seeded from
+  // caseDecisionValues in openForm so reopening a decided decision loads back.
+  const [fieldDrafts, setFieldDrafts] = useState<Record<string, { num: string; date: string; years: string; months: string; choice: string }>>({});
   const [saving, setSaving] = useState(false);
 
   // 2026-06-18: milestone-outcome form state (separate from the decision form).
@@ -162,11 +191,39 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     setDecidedAt((existing?.decidedAt ?? new Date().toISOString()).slice(0, 10));
     setWillingnessToPay(boolToTri(existing?.willingnessToPay));
     setAbilityToPay(boolToTri(existing?.abilityToPay));
+    // Load the case's saved capture-field values back into string drafts.
+    const drafts: Record<string, { num: string; date: string; years: string; months: string; choice: string }> = {};
+    for (const f of type.captureFields ?? []) {
+      const v = caseDecisionValues.find((x) => x.fieldId === f.id);
+      drafts[f.id] = {
+        num: v?.valueNumber != null ? String(v.valueNumber) : '',
+        date: v?.valueDate ? v.valueDate.slice(0, 10) : '',
+        years: v?.valueYears != null ? String(v.valueYears) : '',
+        months: v?.valueMonths != null ? String(v.valueMonths) : '',
+        choice: v?.valueChoice ?? '',
+      };
+    }
+    setFieldDrafts(drafts);
   }
 
   async function save(type: DecisionPointType) {
     if (!outcomeId || saving) return;
     setSaving(true);
+    // Capture-field values ride the same POST: full objects, blanks as null.
+    const fields = type.captureFields ?? [];
+    const parseNum = (s: string) => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
+    const parseInt10 = (s: string) => { const n = parseInt(s, 10); return Number.isInteger(n) ? n : null; };
+    const values = fields.map((f) => {
+      const d = fieldDrafts[f.id] ?? { num: '', date: '', years: '', months: '', choice: '' };
+      return {
+        fieldId: f.id,
+        valueNumber: f.kind === 'amount' ? parseNum(d.num) : null,
+        valueDate: f.kind === 'date' && d.date ? `${d.date}T12:00:00.000Z` : null,
+        valueYears: f.kind === 'duration' ? parseInt10(d.years) : null,
+        valueMonths: f.kind === 'duration' ? parseInt10(d.months) : null,
+        valueChoice: f.kind === 'choice' && d.choice ? d.choice : null,
+      };
+    });
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -178,6 +235,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
         // C9: only send pay sub-states for person-kind milestones.
         willingnessToPay: type.kind === 'person' ? triToBool(willingnessToPay) : undefined,
         abilityToPay: type.kind === 'person' ? triToBool(abilityToPay) : undefined,
+        ...(fields.length > 0 ? { values } : {}),
       }),
     });
     if (res.ok) {
@@ -238,6 +296,62 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
             >
               {tl(o.label)}
             </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Capture-field inputs (2026-07-02), rendered between the outcome pills and
+  // the date/Save row while the form is active. Consultant guidance: model a
+  // conditional set as flat fields — e.g. "agreed current deal" is TWO fields
+  // (choice Fixed,Variable + duration "Fixed for"); no show/hide logic here.
+  const setFieldDraft = (fieldId: string, patch: Partial<{ num: string; date: string; years: string; months: string; choice: string }>) =>
+    setFieldDrafts((prev) => ({ ...prev, [fieldId]: { ...(prev[fieldId] ?? { num: '', date: '', years: '', months: '', choice: '' }), ...patch } }));
+
+  const renderCaptureFields = (type: DecisionPointType, compact: boolean) => {
+    const fields = [...(type.captureFields ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (fields.length === 0) return null;
+    const inputCls = compact
+      ? 'px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none'
+      : 'px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none';
+    return (
+      <div className="space-y-1 pt-0.5" role="group" aria-label={t('capture.dpFieldsAria')}>
+        {fields.map((f) => {
+          const d = fieldDrafts[f.id] ?? { num: '', date: '', years: '', months: '', choice: '' };
+          return (
+            <div key={f.id} className="flex flex-col items-center gap-0.5">
+              <span className="text-[10px] text-gray-500">{tl(f.label)}</span>
+              {f.kind === 'amount' && (
+                <input type="number" value={d.num} onChange={(e) => setFieldDraft(f.id, { num: e.target.value })} aria-label={tl(f.label)} className={`${inputCls} w-24`} />
+              )}
+              {f.kind === 'date' && (
+                <input type="date" value={d.date} onChange={(e) => setFieldDraft(f.id, { date: e.target.value })} aria-label={tl(f.label)} className={inputCls} />
+              )}
+              {f.kind === 'duration' && (
+                <div className="flex items-center gap-1">
+                  <input type="number" value={d.years} onChange={(e) => setFieldDraft(f.id, { years: e.target.value })} placeholder={t('capture.wmYearsPlaceholder')} aria-label={`${tl(f.label)} — ${t('capture.wmYearsPlaceholder')}`} className={`${inputCls} w-14`} />
+                  <input type="number" value={d.months} onChange={(e) => setFieldDraft(f.id, { months: e.target.value })} placeholder={t('capture.wmMonthsPlaceholder')} aria-label={`${tl(f.label)} — ${t('capture.wmMonthsPlaceholder')}`} className={`${inputCls} w-14`} />
+                </div>
+              )}
+              {f.kind === 'choice' && (
+                <div className="flex flex-wrap justify-center gap-1">
+                  {(f.choiceOptions ?? '').split(',').map((raw) => raw.trim()).filter(Boolean).map((opt) => {
+                    const active = d.choice === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setFieldDraft(f.id, { choice: active ? '' : opt })}
+                        className={`rounded-lg font-medium border transition-colors ${compact ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'} ${active ? 'bg-sky-600 text-white border-sky-600' : 'border-sky-300 text-sky-800 bg-sky-50 hover:bg-sky-100'}`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -368,6 +482,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
           </>
         )}
         {renderOutcomePills(type, vOutcomeId, (id) => { focus(); setOrClearOutcome(decision, id); }, true)}
+        {isActive && renderCaptureFields(type, true)}
         {showSave && (
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-center">
@@ -553,6 +668,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   </>
                 )}
                 {renderOutcomePills(type, outcomeId, (id) => setOrClearOutcome(decision, id), false)}
+                {renderCaptureFields(type, false)}
                 <div className="flex items-center justify-center gap-2">
                   <label className="flex items-center gap-1 text-xs text-gray-500">
                     {t('capture.dpDecidedAtLabel')}

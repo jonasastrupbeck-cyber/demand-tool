@@ -67,6 +67,11 @@ export interface WhatMattersType {
   label: string;
   operationalDefinition: string | null;
   sortOrder: number;
+  // 2026-07-01/02: timing (two standard timed types), capture toggle and
+  // structured ask kind — all additive/optional for older payloads.
+  timing?: 'by_date' | 'asap' | null;
+  enabled?: boolean;
+  valueKind?: 'amount' | 'date_or_duration' | null;
 }
 
 export interface WorkType {
