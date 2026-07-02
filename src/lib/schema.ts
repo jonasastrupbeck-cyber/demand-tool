@@ -453,8 +453,63 @@ export const caseMilestones = pgTable('case_milestones', {
   outcome: text('outcome').$type<'achieved' | 'not_achieved'>().notNull(),
   reachedAt: timestamp('reached_at', { withTimezone: true }).notNull(),
   recordedByCollector: text('recorded_by_collector'),
+  // 0042 (decision-box redesign): milestone completion is now DERIVED from
+  // subquestion answers (see recomputeCaseMilestone). derived=true rows are
+  // owned by that helper and rewritten/deleted as answers change; derived=false
+  // rows are frozen legacy/manual completions the helper must never touch.
+  derived: boolean('derived').notNull().default(false),
 }, (t) => ({
   uniqCaseMilestone: unique('case_milestones_unique').on(t.caseId, t.milestoneId),
+}));
+
+// ── Decision-box redesign (0042, 2026-07-02) ─────────────────────────────────
+// The decision-point layer is flattened away: consultants define SUBQUESTIONS
+// directly under a milestone. A subquestion is a typed box (amount | number |
+// date | duration | text | choice); choice options can carry positive/negative
+// polarity (an "outcome"). A subquestion may link to a what-matters type so
+// filling it both records AND evaluates the delivered value (see ask-verdict).
+export const subquestions = pgTable('subquestions', {
+  id: text('id').primaryKey(),
+  milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  kind: text('kind').$type<'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'>().notNull(),
+  // Milestone completion = every REQUIRED subquestion answered.
+  required: boolean('required').notNull().default(true),
+  linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  // Provenance for the 0042 backfill (raw field id, or 'outcome:'/'willingness:'
+  // /'ability:' + decision-point id). Null for subquestions created after.
+  migratedFromFieldId: text('migrated_from_field_id'),
+});
+
+// Options for a choice subquestion. polarity null = a plain choice; 'negative'
+// prompts the collector to close the case (never auto-closes).
+export const subquestionOptions = pgTable('subquestion_options', {
+  id: text('id').primaryKey(),
+  subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  polarity: text('polarity').$type<'positive' | 'negative'>(),
+  sortOrder: integer('sort_order').notNull().default(0),
+});
+
+// One row per (case, subquestion). The value lives in the column matching the
+// subquestion's kind (amount/number → valueNumber, date → valueDate, duration →
+// valueYears+valueMonths, choice → valueChoice, text → valueText). answeredAt is
+// frozen at first answer — it drives the milestone completion date.
+export const caseSubquestionAnswers = pgTable('case_subquestion_answers', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  valueNumber: doublePrecision('value_number'),
+  valueDate: timestamp('value_date', { withTimezone: true }),
+  valueYears: integer('value_years'),
+  valueMonths: integer('value_months'),
+  valueChoice: text('value_choice'),
+  valueText: text('value_text'),
+  answeredAt: timestamp('answered_at', { withTimezone: true }).notNull(),
+  recordedByCollector: text('recorded_by_collector'),
+}, (t) => ({
+  uniqCaseAns: unique('case_subquestion_answers_unique').on(t.caseId, t.subquestionId),
 }));
 
 // Capability-chart annotations (2026-06-18). A case is a datapoint on the

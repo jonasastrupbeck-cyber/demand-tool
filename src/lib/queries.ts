@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, decisionCaptureFields, caseDecisionPoints, caseDecisionValues, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, decisionCaptureFields, caseDecisionPoints, caseDecisionValues, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1975,6 +1975,228 @@ export async function setCaseDecisionValues(caseId: string, values: { fieldId: s
         set: { valueNumber: v.valueNumber, valueDate: v.valueDate, valueYears: v.valueYears, valueMonths: v.valueMonths, valueChoice: v.valueChoice },
       });
   }
+}
+
+// ── Decision-box redesign (0042, 2026-07-02): subquestions on milestones ──────
+// Replaces the decisionPointType/outcome/captureField trio above. A subquestion
+// is a typed box under a milestone; choice options can carry polarity; filling
+// the required ones completes the milestone (recomputeCaseMilestone).
+
+export type SubquestionKind = 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice';
+export type OptionPolarity = 'positive' | 'negative';
+
+export interface AnswerShape {
+  valueNumber: number | null;
+  valueDate: Date | null;
+  valueYears: number | null;
+  valueMonths: number | null;
+  valueChoice: string | null;
+  valueText: string | null;
+}
+
+// True when an answer row actually carries a value for a subquestion of `kind`.
+export function answerIsFilled(kind: SubquestionKind, a: Partial<AnswerShape>): boolean {
+  switch (kind) {
+    case 'amount':
+    case 'number': return a.valueNumber != null;
+    case 'date': return a.valueDate != null;
+    case 'duration': return a.valueYears != null || a.valueMonths != null;
+    case 'text': return a.valueText != null && a.valueText.trim() !== '';
+    case 'choice': return a.valueChoice != null && a.valueChoice !== '';
+    default: return false;
+  }
+}
+
+// All of a study's subquestions with their options nested, ordered by milestone
+// then subquestion — the study payload nests these under each milestone.
+export async function getSubquestions(studyId: string) {
+  const rows = await db
+    .select({
+      id: subquestions.id,
+      milestoneId: subquestions.milestoneId,
+      label: subquestions.label,
+      kind: subquestions.kind,
+      required: subquestions.required,
+      linkedWhatMattersTypeId: subquestions.linkedWhatMattersTypeId,
+      sortOrder: subquestions.sortOrder,
+    })
+    .from(subquestions)
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(eq(milestones.studyId, studyId))
+    .orderBy(asc(subquestions.sortOrder));
+  if (rows.length === 0) return [];
+  const opts = await db.select().from(subquestionOptions)
+    .where(inArray(subquestionOptions.subquestionId, rows.map((r) => r.id)))
+    .orderBy(asc(subquestionOptions.sortOrder));
+  return rows.map((r) => ({
+    ...r,
+    options: opts.filter((o) => o.subquestionId === r.id)
+      .map((o) => ({ id: o.id, label: o.label, polarity: o.polarity, sortOrder: o.sortOrder })),
+  }));
+}
+
+export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null }) {
+  const existing = await db.select().from(subquestions).where(eq(subquestions.milestoneId, milestoneId));
+  const row = {
+    id: generateId(),
+    milestoneId,
+    label: data.label,
+    kind: data.kind,
+    required: data.required ?? true,
+    linkedWhatMattersTypeId: data.linkedWhatMattersTypeId ?? null,
+    sortOrder: existing.length,
+    migratedFromFieldId: null,
+  };
+  await db.insert(subquestions).values(row);
+  return row;
+}
+
+// Kind is immutable after create (a subquestion's shape is fundamental; changing
+// it would strand typed case answers). Moving to another milestone is allowed —
+// case answers survive (keyed on case+subquestion).
+export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; sortOrder?: number; milestoneId?: string }) {
+  const set: Record<string, unknown> = {};
+  if (data.label !== undefined) set.label = data.label;
+  if (data.required !== undefined) set.required = data.required;
+  if (data.linkedWhatMattersTypeId !== undefined) set.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
+  if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder;
+  if (data.milestoneId !== undefined) {
+    set.milestoneId = data.milestoneId;
+    if (data.sortOrder === undefined) {
+      const existing = await db.select().from(subquestions).where(eq(subquestions.milestoneId, data.milestoneId));
+      set.sortOrder = existing.length;
+    }
+  }
+  if (Object.keys(set).length === 0) return;
+  await db.update(subquestions).set(set).where(eq(subquestions.id, id));
+}
+
+export async function getSubquestionById(id: string) {
+  const rows = await db.select().from(subquestions).where(eq(subquestions.id, id));
+  return rows[0] || null;
+}
+
+export async function deleteSubquestion(id: string) {
+  // options + case answers cascade at the DB level (consultant taxonomy fix).
+  await db.delete(subquestions).where(eq(subquestions.id, id));
+}
+
+export async function addSubquestionOption(subquestionId: string, data: { label: string; polarity?: OptionPolarity | null }) {
+  const existing = await db.select().from(subquestionOptions).where(eq(subquestionOptions.subquestionId, subquestionId));
+  const row = { id: generateId(), subquestionId, label: data.label, polarity: data.polarity ?? null, sortOrder: existing.length };
+  await db.insert(subquestionOptions).values(row);
+  return row;
+}
+
+export async function updateSubquestionOption(id: string, data: { label?: string; polarity?: OptionPolarity | null; sortOrder?: number }) {
+  const set: Record<string, unknown> = {};
+  if (data.label !== undefined) set.label = data.label;
+  if (data.polarity !== undefined) set.polarity = data.polarity;
+  if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder;
+  if (Object.keys(set).length === 0) return;
+  await db.update(subquestionOptions).set(set).where(eq(subquestionOptions.id, id));
+}
+
+export async function deleteSubquestionOption(id: string) {
+  await db.delete(subquestionOptions).where(eq(subquestionOptions.id, id));
+}
+
+export async function getCaseSubquestionAnswers(caseId: string) {
+  return db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
+}
+
+// Upsert per-case answers. answered_at is FROZEN at first fill — editing an
+// answered subquestion never moves the completion date. An empty payload for a
+// subquestion CLEARS it (deletes the row). Returns the distinct milestoneIds
+// whose completion the caller should recompute.
+export async function setCaseSubquestionAnswers(
+  caseId: string,
+  answers: ({ subquestionId: string } & AnswerShape & { recordedByCollector?: string | null })[],
+): Promise<string[]> {
+  if (answers.length === 0) return [];
+  const ids = answers.map((a) => a.subquestionId);
+  const sqRows = await db.select({ id: subquestions.id, milestoneId: subquestions.milestoneId, kind: subquestions.kind })
+    .from(subquestions).where(inArray(subquestions.id, ids));
+  const kindById = new Map(sqRows.map((s) => [s.id, s.kind as SubquestionKind]));
+  const msById = new Map(sqRows.map((s) => [s.id, s.milestoneId]));
+  const existing = await db.select().from(caseSubquestionAnswers)
+    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, ids)));
+  const existingBySq = new Map(existing.map((e) => [e.subquestionId, e]));
+  const touched = new Set<string>();
+  for (const a of answers) {
+    const kind = kindById.get(a.subquestionId);
+    if (!kind) continue; // unknown subquestion — ignore
+    const ms = msById.get(a.subquestionId);
+    if (ms) touched.add(ms);
+    const filled = answerIsFilled(kind, a);
+    if (!filled) {
+      await db.delete(caseSubquestionAnswers)
+        .where(and(eq(caseSubquestionAnswers.caseId, caseId), eq(caseSubquestionAnswers.subquestionId, a.subquestionId)));
+      continue;
+    }
+    const answeredAt = existingBySq.get(a.subquestionId)?.answeredAt ?? new Date();
+    await db.insert(caseSubquestionAnswers)
+      .values({
+        id: generateId(), caseId, subquestionId: a.subquestionId,
+        valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
+        valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
+        answeredAt, recordedByCollector: a.recordedByCollector ?? null,
+      })
+      .onConflictDoUpdate({
+        target: [caseSubquestionAnswers.caseId, caseSubquestionAnswers.subquestionId],
+        set: {
+          valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
+          valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
+          answeredAt, recordedByCollector: a.recordedByCollector ?? null,
+        },
+      });
+  }
+  return [...touched];
+}
+
+// THE derivation. A milestone is complete for a case when every REQUIRED
+// subquestion is answered; its reachedAt is the latest of those answers. Keeps
+// a derived=true case_milestones row in sync; never touches a derived=false
+// (legacy/manual) row. Returns whether the milestone is (now) complete.
+export async function recomputeCaseMilestone(caseId: string, milestoneId: string): Promise<boolean> {
+  const reqRows = await db.select({ id: subquestions.id, kind: subquestions.kind })
+    .from(subquestions)
+    .where(and(eq(subquestions.milestoneId, milestoneId), eq(subquestions.required, true)));
+
+  const existing = (await db.select().from(caseMilestones)
+    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, milestoneId))))[0];
+  // Frozen legacy/manual completion — leave it exactly as it is.
+  if (existing && !existing.derived) return existing.outcome === 'achieved';
+
+  // No required subquestions → nothing to complete implicitly.
+  if (reqRows.length === 0) {
+    if (existing && existing.derived) await db.delete(caseMilestones).where(eq(caseMilestones.id, existing.id));
+    return false;
+  }
+
+  const answers = await db.select().from(caseSubquestionAnswers)
+    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, reqRows.map((r) => r.id))));
+  const answerBySq = new Map(answers.map((a) => [a.subquestionId, a]));
+
+  let allAnswered = true;
+  let reachedAt: Date | null = null;
+  for (const r of reqRows) {
+    const a = answerBySq.get(r.id);
+    if (!a || !answerIsFilled(r.kind as SubquestionKind, a)) { allAnswered = false; break; }
+    if (reachedAt == null || a.answeredAt > reachedAt) reachedAt = a.answeredAt;
+  }
+
+  if (allAnswered && reachedAt) {
+    await db.insert(caseMilestones)
+      .values({ id: generateId(), caseId, milestoneId, outcome: 'achieved', reachedAt, recordedByCollector: null, derived: true })
+      .onConflictDoUpdate({
+        target: [caseMilestones.caseId, caseMilestones.milestoneId],
+        set: { reachedAt, outcome: 'achieved', derived: true },
+      });
+    return true;
+  }
+  if (existing && existing.derived) await db.delete(caseMilestones).where(eq(caseMilestones.id, existing.id));
+  return false;
 }
 
 // --- Milestones (2026-06-18) — ordered containers above decision points ---
