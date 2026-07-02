@@ -106,17 +106,17 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
   }
 
   const inputClass =
-    inputVariant === 'green'    ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
-    inputVariant === 'sky'      ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
-    inputVariant === 'thinking' ? 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
-                                  'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none';
+    inputVariant === 'green'    ? 'flex-1 min-w-0 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none' :
+    inputVariant === 'sky'      ? 'flex-1 min-w-0 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none' :
+    inputVariant === 'thinking' ? 'flex-1 min-w-0 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-blue-600 focus:border-blue-600 outline-none' :
+                                  'flex-1 min-w-0 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none';
   const addBtnClass =
     inputVariant === 'green'    ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-green-600 hover:bg-green-700' :
     inputVariant === 'sky'      ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-sky-600 hover:bg-sky-700' :
     inputVariant === 'thinking' ? 'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-blue-700 hover:bg-blue-800' :
                                   'px-3 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand';
   return (
-    <div className="flex gap-2 mt-2">
+    <div className="flex gap-2 mt-2 w-full min-w-0">
       <input
         type="text"
         value={label}

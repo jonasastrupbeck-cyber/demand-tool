@@ -778,6 +778,26 @@ const translations = {
     sv: 'Livsproblem som ska l\u00f6sas',
     de: 'Zu l\u00f6sendes Lebensproblem',
   },
+  // Small category dividers in the green customer-context box (flow capture).
+  // Canonical Vanguard terms sourced from the glossary / existing keys.
+  'capture.valueDemandHeader': {
+    en: 'Value demand',
+    da: 'V\u00e6rdiskabende eftersp\u00f8rgsel',
+    sv: 'V\u00e4rdeskapande efterfr\u00e5gan',
+    de: 'Wert-Nachfrage',
+  },
+  'capture.whatMattersHeader': {
+    en: 'What matters',
+    da: 'Hvad betyder noget',
+    sv: 'Vad \u00e4r viktigt',
+    de: 'Was wichtig ist',
+  },
+  'capture.contextHeader': {
+    en: 'Context & situation',
+    da: 'Kontekst & situation',
+    sv: 'Kontext & situation',
+    de: 'Kontext & Situation',
+  },
   'capture.lifeProblemPlaceholder': {
     en: 'Select life problem...',
     da: 'V\u00e6lg livsproblem...',

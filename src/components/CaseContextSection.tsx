@@ -59,63 +59,82 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
     onPatch({ whatMattersTypeIds: next });
   }
 
+  // Small category divider, mirroring the saved-touch section headers
+  // (CasePanel sepHeader): centred small-caps label flanked by hairlines.
+  const sectionHeader = (label: string) => (
+    <div className="flex items-center gap-1.5">
+      <div className="flex-1 h-px bg-gray-200" />
+      <span className="text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap">{label}</span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
+
   return (
     <div className="mt-2 space-y-2">
       {/* P2BS — the life problem the case exists to solve, the ROOT need.
           On top: the customer has a life problem ("buy a house for my
           family") and BECAUSE of it places a value demand on the system.
           Green strand; reuses the canonical lifeProblem copy. */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <PillSelect
-          ariaLabel={t('capture.lifeProblemLabel')}
-          placeholder={t('capture.lifeProblemPlaceholder')}
-          value={lifeProblemId || ''}
-          onChange={(id) => onPatch({ lifeProblemId: id || null })}
-          options={lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label), operationalDefinition: lp.operationalDefinition ? tl(lp.operationalDefinition) : null }))}
-          variant={lifeProblemId ? 'value' : 'valueLight'}
-          compact
-        />
-        <InlineTypeAdder
-          code={code}
-          apiPath="life-problems"
-          onCreated={(id) => onPatch({ lifeProblemId: id })}
-          onRefresh={onTypesChanged}
-          compact
-          inputVariant="green"
-        />
+      <div className="space-y-1">
+        {sectionHeader(t('capture.lifeProblemLabel'))}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <PillSelect
+            ariaLabel={t('capture.lifeProblemLabel')}
+            placeholder={t('capture.lifeProblemPlaceholder')}
+            value={lifeProblemId || ''}
+            onChange={(id) => onPatch({ lifeProblemId: id || null })}
+            options={lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label), operationalDefinition: lp.operationalDefinition ? tl(lp.operationalDefinition) : null }))}
+            variant={lifeProblemId ? 'value' : 'valueLight'}
+            compact
+          />
+          <InlineTypeAdder
+            code={code}
+            apiPath="life-problems"
+            onCreated={(id) => onPatch({ lifeProblemId: id })}
+            onRefresh={onTypesChanged}
+            compact
+            inputVariant="green"
+          />
+        </div>
       </div>
 
       {/* Value demand — what the customer places on the system BECAUSE of the
           life problem above. Sits directly beneath it (Vanguard causal order:
           life problem → value demand). */}
       {valueDemandTypes.length > 0 && (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <PillSelect
-            ariaLabel={t('capture.customerDemandTypePlaceholder')}
-            placeholder={t('capture.customerDemandTypePlaceholder')}
-            value={demandTypeId || ''}
-            onChange={(id) => onPatch({ demandTypeId: id || null })}
-            options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
-            variant={demandTypeId ? 'value' : 'valueLight'}
-            compact
-          />
+        <div className="space-y-1">
+          {sectionHeader(t('capture.valueDemandHeader'))}
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <PillSelect
+              ariaLabel={t('capture.customerDemandTypePlaceholder')}
+              placeholder={t('capture.customerDemandTypePlaceholder')}
+              value={demandTypeId || ''}
+              onChange={(id) => onPatch({ demandTypeId: id || null })}
+              options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
+              variant={demandTypeId ? 'value' : 'valueLight'}
+              compact
+            />
+          </div>
         </div>
       )}
 
       {/* Context & situation — free text, the person's circumstances. */}
-      <textarea
-        value={contextDraft}
-        onChange={(e) => setContextDraft(e.target.value)}
-        onBlur={() => {
-          if (contextDraft.trim() !== (contextSituation ?? '').trim()) {
-            onPatch({ contextSituation: contextDraft.trim() || null });
-          }
-        }}
-        placeholder={t('capture.caseContextPlaceholder')}
-        aria-label={t('capture.caseContextPlaceholder')}
-        rows={2}
-        className="w-full px-2 py-1.5 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
-      />
+      <div className="space-y-1">
+        {sectionHeader(t('capture.contextHeader'))}
+        <textarea
+          value={contextDraft}
+          onChange={(e) => setContextDraft(e.target.value)}
+          onBlur={() => {
+            if (contextDraft.trim() !== (contextSituation ?? '').trim()) {
+              onPatch({ contextSituation: contextDraft.trim() || null });
+            }
+          }}
+          placeholder={t('capture.caseContextPlaceholder')}
+          aria-label={t('capture.caseContextPlaceholder')}
+          rows={2}
+          className="w-full px-2 py-1.5 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
+        />
+      </div>
 
       {/* What matters — pills first (like the transactional tool): a leading
           "+ Add what matters" pill, then the selectable green chips. The
@@ -123,6 +142,8 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
       {/* Each pill is a vertical unit so a timed factor's date/hint pops out
           DIRECTLY below its own box (not below the whole row). items-start so a
           selected "When I want it" doesn't vertically shift the other pills. */}
+      <div className="space-y-1">
+        {sectionHeader(t('capture.whatMattersHeader'))}
       <div className="flex flex-wrap items-start justify-center gap-2">
         <InlineTypeAdder
           code={code}
@@ -201,6 +222,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }
