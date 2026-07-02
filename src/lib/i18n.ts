@@ -3190,17 +3190,23 @@ const translations = {
     sv: 'De genomgående beslut ett ärende rör sig mot. Varje punkt har sin egen formulering av utfallet; end-to-end-tider mäts till varje punkt.',
     de: 'Die Entscheidungen, auf die ein Fall zuläuft. Jede hat ihre eigene Ergebnis-Formulierung; End-to-End-Zeiten werden je Punkt gemessen.',
   },
-  'settings.dpPositiveLabel': {
-    en: 'Positive outcome',
-    da: 'Positivt udfald',
-    sv: 'Positivt utfall',
-    de: 'Positives Ergebnis',
+  'settings.addDecision': {
+    en: 'Add decision point',
+    da: 'Tilføj beslutningspunkt',
+    sv: 'Lägg till beslutspunkt',
+    de: 'Entscheidungspunkt hinzufügen',
   },
-  'settings.dpNegativeLabel': {
-    en: 'Negative outcome',
-    da: 'Negativt udfald',
-    sv: 'Negativt utfall',
-    de: 'Negatives Ergebnis',
+  'settings.moveDecision': {
+    en: 'Move',
+    da: 'Flyt',
+    sv: 'Flytta',
+    de: 'Verschieben',
+  },
+  'settings.milestoneOutcomeLabel': {
+    en: 'Outcome',
+    da: 'Udfald',
+    sv: 'Utfall',
+    de: 'Ergebnis',
   },
   'settings.decisionOutcomes': {
     en: 'Outcomes',

@@ -147,11 +147,8 @@ export default function SettingsPage() {
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkSource, setNewWorkSource] = useState('');
-  // Decision points (Skipton dotted box, 2026-06-12): three fields per new type.
-  const [newDpLabel, setNewDpLabel] = useState('');
-  const [newDpPos, setNewDpPos] = useState('');
-  const [newDpNeg, setNewDpNeg] = useState('');
-  const [newDpMilestoneId, setNewDpMilestoneId] = useState('');
+  // Decision points: which row has its milestone picker open (Move link).
+  const [movingDpId, setMovingDpId] = useState<string | null>(null);
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -476,29 +473,6 @@ export default function SettingsPage() {
     }));
   }
 
-  // Decision points (Skipton dotted box, 2026-06-12) — optimistic like the
-  // other taxonomy handlers.
-  function addDecisionPointTypeHandler(e: React.FormEvent) {
-    e.preventDefault();
-    const label = newDpLabel.trim();
-    const positiveLabel = newDpPos.trim();
-    const negativeLabel = newDpNeg.trim();
-    if (!label || !positiveLabel || !negativeLabel) return;
-    // Default a new decision point into the first milestone if one isn't picked.
-    const milestoneId = newDpMilestoneId || study?.milestones?.[0]?.id || null;
-    setNewDpLabel(''); setNewDpPos(''); setNewDpNeg('');
-    // Reload after add: the server seeds two outcomes (green + red) whose ids we
-    // need locally, so reconcile from the server rather than guessing them.
-    mutateAdd(
-      () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, positiveLabel, negativeLabel, milestoneId }),
-      }),
-      () => loadStudy(),
-    );
-  }
-
   // --- Decision outcomes (2026-07-01): a decision point's list of answers. ---
   // Update one outcome's local state (label or tone) under its parent dp.
   function patchOutcomeLocal(dpId: string, outcomeId: string, patch: Partial<{ label: string; tone: 'on_target' | 'variation' | 'negative' }>) {
@@ -546,6 +520,7 @@ export default function SettingsPage() {
 
   function removeDecisionPointType(id: string) {
     // Per-case decision records cascade server-side (deliberate).
+    setMovingDpId((v) => (v === id ? null : v));
     setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.filter((d) => d.id !== id) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, { method: 'DELETE' }));
   }
@@ -1325,6 +1300,9 @@ export default function SettingsPage() {
                   onBlur={(e) => patchDecisionPointType(dp.id, { label: e.target.value })}
                   className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                 />
+                {orderedMs.length > 0 && (
+                  <button type="button" onClick={() => setMovingDpId(movingDpId === dp.id ? null : dp.id)} className="text-xs text-gray-500 hover:text-gray-700 shrink-0">{t('settings.moveDecision')}</button>
+                )}
                 <button onClick={() => removeDecisionPointType(dp.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
               </div>
               <div className="space-y-1.5">
@@ -1365,12 +1343,14 @@ export default function SettingsPage() {
                   onRefresh={loadStudy}
                 />
               </div>
-              {orderedMs.length > 0 && (
+              {orderedMs.length > 0 && movingDpId === dp.id && (
                 <label className="block mt-1.5 text-xs text-gray-500">
                   {t('settings.assignToMilestone')}
                   <select
+                    autoFocus
                     value={dp.milestoneId ?? ''}
-                    onChange={(e) => assignDecisionToMilestone(dp.id, e.target.value || null)}
+                    onChange={(e) => { assignDecisionToMilestone(dp.id, e.target.value || null); setMovingDpId(null); }}
+                    onBlur={() => setMovingDpId(null)}
                     className="w-full mt-0.5 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                   >
                     {orderedMs.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -1400,10 +1380,22 @@ export default function SettingsPage() {
                     <button type="button" aria-label={t('settings.moveDown')} disabled={idx === orderedMs.length - 1} onClick={() => moveMilestone(m.id, 1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
                     <button type="button" onClick={() => removeMilestone(m.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
                   </div>
+                  <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.milestoneOutcomeLabel')}: {t('capture.milestoneAchieved')} / {t('capture.milestoneNotAchieved')}</p>
                   <ul className="space-y-2">
                     {dpsIn(m.id).map(renderDpRow)}
-                    {dpsIn(m.id).length === 0 && <li className="text-xs text-gray-400 italic px-1">—</li>}
                   </ul>
+                  <div className="mt-1.5">
+                    <InlineTypeAdder
+                      code={code}
+                      apiPath="decision-point-types"
+                      extraBody={{ milestoneId: m.id, positiveLabel: t('settings.toneOnTarget'), negativeLabel: t('settings.toneNegative') }}
+                      compact
+                      addLabel={t('settings.addDecision')}
+                      inputPlaceholder={t('settings.decisionPointTypes')}
+                      onCreated={() => {}}
+                      onRefresh={loadStudy}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -1412,29 +1404,26 @@ export default function SettingsPage() {
               <button type="submit" disabled={!newMilestoneLabel.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.addMilestone')}</button>
             </form>
 
-            {unassigned.length > 0 && (
+            {(unassigned.length > 0 || orderedMs.length === 0) && (
               <div className="rounded-lg border border-dashed border-gray-300 p-2 mb-4">
                 <p className="text-xs font-medium text-gray-500 mb-2">{t('settings.unassignedDecisions')}</p>
                 <ul className="space-y-2">{unassigned.map(renderDpRow)}</ul>
+                {orderedMs.length === 0 && (
+                  <div className="mt-1.5">
+                    <InlineTypeAdder
+                      code={code}
+                      apiPath="decision-point-types"
+                      extraBody={{ positiveLabel: t('settings.toneOnTarget'), negativeLabel: t('settings.toneNegative') }}
+                      compact
+                      addLabel={t('settings.addDecision')}
+                      inputPlaceholder={t('settings.decisionPointTypes')}
+                      onCreated={() => {}}
+                      onRefresh={loadStudy}
+                    />
+                  </div>
+                )}
               </div>
             )}
-
-            <p className="text-sm font-medium text-gray-700 mb-1">{t('settings.decisionPointTypes')}</p>
-            <form onSubmit={addDecisionPointTypeHandler} className="space-y-2">
-              <input type="text" value={newDpLabel} onChange={(e) => setNewDpLabel(e.target.value)} placeholder={t('settings.decisionPointTypes')} className={inputCls} />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="text" value={newDpPos} onChange={(e) => setNewDpPos(e.target.value)} placeholder={t('settings.dpPositiveLabel')} className={inputCls} />
-                <input type="text" value={newDpNeg} onChange={(e) => setNewDpNeg(e.target.value)} placeholder={t('settings.dpNegativeLabel')} className={inputCls} />
-              </div>
-              <div className="flex gap-2 items-center">
-                {orderedMs.length > 0 && (
-                  <select value={newDpMilestoneId || orderedMs[0].id} onChange={(e) => setNewDpMilestoneId(e.target.value)} className="flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none">
-                    {orderedMs.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-                )}
-                <button type="submit" disabled={!newDpLabel.trim() || !newDpPos.trim() || !newDpNeg.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.add')}</button>
-              </div>
-            </form>
           </div>
           );
         })()}

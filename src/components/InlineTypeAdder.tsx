@@ -34,9 +34,12 @@ interface Props {
   // Custom placeholder for the expanded-state input. Falls back to
   // t('capture.newTypePlaceholder') when not provided.
   inputPlaceholder?: string;
+  // Custom label for the closed-state dashed trigger (renders "+ {addLabel}").
+  // Falls back to t('capture.addNew').
+  addLabel?: string;
 }
 
-export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'sky', inputVariant = 'red', inputPlaceholder }: Props) {
+export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, onRefresh, compact, pillLabel, pillVariant = 'sky', inputVariant = 'red', inputPlaceholder, addLabel }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [label, setLabel] = useState('');
@@ -95,9 +98,9 @@ export default function InlineTypeAdder({ code, apiPath, extraBody, onCreated, o
           ? 'px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400'
           : 'px-3 py-2 rounded-lg text-sm text-gray-400 hover:text-gray-600 border border-dashed border-gray-300 hover:border-gray-400 transition-colors'
         }
-        title={t('capture.addNew')}
+        title={addLabel ?? t('capture.addNew')}
       >
-        + {t('capture.addNew')}
+        + {addLabel ?? t('capture.addNew')}
       </button>
     );
   }
