@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getDecisionCaptureFields, getWhatMattersTypes, updateDecisionCaptureField, deleteDecisionCaptureField } from '@/lib/queries';
+import { getStudyByCode, getDecisionCaptureFields, getWhatMattersTypes, getDecisionPointTypes, updateDecisionCaptureField, deleteDecisionCaptureField } from '@/lib/queries';
 
 // Confirm the field belongs to a decision point of this study before mutating.
 async function findOwnedField(code: string, fieldId: string) {
@@ -39,6 +39,18 @@ export async function PATCH(
     }
   }
   if (typeof body.sortOrder === 'number') data.sortOrder = body.sortOrder;
+  // Move to another decision (2026-07-02, "Evaluate against" on the What
+  // Matters row). Must be a decision point of this study; case values survive.
+  if (body.decisionPointTypeId !== undefined) {
+    if (typeof body.decisionPointTypeId !== 'string' || !body.decisionPointTypeId) {
+      return NextResponse.json({ error: 'decisionPointTypeId must be a decision point id' }, { status: 400 });
+    }
+    const dpTypes = await getDecisionPointTypes(owned.study.id);
+    if (!dpTypes.some((t) => t.id === body.decisionPointTypeId)) {
+      return NextResponse.json({ error: 'decisionPointTypeId must be a decision point of this study' }, { status: 400 });
+    }
+    data.decisionPointTypeId = body.decisionPointTypeId;
+  }
 
   await updateDecisionCaptureField(fieldId, data);
   return NextResponse.json({ success: true });

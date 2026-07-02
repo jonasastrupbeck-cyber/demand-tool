@@ -1927,12 +1927,23 @@ export async function addDecisionCaptureField(decisionPointTypeId: string, data:
 
 // Kind is immutable after create (like work-step tags): a field's shape is
 // fundamental, and changing it would strand typed case values.
-export async function updateDecisionCaptureField(id: string, data: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null; sortOrder?: number }) {
+export async function updateDecisionCaptureField(id: string, data: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null; sortOrder?: number; decisionPointTypeId?: string }) {
   const updateFields: Record<string, unknown> = {};
   if (data.label !== undefined) updateFields.label = data.label;
   if (data.choiceOptions !== undefined) updateFields.choiceOptions = data.choiceOptions;
   if (data.linkedWhatMattersTypeId !== undefined) updateFields.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
   if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
+  // Moving a field to another decision (2026-07-02, "Evaluate against" on the
+  // What Matters row): case values survive (keyed on case+field); the field
+  // joins the end of the target decision's list.
+  if (data.decisionPointTypeId !== undefined) {
+    updateFields.decisionPointTypeId = data.decisionPointTypeId;
+    if (data.sortOrder === undefined) {
+      const existing = await db.select().from(decisionCaptureFields)
+        .where(eq(decisionCaptureFields.decisionPointTypeId, data.decisionPointTypeId));
+      updateFields.sortOrder = existing.length;
+    }
+  }
   if (Object.keys(updateFields).length === 0) return;
   await db.update(decisionCaptureFields).set(updateFields).where(eq(decisionCaptureFields.id, id));
 }

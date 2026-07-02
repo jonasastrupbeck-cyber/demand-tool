@@ -823,6 +823,20 @@ const translations = {
     sv: 'Datum eller varaktighet',
     de: 'Datum oder Dauer',
   },
+  // "Evaluate against" on the What Matters row (2026-07-02, slice 5): pick the
+  // decision that delivers on the ask; the delivered-value box follows.
+  'settings.wmEvaluateAgainst': {
+    en: 'Evaluate against',
+    da: 'Evalueres mod',
+    sv: 'Utvärderas mot',
+    de: 'Bewertet gegen',
+  },
+  'settings.wmCapturedAs': {
+    en: 'captured as',
+    da: 'registreres som',
+    sv: 'registreras som',
+    de: 'erfasst als',
+  },
   'capture.wmAmountSpecific': {
     en: 'Specific',
     da: 'Præcist',

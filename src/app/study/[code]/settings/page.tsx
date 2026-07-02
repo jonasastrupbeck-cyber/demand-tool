@@ -149,6 +149,9 @@ export default function SettingsPage() {
   const [newWorkSource, setNewWorkSource] = useState('');
   // Decision points: which row has its milestone picker open (Move link).
   const [movingDpId, setMovingDpId] = useState<string | null>(null);
+  // "Captured as" choice for date_or_duration what-matters rows while UNLINKED
+  // (once linked, the field's kind is the source of truth). Default: duration.
+  const [wmCapturedAs, setWmCapturedAs] = useState<Record<string, 'date' | 'duration'>>({});
   // Capture-field add form (2026-07-02): one open at a time, keyed by DP id.
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [fieldAdderDpId, setFieldAdderDpId] = useState<string | null>(null);
@@ -400,15 +403,77 @@ export default function SettingsPage() {
     }));
   }
 
+  // The delivered-value field a what-matters type is evaluated against: the
+  // FIRST capture field (across all decision points) linked to it. Manually
+  // created links surface here too; extra links on the same type are left alone.
+  function linkedFieldOf(wmId: string): { field: NonNullable<StudyData['decisionPointTypes'][number]['captureFields']>[number]; dpId: string } | null {
+    for (const dp of study?.decisionPointTypes ?? []) {
+      const field = (dp.captureFields ?? []).find((f) => f.linkedWhatMattersTypeId === wmId);
+      if (field) return { field, dpId: dp.id };
+    }
+    return null;
+  }
+
+  // "Evaluate against" (2026-07-02): manage the linked delivered-value field
+  // from the What Matters row. Link = create the field on the chosen decision
+  // (named after the category, renameable there); re-point = MOVE the field
+  // (case values survive); clear = DELETE the field incl. its case values
+  // (Settings taxonomy-fix philosophy). Server-authoritative: reload after.
+  async function setWmEvaluateAgainst(wm: StudyData['whatMattersTypes'][number], dpId: string | null, kind: 'amount' | 'date' | 'duration') {
+    const linked = linkedFieldOf(wm.id);
+    if (!dpId && !linked) return;
+    if (dpId && linked?.dpId === dpId) return;
+    if (linked && !dpId) {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, { method: 'DELETE' });
+    } else if (linked && dpId) {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decisionPointTypeId: dpId }),
+      });
+    } else if (dpId) {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${dpId}/capture-fields`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: wm.label, kind, linkedWhatMattersTypeId: wm.id }),
+      });
+    }
+    await loadStudy();
+  }
+
+  // Kind is immutable per field, so switching a date_or_duration category's
+  // "captured as" (or changing its Ask-for while linked) RECREATES the linked
+  // field on the same decision with the new kind. Config-stage action: case
+  // values recorded on the old field go with it (same as unlink).
+  async function recreateLinkedField(wm: StudyData['whatMattersTypes'][number], kind: 'amount' | 'date' | 'duration') {
+    const linked = linkedFieldOf(wm.id);
+    if (!linked || linked.field.kind === kind) return;
+    await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, { method: 'DELETE' });
+    await fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${linked.dpId}/capture-fields`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: linked.field.label, kind, linkedWhatMattersTypeId: wm.id }),
+    });
+    await loadStudy();
+  }
+
   // Structured ask kind (2026-07-02): null = plain pill; 'amount' = specific or
   // range; 'date_or_duration' = end date or years+months. Non-timed types only.
   function setWhatMattersValueKind(id: string, kind: 'amount' | 'date_or_duration' | null) {
+    const wm = study?.whatMattersTypes.find((w) => w.id === id);
     setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, valueKind: kind } : w)) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ valueKind: kind }),
     }));
+    // Keep a linked delivered-value field's kind in step with the ask kind;
+    // clearing the ask kind removes the evaluation link (nothing to compare).
+    if (wm && linkedFieldOf(id)) {
+      if (kind === 'amount') void recreateLinkedField(wm, 'amount');
+      else if (kind === 'date_or_duration') void recreateLinkedField(wm, 'duration');
+      else void setWmEvaluateAgainst(wm, null, 'amount');
+    }
   }
 
   // Decision capture fields (2026-07-02) — optimistic, mirroring the outcome
@@ -1844,6 +1909,52 @@ export default function SettingsPage() {
                         </select>
                       </label>
                     )}
+                    {/* Evaluate against (2026-07-02): pick the decision that
+                        delivers on this ask — the delivered-value box on that
+                        decision is created/moved/removed automatically. Shown
+                        for comparable asks: the by_date standard type and any
+                        valueKind type. */}
+                    {(wm.timing === 'by_date' || (!wm.timing && wm.valueKind)) && (() => {
+                      const linked = linkedFieldOf(wm.id);
+                      const capturedAs: 'date' | 'duration' = linked && (linked.field.kind === 'date' || linked.field.kind === 'duration')
+                        ? linked.field.kind
+                        : (wmCapturedAs[wm.id] ?? 'duration');
+                      const deliveredKind: 'amount' | 'date' | 'duration' =
+                        wm.timing === 'by_date' ? 'date' : wm.valueKind === 'amount' ? 'amount' : capturedAs;
+                      return (
+                        <>
+                          <label className="flex items-center gap-1 text-xs text-gray-600">
+                            {t('settings.wmEvaluateAgainst')}
+                            <select
+                              value={linked?.dpId ?? ''}
+                              onChange={(e) => void setWmEvaluateAgainst(wm, e.target.value || null, deliveredKind)}
+                              className="max-w-[14rem] truncate px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                            >
+                              <option value="">—</option>
+                              {[...(study.decisionPointTypes || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+                            </select>
+                          </label>
+                          {!wm.timing && wm.valueKind === 'date_or_duration' && (
+                            <label className="flex items-center gap-1 text-xs text-gray-600">
+                              {t('settings.wmCapturedAs')}
+                              <select
+                                value={capturedAs}
+                                onChange={(e) => {
+                                  const next = e.target.value as 'date' | 'duration';
+                                  setWmCapturedAs((prev) => ({ ...prev, [wm.id]: next }));
+                                  // Linked: the field's kind must follow (recreate).
+                                  if (linked) void recreateLinkedField(wm, next);
+                                }}
+                                className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                              >
+                                <option value="duration">{t('capture.wmModeDuration')}</option>
+                                <option value="date">{t('settings.captureFieldKindDate')}</option>
+                              </select>
+                            </label>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </li>
               ))}
