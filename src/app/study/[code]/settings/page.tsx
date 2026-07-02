@@ -1778,13 +1778,25 @@ export default function SettingsPage() {
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.whatMattersTypes')}</h2>
             <p className="text-sm text-gray-600 mb-3">{t('settings.whatMattersTypesDesc')}</p>
             <ul className="space-y-2 mb-4">
+              {/* Stacked two-line rows (2026-07-02): line 1 = identity (label
+                  wraps, tag/remove pinned right), line 2 = controls that WRAP
+                  on narrow widths. The old single-line layout overflowed the
+                  box once the capture toggle + ask-kind/anchor selects landed. */}
               {study.whatMattersTypes.map((wm) => (
-                <li key={wm.id} className={`${itemCls} bg-blue-50`}>
-                  <span className="flex items-center gap-1.5 min-w-0">
-                    {wm.timing === 'by_date' ? <span aria-hidden>📅</span> : wm.timing === 'asap' ? <span aria-hidden>⏱</span> : null}
-                    {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700')}
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
+                <li key={wm.id} className="py-2 px-3 rounded-lg bg-blue-50 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      {wm.timing === 'by_date' ? <span aria-hidden>📅</span> : wm.timing === 'asap' ? <span aria-hidden>⏱</span> : null}
+                      {renderLabel(wm.id, wm.label, 'whatMatters', 'text-sm text-blue-700 break-words')}
+                    </span>
+                    {/* The two standard timed types are protected — no delete, just a tag. */}
+                    {wm.timing ? (
+                      <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{t('settings.standardType')}</span>
+                    ) : (
+                      <button onClick={() => removeWhatMattersType(wm.id)} className="shrink-0 text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                     {/* Capture toggle (2026-07-02): off = pill hidden for NEW
                         selection; history + dashboards untouched. */}
                     <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
@@ -1820,7 +1832,7 @@ export default function SettingsPage() {
                         <select
                           value={wm.anchorEvent ?? (wm.anchorMilestoneId ? `milestone:${wm.anchorMilestoneId}` : '')}
                           onChange={(e) => setWhatMattersAnchor(wm.id, e.target.value || null)}
-                          className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                          className="max-w-[14rem] truncate px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                         >
                           <option value="">—</option>
                           <optgroup label={t('settings.milestones')}>
@@ -1831,12 +1843,6 @@ export default function SettingsPage() {
                           </optgroup>
                         </select>
                       </label>
-                    )}
-                    {/* The two standard timed types are protected — no delete, just a tag. */}
-                    {wm.timing ? (
-                      <span className="text-[10px] uppercase tracking-wide text-gray-400 font-medium">{t('settings.standardType')}</span>
-                    ) : (
-                      <button onClick={() => removeWhatMattersType(wm.id)} className="text-xs text-red-500 hover:text-red-700">{t('settings.remove')}</button>
                     )}
                   </div>
                 </li>
