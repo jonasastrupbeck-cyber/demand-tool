@@ -510,13 +510,13 @@ const translations = {
     sv: 'Ångra',
     de: 'Rückgängig',
   },
-  // Regret = abandon the entry being typed (kept distinct from Undo's "Fortryd"/
-  // "Ångra" since both can be visible at once).
+  // Reset description = abandon the entry being typed (kept distinct from
+  // Undo's "Fortryd"/"Ångra" since both can be visible at once).
   'capture.regret': {
-    en: 'Regret',
-    da: 'Ryd',
-    sv: 'Rensa',
-    de: 'Verwerfen',
+    en: 'Reset description',
+    da: 'Ryd beskrivelsen',
+    sv: 'Rensa beskrivningen',
+    de: 'Beschreibung zurücksetzen',
   },
   'capture.deleteTouch': {
     en: 'Delete',
