@@ -67,6 +67,9 @@ export default function DashboardPage() {
   const [selectedFlow, setSelectedFlow] = useState<{ sourceLabel: string; targetLabel: string; sourceName: string; targetName: string; count: number } | null>(null);
   const [flowCauses, setFlowCauses] = useState<Array<{ cause: string; count: number }> | null>(null);
   const [flowCausesLoading, setFlowCausesLoading] = useState(false);
+  // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
+  // mattered, per linked capture field. Fetched when the Analytics tab opens.
+  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null }> | null>(null);
   const [showEntries, setShowEntries] = useState(false);
   const [entries, setEntries] = useState<Array<{ id: string; verbatim: string; classification: string; createdAt: string; demandTypeId: string | null; entryType: string; collectorName: string | null }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
@@ -215,6 +218,21 @@ export default function DashboardPage() {
       .then(d => setFlowCauses(d.causes))
       .finally(() => setFlowCausesLoading(false));
   }, [selectedFlow, code, getDateRangeParams]);
+
+  // Ask delivery (slice 4): refetch when the Analytics tab is open and the
+  // date range / P2BS scope changes. Same params as the main dashboard fetch.
+  useEffect(() => {
+    if (dashboardView !== 'analytics') return;
+    const qp = new URLSearchParams();
+    const range = getDateRangeParams();
+    if (range.from) qp.set('from', range.from);
+    if (range.to) qp.set('to', range.to);
+    if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/ask-delivery?${qp}`)
+      .then(r => r.ok ? r.json() : { rows: [] })
+      .then(d => setAskDelivery(d.rows))
+      .catch(() => setAskDelivery([]));
+  }, [dashboardView, code, getDateRangeParams, lifeProblemFilter]);
 
   // Capability: event options (fixed + milestones + decision points) for the
   // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
@@ -1754,6 +1772,44 @@ export default function DashboardPage() {
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartCard>
+              )}
+
+              {/* Ask delivery (2026-07-02, slice 4): per linked capture field,
+                  how often the decision delivered what mattered. Self-gates on
+                  having evaluated cases; scoped by the P2BS filter + date range
+                  (decidedAt) like everything else on this tab. */}
+              {askDelivery && askDelivery.length > 0 && (
+                <div className="rounded-xl bg-white border border-gray-200 p-5">
+                  <h3 className="font-bold text-gray-900 mb-1">{t('dashboard.askDeliveryTitle')}</h3>
+                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
+                  <div className="space-y-2">
+                    {askDelivery.map((r) => {
+                      const pct = Math.round((r.metCount / r.n) * 100);
+                      const notMet = r.n - r.metCount;
+                      return (
+                        <div key={r.fieldId} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-800 break-words">{tl(r.whatMattersLabel)}</p>
+                            <p className="text-[11px] text-gray-500 break-words">{tl(r.fieldLabel)} · {tl(r.decisionLabel)}</p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 text-sm">
+                            <span className={`font-semibold ${pct >= 100 ? 'text-green-700' : notMet > 0 ? 'text-gray-800' : 'text-green-700'}`}>
+                              {r.metCount}/{r.n} <span className="font-normal text-gray-500">({pct}%)</span>
+                            </span>
+                            <span className="text-[11px] text-green-700">✓ {t('capture.evalMet')} {r.metCount}</span>
+                            {notMet > 0 && <span className="text-[11px] text-red-600">✗ {t('capture.evalNotMet')} {notMet}</span>}
+                            {r.kind === 'date' && r.avgDaysLate !== null && (
+                              <span className="text-[11px] text-red-600">{t('dashboard.wmAvgDaysLate')}: {r.avgDaysLate}</span>
+                            )}
+                            {r.kind === 'duration' && r.avgDiffMonths !== null && (
+                              <span className="text-[11px] text-red-600">{t('dashboard.askAvgDeviation')}: {r.avgDiffMonths} {t('capture.unitMonthsShort')}</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           )

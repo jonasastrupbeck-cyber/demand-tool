@@ -1,5 +1,6 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations, decisionPointTypes, decisionCaptureFields, caseDecisionValues } from './schema';
+import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData, TouchSeriesPoint } from '@/types';
@@ -1084,4 +1085,127 @@ export async function getTouchSeries(
   return [...map.entries()]
     .map(([date, c]) => ({ date, ...c }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// --- Ask delivery (2026-07-02, slice 4) -------------------------------------
+// How well the system delivers on what matters: per capture field LINKED to a
+// what-matters type, evaluate every case that carries BOTH the ask and a
+// recorded decision value, using the shared rules in ask-verdict.ts (the same
+// rules the capture-side live evaluation shows). P2BS scope filters the case
+// set by its primary life problem (like getCapabilityData); the from/to range
+// filters on the decision's decidedAt.
+export interface AskDeliveryRow {
+  fieldId: string;
+  fieldLabel: string;
+  decisionLabel: string;
+  whatMattersTypeId: string;
+  whatMattersLabel: string;
+  kind: 'amount' | 'date' | 'duration' | 'choice';
+  n: number;          // cases evaluated (ask + delivered value present)
+  metCount: number;
+  lateCount: number;  // date kind only: not-met cases
+  avgDaysLate: number | null; // date kind only: mean days late among lateCount
+  avgDiffMonths: number | null; // duration kind only: mean |diff| among not-met
+}
+
+export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<AskDeliveryRow[]> {
+  // Linked fields only — an unlinked field has no ask to evaluate against.
+  const fields = await db
+    .select({
+      id: decisionCaptureFields.id,
+      label: decisionCaptureFields.label,
+      kind: decisionCaptureFields.kind,
+      decisionPointTypeId: decisionCaptureFields.decisionPointTypeId,
+      linkedWhatMattersTypeId: decisionCaptureFields.linkedWhatMattersTypeId,
+      sortOrder: decisionCaptureFields.sortOrder,
+      decisionLabel: decisionPointTypes.label,
+      decisionSort: decisionPointTypes.sortOrder,
+    })
+    .from(decisionCaptureFields)
+    .innerJoin(decisionPointTypes, eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypes.id))
+    .where(and(eq(decisionPointTypes.studyId, studyId), isNotNull(decisionCaptureFields.linkedWhatMattersTypeId)));
+  if (fields.length === 0) return [];
+
+  // P2BS scope: filter the case set by its primary life problem.
+  const caseWhere = lifeProblemId
+    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
+    : eq(cases.studyId, studyId);
+  const caseRows = await db.select({ id: cases.id }).from(cases).where(caseWhere);
+  if (caseRows.length === 0) return [];
+  const caseIds = caseRows.map((c) => c.id);
+
+  const dpTypeIds = [...new Set(fields.map((f) => f.decisionPointTypeId))];
+  const wmTypeIds = [...new Set(fields.map((f) => f.linkedWhatMattersTypeId!))];
+
+  // A value only counts while its decision is recorded (and in range).
+  const decisionConds = [inArray(caseDecisionPoints.caseId, caseIds), inArray(caseDecisionPoints.decisionPointTypeId, dpTypeIds)];
+  if (from) decisionConds.push(gte(caseDecisionPoints.decidedAt, from));
+  if (to) decisionConds.push(lte(caseDecisionPoints.decidedAt, to));
+  const decisionRows = await db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId })
+    .from(caseDecisionPoints).where(and(...decisionConds));
+  const decided = new Set(decisionRows.map((d) => `${d.caseId}:${d.decisionPointTypeId}`));
+
+  const valueRows = await db.select().from(caseDecisionValues)
+    .where(and(inArray(caseDecisionValues.caseId, caseIds), inArray(caseDecisionValues.fieldId, fields.map((f) => f.id))));
+  const askRows = await db.select().from(caseWhatMatters)
+    .where(and(inArray(caseWhatMatters.caseId, caseIds), inArray(caseWhatMatters.whatMattersTypeId, wmTypeIds)));
+  const asksByCaseType = new Map(askRows.map((a) => [`${a.caseId}:${a.whatMattersTypeId}`, a]));
+
+  const wmTypes = await db.select({ id: whatMattersTypes.id, label: whatMattersTypes.label })
+    .from(whatMattersTypes).where(eq(whatMattersTypes.studyId, studyId));
+  const wmLabelById = new Map(wmTypes.map((w) => [w.id, w.label]));
+
+  const rows: AskDeliveryRow[] = [];
+  for (const f of fields.sort((a, b) => a.decisionSort - b.decisionSort || a.sortOrder - b.sortOrder)) {
+    let n = 0;
+    let metCount = 0;
+    let lateCount = 0;
+    let lateDaysSum = 0;
+    let diffMonthsSum = 0;
+    let diffMonthsN = 0;
+    for (const v of valueRows) {
+      if (v.fieldId !== f.id) continue;
+      if (!decided.has(`${v.caseId}:${f.decisionPointTypeId}`)) continue;
+      const ask = asksByCaseType.get(`${v.caseId}:${f.linkedWhatMattersTypeId}`);
+      if (!ask) continue;
+      const verdict = askVerdict(f.kind, {
+        targetDate: ask.targetDate,
+        amountSpecific: ask.amountSpecific,
+        amountMin: ask.amountMin,
+        amountMax: ask.amountMax,
+        termYears: ask.termYears,
+        termMonths: ask.termMonths,
+      }, {
+        valueNumber: v.valueNumber,
+        valueDate: v.valueDate,
+        valueYears: v.valueYears,
+        valueMonths: v.valueMonths,
+      });
+      if (!verdict.comparable || verdict.met === null) continue;
+      n += 1;
+      if (verdict.met) metCount += 1;
+      else if (f.kind === 'date' && verdict.diffDays !== null) {
+        lateCount += 1;
+        lateDaysSum += verdict.diffDays;
+      } else if (f.kind === 'duration' && verdict.diffMonths !== null) {
+        diffMonthsSum += Math.abs(verdict.diffMonths);
+        diffMonthsN += 1;
+      }
+    }
+    if (n === 0) continue;
+    rows.push({
+      fieldId: f.id,
+      fieldLabel: f.label,
+      decisionLabel: f.decisionLabel,
+      whatMattersTypeId: f.linkedWhatMattersTypeId!,
+      whatMattersLabel: wmLabelById.get(f.linkedWhatMattersTypeId!) ?? '',
+      kind: f.kind,
+      n,
+      metCount,
+      lateCount,
+      avgDaysLate: lateCount > 0 ? Math.round((lateDaysSum / lateCount) * 10) / 10 : null,
+      avgDiffMonths: diffMonthsN > 0 ? Math.round((diffMonthsSum / diffMonthsN) * 10) / 10 : null,
+    });
+  }
+  return rows;
 }

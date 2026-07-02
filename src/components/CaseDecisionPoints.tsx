@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import SegmentedToggle from '@/components/SegmentedToggle';
+import { askVerdict } from '@/lib/ask-verdict';
 
 // 2026-07-01: a decision point's possible answers. tone drives colour AND
 // polarity: on_target (green) / variation (amber) are positive (carry the case
@@ -324,65 +325,53 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
 
   // --- Ask evaluation (2026-07-02, slice 3) -------------------------------
   // A linked field shows the customer's ASK next to the delivered value with
-  // a met/not-met verdict, live as the consultant types. Rules (agreed):
-  //   amount   — met if delivered ≤ asked amount, or ≤ the range's upper end
-  //   date     — met if delivered on/before the asked date (days early/late)
-  //   duration — met when it matches the ask exactly; else signed difference
-  // Kind-incompatible pairs (e.g. duration ask vs date field) show the ask
-  // side-by-side without a verdict. No ask captured on this case → nothing.
+  // a met/not-met verdict, live as the consultant types. The RULES live in
+  // src/lib/ask-verdict.ts (shared with the dashboard aggregation, slice 4);
+  // this component only parses drafts and words the badge.
   const fmtDuration = (years: number | null, months: number | null) => {
     const parts: string[] = [];
     if (years != null && years !== 0) parts.push(`${years} ${t('capture.unitYearsShort')}`);
     if (months != null && months !== 0) parts.push(`${months} ${t('capture.unitMonthsShort')}`);
     return parts.length ? parts.join(' ') : `0 ${t('capture.unitYearsShort')}`;
   };
-  const dayIndex = (iso: string) => Math.floor(new Date(iso.length <= 10 ? `${iso}T12:00:00.000Z` : iso).getTime() / 86_400_000);
+
+  // The ask rendered as text, regardless of comparability.
+  const askText = (ask: AskValue): string | null =>
+    ask.targetDate ? new Date(ask.targetDate).toLocaleDateString()
+      : ask.amountSpecific != null ? `≤ ${ask.amountSpecific}`
+      : (ask.amountMin != null || ask.amountMax != null) ? `${ask.amountMin ?? '…'}–${ask.amountMax ?? '…'}`
+      : (ask.termYears != null || ask.termMonths != null) ? fmtDuration(ask.termYears, ask.termMonths)
+      : null;
 
   type Verdict = { askText: string; met: boolean | null; badge: string | null };
   const evaluateField = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }): Verdict | null => {
     if (!f.linkedWhatMattersTypeId) return null;
     const ask = whatMattersValues[f.linkedWhatMattersTypeId];
     if (!ask) return null;
+    const text = askText(ask);
+    if (!text) return null;
 
-    if (f.kind === 'amount' && (ask.amountSpecific != null || ask.amountMin != null || ask.amountMax != null)) {
-      const cap = ask.amountSpecific ?? ask.amountMax ?? null; // at-or-under rule
-      const askText = ask.amountSpecific != null
-        ? `≤ ${ask.amountSpecific}`
-        : `${ask.amountMin ?? '…'}–${ask.amountMax ?? '…'}`;
-      const delivered = parseFloat(d.num);
-      if (!Number.isFinite(delivered) || cap == null) return { askText, met: null, badge: null };
-      const met = delivered <= cap;
-      return { askText, met, badge: met ? t('capture.evalMet') : t('capture.evalNotMet') };
+    // Parse the string drafts into the shared shape (blank → null).
+    const num = parseFloat(d.num);
+    const y = parseInt(d.years, 10);
+    const m = parseInt(d.months, 10);
+    const v = askVerdict(f.kind, ask, {
+      valueNumber: Number.isFinite(num) ? num : null,
+      valueDate: d.date || null,
+      valueYears: Number.isInteger(y) ? y : null,
+      valueMonths: Number.isInteger(m) ? m : null,
+    });
+    if (!v.comparable || v.met === null) return { askText: text, met: null, badge: null };
+
+    if (f.kind === 'date' && v.diffDays !== null) {
+      if (v.met) return { askText: text, met: true, badge: v.diffDays === 0 ? t('capture.evalMet') : `${-v.diffDays} ${t('capture.evalDaysEarly')}` };
+      return { askText: text, met: false, badge: `${v.diffDays} ${t('capture.evalDaysLate')}` };
     }
-    if (f.kind === 'date' && ask.targetDate) {
-      const askText = new Date(ask.targetDate).toLocaleDateString();
-      if (!d.date) return { askText, met: null, badge: null };
-      const diff = dayIndex(d.date) - dayIndex(ask.targetDate);
-      if (diff <= 0) {
-        return { askText, met: true, badge: diff === 0 ? t('capture.evalMet') : `${-diff} ${t('capture.evalDaysEarly')}` };
-      }
-      return { askText, met: false, badge: `${diff} ${t('capture.evalDaysLate')}` };
+    if (f.kind === 'duration' && v.diffMonths !== null && !v.met) {
+      const sign = v.diffMonths > 0 ? '+' : '−';
+      return { askText: text, met: false, badge: `${sign}${fmtDuration(Math.floor(Math.abs(v.diffMonths) / 12), Math.abs(v.diffMonths) % 12)}` };
     }
-    if (f.kind === 'duration' && (ask.termYears != null || ask.termMonths != null)) {
-      const askText = fmtDuration(ask.termYears, ask.termMonths);
-      const y = parseInt(d.years, 10);
-      const m = parseInt(d.months, 10);
-      if (!Number.isInteger(y) && !Number.isInteger(m)) return { askText, met: null, badge: null };
-      const deliveredMonths = (Number.isInteger(y) ? y : 0) * 12 + (Number.isInteger(m) ? m : 0);
-      const askedMonths = (ask.termYears ?? 0) * 12 + (ask.termMonths ?? 0);
-      const diff = deliveredMonths - askedMonths;
-      if (diff === 0) return { askText, met: true, badge: t('capture.evalMet') };
-      const sign = diff > 0 ? '+' : '−';
-      return { askText, met: false, badge: `${sign}${fmtDuration(Math.floor(Math.abs(diff) / 12), Math.abs(diff) % 12)}` };
-    }
-    // Ask exists but in a shape this field can't be compared against (e.g.
-    // duration ask vs date field): show the ask, no verdict.
-    const fallback = ask.targetDate ? new Date(ask.targetDate).toLocaleDateString()
-      : ask.amountSpecific != null ? `≤ ${ask.amountSpecific}`
-      : (ask.amountMin != null || ask.amountMax != null) ? `${ask.amountMin ?? '…'}–${ask.amountMax ?? '…'}`
-      : (ask.termYears != null || ask.termMonths != null) ? fmtDuration(ask.termYears, ask.termMonths)
-      : null;
-    return fallback ? { askText: fallback, met: null, badge: null } : null;
+    return { askText: text, met: v.met, badge: v.met ? t('capture.evalMet') : t('capture.evalNotMet') };
   };
 
   const renderAskLine = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }) => {

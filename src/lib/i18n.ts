@@ -974,6 +974,26 @@ const translations = {
     sv: 'mån',
     de: 'Mon.',
   },
+  // Ask-delivery dashboard card (2026-07-02, slice 4). "What matters" wording
+  // follows the canonical term.
+  'dashboard.askDeliveryTitle': {
+    en: 'Delivery on what matters',
+    da: 'Levering på hvad betyder noget',
+    sv: 'Leverans på vad är viktigt',
+    de: 'Lieferung auf das, was wichtig ist',
+  },
+  'dashboard.askDeliveryHint': {
+    en: 'Cases where both the customer’s ask and the decision’s delivered value were captured.',
+    da: 'Sager hvor både kundens ønske og beslutningens leverede værdi er registreret.',
+    sv: 'Ärenden där både kundens önskemål och beslutets levererade värde har registrerats.',
+    de: 'Fälle, in denen sowohl der Kundenwunsch als auch der gelieferte Wert der Entscheidung erfasst wurden.',
+  },
+  'dashboard.askAvgDeviation': {
+    en: 'Avg deviation',
+    da: 'Gns. afvigelse',
+    sv: 'Snitt avvikelse',
+    de: 'Ø Abweichung',
+  },
   // Small category dividers in the green customer-context box (flow capture).
   // Canonical Vanguard terms sourced from the glossary / existing keys.
   'capture.valueDemandHeader': {
