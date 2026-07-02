@@ -277,6 +277,27 @@ export const caseWhatMatters = pgTable('case_what_matters', {
   uniqCaseWm: unique('case_what_matters_unique').on(t.caseId, t.whatMattersTypeId),
 }));
 
+// Case-level multi-select for life problems (P2BS) and value demands (2026-07-02).
+// A case can carry several of each. The single cases.lifeProblemId /
+// cases.demandTypeId columns stay as the "primary" (first-selected, earliest by
+// row id) so dashboards + CSV export keep working unchanged; these junctions
+// hold the full set the flow capture green box shows. Mirror caseWhatMatters.
+export const caseLifeProblems = pgTable('case_life_problems', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  lifeProblemId: text('life_problem_id').notNull().references(() => lifeProblems.id),
+}, (t) => ({
+  uniqCaseLp: unique('case_life_problems_unique').on(t.caseId, t.lifeProblemId),
+}));
+
+export const caseDemandTypes = pgTable('case_demand_types', {
+  id: text('id').primaryKey(),
+  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
+  demandTypeId: text('demand_type_id').notNull().references(() => demandTypes.id),
+}, (t) => ({
+  uniqCaseDt: unique('case_demand_types_unique').on(t.caseId, t.demandTypeId),
+}));
+
 // Milestones (2026-06-18). An ordered container layer ABOVE decision points:
 // a mortgage journey runs through milestones (e.g. milestone 1 wraps the
 // person/property/value decisions; later ones lead to "completion / funds

@@ -778,6 +778,20 @@ const translations = {
     sv: 'Livsproblem som ska l\u00f6sas',
     de: 'Zu l\u00f6sendes Lebensproblem',
   },
+  // Short acronym form for the compact green-box section header (kept identical
+  // across languages, like the VS/IVS abbreviations).
+  'capture.lp2bs': {
+    en: 'LP2BS',
+    da: 'LP2BS',
+    sv: 'LP2BS',
+    de: 'LP2BS',
+  },
+  'capture.remove': {
+    en: 'Remove',
+    da: 'Fjern',
+    sv: 'Ta bort',
+    de: 'Entfernen',
+  },
   // Small category dividers in the green customer-context box (flow capture).
   // Canonical Vanguard terms sourced from the glossary / existing keys.
   'capture.valueDemandHeader': {

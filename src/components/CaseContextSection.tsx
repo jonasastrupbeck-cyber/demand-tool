@@ -19,7 +19,9 @@ import InlineTypeAdder from '@/components/InlineTypeAdder';
 interface Props {
   code: string;
   contextSituation: string | null;
-  lifeProblemId: string | null;
+  // Multi-select (2026-07-02): a case can carry several life problems / value
+  // demands. The picker adds pills; each is removable.
+  lifeProblemIds: string[];
   whatMatters: string | null;
   whatMattersTypeIds: string[];
   /** Per-'by_date' what-matters target dates on this case (typeId → ISO date). */
@@ -29,14 +31,14 @@ interface Props {
   // Value demand (2026-06-12): in flow mode the demand the customer places on
   // the system lives here, right below the life problem it flows from — the
   // Vanguard causal order (life problem → value demand). Patched on the case.
-  demandTypeId: string | null;
+  demandTypeIds: string[];
   valueDemandTypes: { id: string; label: string; operationalDefinition: string | null }[];
   onPatch: (body: Record<string, unknown>) => void;
   /** Refresh study taxonomies after an inline add. */
   onTypesChanged?: () => Promise<void> | void;
 }
 
-export default function CaseContextSection({ code, contextSituation, lifeProblemId, whatMatters, whatMattersTypeIds, whatMattersTargetDates, lifeProblems, whatMattersTypes, demandTypeId, valueDemandTypes, onPatch, onTypesChanged }: Props) {
+export default function CaseContextSection({ code, contextSituation, lifeProblemIds, whatMatters, whatMattersTypeIds, whatMattersTargetDates, lifeProblems, whatMattersTypes, demandTypeIds, valueDemandTypes, onPatch, onTypesChanged }: Props) {
   const { t, tl } = useLocale();
 
   // Local draft for the free-text fields; saved on blur. Re-sync when another
@@ -89,6 +91,51 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
     </div>
   );
 
+  // Multi-select picker (2026-07-02): selected types render as removable green
+  // pills; a trailing PillSelect adds another (its dropdown lists the not-yet-
+  // selected types + an inline "+ create"). Picking or creating appends the id;
+  // the × removes it. The trailing pill shrinks to a bare "+" once one is chosen.
+  const renderMultiPicker = (opts: {
+    selectedIds: string[];
+    allTypes: { id: string; label: string; operationalDefinition: string | null }[];
+    placeholder: string;
+    ariaLabel: string;
+    addNewLabel: string;
+    patchKey: 'lifeProblemIds' | 'demandTypeIds';
+    apiPath: string;
+    extraBody?: Record<string, unknown>;
+  }) => {
+    const { selectedIds, allTypes, placeholder, ariaLabel, addNewLabel, patchKey, apiPath, extraBody } = opts;
+    const byId = new Map(allTypes.map((tp) => [tp.id, tp]));
+    const add = (id: string) => { if (id && !selectedIds.includes(id)) onPatch({ [patchKey]: [...selectedIds, id] }); };
+    const remove = (id: string) => onPatch({ [patchKey]: selectedIds.filter((x) => x !== id) });
+    const unselected = allTypes.filter((tp) => !selectedIds.includes(tp.id));
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {selectedIds.map((id) => {
+          const tp = byId.get(id);
+          return (
+            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-green-600 text-white border border-green-600 text-[11px] font-medium pl-2 pr-1 py-0.5">
+              <span className="min-w-0 break-words">{tp ? tl(tp.label) : '—'}</span>
+              <button type="button" onClick={() => remove(id)} aria-label={t('capture.remove')} className="shrink-0 leading-none text-white/80 hover:text-white">×</button>
+            </span>
+          );
+        })}
+        <PillSelect
+          ariaLabel={ariaLabel}
+          placeholder={selectedIds.length > 0 ? '+' : placeholder}
+          value=""
+          onChange={add}
+          options={unselected.map((tp) => ({ id: tp.id, label: tl(tp.label), operationalDefinition: tp.operationalDefinition ? tl(tp.operationalDefinition) : null }))}
+          variant="valueLight"
+          onCreate={(label) => createType(apiPath, extraBody ? { label, ...extraBody } : { label })}
+          addNewLabel={addNewLabel}
+          compact
+        />
+      </div>
+    );
+  };
+
   return (
     <div className="mt-2 space-y-2">
       {/* P2BS — the life problem the case exists to solve, the ROOT need.
@@ -96,20 +143,16 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           family") and BECAUSE of it places a value demand on the system.
           Green strand; reuses the canonical lifeProblem copy. */}
       <div className="space-y-1">
-        {sectionHeader(t('capture.lifeProblemLabel'))}
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <PillSelect
-            ariaLabel={t('capture.lifeProblemLabel')}
-            placeholder={t('capture.lifeProblemPlaceholder')}
-            value={lifeProblemId || ''}
-            onChange={(id) => onPatch({ lifeProblemId: id || null })}
-            options={lifeProblems.map((lp) => ({ id: lp.id, label: tl(lp.label), operationalDefinition: lp.operationalDefinition ? tl(lp.operationalDefinition) : null }))}
-            variant={lifeProblemId ? 'value' : 'valueLight'}
-            onCreate={(label) => createType('life-problems', { label })}
-            addNewLabel={t('capture.lifeProblemLabel')}
-            compact
-          />
-        </div>
+        {sectionHeader(t('capture.lp2bs'))}
+        {renderMultiPicker({
+          selectedIds: lifeProblemIds,
+          allTypes: lifeProblems,
+          placeholder: t('capture.lifeProblemPlaceholder'),
+          ariaLabel: t('capture.lifeProblemLabel'),
+          addNewLabel: t('capture.lifeProblemLabel'),
+          patchKey: 'lifeProblemIds',
+          apiPath: 'life-problems',
+        })}
       </div>
 
       {/* Value demand — what the customer places on the system BECAUSE of the
@@ -118,19 +161,16 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
       {valueDemandTypes.length > 0 && (
         <div className="space-y-1">
           {sectionHeader(t('capture.valueDemandHeader'))}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <PillSelect
-              ariaLabel={t('capture.customerDemandTypePlaceholder')}
-              placeholder={t('capture.customerDemandTypePlaceholder')}
-              value={demandTypeId || ''}
-              onChange={(id) => onPatch({ demandTypeId: id || null })}
-              options={valueDemandTypes.map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition ? tl(dt.operationalDefinition) : null }))}
-              variant={demandTypeId ? 'value' : 'valueLight'}
-              onCreate={(label) => createType('demand-types', { label, category: 'value' })}
-              addNewLabel={t('capture.valueDemandHeader')}
-              compact
-            />
-          </div>
+          {renderMultiPicker({
+            selectedIds: demandTypeIds,
+            allTypes: valueDemandTypes,
+            placeholder: t('capture.customerDemandTypePlaceholder'),
+            ariaLabel: t('capture.customerDemandTypePlaceholder'),
+            addNewLabel: t('capture.valueDemandHeader'),
+            patchKey: 'demandTypeIds',
+            apiPath: 'demand-types',
+            extraBody: { category: 'value' },
+          })}
         </div>
       )}
 

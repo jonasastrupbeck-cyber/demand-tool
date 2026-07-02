@@ -31,6 +31,10 @@ interface CaseRow {
   // Flow-mode person context (slice B).
   contextSituation: string | null;
   lifeProblemId: string | null;
+  // Multi-select sets (2026-07-02); lifeProblemId/demandTypeId above stay as the
+  // primary (first) for the summary row + dashboards.
+  lifeProblemIds?: string[];
+  demandTypeIds?: string[];
   whatMatters: string | null;
 }
 
@@ -879,13 +883,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           <CaseContextSection
             code={code}
             contextSituation={caseRow.contextSituation}
-            lifeProblemId={caseRow.lifeProblemId}
+            lifeProblemIds={caseRow.lifeProblemIds ?? []}
             whatMatters={caseRow.whatMatters}
             whatMattersTypeIds={wmIds}
             whatMattersTargetDates={wmTargetDates}
             lifeProblems={lifeProblems}
             whatMattersTypes={whatMattersTypes}
-            demandTypeId={caseRow.demandTypeId}
+            demandTypeIds={caseRow.demandTypeIds ?? []}
             valueDemandTypes={valueDemandTypes}
             onPatch={patchCase}
             onTypesChanged={onTypesChanged}

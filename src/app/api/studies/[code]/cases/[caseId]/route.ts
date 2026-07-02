@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, getCaseDecisions, getCaseMilestones } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, getCaseDecisions, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -21,13 +21,15 @@ export async function GET(
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
 
-  const [entries, wmRows, decisions, milestones] = await Promise.all([
+  const [entries, wmRows, decisions, milestones, lifeProblemIds, demandTypeIds] = await Promise.all([
     getCaseEntries(caseId),
     getCaseWhatMatters(caseId),
     getCaseDecisions(caseId),
     getCaseMilestones(caseId),
+    getCaseLifeProblemIds(caseId),
+    getCaseDemandTypeIds(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), decisions, milestones });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), decisions, milestones, lifeProblemIds, demandTypeIds });
 }
 
 export async function PATCH(
@@ -82,6 +84,18 @@ export async function PATCH(
     }
     data.whatMattersTypeIds = body.whatMattersTypeIds;
   }
+  if (body.lifeProblemIds !== undefined) {
+    if (!Array.isArray(body.lifeProblemIds) || !body.lifeProblemIds.every((x: unknown) => typeof x === 'string')) {
+      return NextResponse.json({ error: 'lifeProblemIds must be an array of ids' }, { status: 400 });
+    }
+    data.lifeProblemIds = body.lifeProblemIds;
+  }
+  if (body.demandTypeIds !== undefined) {
+    if (!Array.isArray(body.demandTypeIds) || !body.demandTypeIds.every((x: unknown) => typeof x === 'string')) {
+      return NextResponse.json({ error: 'demandTypeIds must be an array of ids' }, { status: 400 });
+    }
+    data.demandTypeIds = body.demandTypeIds;
+  }
 
   // Set/clear the customer's wanted date for one 'by_date' what-matters type.
   // date === null (or '') clears it; a bad date string is rejected.
@@ -104,6 +118,11 @@ export async function PATCH(
 
   await updateCase(caseId, data);
   if (wmDate) await setCaseWhatMattersDate(caseId, wmDate.whatMattersTypeId, wmDate.date);
-  const [updated, wmRows] = await Promise.all([getCase(caseId), getCaseWhatMatters(caseId)]);
-  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows) });
+  const [updated, wmRows, lifeProblemIds, demandTypeIds] = await Promise.all([
+    getCase(caseId),
+    getCaseWhatMatters(caseId),
+    getCaseLifeProblemIds(caseId),
+    getCaseDemandTypeIds(caseId),
+  ]);
+  return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), lifeProblemIds, demandTypeIds });
 }

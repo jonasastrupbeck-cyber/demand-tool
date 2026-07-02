@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, decisionPointTypes, decisionOutcomeTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, caseDecisionPoints, milestones, caseMilestones, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1501,6 +1501,13 @@ export async function findOrCreateCase(studyId: string, caseRef: string, opts?: 
   }).onConflictDoNothing();
   const rows = await db.select().from(cases)
     .where(and(eq(cases.studyId, studyId), eq(cases.caseRef, ref)));
+  // Keep the value-demand junction in sync with the primary column seeded above,
+  // so a case created with a "big flow" shows it in the multi-select green box.
+  if (opts?.demandTypeId && rows[0]) {
+    await db.insert(caseDemandTypes)
+      .values({ id: generateId(), caseId: rows[0].id, demandTypeId: opts.demandTypeId })
+      .onConflictDoNothing();
+  }
   return rows[0];
 }
 
@@ -1519,6 +1526,10 @@ export async function getCases(studyId: string) {
     // C5 case-search table (2026-06-17): P2BS + What Matters so the entry screen
     // can show an overview (Account Number / P2BS / Demand / What Matters).
     lifeProblemId: cases.lifeProblemId,
+    // Multi-select sets (2026-07-02), ordered by junction id so the "first" is
+    // stable (earliest added) — matches the primary single column above.
+    lifeProblemIds: sql<string | null>`(select string_agg(clp.life_problem_id, ',' order by clp.id) from case_life_problems clp where clp.case_id = cases.id)`,
+    demandTypeIds: sql<string | null>`(select string_agg(cdt.demand_type_id, ',' order by cdt.id) from case_demand_types cdt where cdt.case_id = cases.id)`,
     whatMattersTypeIds: sql<string | null>`(select string_agg(cwm.what_matters_type_id, ',') from case_what_matters cwm where cwm.case_id = cases.id)`,
     status: cases.status,
     openedAt: cases.openedAt,
@@ -1609,6 +1620,11 @@ export async function updateCase(caseId: string, data: {
   lifeProblemId?: string | null;
   whatMatters?: string | null;
   whatMattersTypeIds?: string[];
+  // Multi-select life problems / value demands (2026-07-02). When provided, the
+  // junctions are diff-set and the primary single column above is synced to the
+  // first id (or null) so dashboards/export keep reading one value.
+  lifeProblemIds?: string[];
+  demandTypeIds?: string[];
 }) {
   const updateFields: Record<string, unknown> = {};
   if (data.demandTypeId !== undefined) updateFields.demandTypeId = data.demandTypeId;
@@ -1624,6 +1640,11 @@ export async function updateCase(caseId: string, data: {
   if (data.contextSituation !== undefined) updateFields.contextSituation = data.contextSituation;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;
+  // Sync the primary single columns to the first of each multi-select set so the
+  // P2BS dashboard filter / CSV export keep working off one value. Array wins
+  // over any single-field value passed in the same call.
+  if (data.lifeProblemIds !== undefined) updateFields.lifeProblemId = data.lifeProblemIds[0] ?? null;
+  if (data.demandTypeIds !== undefined) updateFields.demandTypeId = data.demandTypeIds[0] ?? null;
   if (Object.keys(updateFields).length > 0) {
     await db.update(cases).set(updateFields).where(eq(cases.id, caseId));
   }
@@ -1644,10 +1665,49 @@ export async function updateCase(caseId: string, data: {
       await db.insert(caseWhatMatters).values({ id: generateId(), caseId, whatMattersTypeId: wmtId });
     }
   }
+  // Same diff-set for the life-problem and value-demand junctions (2026-07-02).
+  if (data.lifeProblemIds !== undefined) {
+    const desired = new Set(data.lifeProblemIds);
+    const current = await db.select().from(caseLifeProblems).where(eq(caseLifeProblems.caseId, caseId));
+    const currentIds = new Set(current.map((r) => r.lifeProblemId));
+    for (const r of current) {
+      if (!desired.has(r.lifeProblemId)) await db.delete(caseLifeProblems).where(eq(caseLifeProblems.id, r.id));
+    }
+    for (const lpId of data.lifeProblemIds) {
+      if (currentIds.has(lpId)) continue;
+      await db.insert(caseLifeProblems).values({ id: generateId(), caseId, lifeProblemId: lpId });
+    }
+  }
+  if (data.demandTypeIds !== undefined) {
+    const desired = new Set(data.demandTypeIds);
+    const current = await db.select().from(caseDemandTypes).where(eq(caseDemandTypes.caseId, caseId));
+    const currentIds = new Set(current.map((r) => r.demandTypeId));
+    for (const r of current) {
+      if (!desired.has(r.demandTypeId)) await db.delete(caseDemandTypes).where(eq(caseDemandTypes.id, r.id));
+    }
+    for (const dtId of data.demandTypeIds) {
+      if (currentIds.has(dtId)) continue;
+      await db.insert(caseDemandTypes).values({ id: generateId(), caseId, demandTypeId: dtId });
+    }
+  }
 }
 
 export async function getCaseWhatMatters(caseId: string) {
   return db.select().from(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+}
+
+// Multi-select id arrays for a case's life problems / value demands, ordered by
+// junction id so the first is the stable "primary" (mirrors getCases ordering).
+export async function getCaseLifeProblemIds(caseId: string): Promise<string[]> {
+  const rows = await db.select({ id: caseLifeProblems.lifeProblemId }).from(caseLifeProblems)
+    .where(eq(caseLifeProblems.caseId, caseId)).orderBy(asc(caseLifeProblems.id));
+  return rows.map((r) => r.id);
+}
+
+export async function getCaseDemandTypeIds(caseId: string): Promise<string[]> {
+  const rows = await db.select({ id: caseDemandTypes.demandTypeId }).from(caseDemandTypes)
+    .where(eq(caseDemandTypes.caseId, caseId)).orderBy(asc(caseDemandTypes.id));
+  return rows.map((r) => r.id);
 }
 
 // Set (or clear) the customer's wanted date for one 'by_date' what-matters type
