@@ -66,6 +66,22 @@ export interface CaseDecisionValue {
   valueChoice: string | null;
 }
 
+// 2026-07-02 (slice 3): the case's structured ASK per what-matters type, used
+// to evaluate a linked capture field's delivered value against it. Shape
+// mirrors CaseContextSection's WmValue.
+export interface AskValue {
+  targetDate: string | null;
+  amountSpecific: number | null;
+  amountMin: number | null;
+  amountMax: number | null;
+  termYears: number | null;
+  termMonths: number | null;
+}
+export interface LinkedWhatMattersType {
+  id: string;
+  label: string;
+}
+
 export interface CaseDecision {
   id: string;
   decisionPointTypeId: string;
@@ -153,9 +169,13 @@ interface Props {
   // 2026-07-02: the case's current capture-field values (loaded back into the
   // form when reopening a decided decision).
   caseDecisionValues?: CaseDecisionValue[];
+  // 2026-07-02 (slice 3): the case's structured asks + type labels, so a
+  // linked field can show "asked vs delivered" with a met/not-met verdict.
+  whatMattersValues?: Record<string, AskValue>;
+  whatMattersTypes?: LinkedWhatMattersType[];
 }
 
-export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact', milestones = [], caseMilestones = [], caseDecisionValues = [] }: Props) {
+export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, decisions, collectorName, onChanged, variant = 'compact', milestones = [], caseMilestones = [], caseDecisionValues = [], whatMattersValues = {}, whatMattersTypes = [] }: Props) {
   const { t, tl } = useLocale();
 
   // The type whose mini-form is open; prefilled from its decision if decided.
@@ -302,6 +322,86 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
     );
   };
 
+  // --- Ask evaluation (2026-07-02, slice 3) -------------------------------
+  // A linked field shows the customer's ASK next to the delivered value with
+  // a met/not-met verdict, live as the consultant types. Rules (agreed):
+  //   amount   — met if delivered ≤ asked amount, or ≤ the range's upper end
+  //   date     — met if delivered on/before the asked date (days early/late)
+  //   duration — met when it matches the ask exactly; else signed difference
+  // Kind-incompatible pairs (e.g. duration ask vs date field) show the ask
+  // side-by-side without a verdict. No ask captured on this case → nothing.
+  const fmtDuration = (years: number | null, months: number | null) => {
+    const parts: string[] = [];
+    if (years != null && years !== 0) parts.push(`${years} ${t('capture.unitYearsShort')}`);
+    if (months != null && months !== 0) parts.push(`${months} ${t('capture.unitMonthsShort')}`);
+    return parts.length ? parts.join(' ') : `0 ${t('capture.unitYearsShort')}`;
+  };
+  const dayIndex = (iso: string) => Math.floor(new Date(iso.length <= 10 ? `${iso}T12:00:00.000Z` : iso).getTime() / 86_400_000);
+
+  type Verdict = { askText: string; met: boolean | null; badge: string | null };
+  const evaluateField = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }): Verdict | null => {
+    if (!f.linkedWhatMattersTypeId) return null;
+    const ask = whatMattersValues[f.linkedWhatMattersTypeId];
+    if (!ask) return null;
+
+    if (f.kind === 'amount' && (ask.amountSpecific != null || ask.amountMin != null || ask.amountMax != null)) {
+      const cap = ask.amountSpecific ?? ask.amountMax ?? null; // at-or-under rule
+      const askText = ask.amountSpecific != null
+        ? `≤ ${ask.amountSpecific}`
+        : `${ask.amountMin ?? '…'}–${ask.amountMax ?? '…'}`;
+      const delivered = parseFloat(d.num);
+      if (!Number.isFinite(delivered) || cap == null) return { askText, met: null, badge: null };
+      const met = delivered <= cap;
+      return { askText, met, badge: met ? t('capture.evalMet') : t('capture.evalNotMet') };
+    }
+    if (f.kind === 'date' && ask.targetDate) {
+      const askText = new Date(ask.targetDate).toLocaleDateString();
+      if (!d.date) return { askText, met: null, badge: null };
+      const diff = dayIndex(d.date) - dayIndex(ask.targetDate);
+      if (diff <= 0) {
+        return { askText, met: true, badge: diff === 0 ? t('capture.evalMet') : `${-diff} ${t('capture.evalDaysEarly')}` };
+      }
+      return { askText, met: false, badge: `${diff} ${t('capture.evalDaysLate')}` };
+    }
+    if (f.kind === 'duration' && (ask.termYears != null || ask.termMonths != null)) {
+      const askText = fmtDuration(ask.termYears, ask.termMonths);
+      const y = parseInt(d.years, 10);
+      const m = parseInt(d.months, 10);
+      if (!Number.isInteger(y) && !Number.isInteger(m)) return { askText, met: null, badge: null };
+      const deliveredMonths = (Number.isInteger(y) ? y : 0) * 12 + (Number.isInteger(m) ? m : 0);
+      const askedMonths = (ask.termYears ?? 0) * 12 + (ask.termMonths ?? 0);
+      const diff = deliveredMonths - askedMonths;
+      if (diff === 0) return { askText, met: true, badge: t('capture.evalMet') };
+      const sign = diff > 0 ? '+' : '−';
+      return { askText, met: false, badge: `${sign}${fmtDuration(Math.floor(Math.abs(diff) / 12), Math.abs(diff) % 12)}` };
+    }
+    // Ask exists but in a shape this field can't be compared against (e.g.
+    // duration ask vs date field): show the ask, no verdict.
+    const fallback = ask.targetDate ? new Date(ask.targetDate).toLocaleDateString()
+      : ask.amountSpecific != null ? `≤ ${ask.amountSpecific}`
+      : (ask.amountMin != null || ask.amountMax != null) ? `${ask.amountMin ?? '…'}–${ask.amountMax ?? '…'}`
+      : (ask.termYears != null || ask.termMonths != null) ? fmtDuration(ask.termYears, ask.termMonths)
+      : null;
+    return fallback ? { askText: fallback, met: null, badge: null } : null;
+  };
+
+  const renderAskLine = (f: DecisionCaptureField, d: { num: string; date: string; years: string; months: string; choice: string }) => {
+    const v = evaluateField(f, d);
+    if (!v) return null;
+    const wmLabel = whatMattersTypes.find((w) => w.id === f.linkedWhatMattersTypeId)?.label;
+    return (
+      <p className="text-[10px] leading-tight text-center">
+        <span className="text-gray-400">{t('capture.wmAskLabel')}{wmLabel ? ` (${tl(wmLabel)})` : ''}: </span>
+        <span className="text-gray-600">{v.askText}</span>
+        {v.badge && (
+          <span className={`ml-1 font-medium ${v.met ? 'text-green-700' : 'text-red-600'}`}>
+            {v.met ? '✓' : '✗'} {v.badge}
+          </span>
+        )}
+      </p>
+    );
+  };
+
   // Capture-field inputs (2026-07-02), rendered between the outcome pills and
   // the date/Save row while the form is active. Consultant guidance: model a
   // conditional set as flat fields — e.g. "agreed current deal" is TWO fields
@@ -351,6 +451,7 @@ export default function CaseDecisionPoints({ code, caseId, decisionPointTypes, d
                   })}
                 </div>
               )}
+              {renderAskLine(f, d)}
             </div>
           );
         })}

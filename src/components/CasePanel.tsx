@@ -365,6 +365,12 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         else delete next[whatMattersDate.whatMattersTypeId];
         return next;
       });
+      // Mirror into the structured-ask map too — the decision-side ask
+      // evaluation reads targetDate from wmValues (2026-07-02, slice 3).
+      setWmValues((prev) => {
+        const cur = prev[whatMattersDate.whatMattersTypeId] ?? { targetDate: null, amountSpecific: null, amountMin: null, amountMax: null, termYears: null, termMonths: null };
+        return { ...prev, [whatMattersDate.whatMattersTypeId]: { ...cur, targetDate: whatMattersDate.date } };
+      });
       // A date can also select the type; keep the pill in sync.
       if (whatMattersDate.date && !wmIds.includes(whatMattersDate.whatMattersTypeId)) {
         setWmIds([...wmIds, whatMattersDate.whatMattersTypeId]);
@@ -981,6 +987,8 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                     milestones={milestones}
                     caseMilestones={caseMilestones}
                     caseDecisionValues={decisionValues}
+                    whatMattersValues={wmValues}
+                    whatMattersTypes={whatMattersTypes}
                     collectorName={collectorName}
                     variant="overview"
                     onChanged={() => loadCase(caseRow.id)}

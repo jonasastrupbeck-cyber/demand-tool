@@ -931,6 +931,49 @@ const translations = {
     sv: 'Registreringsfält för beslutet',
     de: 'Erfassungsfelder der Entscheidung',
   },
+  // Ask evaluation on linked capture fields (2026-07-02, slice 3).
+  'capture.wmAskLabel': {
+    en: 'Asked',
+    da: 'Ønsket',
+    sv: 'Önskat',
+    de: 'Gewünscht',
+  },
+  'capture.evalMet': {
+    en: 'Met',
+    da: 'Opfyldt',
+    sv: 'Uppfyllt',
+    de: 'Erfüllt',
+  },
+  'capture.evalNotMet': {
+    en: 'Not met',
+    da: 'Ikke opfyldt',
+    sv: 'Ej uppfyllt',
+    de: 'Nicht erfüllt',
+  },
+  'capture.evalDaysEarly': {
+    en: 'days early',
+    da: 'dage før tid',
+    sv: 'dagar tidigt',
+    de: 'Tage früher',
+  },
+  'capture.evalDaysLate': {
+    en: 'days late',
+    da: 'dage for sent',
+    sv: 'dagar sent',
+    de: 'Tage später',
+  },
+  'capture.unitYearsShort': {
+    en: 'yr',
+    da: 'år',
+    sv: 'år',
+    de: 'J.',
+  },
+  'capture.unitMonthsShort': {
+    en: 'mo',
+    da: 'mdr.',
+    sv: 'mån',
+    de: 'Mon.',
+  },
   // Small category dividers in the green customer-context box (flow capture).
   // Canonical Vanguard terms sourced from the glossary / existing keys.
   'capture.valueDemandHeader': {
