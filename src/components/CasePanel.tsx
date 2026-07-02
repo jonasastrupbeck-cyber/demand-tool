@@ -19,7 +19,8 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
-import CaseDecisionPoints, { type CaseDecision, type DecisionPointType, type Milestone, type CaseMilestone, type CaseDecisionValue } from '@/components/CaseDecisionPoints';
+import { type DecisionPointType } from '@/components/CaseDecisionPoints';
+import CaseMilestones, { type MilestoneWithSubqs, type CaseMilestone, type CaseSubquestionAnswer } from '@/components/CaseMilestones';
 
 interface CaseRow {
   id: string;
@@ -83,8 +84,9 @@ interface Props {
   // Decision points (Skipton dotted box, 2026-06-12). Empty array hides the box.
   decisionPointsEnabled: boolean;
   decisionPointTypes: DecisionPointType[];
-  // Milestones (2026-06-18): ordered containers grouping the decision points.
-  milestones: Milestone[];
+  // Milestones (2026-06-18): ordered containers. Since 0042 each carries its
+  // subquestions (the flattened decision box).
+  milestones: MilestoneWithSubqs[];
   /** Tap a previous touch to open its full detail/edit window (2026-06-14). */
   onOpenEntry?: (id: string) => void;
   /** When false, CasePanel is a pure passthrough rendering only children —
@@ -103,7 +105,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, decisionPointTypes, milestones, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -116,8 +118,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const [wmTargetDates, setWmTargetDates] = useState<Record<string, string>>({});
   // Structured ask values per type (2026-07-02) + captured decision values.
   const [wmValues, setWmValues] = useState<Record<string, WmValue>>({});
-  const [decisionValues, setDecisionValues] = useState<CaseDecisionValue[]>([]);
-  const [decisions, setDecisions] = useState<CaseDecision[]>([]);
+  // Decision-box redesign (0042): milestone subquestion answers + derived
+  // completion cache rows.
+  const [subquestionAnswers, setSubquestionAnswers] = useState<CaseSubquestionAnswer[]>([]);
   const [caseMilestones, setCaseMilestones] = useState<CaseMilestone[]>([]);
   const [attaching, setAttaching] = useState(false);
   // Previous touches collapse to the latest by default; expand reveals history.
@@ -176,8 +179,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
     setWmTargetDates(data.whatMattersTargetDates && typeof data.whatMattersTargetDates === 'object' ? data.whatMattersTargetDates : {});
     setWmValues(data.whatMattersValues && typeof data.whatMattersValues === 'object' ? data.whatMattersValues : {});
-    setDecisionValues(Array.isArray(data.decisionValues) ? data.decisionValues : []);
-    setDecisions(Array.isArray(data.decisions) ? data.decisions : []);
+    setSubquestionAnswers(Array.isArray(data.subquestionAnswers) ? data.subquestionAnswers : []);
     setCaseMilestones(Array.isArray(data.milestones) ? data.milestones : []);
   }, [code]);
 
@@ -979,18 +981,17 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                   <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                     {t('capture.caseDecisionsHeading')}
                   </p>
-                  <CaseDecisionPoints
+                  <CaseMilestones
+                    key={caseRow.id}
                     code={code}
                     caseId={caseRow.id}
-                    decisionPointTypes={decisionPointTypes}
-                    decisions={decisions}
                     milestones={milestones}
+                    answers={subquestionAnswers}
                     caseMilestones={caseMilestones}
-                    caseDecisionValues={decisionValues}
                     whatMattersValues={wmValues}
                     whatMattersTypes={whatMattersTypes}
                     collectorName={collectorName}
-                    variant="overview"
+                    compact
                     onChanged={() => loadCase(caseRow.id)}
                   />
                 </div>

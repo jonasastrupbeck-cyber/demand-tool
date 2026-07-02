@@ -2111,7 +2111,7 @@ export async function getCaseSubquestionAnswers(caseId: string) {
 // whose completion the caller should recompute.
 export async function setCaseSubquestionAnswers(
   caseId: string,
-  answers: ({ subquestionId: string } & AnswerShape & { recordedByCollector?: string | null })[],
+  answers: ({ subquestionId: string } & AnswerShape & { recordedByCollector?: string | null; answeredAt?: Date | null })[],
 ): Promise<string[]> {
   if (answers.length === 0) return [];
   const ids = answers.map((a) => a.subquestionId);
@@ -2134,7 +2134,9 @@ export async function setCaseSubquestionAnswers(
         .where(and(eq(caseSubquestionAnswers.caseId, caseId), eq(caseSubquestionAnswers.subquestionId, a.subquestionId)));
       continue;
     }
-    const answeredAt = existingBySq.get(a.subquestionId)?.answeredAt ?? new Date();
+    // Freeze at first fill: keep an existing answer's date; a new answer takes
+    // the caller-supplied date (backdated capture) or now.
+    const answeredAt = existingBySq.get(a.subquestionId)?.answeredAt ?? a.answeredAt ?? new Date();
     await db.insert(caseSubquestionAnswers)
       .values({
         id: generateId(), caseId, subquestionId: a.subquestionId,

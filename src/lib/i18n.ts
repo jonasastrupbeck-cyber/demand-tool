@@ -3592,6 +3592,37 @@ const translations = {
     sv: 'Fäll ihop milstolpe',
     de: 'Meilenstein einklappen',
   },
+  // Decision-box redesign (0042).
+  'capture.milestoneCompletedOnLabel': {
+    en: 'Completed',
+    da: 'Fuldført',
+    sv: 'Slutförd',
+    de: 'Abgeschlossen am',
+  },
+  'capture.milestoneNoSubquestions': {
+    en: 'No fields to fill in yet',
+    da: 'Ingen felter at udfylde endnu',
+    sv: 'Inga fält att fylla i ännu',
+    de: 'Noch keine Felder auszufüllen',
+  },
+  'capture.closePromptTitle': {
+    en: 'This looks like a negative outcome — close this case?',
+    da: 'Det ligner et negativt udfald — luk denne sag?',
+    sv: 'Det här ser ut som ett negativt utfall — stäng det här ärendet?',
+    de: 'Das sieht nach einem negativen Ergebnis aus — diesen Fall schließen?',
+  },
+  'capture.closePromptConfirm': {
+    en: 'Close case',
+    da: 'Luk sag',
+    sv: 'Stäng ärende',
+    de: 'Fall schließen',
+  },
+  'capture.closePromptCancel': {
+    en: 'Keep open',
+    da: 'Hold åben',
+    sv: 'Håll öppet',
+    de: 'Offen lassen',
+  },
   'capture.flowEntryWork': {
     en: 'Work we did',
     da: 'Udført arbejde',

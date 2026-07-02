@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseDecisions, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseDecisionValues, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseDecisions, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseDecisionValues, getCaseSubquestionAnswers, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -40,7 +40,7 @@ export async function GET(
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
 
-  const [entries, wmRows, decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues] = await Promise.all([
+  const [entries, wmRows, decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues, subquestionAnswers] = await Promise.all([
     getCaseEntries(caseId),
     getCaseWhatMatters(caseId),
     getCaseDecisions(caseId),
@@ -48,8 +48,9 @@ export async function GET(
     getCaseLifeProblemIds(caseId),
     getCaseDemandTypeIds(caseId),
     getCaseDecisionValues(caseId),
+    getCaseSubquestionAnswers(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), decisions, milestones, lifeProblemIds, demandTypeIds, decisionValues, subquestionAnswers });
 }
 
 export async function PATCH(

@@ -109,7 +109,7 @@ interface StudyData {
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
   decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null; milestoneId?: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[] }[];
-  milestones: { id: string; label: string; sortOrder: number }[];
+  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[] }[] }[];
 }
 
 export default function CapturePage() {
