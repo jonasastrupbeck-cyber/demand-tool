@@ -850,10 +850,10 @@ const translations = {
     de: 'Systemzustand zum Hinzuf\u00fcgen w\u00e4hlen...',
   },
   'capture.addWorkBlockButton': {
-    en: '+ Add block',
-    da: '+ Tilf\u00f8j blok',
-    sv: '+ L\u00e4gg till block',
-    de: '+ Block hinzuf\u00fcgen',
+    en: '+ Add a step',
+    da: '+ Tilf\u00f8j et trin',
+    sv: '+ L\u00e4gg till ett steg',
+    de: '+ Schritt hinzuf\u00fcgen',
   },
   'capture.insertWorkBlock': {
     en: 'Insert step here',
@@ -3360,10 +3360,10 @@ const translations = {
     de: 'Frühere Kontakte',
   },
   'capture.caseComposerHeading': {
-    en: "What's happening now?",
-    da: 'Hvad sker der nu?',
-    sv: 'Vad händer nu?',
-    de: 'Was passiert jetzt?',
+    en: 'Work in this touch',
+    da: 'Arbejde i denne berøring',
+    sv: 'Arbete i denna kontakt',
+    de: 'Arbeit in diesem Kontakt',
   },
   // C5 (2026-06-17): heading over the frozen decision-milestone pane.
   'capture.caseDecisionsHeading': {

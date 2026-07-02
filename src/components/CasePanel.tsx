@@ -931,7 +931,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             })}
             {children && (
               <div ref={composerColRef} className="order-1 md:order-2 w-full md:w-fit md:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
-                <p className="text-sm font-semibold text-gray-900 mb-2 text-center">{t('capture.caseComposerHeading')}</p>
+                <p className="text-[10px] uppercase tracking-widest text-brand font-medium mb-1 px-1 text-center">{t('capture.caseComposerHeading')}</p>
                 {children}
               </div>
             )}
