@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations, decisionPointTypes, decisionCaptureFields, caseDecisionValues } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations, decisionPointTypes, decisionCaptureFields, caseDecisionValues, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -1099,34 +1099,34 @@ export async function getTouchSeries(
 export interface AskDeliveryRow {
   fieldId: string;
   fieldLabel: string;
-  decisionLabel: string;
+  decisionLabel: string; // the milestone label since 0042
   whatMattersTypeId: string;
   whatMattersLabel: string;
-  kind: 'amount' | 'date' | 'duration' | 'choice';
+  kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice';
   n: number;          // cases evaluated (ask + delivered value present)
   metCount: number;
-  notCaptured: number; // ask + recorded decision, but no usable delivered value
+  notCaptured: number; // ask + completed milestone, but no usable delivered value
   lateCount: number;  // date kind only: not-met cases
   avgDaysLate: number | null; // date kind only: mean days late among lateCount
   avgDiffMonths: number | null; // duration kind only: mean |diff| among not-met
 }
 
 export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<AskDeliveryRow[]> {
-  // Linked fields only — an unlinked field has no ask to evaluate against.
+  // Linked subquestions only — an unlinked one has no ask to evaluate against.
   const fields = await db
     .select({
-      id: decisionCaptureFields.id,
-      label: decisionCaptureFields.label,
-      kind: decisionCaptureFields.kind,
-      decisionPointTypeId: decisionCaptureFields.decisionPointTypeId,
-      linkedWhatMattersTypeId: decisionCaptureFields.linkedWhatMattersTypeId,
-      sortOrder: decisionCaptureFields.sortOrder,
-      decisionLabel: decisionPointTypes.label,
-      decisionSort: decisionPointTypes.sortOrder,
+      id: subquestions.id,
+      label: subquestions.label,
+      kind: subquestions.kind,
+      milestoneId: subquestions.milestoneId,
+      linkedWhatMattersTypeId: subquestions.linkedWhatMattersTypeId,
+      sortOrder: subquestions.sortOrder,
+      decisionLabel: milestones.label,
+      decisionSort: milestones.sortOrder,
     })
-    .from(decisionCaptureFields)
-    .innerJoin(decisionPointTypes, eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypes.id))
-    .where(and(eq(decisionPointTypes.studyId, studyId), isNotNull(decisionCaptureFields.linkedWhatMattersTypeId)));
+    .from(subquestions)
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(and(eq(milestones.studyId, studyId), isNotNull(subquestions.linkedWhatMattersTypeId)));
   if (fields.length === 0) return [];
 
   // P2BS scope: filter the case set by its primary life problem.
@@ -1137,26 +1137,27 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
   if (caseRows.length === 0) return [];
   const caseIds = caseRows.map((c) => c.id);
 
-  const dpTypeIds = [...new Set(fields.map((f) => f.decisionPointTypeId))];
+  const msIds = [...new Set(fields.map((f) => f.milestoneId))];
   const wmTypeIds = [...new Set(fields.map((f) => f.linkedWhatMattersTypeId!))];
 
-  // A value only counts while its decision is recorded (and in range).
-  const decisionConds = [inArray(caseDecisionPoints.caseId, caseIds), inArray(caseDecisionPoints.decisionPointTypeId, dpTypeIds)];
-  if (from) decisionConds.push(gte(caseDecisionPoints.decidedAt, from));
-  if (to) decisionConds.push(lte(caseDecisionPoints.decidedAt, to));
-  const decisionRows = await db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId })
-    .from(caseDecisionPoints).where(and(...decisionConds));
-  // Per decision point type: the cases with a recorded decision (in range).
-  const decidedCasesByType = new Map<string, string[]>();
-  for (const d of decisionRows) {
-    const list = decidedCasesByType.get(d.decisionPointTypeId) ?? [];
-    list.push(d.caseId);
-    decidedCasesByType.set(d.decisionPointTypeId, list);
+  // A value only counts while its MILESTONE is complete (and in range on
+  // reachedAt — the analogue of the old decision decidedAt).
+  const msConds = [inArray(caseMilestones.caseId, caseIds), inArray(caseMilestones.milestoneId, msIds)];
+  if (from) msConds.push(gte(caseMilestones.reachedAt, from));
+  if (to) msConds.push(lte(caseMilestones.reachedAt, to));
+  const msRows = await db.select({ caseId: caseMilestones.caseId, milestoneId: caseMilestones.milestoneId })
+    .from(caseMilestones).where(and(...msConds));
+  // Per milestone: the cases whose milestone is complete (in range).
+  const completedCasesByMs = new Map<string, string[]>();
+  for (const m of msRows) {
+    const list = completedCasesByMs.get(m.milestoneId) ?? [];
+    list.push(m.caseId);
+    completedCasesByMs.set(m.milestoneId, list);
   }
 
-  const valueRows = await db.select().from(caseDecisionValues)
-    .where(and(inArray(caseDecisionValues.caseId, caseIds), inArray(caseDecisionValues.fieldId, fields.map((f) => f.id))));
-  const valuesByCaseField = new Map(valueRows.map((v) => [`${v.caseId}:${v.fieldId}`, v]));
+  const valueRows = await db.select().from(caseSubquestionAnswers)
+    .where(and(inArray(caseSubquestionAnswers.caseId, caseIds), inArray(caseSubquestionAnswers.subquestionId, fields.map((f) => f.id))));
+  const valuesByCaseField = new Map(valueRows.map((v) => [`${v.caseId}:${v.subquestionId}`, v]));
   const askRows = await db.select().from(caseWhatMatters)
     .where(and(inArray(caseWhatMatters.caseId, caseIds), inArray(caseWhatMatters.whatMattersTypeId, wmTypeIds)));
   const asksByCaseType = new Map(askRows.map((a) => [`${a.caseId}:${a.whatMattersTypeId}`, a]));
@@ -1174,9 +1175,9 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
     let lateDaysSum = 0;
     let diffMonthsSum = 0;
     let diffMonthsN = 0;
-    // Iterate DECIDED cases (not value rows): a decision saved without any
-    // value row must still count — as notCaptured, when the ask exists.
-    for (const caseId of decidedCasesByType.get(f.decisionPointTypeId) ?? []) {
+    // Iterate COMPLETED-milestone cases: a milestone completed without a value
+    // for this subquestion still counts — as notCaptured, when the ask exists.
+    for (const caseId of completedCasesByMs.get(f.milestoneId) ?? []) {
       const ask = asksByCaseType.get(`${caseId}:${f.linkedWhatMattersTypeId}`);
       if (!ask) continue;
       const v = valuesByCaseField.get(`${caseId}:${f.id}`);
