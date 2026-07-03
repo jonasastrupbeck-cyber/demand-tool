@@ -115,6 +115,18 @@ interface StudyData {
   lifecycleStages: LifecycleStage[];
 }
 
+// Decision-box redesign (0042): ready-made choice subquestions a consultant can
+// drop onto a milestone. Labels are English starters (renameable per study);
+// options carry polarity only where an outcome is implied. Add on demand — none
+// are auto-seeded.
+type Preset = { key: string; label: string; options: { label: string; polarity?: 'positive' | 'negative' }[] };
+const PRESET_SUBQUESTIONS: Preset[] = [
+  { key: 'avm', label: 'AVM or Standard', options: [{ label: 'AVM' }, { label: 'Standard' }] },
+  { key: 'confidence', label: 'Confidence grade', options: ['A', 'B', 'C', 'D', 'E', 'U'].map((l) => ({ label: l })) },
+  { key: 'paymentDate', label: 'Payment date', options: ['1st', '11th', '12th', '15th', '20th', 'Last Working Day'].map((l) => ({ label: l })) },
+  { key: 'yesNo', label: 'Yes / No', options: [{ label: 'Yes', polarity: 'positive' }, { label: 'No', polarity: 'negative' }] },
+];
+
 export default function SettingsPage() {
   const params = useParams();
   const code = params.code as string;
@@ -149,9 +161,6 @@ export default function SettingsPage() {
   const [newWorkSource, setNewWorkSource] = useState('');
   // Decision points: which row has its milestone picker open (Move link).
   const [movingDpId, setMovingDpId] = useState<string | null>(null);
-  // "Captured as" choice for date_or_duration what-matters rows while UNLINKED
-  // (once linked, the field's kind is the source of truth). Default: duration.
-  const [wmCapturedAs, setWmCapturedAs] = useState<Record<string, 'date' | 'duration'>>({});
   // Capture-field add form (2026-07-02): one open at a time, keyed by DP id.
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [fieldAdderDpId, setFieldAdderDpId] = useState<string | null>(null);
@@ -162,6 +171,8 @@ export default function SettingsPage() {
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
   const [newSubqLabel, setNewSubqLabel] = useState('');
   const [newSubqKind, setNewSubqKind] = useState<'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'>('choice');
+  // Which milestone's preset menu is open (add a ready-made choice subquestion).
+  const [presetMenuMsId, setPresetMenuMsId] = useState<string | null>(null);
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -408,77 +419,17 @@ export default function SettingsPage() {
     }));
   }
 
-  // The delivered-value field a what-matters type is evaluated against: the
-  // FIRST capture field (across all decision points) linked to it. Manually
-  // created links surface here too; extra links on the same type are left alone.
-  function linkedFieldOf(wmId: string): { field: NonNullable<StudyData['decisionPointTypes'][number]['captureFields']>[number]; dpId: string } | null {
-    for (const dp of study?.decisionPointTypes ?? []) {
-      const field = (dp.captureFields ?? []).find((f) => f.linkedWhatMattersTypeId === wmId);
-      if (field) return { field, dpId: dp.id };
-    }
-    return null;
-  }
-
-  // "Evaluate against" (2026-07-02): manage the linked delivered-value field
-  // from the What Matters row. Link = create the field on the chosen decision
-  // (named after the category, renameable there); re-point = MOVE the field
-  // (case values survive); clear = DELETE the field incl. its case values
-  // (Settings taxonomy-fix philosophy). Server-authoritative: reload after.
-  async function setWmEvaluateAgainst(wm: StudyData['whatMattersTypes'][number], dpId: string | null, kind: 'amount' | 'date' | 'duration') {
-    const linked = linkedFieldOf(wm.id);
-    if (!dpId && !linked) return;
-    if (dpId && linked?.dpId === dpId) return;
-    if (linked && !dpId) {
-      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, { method: 'DELETE' });
-    } else if (linked && dpId) {
-      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decisionPointTypeId: dpId }),
-      });
-    } else if (dpId) {
-      await fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${dpId}/capture-fields`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: wm.label, kind, linkedWhatMattersTypeId: wm.id }),
-      });
-    }
-    await loadStudy();
-  }
-
-  // Kind is immutable per field, so switching a date_or_duration category's
-  // "captured as" (or changing its Ask-for while linked) RECREATES the linked
-  // field on the same decision with the new kind. Config-stage action: case
-  // values recorded on the old field go with it (same as unlink).
-  async function recreateLinkedField(wm: StudyData['whatMattersTypes'][number], kind: 'amount' | 'date' | 'duration') {
-    const linked = linkedFieldOf(wm.id);
-    if (!linked || linked.field.kind === kind) return;
-    await fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${linked.field.id}`, { method: 'DELETE' });
-    await fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${linked.dpId}/capture-fields`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: linked.field.label, kind, linkedWhatMattersTypeId: wm.id }),
-    });
-    await loadStudy();
-  }
-
   // Structured ask kind (2026-07-02): null = plain pill; 'amount' = specific or
   // range; 'date_or_duration' = end date or years+months. Non-timed types only.
+  // The delivered value it's evaluated against is now linked from the SUBQUESTION
+  // side (0042, "links to what matters" in the Milestones editor), not here.
   function setWhatMattersValueKind(id: string, kind: 'amount' | 'date_or_duration' | null) {
-    const wm = study?.whatMattersTypes.find((w) => w.id === id);
     setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, valueKind: kind } : w)) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ valueKind: kind }),
     }));
-    // Keep a linked delivered-value field's kind in step with the ask kind;
-    // clearing the ask kind removes the evaluation link (nothing to compare).
-    if (wm && linkedFieldOf(id)) {
-      if (kind === 'amount') void recreateLinkedField(wm, 'amount');
-      else if (kind === 'date_or_duration') void recreateLinkedField(wm, 'duration');
-      else void setWmEvaluateAgainst(wm, null, 'amount');
-    }
   }
 
   // Decision capture fields (2026-07-02) — optimistic, mirroring the outcome
@@ -551,6 +502,23 @@ export default function SettingsPage() {
       }),
       () => loadStudy(),
     );
+  }
+
+  // Drop a ready-made preset onto a milestone: create the choice subquestion,
+  // then its options (with any polarity), then reload so ids are real.
+  async function addPresetSubquestion(msId: string, preset: Preset) {
+    setPresetMenuMsId(null);
+    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${msId}/subquestions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: preset.label, kind: 'choice' }),
+    });
+    if (!res.ok) return;
+    const sq = await res.json();
+    for (const o of preset.options) {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sq.id}/options`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: o.label, polarity: o.polarity }),
+      });
+    }
+    await loadStudy();
   }
 
   function patchOption(msId: string, sqId: string, optId: string, patch: { label?: string; polarity?: 'positive' | 'negative' | null }) {
@@ -1606,13 +1574,39 @@ export default function SettingsPage() {
                       <button type="button" onClick={() => { setSubqAdderMsId(null); setNewSubqLabel(''); }} className="shrink-0 px-1 py-1 text-gray-400 hover:text-gray-600 text-sm">×</button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => { setSubqAdderMsId(m.id); setNewSubqLabel(''); setNewSubqKind('choice'); }}
-                      className="mt-1.5 px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
-                    >
-                      + {t('settings.addSubquestion')}
-                    </button>
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => { setSubqAdderMsId(m.id); setNewSubqLabel(''); setNewSubqKind('choice'); }}
+                        className="px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
+                      >
+                        + {t('settings.addSubquestion')}
+                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setPresetMenuMsId(presetMenuMsId === m.id ? null : m.id)}
+                          className="px-2 py-1 rounded text-xs text-gray-500 hover:text-gray-700 border border-dashed border-gray-300 hover:border-gray-400"
+                        >
+                          + {t('settings.addPreset')} ▾
+                        </button>
+                        {presetMenuMsId === m.id && (
+                          <div className="absolute z-10 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                            {PRESET_SUBQUESTIONS.map((p) => (
+                              <button
+                                key={p.key}
+                                type="button"
+                                onClick={() => void addPresetSubquestion(m.id, p)}
+                                className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                              >
+                                {p.label}
+                                <span className="text-gray-400"> · {p.options.map((o) => o.label).join(', ')}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1898,72 +1892,12 @@ export default function SettingsPage() {
                         </select>
                       </label>
                     )}
-                    {/* Evaluate against (2026-07-02): pick the decision that
-                        delivers on this ask — the delivered-value box on that
-                        decision is created/moved/removed automatically. Shown
-                        for comparable asks: the by_date standard type and any
-                        valueKind type. */}
-                    {(wm.timing === 'by_date' || (!wm.timing && wm.valueKind)) && (() => {
-                      const linked = linkedFieldOf(wm.id);
-                      const capturedAs: 'date' | 'duration' = linked && (linked.field.kind === 'date' || linked.field.kind === 'duration')
-                        ? linked.field.kind
-                        : (wmCapturedAs[wm.id] ?? 'duration');
-                      const deliveredKind: 'amount' | 'date' | 'duration' =
-                        wm.timing === 'by_date' ? 'date' : wm.valueKind === 'amount' ? 'amount' : capturedAs;
-                      return (
-                        <>
-                          <label className="flex items-center gap-1 text-xs text-gray-600">
-                            {t('settings.wmEvaluateAgainst')}
-                            <select
-                              value={linked?.dpId ?? ''}
-                              onChange={(e) => void setWmEvaluateAgainst(wm, e.target.value || null, deliveredKind)}
-                              className="max-w-[14rem] truncate px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                            >
-                              <option value="">—</option>
-                              {/* Decisions grouped under their milestone (same
-                                  visual language as the ASAP anchor select) so
-                                  they're findable in a milestone-structured
-                                  journey. A DECISION is always what's picked —
-                                  the milestone name is just the group label. */}
-                              {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => {
-                                const dps = (study.decisionPointTypes || []).filter((d) => d.milestoneId === m.id).sort((a, b) => a.sortOrder - b.sortOrder);
-                                return dps.length > 0 ? (
-                                  <optgroup key={m.id} label={`◇ ${m.label}`}>
-                                    {dps.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-                                  </optgroup>
-                                ) : null;
-                              })}
-                              {(() => {
-                                const unassigned = (study.decisionPointTypes || []).filter((d) => !d.milestoneId).sort((a, b) => a.sortOrder - b.sortOrder);
-                                return unassigned.length > 0 ? (
-                                  <optgroup label={t('settings.unassignedDecisions')}>
-                                    {unassigned.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-                                  </optgroup>
-                                ) : null;
-                              })()}
-                            </select>
-                          </label>
-                          {!wm.timing && wm.valueKind === 'date_or_duration' && (
-                            <label className="flex items-center gap-1 text-xs text-gray-600">
-                              {t('settings.wmCapturedAs')}
-                              <select
-                                value={capturedAs}
-                                onChange={(e) => {
-                                  const next = e.target.value as 'date' | 'duration';
-                                  setWmCapturedAs((prev) => ({ ...prev, [wm.id]: next }));
-                                  // Linked: the field's kind must follow (recreate).
-                                  if (linked) void recreateLinkedField(wm, next);
-                                }}
-                                className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                              >
-                                <option value="duration">{t('capture.wmModeDuration')}</option>
-                                <option value="date">{t('settings.captureFieldKindDate')}</option>
-                              </select>
-                            </label>
-                          )}
-                        </>
-                      );
-                    })()}
+                    {/* Delivery on this ask is now linked from the SUBQUESTION
+                        side (0042): in the Milestones section, set a subquestion's
+                        "links to what matters" to this type. */}
+                    {(wm.timing === 'by_date' || (!wm.timing && wm.valueKind)) && (
+                      <p className="text-[11px] text-gray-400 italic">{t('settings.wmEvaluateHint')}</p>
+                    )}
                   </div>
                 </li>
               ))}

@@ -3533,6 +3533,12 @@ const translations = {
     sv: 'Lägg till underfråga',
     de: 'Unterfrage hinzufügen',
   },
+  'settings.addPreset': {
+    en: 'Add preset',
+    da: 'Tilføj forudindstilling',
+    sv: 'Lägg till förval',
+    de: 'Vorlage hinzufügen',
+  },
   'settings.subquestionRequired': {
     en: 'Required',
     da: 'Påkrævet',
@@ -3586,6 +3592,12 @@ const translations = {
     da: 'Sidste milepæl — når den fuldføres, lukkes sagen',
     sv: 'Sista milstolpen — när den slutförs stängs ärendet',
     de: 'Letzter Meilenstein — sein Abschluss schließt den Fall',
+  },
+  'settings.wmEvaluateHint': {
+    en: 'To evaluate delivery, link a milestone subquestion to this in the Milestones section.',
+    da: 'For at vurdere leveringen skal du linke et milepæls-underspørgsmål til denne i Milepæle-afsnittet.',
+    sv: 'För att utvärdera leveransen, länka en milstolpe-underfråga till denna i Milstolpar-avsnittet.',
+    de: 'Um die Lieferung zu bewerten, verknüpfe im Abschnitt Meilensteine eine Unterfrage mit dieser Angabe.',
   },
   'settings.addMilestone': {
     en: 'Add milestone',
