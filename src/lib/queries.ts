@@ -1950,6 +1950,21 @@ export async function updateSubquestionOption(id: string, data: { label?: string
   if (data.polarity !== undefined) set.polarity = data.polarity;
   if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder;
   if (Object.keys(set).length === 0) return;
+  // Rename cascade: choice answers (value_choice) and branch triggers
+  // (subquestion_conditions.trigger_value) both store the option LABEL, so a
+  // rename must carry through to them — otherwise a saved answer would silently
+  // de-select and a wired branch would stop firing. Runs only on a real change.
+  if (data.label !== undefined) {
+    const cur = (await db.select().from(subquestionOptions).where(eq(subquestionOptions.id, id)))[0];
+    if (cur && cur.label !== data.label) {
+      await db.update(caseSubquestionAnswers)
+        .set({ valueChoice: data.label })
+        .where(and(eq(caseSubquestionAnswers.subquestionId, cur.subquestionId), eq(caseSubquestionAnswers.valueChoice, cur.label)));
+      await db.update(subquestionConditions)
+        .set({ triggerValue: data.label })
+        .where(and(eq(subquestionConditions.parentSubquestionId, cur.subquestionId), eq(subquestionConditions.triggerValue, cur.label)));
+    }
+  }
   await db.update(subquestionOptions).set(set).where(eq(subquestionOptions.id, id));
 }
 
