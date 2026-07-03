@@ -24,6 +24,16 @@ export async function PATCH(
   if (typeof body.label === 'string' && body.label.trim()) data.label = body.label.trim();
   if (typeof body.required === 'boolean') data.required = body.required;
   if (typeof body.sortOrder === 'number') data.sortOrder = body.sortOrder;
+  if (body.currencyCode === null) {
+    data.currencyCode = null;
+  } else if (typeof body.currencyCode === 'string') {
+    data.currencyCode = body.currencyCode || null;
+  }
+  if (body.formula === null) {
+    data.formula = null;
+  } else if (typeof body.formula === 'string') {
+    data.formula = body.formula.trim() || null;
+  }
   if (body.linkedWhatMattersTypeId === null) {
     data.linkedWhatMattersTypeId = null;
   } else if (typeof body.linkedWhatMattersTypeId === 'string' && body.linkedWhatMattersTypeId) {

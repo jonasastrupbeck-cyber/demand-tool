@@ -12,8 +12,9 @@
  */
 
 import { useLocale } from '@/lib/locale-context';
+import { formatCurrency, currencyForSubquestion, parseAmountLoose } from '@/lib/format-currency';
 
-export type SubquestionKind = 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice';
 export type OptionPolarity = 'positive' | 'negative' | null;
 
 export interface SubquestionOption {
@@ -23,6 +24,12 @@ export interface SubquestionOption {
   sortOrder: number;
 }
 
+export interface SubquestionCondition {
+  id: string;
+  parentSubquestionId: string;
+  triggerValue: string;
+}
+
 export interface Subquestion {
   id: string;
   milestoneId: string;
@@ -30,8 +37,11 @@ export interface Subquestion {
   kind: SubquestionKind;
   required: boolean;
   linkedWhatMattersTypeId: string | null;
+  currencyCode: string | null;
+  formula: string | null;
   sortOrder: number;
   options: SubquestionOption[];
+  conditions: SubquestionCondition[];
 }
 
 export interface Draft {
@@ -63,10 +73,12 @@ interface Props {
   compact?: boolean;
   /** Called when a negative-polarity choice option is picked (not deselected). */
   onNegativePick?: () => void;
+  /** For kind='calculated': the value computed by the caller from sibling drafts. */
+  computed?: string;
 }
 
-export default function SubquestionInput({ subquestion: sq, draft: d, onChange, compact = false, onNegativePick }: Props) {
-  const { t, tl } = useLocale();
+export default function SubquestionInput({ subquestion: sq, draft: d, onChange, compact = false, onNegativePick, computed }: Props) {
+  const { t, tl, locale } = useLocale();
   const inputCls = compact
     ? 'px-1.5 py-0.5 rounded text-[10px] text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none'
     : 'px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none';
@@ -82,6 +94,29 @@ export default function SubquestionInput({ subquestion: sq, draft: d, onChange, 
         <input type="number" value={d.num} onChange={(e) => onChange({ num: e.target.value })} aria-label={tl(sq.label)} className={`${inputCls} w-24`} />
       )}
 
+      {sq.kind === 'percent' && (
+        <div className="relative inline-flex items-center">
+          <input type="number" value={d.num} onChange={(e) => onChange({ num: e.target.value })} aria-label={tl(sq.label)} className={`${inputCls} w-24 pr-5`} />
+          <span className="pointer-events-none absolute right-2 text-gray-400 text-[11px]">%</span>
+        </div>
+      )}
+
+      {sq.kind === 'currency' && (() => {
+        const code = currencyForSubquestion(sq.currencyCode, locale);
+        const parsed = parseAmountLoose(d.num);
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="relative inline-flex items-center">
+              <input type="text" inputMode="decimal" value={d.num} onChange={(e) => onChange({ num: e.target.value })} aria-label={tl(sq.label)} className={`${inputCls} w-28 pr-8`} />
+              <span className="pointer-events-none absolute right-2 text-gray-400 text-[11px]">{code}</span>
+            </div>
+            {parsed != null && (
+              <span className="text-[10px] text-gray-500 tabular-nums">{formatCurrency(parsed, code, locale)}</span>
+            )}
+          </div>
+        );
+      })()}
+
       {sq.kind === 'date' && (
         <input type="date" value={d.date} onChange={(e) => onChange({ date: e.target.value })} aria-label={tl(sq.label)} className={inputCls} />
       )}
@@ -95,6 +130,12 @@ export default function SubquestionInput({ subquestion: sq, draft: d, onChange, 
 
       {sq.kind === 'text' && (
         <input type="text" value={d.text} onChange={(e) => onChange({ text: e.target.value })} aria-label={tl(sq.label)} className={`${inputCls} w-40`} />
+      )}
+
+      {sq.kind === 'calculated' && (
+        <output aria-label={tl(sq.label)} className={`${inputCls} w-24 text-center bg-gray-50 text-gray-600 tabular-nums`}>
+          {computed && computed !== '' ? computed : '—'}
+        </output>
       )}
 
       {sq.kind === 'choice' && (

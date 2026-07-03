@@ -378,10 +378,16 @@ export const subquestions = pgTable('subquestions', {
   id: text('id').primaryKey(),
   milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
-  kind: text('kind').$type<'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'>().notNull(),
+  kind: text('kind').$type<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>().notNull(),
   // Milestone completion = every REQUIRED subquestion answered.
   required: boolean('required').notNull().default(true),
   linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),
+  // Fixed currency code for kind='currency' (author-set; null = default from
+  // the study language at render). Ignored for every other kind.
+  currencyCode: text('currency_code'),
+  // Expression for kind='calculated' (references siblings by {sq:<id>}; see
+  // src/lib/formula.ts). Ignored for every other kind.
+  formula: text('formula'),
   sortOrder: integer('sort_order').notNull().default(0),
   // Provenance for the 0042 backfill (raw field id, or 'outcome:'/'willingness:'
   // /'ability:' + decision-point id). Null for subquestions created after.
@@ -397,6 +403,18 @@ export const subquestionOptions = pgTable('subquestion_options', {
   polarity: text('polarity').$type<'positive' | 'negative'>(),
   sortOrder: integer('sort_order').notNull().default(0),
 });
+
+// Conditional visibility (0050): a CHILD subquestion is shown only when its
+// PARENT choice-subquestion's answer equals one of the trigger option labels.
+// No rows for a child = always shown (back-compat). Multiple rows = OR.
+export const subquestionConditions = pgTable('subquestion_conditions', {
+  id: text('id').primaryKey(),
+  subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  parentSubquestionId: text('parent_subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  triggerValue: text('trigger_value').notNull(),
+}, (t) => ({
+  uniqCond: unique('subquestion_conditions_unique').on(t.subquestionId, t.parentSubquestionId, t.triggerValue),
+}));
 
 // One row per (case, subquestion). The value lives in the column matching the
 // subquestion's kind (amount/number → valueNumber, date → valueDate, duration →

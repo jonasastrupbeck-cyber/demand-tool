@@ -20,6 +20,9 @@ import { useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
+import { parseAmountLoose } from '@/lib/format-currency';
+import { evalFormula, type Resolved } from '@/lib/formula';
+import { visibleSubquestionIds } from '@/lib/subquestion-visibility';
 
 export interface MilestoneWithSubqs {
   id: string;
@@ -102,14 +105,43 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
 
   const completeByMilestone = new Map(caseMilestones.map((r) => [r.milestoneId, r]));
 
+  // Conditional visibility (0050): resolve live from current drafts across ALL
+  // milestones (a parent choice can gate a child on another milestone). Hidden
+  // subquestions are neither rendered nor sent on save (the server also clears
+  // any stale hidden answer).
+  const allSubqsFlat = milestones.flatMap((m) => m.subquestions);
+  const choiceBySubqId = new Map(allSubqsFlat.map((s) => [s.id, (drafts[s.id] ?? EMPTY_DRAFT).choice || null]));
+  const visibleIds = visibleSubquestionIds(allSubqsFlat.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
+
   // --- Save a milestone's answers (0042) ---------------------------------
   const parseNum = (s: string) => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
   const parseInt10 = (s: string) => { const n = parseInt(s, 10); return Number.isInteger(n) ? n : null; };
 
+  // Calculated subquestions derive their value from sibling drafts (see
+  // src/lib/formula.ts). Resolve refs case-wide; a `seen` set prevents a cyclic
+  // calculated→calculated reference from looping.
+  const subqById = new Map<string, Subquestion>();
+  for (const m of milestones) for (const sq of m.subquestions) subqById.set(sq.id, sq);
+  const computeCalc = (sq: Subquestion, seen: Set<string> = new Set()): number | null => {
+    if (!sq.formula || seen.has(sq.id)) return null;
+    const next = new Set(seen); next.add(sq.id);
+    const resolve = (id: string): Resolved => {
+      const s = subqById.get(id);
+      if (s && s.kind === 'calculated') return { number: computeCalc(s, next), years: null, months: null, date: null };
+      const dd = drafts[id] ?? EMPTY_DRAFT;
+      const num = s?.kind === 'currency' ? parseAmountLoose(dd.num) : parseNum(dd.num);
+      return { number: num, years: parseInt10(dd.years), months: parseInt10(dd.months), date: dd.date || null };
+    };
+    return evalFormula(sq.formula, resolve);
+  };
+  const fmtCalc = (v: number | null): string => v == null ? '' : (Number.isInteger(v) ? String(v) : (Math.round(v * 100) / 100).toString());
+
   function toAnswer(sq: Subquestion, d: Draft, answeredAt: string) {
     return {
       subquestionId: sq.id,
-      valueNumber: (sq.kind === 'amount' || sq.kind === 'number') ? parseNum(d.num) : null,
+      valueNumber: sq.kind === 'calculated' ? computeCalc(sq)
+        : sq.kind === 'currency' ? parseAmountLoose(d.num)
+        : (sq.kind === 'amount' || sq.kind === 'number' || sq.kind === 'percent') ? parseNum(d.num) : null,
       valueDate: sq.kind === 'date' && d.date ? `${d.date}T12:00:00.000Z` : null,
       valueYears: sq.kind === 'duration' ? parseInt10(d.years) : null,
       valueMonths: sq.kind === 'duration' ? parseInt10(d.months) : null,
@@ -123,7 +155,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
     if (savingId) return;
     setSavingId(m.id);
     const on = completedOn[m.id] ?? todayISO();
-    const answersPayload = m.subquestions.map((sq) => toAnswer(sq, drafts[sq.id] ?? EMPTY_DRAFT, on));
+    const answersPayload = m.subquestions.filter((sq) => visibleIds.has(sq.id)).map((sq) => toAnswer(sq, drafts[sq.id] ?? EMPTY_DRAFT, on));
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/answers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,14 +193,14 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
 
   const renderAskLine = (sq: Subquestion, d: Draft) => {
     if (!sq.linkedWhatMattersTypeId) return null;
-    // text/choice aren't comparable to a timed/amount ask; number compares like amount.
-    if (sq.kind === 'text' || sq.kind === 'choice') return null;
+    // text/choice/percent/calculated aren't comparable to a timed/amount ask; number compares like amount.
+    if (sq.kind === 'text' || sq.kind === 'choice' || sq.kind === 'percent' || sq.kind === 'calculated') return null;
     const ask = whatMattersValues[sq.linkedWhatMattersTypeId];
     if (!ask) return null;
     const text = askText(ask);
     if (!text) return null;
-    const vkind: CaptureKind = sq.kind === 'number' ? 'amount' : sq.kind;
-    const num = parseFloat(d.num);
+    const vkind: CaptureKind = (sq.kind === 'number' || sq.kind === 'currency') ? 'amount' : sq.kind;
+    const num = sq.kind === 'currency' ? parseAmountLoose(d.num) : parseFloat(d.num);
     const y = parseInt(d.years, 10);
     const mo = parseInt(d.months, 10);
     const v = askVerdict(vkind, ask, {
@@ -213,7 +245,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
       {ordered.map((m, idx) => {
         const rec = completeByMilestone.get(m.id);
         const complete = !!rec;
-        const subqs = [...m.subquestions].sort((a, b) => a.sortOrder - b.sortOrder);
+        const subqs = [...m.subquestions].filter((sq) => visibleIds.has(sq.id)).sort((a, b) => a.sortOrder - b.sortOrder);
         const defaultOpen = idx === firstIncompleteIdx;
         const isOpen = m.id in overrides ? overrides[m.id] : defaultOpen;
         const toggleOpen = (open: boolean) => setOverrides((o) => ({ ...o, [m.id]: open }));
@@ -255,6 +287,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
                   onChange={(patch) => setDraft(sq.id, patch)}
                   compact={compact}
                   onNegativePick={() => setClosePrompt(true)}
+                  computed={sq.kind === 'calculated' ? fmtCalc(computeCalc(sq)) : undefined}
                 />
                 {renderAskLine(sq, drafts[sq.id] ?? EMPTY_DRAFT)}
               </div>

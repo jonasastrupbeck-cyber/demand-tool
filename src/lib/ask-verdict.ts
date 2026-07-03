@@ -14,7 +14,7 @@
 
 // 0042: 'number' compares like 'amount' (at-or-under); 'text'/'choice' are not
 // comparable to a timed/amount ask.
-export type CaptureKind = 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice';
+export type CaptureKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice';
 
 export interface AskShape {
   targetDate: string | Date | null;
@@ -53,7 +53,7 @@ const dayIndex = (d: string | Date): number => {
 };
 
 export function askVerdict(kind: CaptureKind, ask: AskShape, delivered: DeliveredShape): AskVerdict {
-  if ((kind === 'amount' || kind === 'number') && (ask.amountSpecific != null || ask.amountMin != null || ask.amountMax != null)) {
+  if ((kind === 'amount' || kind === 'number' || kind === 'currency') && (ask.amountSpecific != null || ask.amountMin != null || ask.amountMax != null)) {
     const cap = ask.amountSpecific ?? ask.amountMax; // at-or-under rule
     if (cap == null) return { comparable: true, met: null, diffDays: null, diffMonths: null };
     if (delivered.valueNumber == null) return { comparable: true, met: null, diffDays: null, diffMonths: null };

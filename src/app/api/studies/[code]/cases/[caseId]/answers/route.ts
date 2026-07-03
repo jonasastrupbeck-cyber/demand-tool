@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getSubquestions, getCaseSubquestionAnswers, setCaseSubquestionAnswers, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
+import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
 
 // Decision-box redesign (0042): per-case subquestion answers. POST upserts a
 // batch of answers (full objects, blanks clear), then re-derives the completion
@@ -69,8 +69,16 @@ export async function POST(
   }
 
   const touched = await setCaseSubquestionAnswers(caseId, parsed);
-  for (const milestoneId of touched) await recomputeCaseMilestone(caseId, milestoneId);
-  // Completing the final milestone auto-closes the case (un-completing reopens).
-  if (touched.length > 0) await recomputeCaseClosure(caseId, study.id);
+  // Conditional visibility (0050): drop answers to now-hidden subquestions, then
+  // recompute EVERY milestone — a changed choice can hide/reveal children on
+  // other milestones, not just the directly-touched ones.
+  await clearHiddenCaseAnswers(caseId, study.id);
+  if (touched.length > 0) {
+    const visible = await getCaseVisibleSubquestionIds(caseId, study.id);
+    const allMs = await getMilestones(study.id);
+    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible);
+    // Completing the final milestone auto-closes the case (un-completing reopens).
+    await recomputeCaseClosure(caseId, study.id);
+  }
   return NextResponse.json(await getCaseSubquestionAnswers(caseId), { status: 201 });
 }

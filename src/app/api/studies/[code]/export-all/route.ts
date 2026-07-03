@@ -139,6 +139,11 @@ export async function GET(
     switch (kind) {
       case 'amount':
       case 'number': return a.valueNumber == null ? '' : String(a.valueNumber);
+      case 'percent': return a.valueNumber == null ? '' : `${a.valueNumber}%`;
+      // Currency: raw number so the sheet stays numeric-analysable; the code is
+      // exported in its own 'Currency' column below.
+      case 'currency': return a.valueNumber == null ? '' : String(a.valueNumber);
+      case 'calculated': return a.valueNumber == null ? '' : String(a.valueNumber);
       case 'date': return a.valueDate ? new Date(a.valueDate).toLocaleDateString() : '';
       case 'duration': return (a.valueYears == null && a.valueMonths == null) ? '' : `${a.valueYears ?? 0}y ${a.valueMonths ?? 0}m`;
       case 'choice': return a.valueChoice || '';
@@ -153,6 +158,7 @@ export async function GET(
       'Milestone': sq ? (msMap.get(sq.milestoneId) || '') : '',
       'Subquestion': sq ? sq.label : '',
       'Value': sq ? fmtAnswer(sq.kind, a) : '',
+      'Currency': sq && sq.kind === 'currency' ? (sq.currencyCode || '') : '',
       'Answered At': a.answeredAt ? new Date(a.answeredAt).toLocaleString() : '',
       'Recorded By': a.recordedByCollector || '',
     };

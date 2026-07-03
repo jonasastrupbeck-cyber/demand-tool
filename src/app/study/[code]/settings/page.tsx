@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
+import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
+import FormulaEditor from '@/components/FormulaEditor';
+import ConditionEditor from '@/components/ConditionEditor';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import InlineTypeAdder from '@/components/InlineTypeAdder';
@@ -105,7 +108,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -131,7 +134,7 @@ const PRESET_SUBQUESTIONS: Preset[] = [
 export default function SettingsPage() {
   const params = useParams();
   const code = params.code as string;
-  const { t, tl } = useLocale();
+  const { t, tl, locale } = useLocale();
 
   const [study, setStudy] = useState<StudyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,7 +167,7 @@ export default function SettingsPage() {
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
   const [newSubqLabel, setNewSubqLabel] = useState('');
-  const [newSubqKind, setNewSubqKind] = useState<'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'>('choice');
+  const [newSubqKind, setNewSubqKind] = useState<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>('choice');
   // Which milestone's preset menu is open (add a ready-made choice subquestion).
   const [presetMenuMsId, setPresetMenuMsId] = useState<string | null>(null);
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
@@ -431,11 +434,13 @@ export default function SettingsPage() {
   const patchMsSubqs = (msId: string, fn: (subs: StudyData['milestones'][number]['subquestions']) => StudyData['milestones'][number]['subquestions']) =>
     setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === msId ? { ...m, subquestions: fn(m.subquestions) } : m)) } : s));
 
-  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null }) {
+  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null }) {
     const clean: typeof patch = {};
     if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
     if (typeof patch.required === 'boolean') clean.required = patch.required;
     if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
+    if (patch.currencyCode !== undefined) clean.currencyCode = patch.currencyCode;
+    if (patch.formula !== undefined) clean.formula = patch.formula;
     if (Object.keys(clean).length === 0) return;
     patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, ...clean } : f)));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}`, {
@@ -1398,11 +1403,14 @@ export default function SettingsPage() {
           const kindLabel = (k: string) =>
             k === 'amount' ? t('settings.captureFieldKindAmount')
             : k === 'number' ? t('settings.subquestionKindNumber')
+            : k === 'percent' ? t('settings.subquestionKindPercent')
+            : k === 'currency' ? t('settings.subquestionKindCurrency')
+            : k === 'calculated' ? t('settings.subquestionKindCalculated')
             : k === 'date' ? t('settings.captureFieldKindDate')
             : k === 'duration' ? t('settings.captureFieldKindDuration')
             : k === 'text' ? t('settings.subquestionKindText')
             : t('settings.captureFieldKindChoice');
-          const canLink = (k: string) => k === 'amount' || k === 'number' || k === 'date' || k === 'duration';
+          const canLink = (k: string) => k === 'amount' || k === 'number' || k === 'currency' || k === 'date' || k === 'duration';
           const renderSubqRow = (msId: string, sq: StudyData['milestones'][number]['subquestions'][number]) => (
             <li key={sq.id} className="p-2 rounded-lg bg-white border border-gray-200 space-y-1.5">
               <div className="flex items-center gap-1.5">
@@ -1431,6 +1439,19 @@ export default function SettingsPage() {
                     >
                       <option value="">—</option>
                       {(study.whatMattersTypes || []).map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+                    </select>
+                  </label>
+                )}
+                {sq.kind === 'currency' && (
+                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                    {t('settings.subquestionCurrencyCode')}
+                    <select
+                      value={sq.currencyCode ?? ''}
+                      onChange={(e) => patchSubquestion(msId, sq.id, { currencyCode: e.target.value || null })}
+                      className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                    >
+                      <option value="">{LOCALE_CURRENCY[locale]}</option>
+                      {CURRENCY_CHOICES.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </label>
                 )}
@@ -1471,6 +1492,20 @@ export default function SettingsPage() {
                   />
                 </div>
               )}
+              {sq.kind === 'calculated' && (
+                <FormulaEditor
+                  initialFormula={sq.formula}
+                  siblings={(orderedMs.find((mm) => mm.id === msId)?.subquestions ?? []).filter((s) => s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, kind: s.kind }))}
+                  onSave={(f) => patchSubquestion(msId, sq.id, { formula: f })}
+                />
+              )}
+              <ConditionEditor
+                code={code}
+                sqId={sq.id}
+                conditions={sq.conditions}
+                parents={orderedMs.flatMap((mm) => mm.subquestions).filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
+                onRefresh={loadStudy}
+              />
             </li>
           );
           return (
@@ -1519,6 +1554,9 @@ export default function SettingsPage() {
                         <option value="choice">{t('settings.captureFieldKindChoice')}</option>
                         <option value="amount">{t('settings.captureFieldKindAmount')}</option>
                         <option value="number">{t('settings.subquestionKindNumber')}</option>
+                        <option value="percent">{t('settings.subquestionKindPercent')}</option>
+                        <option value="currency">{t('settings.subquestionKindCurrency')}</option>
+                        <option value="calculated">{t('settings.subquestionKindCalculated')}</option>
                         <option value="date">{t('settings.captureFieldKindDate')}</option>
                         <option value="duration">{t('settings.captureFieldKindDuration')}</option>
                         <option value="text">{t('settings.subquestionKindText')}</option>

@@ -1,5 +1,6 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, subquestions, subquestionOptions, subquestionConditions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1823,7 +1824,7 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
 // is a typed box under a milestone; choice options can carry polarity; filling
 // the required ones completes the milestone (recomputeCaseMilestone).
 
-export type SubquestionKind = 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice';
 export type OptionPolarity = 'positive' | 'negative';
 
 export interface AnswerShape {
@@ -1839,7 +1840,10 @@ export interface AnswerShape {
 export function answerIsFilled(kind: SubquestionKind, a: Partial<AnswerShape>): boolean {
   switch (kind) {
     case 'amount':
-    case 'number': return a.valueNumber != null;
+    case 'number':
+    case 'percent':
+    case 'currency':
+    case 'calculated': return a.valueNumber != null;
     case 'date': return a.valueDate != null;
     case 'duration': return a.valueYears != null || a.valueMonths != null;
     case 'text': return a.valueText != null && a.valueText.trim() !== '';
@@ -1859,6 +1863,8 @@ export async function getSubquestions(studyId: string) {
       kind: subquestions.kind,
       required: subquestions.required,
       linkedWhatMattersTypeId: subquestions.linkedWhatMattersTypeId,
+      currencyCode: subquestions.currencyCode,
+      formula: subquestions.formula,
       sortOrder: subquestions.sortOrder,
     })
     .from(subquestions)
@@ -1866,17 +1872,22 @@ export async function getSubquestions(studyId: string) {
     .where(eq(milestones.studyId, studyId))
     .orderBy(asc(subquestions.sortOrder));
   if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.id);
   const opts = await db.select().from(subquestionOptions)
-    .where(inArray(subquestionOptions.subquestionId, rows.map((r) => r.id)))
+    .where(inArray(subquestionOptions.subquestionId, ids))
     .orderBy(asc(subquestionOptions.sortOrder));
+  const conds = await db.select().from(subquestionConditions)
+    .where(inArray(subquestionConditions.subquestionId, ids));
   return rows.map((r) => ({
     ...r,
     options: opts.filter((o) => o.subquestionId === r.id)
       .map((o) => ({ id: o.id, label: o.label, polarity: o.polarity, sortOrder: o.sortOrder })),
+    conditions: conds.filter((c) => c.subquestionId === r.id)
+      .map((c) => ({ id: c.id, parentSubquestionId: c.parentSubquestionId, triggerValue: c.triggerValue })),
   }));
 }
 
-export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null }) {
+export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null }) {
   const existing = await db.select().from(subquestions).where(eq(subquestions.milestoneId, milestoneId));
   const row = {
     id: generateId(),
@@ -1885,6 +1896,8 @@ export async function addSubquestion(milestoneId: string, data: { label: string;
     kind: data.kind,
     required: data.required ?? true,
     linkedWhatMattersTypeId: data.linkedWhatMattersTypeId ?? null,
+    currencyCode: data.currencyCode ?? null,
+    formula: data.formula ?? null,
     sortOrder: existing.length,
     migratedFromFieldId: null,
   };
@@ -1895,11 +1908,13 @@ export async function addSubquestion(milestoneId: string, data: { label: string;
 // Kind is immutable after create (a subquestion's shape is fundamental; changing
 // it would strand typed case answers). Moving to another milestone is allowed —
 // case answers survive (keyed on case+subquestion).
-export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; sortOrder?: number; milestoneId?: string }) {
+export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; sortOrder?: number; milestoneId?: string }) {
   const set: Record<string, unknown> = {};
   if (data.label !== undefined) set.label = data.label;
   if (data.required !== undefined) set.required = data.required;
   if (data.linkedWhatMattersTypeId !== undefined) set.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
+  if (data.currencyCode !== undefined) set.currencyCode = data.currencyCode;
+  if (data.formula !== undefined) set.formula = data.formula;
   if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder;
   if (data.milestoneId !== undefined) {
     set.milestoneId = data.milestoneId;
@@ -1940,6 +1955,50 @@ export async function updateSubquestionOption(id: string, data: { label?: string
 
 export async function deleteSubquestionOption(id: string) {
   await db.delete(subquestionOptions).where(eq(subquestionOptions.id, id));
+}
+
+// ── Conditional visibility (0050) ────────────────────────────────────────────
+export async function addSubquestionCondition(subquestionId: string, parentSubquestionId: string, triggerValue: string) {
+  const row = { id: generateId(), subquestionId, parentSubquestionId, triggerValue };
+  await db.insert(subquestionConditions).values(row).onConflictDoNothing();
+  return row;
+}
+
+export async function deleteSubquestionCondition(id: string) {
+  await db.delete(subquestionConditions).where(eq(subquestionConditions.id, id));
+}
+
+export async function getSubquestionConditionsForSubquestion(subquestionId: string) {
+  return db.select().from(subquestionConditions).where(eq(subquestionConditions.subquestionId, subquestionId));
+}
+
+// Visible subquestion ids for a case: the study's subquestions (with their
+// conditions) resolved against the case's current choice answers, via the shared
+// pure rule. A subquestion with no conditions is always visible (back-compat).
+export async function getCaseVisibleSubquestionIds(caseId: string, studyId: string): Promise<Set<string>> {
+  const subqs = await getSubquestions(studyId);
+  const answers = await db.select({ subquestionId: caseSubquestionAnswers.subquestionId, valueChoice: caseSubquestionAnswers.valueChoice })
+    .from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
+  const choiceBySubqId = new Map(answers.map((a) => [a.subquestionId, a.valueChoice]));
+  return visibleSubquestionIds(subqs.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
+}
+
+// Delete any case answers whose subquestion is currently HIDDEN (a since-changed
+// parent), so a stale answer never lingers nor counts toward completion. Returns
+// the milestoneIds whose answers were cleared.
+export async function clearHiddenCaseAnswers(caseId: string, studyId: string): Promise<string[]> {
+  const subqs = await getSubquestions(studyId);
+  const visible = await getCaseVisibleSubquestionIds(caseId, studyId);
+  const answers = await db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
+  const msBySubq = new Map(subqs.map((s) => [s.id, s.milestoneId]));
+  const clearedMs = new Set<string>();
+  for (const a of answers) {
+    if (visible.has(a.subquestionId)) continue;
+    await db.delete(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.id, a.id));
+    const ms = msBySubq.get(a.subquestionId);
+    if (ms) clearedMs.add(ms);
+  }
+  return [...clearedMs];
 }
 
 export async function getCaseSubquestionAnswers(caseId: string) {
@@ -2001,7 +2060,7 @@ export async function setCaseSubquestionAnswers(
 // subquestion is answered; its reachedAt is the latest of those answers. Keeps
 // a derived=true case_milestones row in sync; never touches a derived=false
 // (legacy/manual) row. Returns whether the milestone is (now) complete.
-export async function recomputeCaseMilestone(caseId: string, milestoneId: string): Promise<boolean> {
+export async function recomputeCaseMilestone(caseId: string, milestoneId: string, visible?: Set<string>): Promise<boolean> {
   const reqRows = await db.select({ id: subquestions.id, kind: subquestions.kind })
     .from(subquestions)
     .where(and(eq(subquestions.milestoneId, milestoneId), eq(subquestions.required, true)));
@@ -2017,13 +2076,29 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
     return false;
   }
 
+  // Conditional visibility (0050): a required-but-HIDDEN subquestion does not
+  // gate — only currently-visible required subquestions must be answered.
+  let vis = visible;
+  if (!vis) {
+    const msRow = (await db.select({ studyId: milestones.studyId }).from(milestones).where(eq(milestones.id, milestoneId)))[0];
+    vis = msRow ? await getCaseVisibleSubquestionIds(caseId, msRow.studyId) : new Set<string>();
+  }
+  const visibleReq = reqRows.filter((r) => vis!.has(r.id));
+  // Every required subquestion is conditionally hidden for this case → there is
+  // nothing to gate on. Don't auto-complete an empty milestone (whole-milestone
+  // skipping by demand type is a separate concern — see Slice 5). Leave open.
+  if (visibleReq.length === 0) {
+    if (existing && existing.derived) await db.delete(caseMilestones).where(eq(caseMilestones.id, existing.id));
+    return false;
+  }
+
   const answers = await db.select().from(caseSubquestionAnswers)
-    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, reqRows.map((r) => r.id))));
+    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, visibleReq.map((r) => r.id))));
   const answerBySq = new Map(answers.map((a) => [a.subquestionId, a]));
 
   let allAnswered = true;
   let reachedAt: Date | null = null;
-  for (const r of reqRows) {
+  for (const r of visibleReq) {
     const a = answerBySq.get(r.id);
     if (!a || !answerIsFilled(r.kind as SubquestionKind, a)) { allAnswered = false; break; }
     if (reachedAt == null || a.answeredAt > reachedAt) reachedAt = a.answeredAt;
