@@ -257,6 +257,10 @@ export const cases = pgTable('cases', {
   status: text('status').$type<'open' | 'closed'>().notNull().default('open'),
   openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
   closedAt: timestamp('closed_at', { withTimezone: true }),
+  // 0043: why the case is closed — 'final_milestone' (auto, from completing the
+  // last milestone) vs 'manual' (an explicit human close). recomputeCaseClosure
+  // only reopens a case it closed itself ('final_milestone'), never a manual one.
+  closedReason: text('closed_reason').$type<'final_milestone' | 'manual'>(),
   note: text('note'),
   createdByCollector: text('created_by_collector'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),

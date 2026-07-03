@@ -1616,6 +1616,8 @@ export async function updateCase(caseId: string, data: {
   status?: 'open' | 'closed';
   openedAt?: Date;
   closedAt?: Date | null;
+  // 0043: defaults to 'manual' on an explicit close so recompute won't reopen it.
+  closedReason?: 'final_milestone' | 'manual' | null;
   note?: string | null;
   // Flow-mode person context (slice B).
   contextSituation?: string | null;
@@ -1635,9 +1637,14 @@ export async function updateCase(caseId: string, data: {
     // Closing stamps closedAt unless the caller supplies one; reopening clears it.
     if (data.status === 'closed' && data.closedAt === undefined) updateFields.closedAt = new Date();
     if (data.status === 'open' && data.closedAt === undefined) updateFields.closedAt = null;
+    // 0043: an explicit close is 'manual' unless the caller says otherwise (the
+    // auto-close from recomputeCaseClosure passes 'final_milestone'); reopening clears it.
+    if (data.status === 'closed' && data.closedReason === undefined) updateFields.closedReason = 'manual';
+    if (data.status === 'open' && data.closedReason === undefined) updateFields.closedReason = null;
   }
   if (data.openedAt !== undefined) updateFields.openedAt = data.openedAt;
   if (data.closedAt !== undefined) updateFields.closedAt = data.closedAt;
+  if (data.closedReason !== undefined) updateFields.closedReason = data.closedReason;
   if (data.note !== undefined) updateFields.note = data.note;
   if (data.contextSituation !== undefined) updateFields.contextSituation = data.contextSituation;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
@@ -2199,6 +2206,29 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
   }
   if (existing && existing.derived) await db.delete(caseMilestones).where(eq(caseMilestones.id, existing.id));
   return false;
+}
+
+// Implicit closure (0043): completing the FINAL milestone (highest sort_order in
+// the study) auto-closes the case; un-completing it reopens — but ONLY if the
+// case was auto-closed (closedReason='final_milestone'), never a manual close.
+export async function recomputeCaseClosure(caseId: string, studyId: string): Promise<void> {
+  const ms = await db.select({ id: milestones.id, sortOrder: milestones.sortOrder })
+    .from(milestones).where(eq(milestones.studyId, studyId))
+    .orderBy(desc(milestones.sortOrder));
+  const final = ms[0];
+  if (!final) return; // no milestones → nothing drives closure
+
+  const caseRow = (await db.select().from(cases).where(eq(cases.id, caseId)))[0];
+  if (!caseRow) return;
+
+  const finalDone = (await db.select().from(caseMilestones)
+    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, final.id))))[0];
+
+  if (finalDone && caseRow.status === 'open') {
+    await updateCase(caseId, { status: 'closed', closedAt: finalDone.reachedAt, closedReason: 'final_milestone' });
+  } else if (!finalDone && caseRow.status === 'closed' && caseRow.closedReason === 'final_milestone') {
+    await updateCase(caseId, { status: 'open' });
+  }
 }
 
 // --- Milestones (2026-06-18) — ordered containers above decision points ---

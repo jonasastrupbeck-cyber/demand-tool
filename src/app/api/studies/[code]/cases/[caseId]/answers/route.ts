@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getSubquestions, getCaseSubquestionAnswers, setCaseSubquestionAnswers, recomputeCaseMilestone } from '@/lib/queries';
+import { getStudyByCode, getCase, getSubquestions, getCaseSubquestionAnswers, setCaseSubquestionAnswers, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
 
 // Decision-box redesign (0042): per-case subquestion answers. POST upserts a
 // batch of answers (full objects, blanks clear), then re-derives the completion
@@ -70,5 +70,7 @@ export async function POST(
 
   const touched = await setCaseSubquestionAnswers(caseId, parsed);
   for (const milestoneId of touched) await recomputeCaseMilestone(caseId, milestoneId);
+  // Completing the final milestone auto-closes the case (un-completing reopens).
+  if (touched.length > 0) await recomputeCaseClosure(caseId, study.id);
   return NextResponse.json(await getCaseSubquestionAnswers(caseId), { status: 201 });
 }
