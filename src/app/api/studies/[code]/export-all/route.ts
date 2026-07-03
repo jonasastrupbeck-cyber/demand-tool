@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import {
   getStudyByCode, getCases, getEntries, getHandlingTypes, getDemandTypes,
   getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getLifeProblems,
-  getSystemConditions, getThinkings, getMilestones, getDecisionPointTypes, getWorkStepTypes,
+  getSystemConditions, getThinkings, getMilestones, getWorkStepTypes,
   getSubquestions,
   getWhatMattersForEntries, getSystemConditionsForEntries, getThinkingsForEntries, getWorkBlocksForEntries,
 } from '@/lib/queries';
@@ -26,12 +26,12 @@ export async function GET(
 
   const [
     cases, entries, hTypes, dTypes, cMethods, potTypes, wmTypes, lProblems,
-    scTypes, thTypes, msTypes, dpTypes, wsTypes,
+    scTypes, thTypes, msTypes, wsTypes,
   ] = await Promise.all([
     getCases(study.id), getEntries(study.id), getHandlingTypes(study.id), getDemandTypes(study.id),
     getContactMethods(study.id), getPointsOfTransaction(study.id), getWhatMattersTypes(study.id),
     getLifeProblems(study.id), getSystemConditions(study.id), getThinkings(study.id),
-    getMilestones(study.id), getDecisionPointTypes(study.id), getWorkStepTypes(study.id),
+    getMilestones(study.id), getWorkStepTypes(study.id),
   ]);
   const subqs = await getSubquestions(study.id);
   const sqById = new Map(subqs.map((s) => [s.id, s]));
@@ -46,7 +46,6 @@ export async function GET(
   const scMap = new Map(scTypes.map((s) => [s.id, s.label]));
   const thMap = new Map(thTypes.map((t) => [t.id, t.label]));
   const msMap = new Map(msTypes.map((m) => [m.id, m.label]));
-  const dpMap = new Map(dpTypes.map((d) => [d.id, d.label]));
   const wsMap = new Map(wsTypes.map((w) => [w.id, w.label]));
 
   // Resolve a capability event token to a readable label.
@@ -55,7 +54,6 @@ export async function GET(
     if (token === 'firstContact') return 'First contact';
     if (token === 'caseClose') return 'Case closed';
     if (token.startsWith('milestone:')) return msMap.get(token.slice('milestone:'.length)) || token;
-    if (token.startsWith('decision:')) return dpMap.get(token.slice('decision:'.length)) || token;
     return token;
   };
 

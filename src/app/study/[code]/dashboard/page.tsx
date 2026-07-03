@@ -96,7 +96,6 @@ export default function DashboardPage() {
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
   // Case list for the Touches-over-time scope selector.
   const [cases, setCases] = useState<{ id: string; caseRef: string }[]>([]);
-  const [decisionPointTypes, setDecisionPointTypes] = useState<{ id: string; label: string; sortOrder: number; milestoneId: string | null }[]>([]);
   const [milestones, setMilestones] = useState<{ id: string; label: string; sortOrder: number }[]>([]);
   const [whatMattersTypes, setWhatMattersTypes] = useState<{ id: string; label: string; sortOrder: number; timing: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null }[]>([]);
   // What-matters scope (flow): restrict every capability chart to cases that
@@ -178,7 +177,6 @@ export default function DashboardPage() {
         setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
         setLifeProblemsEnabled(s.lifeProblemsEnabled ?? false);
         setLifeProblems(Array.isArray(s.lifeProblems) ? s.lifeProblems : []);
-        setDecisionPointTypes(Array.isArray(s.decisionPointTypes) ? s.decisionPointTypes : []);
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         setWhatMattersTypes(Array.isArray(s.whatMattersTypes) ? s.whatMattersTypes : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -236,8 +234,8 @@ export default function DashboardPage() {
 
   // Capability: event options (fixed + milestones + decision points) for the
   // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
-  // decision:<id>, milestone:<id>).
-  const capabilityAvailable = caseTrackingEnabled && (decisionPointTypes.length > 0 || milestones.length > 0);
+  // milestone:<id>).
+  const capabilityAvailable = caseTrackingEnabled && milestones.length > 0;
   // R7: flow studies get a capability-only dashboard (demand widgets stripped).
   const isFlow = systemType === 'flow';
   // Synthesis (0028/0030): the "Synthesise" tab is available once the toggle is
@@ -248,7 +246,6 @@ export default function DashboardPage() {
   const flowAnalyticsAvailable = isFlow && flowAnalyticsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
     const ms = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => ({ id: `milestone:${m.id}`, label: `◇ ${tl(m.label)}` }));
-    const dp = [...decisionPointTypes].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => ({ id: `decision:${d.id}`, label: tl(d.label) }));
     // 'by_date' what-matters types add a target-date event (the customer's
     // wanted date). Pair it with a completion event + the "days early/late"
     // metric to measure whether we met the date.
@@ -258,7 +255,6 @@ export default function DashboardPage() {
     // with case opened + Lead time.
     const anchorLabel = (tok: string) => {
       if (tok.startsWith('milestone:')) { const m = milestones.find((x) => x.id === tok.slice('milestone:'.length)); return m ? `◇ ${tl(m.label)}` : '?'; }
-      if (tok.startsWith('decision:')) { const d = decisionPointTypes.find((x) => x.id === tok.slice('decision:'.length)); return d ? tl(d.label) : '?'; }
       return '?';
     };
     const wmAsap = whatMattersTypes
@@ -270,12 +266,11 @@ export default function DashboardPage() {
       { id: 'caseOpen', label: t('dashboard.evCaseOpened') },
       { id: 'firstContact', label: t('dashboard.evFirstContact') },
       ...ms,
-      ...dp,
       ...wm,
       ...wmAsap,
       { id: 'caseClose', label: t('dashboard.evCaseClosed') },
     ];
-  }, [milestones, decisionPointTypes, whatMattersTypes, t, tl]);
+  }, [milestones, whatMattersTypes, t, tl]);
 
   // R7: flow studies show only the capability view.
   useEffect(() => {

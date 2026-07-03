@@ -19,7 +19,6 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
-import { type DecisionPointType } from '@/components/CaseDecisionPoints';
 import CaseMilestones, { type MilestoneWithSubqs, type CaseMilestone, type CaseSubquestionAnswer } from '@/components/CaseMilestones';
 
 interface CaseRow {
@@ -81,9 +80,8 @@ interface Props {
    *  saved entry if it has no case yet — renders a one-tap attach chip. */
   unattachedLastEntryId: string | null;
   onAttachedLast?: (caseId: string) => void;
-  // Decision points (Skipton dotted box, 2026-06-12). Empty array hides the box.
+  // Decision box gate (Skipton, 2026-06-12). Off hides the milestone panel.
   decisionPointsEnabled: boolean;
-  decisionPointTypes: DecisionPointType[];
   // Milestones (2026-06-18): ordered containers. Since 0042 each carries its
   // subquestions (the flattened decision box).
   milestones: MilestoneWithSubqs[];

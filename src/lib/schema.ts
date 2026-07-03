@@ -334,127 +334,15 @@ export const milestones = pgTable('milestones', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
-// Decision points (Skipton dotted box, 2026-06-12). A per-study taxonomy —
-// NOT a hardcoded person/property/value enum — so the tool stays generic.
-// Each type carries its own outcome wording (Accept/Decline, £ accepted/
-// £ disputed, ...). The three mortgage points are seed data per locale.
-export const decisionPointTypes = pgTable('decision_point_types', {
-  id: text('id').primaryKey(),
-  studyId: text('study_id').notNull().references(() => studies.id),
-  label: text('label').notNull(),
-  positiveLabel: text('positive_label').notNull(),
-  negativeLabel: text('negative_label').notNull(),
-  sortOrder: integer('sort_order').notNull().default(0),
-  // C9 (2026-06-17): which sub-state template this milestone shows. 'person'
-  // adds the Willingness/Ability-to-Pay yes/no sub-states (the affordability
-  // gate before an Accept/Decline). Null = standard (outcome + cleanliness only).
-  kind: text('kind'),
-  // 2026-06-18: the milestone this decision point belongs to. Nullable so a
-  // point can be transiently unassigned in Settings; SET NULL on milestone
-  // delete (deleting a milestone keeps its decision points, just unassigns
-  // them — contrast caseDecisionPoints.decisionPointTypeId which cascades).
-  milestoneId: text('milestone_id').references(() => milestones.id, { onDelete: 'set null' }),
-});
-
-// Outcomes for a decision point (2026-07-01). A decision can be reached in more
-// than one way, and not all positives are equal: "money moved on the day" is
-// on-target (green); "moved early"/"moved late" still carry the case forward but
-// imperfectly (amber, the sequence-work tone); "didn't move" is negative (red).
-// `tone` drives colour AND polarity — on_target/variation are positive (advance
-// the case), negative is not. A per-study taxonomy child of decisionPointTypes:
-// deleting a point takes its outcomes with it. Migration 0039 seeds every
-// existing point with one on_target (= positiveLabel) + one negative
-// (= negativeLabel) outcome, so untouched points behave exactly as before.
-export const decisionOutcomeTypes = pgTable('decision_outcome_types', {
-  id: text('id').primaryKey(),
-  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(),
-  tone: text('tone').$type<'on_target' | 'variation' | 'negative'>().notNull(),
-  sortOrder: integer('sort_order').notNull().default(0),
-});
-
-// Capture fields on a decision point (2026-07-02): the DELIVERED values the
-// system agrees/produces at that decision — "Agreed monthly payment" (amount),
-// "Agreed mortgage term" (duration), "Current deal" (choice Fixed,Variable),
-// "Completion date on first CoT" (date). `linkedWhatMattersTypeId` closes the
-// loop to the customer's ASK (a structured what-matters value) so a later
-// slice can evaluate delivered vs asked. Kind is immutable after create (a
-// field's shape is fundamental; changing it would strand typed case values).
-// Cascade with the decision point; a deleted what-matters link SET NULLs.
-export const decisionCaptureFields = pgTable('decision_capture_fields', {
-  id: text('id').primaryKey(),
-  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
-  label: text('label').notNull(),
-  kind: text('kind').$type<'amount' | 'date' | 'duration' | 'choice'>().notNull(),
-  // Comma-separated option labels, only for kind='choice' (e.g. "Fixed,Variable").
-  choiceOptions: text('choice_options'),
-  linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),
-  sortOrder: integer('sort_order').notNull().default(0),
-});
-
-// One row per decided point per case; pending points simply have no row.
-// E2E time per point = decidedAt − cases.openedAt, always computed, never
-// stored. Cleanliness is captured HERE and only here (per Skipton req 7:
-// per-step dirtiness is too noisy — the decision point is the measure).
-// Type-FK cascades deliberately: deleting a decision-point type from
-// settings is a consultant taxonomy fix and takes its case records along.
-export const caseDecisionPoints = pgTable('case_decision_points', {
-  id: text('id').primaryKey(),
-  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
-  decisionPointTypeId: text('decision_point_type_id').notNull().references(() => decisionPointTypes.id, { onDelete: 'cascade' }),
-  outcome: text('outcome').$type<'positive' | 'negative'>().notNull(),
-  // 2026-07-01: which specific outcome (decisionOutcomeTypes) was chosen. Nullable
-  // — legacy rows fall back to `outcome` + the type's positive/negative label.
-  // SET NULL on outcome delete: retiring an outcome in Settings keeps the case
-  // record (its coarse positive/negative `outcome` above still stands).
-  decisionOutcomeTypeId: text('decision_outcome_type_id').references(() => decisionOutcomeTypes.id, { onDelete: 'set null' }),
-  // Clean/dirty capture was removed 2026-06-26 (migration 0035) — now optional.
-  // Existing rows keep their value; new decisions leave it null.
-  cleanliness: text('cleanliness').$type<'clean' | 'dirty'>(),
-  dirtyCause: text('dirty_cause'),
-  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
-  recordedByCollector: text('recorded_by_collector'),
-  // C9 (2026-06-17): affordability sub-states captured for 'person'-kind
-  // milestones. Nullable — only set when the type asks for them; legacy rows
-  // and other decision kinds stay null.
-  willingnessToPay: boolean('willingness_to_pay'),
-  abilityToPay: boolean('ability_to_pay'),
-}, (t) => ({
-  // Explicit short name (63-char identifier lesson, see 0019).
-  uniqCaseDp: unique('case_decision_points_unique').on(t.caseId, t.decisionPointTypeId),
-}));
-
-// Per-case values for a decision point's capture fields (2026-07-02). One row
-// per case per field; the value lives in the column matching the field's kind
-// (amount → valueNumber, date → valueDate, duration → valueYears+valueMonths,
-// choice → valueChoice). The setter writes all five columns from a full-object
-// upsert. Field-FK cascades: deleting a capture field in Settings takes its
-// case values along (same taxonomy-fix philosophy as decision-point delete).
-export const caseDecisionValues = pgTable('case_decision_values', {
-  id: text('id').primaryKey(),
-  caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
-  fieldId: text('field_id').notNull().references(() => decisionCaptureFields.id, { onDelete: 'cascade' }),
-  valueNumber: doublePrecision('value_number'),
-  valueDate: timestamp('value_date', { withTimezone: true }),
-  valueYears: integer('value_years'),
-  valueMonths: integer('value_months'),
-  valueChoice: text('value_choice'),
-}, (t) => ({
-  // Explicit short name (63-char identifier lesson, see 0019).
-  uniqCaseDv: unique('case_decision_values_unique').on(t.caseId, t.fieldId),
-}));
-
-// One row per achieved/not-achieved milestone per case (2026-06-18). The
-// milestone's OWN outcome, recorded explicitly and separately from the
-// decisions inside it. A 'not_achieved' outcome halts the journey and closes
-// the case (status closed, closedAt = reachedAt); 'achieved' / no row keeps it
-// open. reachedAt feeds the later "time between events" capability charts.
-// Both FKs cascade: deleting a case or a milestone type drops its records.
+// One row per COMPLETED milestone per case. Completion is derived (0042): a row
+// exists once every required subquestion is answered (see recomputeCaseMilestone);
+// reachedAt is the latest of those answers and feeds the capability charts.
+// `derived` marks a helper-owned row vs a frozen legacy completion. Both FKs
+// cascade: deleting a case or a milestone type drops its records.
 export const caseMilestones = pgTable('case_milestones', {
   id: text('id').primaryKey(),
   caseId: text('case_id').notNull().references(() => cases.id, { onDelete: 'cascade' }),
   milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
-  outcome: text('outcome').$type<'achieved' | 'not_achieved'>().notNull(),
   reachedAt: timestamp('reached_at', { withTimezone: true }).notNull(),
   recordedByCollector: text('recorded_by_collector'),
   // 0042 (decision-box redesign): milestone completion is now DERIVED from

@@ -104,7 +104,6 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; milestoneId: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[]; captureFields?: { id: string; label: string; kind: 'amount' | 'date' | 'duration' | 'choice'; choiceOptions: string | null; linkedWhatMattersTypeId: string | null; sortOrder: number }[] }[];
   milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
@@ -610,12 +609,8 @@ export default function SettingsPage() {
   }
 
   function removeMilestone(id: string) {
-    // Decision points fall back to unassigned (server SET NULL); mirror locally.
-    setStudy((s) => (s ? {
-      ...s,
-      milestones: s.milestones.filter((m) => m.id !== id),
-      decisionPointTypes: s.decisionPointTypes.map((d) => (d.milestoneId === id ? { ...d, milestoneId: null } : d)),
-    } : s));
+    // Its subquestions + their case answers cascade server-side.
+    setStudy((s) => (s ? { ...s, milestones: s.milestones.filter((m) => m.id !== id) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${id}`, { method: 'DELETE' }));
   }
 

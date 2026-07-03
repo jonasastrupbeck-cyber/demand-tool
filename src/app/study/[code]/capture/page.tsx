@@ -108,7 +108,6 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
-  decisionPointTypes: { id: string; label: string; positiveLabel: string; negativeLabel: string; sortOrder: number; kind?: string | null; milestoneId?: string | null; outcomes?: { id: string; label: string; tone: 'on_target' | 'variation' | 'negative'; sortOrder: number }[] }[];
   milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[] }[] }[];
 }
 
@@ -944,7 +943,6 @@ export default function CapturePage() {
         unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
-        decisionPointTypes={study.decisionPointTypes}
         milestones={study.milestones || []}
         onOpenEntry={(id) => setEditingEntryId(id)}
       >

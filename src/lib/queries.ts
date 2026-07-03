@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, decisionPointTypes, decisionOutcomeTypes, decisionCaptureFields, caseDecisionPoints, caseDecisionValues, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1755,42 +1755,7 @@ export async function setCaseWhatMattersValue(caseId: string, whatMattersTypeId:
   }
 }
 
-// --- Decision points (Skipton dotted box, 2026-06-12) ---
-
-export async function seedDefaultDecisionPointTypes(studyId: string, locale: Locale = 'en') {
-  const existing = await db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId));
-  if (existing.length > 0) return; // seed once, never duplicate
-  // Every decision point lives in a milestone (2026-06-18). A fresh study gets
-  // one default milestone wrapping the seeded decisions — same shape the 0026
-  // backfill gave existing studies.
-  const milestoneId = generateId();
-  await db.insert(milestones).values({ id: milestoneId, studyId, label: DEFAULT_MILESTONE_LABEL[locale], sortOrder: 0 });
-  const defaults = DEFAULT_DECISION_POINT_TYPES[locale];
-  for (let i = 0; i < defaults.length; i++) {
-    const dptId = generateId();
-    await db.insert(decisionPointTypes).values({
-      id: dptId,
-      studyId,
-      label: defaults[i].label,
-      positiveLabel: defaults[i].positiveLabel,
-      negativeLabel: defaults[i].negativeLabel,
-      sortOrder: i,
-      kind: defaults[i].kind ?? null,
-      milestoneId,
-    });
-    await seedDefaultDecisionOutcomes(dptId, defaults[i].positiveLabel, defaults[i].negativeLabel);
-  }
-}
-
-// A fresh decision point gets one on_target (green) + one negative (red)
-// outcome from its positive/negative labels — the same two-outcome shape the
-// 0039 migration seeds onto existing points, so new and old behave identically.
-async function seedDefaultDecisionOutcomes(decisionPointTypeId: string, positiveLabel: string, negativeLabel: string) {
-  await db.insert(decisionOutcomeTypes).values([
-    { id: generateId(), decisionPointTypeId, label: positiveLabel, tone: 'on_target', sortOrder: 0 },
-    { id: generateId(), decisionPointTypeId, label: negativeLabel, tone: 'negative', sortOrder: 1 },
-  ]);
-}
+// --- Milestone subquestions (decision-box redesign, 2026-07-02) ---
 
 // Decision-box redesign (0042): the new-study seed. Replaces
 // seedDefaultDecisionPointTypes — a fresh study gets one milestone with the
@@ -1823,198 +1788,6 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
       { id: generateId(), subquestionId: sqId, label: defaults[i].positiveLabel, polarity: 'positive', sortOrder: 0 },
       { id: generateId(), subquestionId: sqId, label: defaults[i].negativeLabel, polarity: 'negative', sortOrder: 1 },
     ]);
-  }
-}
-
-export async function getDecisionPointTypes(studyId: string) {
-  return db.select().from(decisionPointTypes).where(eq(decisionPointTypes.studyId, studyId)).orderBy(asc(decisionPointTypes.sortOrder));
-}
-
-export async function addDecisionPointType(studyId: string, label: string, positiveLabel: string, negativeLabel: string, milestoneId?: string | null) {
-  const id = generateId();
-  const existing = await getDecisionPointTypes(studyId);
-  const row = { id, studyId, label, positiveLabel, negativeLabel, sortOrder: existing.length, milestoneId: milestoneId ?? null };
-  await db.insert(decisionPointTypes).values(row);
-  await seedDefaultDecisionOutcomes(id, positiveLabel, negativeLabel);
-  return row;
-}
-
-export async function updateDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string; sortOrder?: number; kind?: string | null; milestoneId?: string | null }) {
-  const updateFields: Record<string, unknown> = {};
-  if (data.label !== undefined) updateFields.label = data.label;
-  if (data.positiveLabel !== undefined) updateFields.positiveLabel = data.positiveLabel;
-  if (data.negativeLabel !== undefined) updateFields.negativeLabel = data.negativeLabel;
-  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
-  if (data.kind !== undefined) updateFields.kind = data.kind;
-  if (data.milestoneId !== undefined) updateFields.milestoneId = data.milestoneId;
-  if (Object.keys(updateFields).length > 0) {
-    await db.update(decisionPointTypes).set(updateFields).where(eq(decisionPointTypes.id, id));
-  }
-}
-
-export async function deleteDecisionPointType(id: string) {
-  // case_decision_points rows cascade (deliberate; see schema comment).
-  await db.delete(decisionPointTypes).where(eq(decisionPointTypes.id, id));
-}
-
-// --- Decision outcomes (2026-07-01) — a decision point's list of possible
-// answers, each toned on_target (green) / variation (amber) / negative (red). ---
-
-export type OutcomeTone = 'on_target' | 'variation' | 'negative';
-
-// All outcomes across a study's decision points, ordered — the study payload
-// nests these under each decisionPointType.
-export async function getDecisionOutcomeTypes(studyId: string) {
-  return db
-    .select({
-      id: decisionOutcomeTypes.id,
-      decisionPointTypeId: decisionOutcomeTypes.decisionPointTypeId,
-      label: decisionOutcomeTypes.label,
-      tone: decisionOutcomeTypes.tone,
-      sortOrder: decisionOutcomeTypes.sortOrder,
-    })
-    .from(decisionOutcomeTypes)
-    .innerJoin(decisionPointTypes, eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypes.id))
-    .where(eq(decisionPointTypes.studyId, studyId))
-    .orderBy(asc(decisionOutcomeTypes.sortOrder));
-}
-
-// Keep the type's positive_label / negative_label columns in sync with its
-// outcomes: they mirror the FIRST positive (on_target/variation) and FIRST
-// negative outcome, so legacy readers (and case rows lacking an outcome id)
-// still get sensible labels. Only overwrites a side when one exists — never
-// blanks the NOT NULL columns.
-async function syncDecisionPointLabels(decisionPointTypeId: string) {
-  const outcomes = await db.select().from(decisionOutcomeTypes)
-    .where(eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypeId))
-    .orderBy(asc(decisionOutcomeTypes.sortOrder));
-  const positive = outcomes.find((o) => o.tone !== 'negative');
-  const negative = outcomes.find((o) => o.tone === 'negative');
-  const set: Record<string, string> = {};
-  if (positive) set.positiveLabel = positive.label;
-  if (negative) set.negativeLabel = negative.label;
-  if (Object.keys(set).length > 0) {
-    await db.update(decisionPointTypes).set(set).where(eq(decisionPointTypes.id, decisionPointTypeId));
-  }
-}
-
-export async function addDecisionOutcomeType(decisionPointTypeId: string, label: string, tone: OutcomeTone) {
-  const id = generateId();
-  const existing = await db.select().from(decisionOutcomeTypes)
-    .where(eq(decisionOutcomeTypes.decisionPointTypeId, decisionPointTypeId));
-  const row = { id, decisionPointTypeId, label, tone, sortOrder: existing.length };
-  await db.insert(decisionOutcomeTypes).values(row);
-  await syncDecisionPointLabels(decisionPointTypeId);
-  return row;
-}
-
-export async function updateDecisionOutcomeType(id: string, data: { label?: string; tone?: OutcomeTone; sortOrder?: number }) {
-  const updateFields: Record<string, unknown> = {};
-  if (data.label !== undefined) updateFields.label = data.label;
-  if (data.tone !== undefined) updateFields.tone = data.tone;
-  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
-  if (Object.keys(updateFields).length === 0) return;
-  await db.update(decisionOutcomeTypes).set(updateFields).where(eq(decisionOutcomeTypes.id, id));
-  const rows = await db.select().from(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
-  if (rows[0]) await syncDecisionPointLabels(rows[0].decisionPointTypeId);
-}
-
-export async function deleteDecisionOutcomeType(id: string) {
-  const rows = await db.select().from(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
-  // case_decision_points.decision_outcome_type_id is SET NULL (case records
-  // survive; their coarse positive/negative outcome stands).
-  await db.delete(decisionOutcomeTypes).where(eq(decisionOutcomeTypes.id, id));
-  if (rows[0]) await syncDecisionPointLabels(rows[0].decisionPointTypeId);
-}
-
-// --- Decision capture fields (2026-07-02) — the delivered values recorded at a
-// decision, mirroring the outcomes taxonomy block above. ---
-
-export type CaptureFieldKind = 'amount' | 'date' | 'duration' | 'choice';
-
-export async function getDecisionCaptureFields(studyId: string) {
-  return db
-    .select({
-      id: decisionCaptureFields.id,
-      decisionPointTypeId: decisionCaptureFields.decisionPointTypeId,
-      label: decisionCaptureFields.label,
-      kind: decisionCaptureFields.kind,
-      choiceOptions: decisionCaptureFields.choiceOptions,
-      linkedWhatMattersTypeId: decisionCaptureFields.linkedWhatMattersTypeId,
-      sortOrder: decisionCaptureFields.sortOrder,
-    })
-    .from(decisionCaptureFields)
-    .innerJoin(decisionPointTypes, eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypes.id))
-    .where(eq(decisionPointTypes.studyId, studyId))
-    .orderBy(asc(decisionCaptureFields.sortOrder));
-}
-
-export async function addDecisionCaptureField(decisionPointTypeId: string, data: { label: string; kind: CaptureFieldKind; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null }) {
-  const id = generateId();
-  const existing = await db.select().from(decisionCaptureFields)
-    .where(eq(decisionCaptureFields.decisionPointTypeId, decisionPointTypeId));
-  const row = {
-    id,
-    decisionPointTypeId,
-    label: data.label,
-    kind: data.kind,
-    choiceOptions: data.choiceOptions ?? null,
-    linkedWhatMattersTypeId: data.linkedWhatMattersTypeId ?? null,
-    sortOrder: existing.length,
-  };
-  await db.insert(decisionCaptureFields).values(row);
-  return row;
-}
-
-// Kind is immutable after create (like work-step tags): a field's shape is
-// fundamental, and changing it would strand typed case values.
-export async function updateDecisionCaptureField(id: string, data: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null; sortOrder?: number; decisionPointTypeId?: string }) {
-  const updateFields: Record<string, unknown> = {};
-  if (data.label !== undefined) updateFields.label = data.label;
-  if (data.choiceOptions !== undefined) updateFields.choiceOptions = data.choiceOptions;
-  if (data.linkedWhatMattersTypeId !== undefined) updateFields.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
-  if (data.sortOrder !== undefined) updateFields.sortOrder = data.sortOrder;
-  // Moving a field to another decision (2026-07-02, "Evaluate against" on the
-  // What Matters row): case values survive (keyed on case+field); the field
-  // joins the end of the target decision's list.
-  if (data.decisionPointTypeId !== undefined) {
-    updateFields.decisionPointTypeId = data.decisionPointTypeId;
-    if (data.sortOrder === undefined) {
-      const existing = await db.select().from(decisionCaptureFields)
-        .where(eq(decisionCaptureFields.decisionPointTypeId, data.decisionPointTypeId));
-      updateFields.sortOrder = existing.length;
-    }
-  }
-  if (Object.keys(updateFields).length === 0) return;
-  await db.update(decisionCaptureFields).set(updateFields).where(eq(decisionCaptureFields.id, id));
-}
-
-export async function getDecisionCaptureFieldById(id: string) {
-  const rows = await db.select().from(decisionCaptureFields).where(eq(decisionCaptureFields.id, id));
-  return rows[0] || null;
-}
-
-export async function deleteDecisionCaptureField(id: string) {
-  // case_decision_values cascade at the DB level — deleting a field in
-  // Settings is a consultant taxonomy fix and takes its case values along.
-  await db.delete(decisionCaptureFields).where(eq(decisionCaptureFields.id, id));
-}
-
-export async function getCaseDecisionValues(caseId: string) {
-  return db.select().from(caseDecisionValues).where(eq(caseDecisionValues.caseId, caseId));
-}
-
-// Upsert per-case values for capture fields. Full-object rule: every row
-// carries all five value columns (unused ones null), so re-saving a decision
-// overwrites cleanly.
-export async function setCaseDecisionValues(caseId: string, values: { fieldId: string; valueNumber: number | null; valueDate: Date | null; valueYears: number | null; valueMonths: number | null; valueChoice: string | null }[]) {
-  for (const v of values) {
-    await db.insert(caseDecisionValues)
-      .values({ id: generateId(), caseId, ...v })
-      .onConflictDoUpdate({
-        target: [caseDecisionValues.caseId, caseDecisionValues.fieldId],
-        set: { valueNumber: v.valueNumber, valueDate: v.valueDate, valueYears: v.valueYears, valueMonths: v.valueMonths, valueChoice: v.valueChoice },
-      });
   }
 }
 
@@ -2208,8 +1981,8 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
 
   const existing = (await db.select().from(caseMilestones)
     .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, milestoneId))))[0];
-  // Frozen legacy/manual completion — leave it exactly as it is.
-  if (existing && !existing.derived) return existing.outcome === 'achieved';
+  // Frozen legacy/manual completion — its existence means complete; leave as is.
+  if (existing && !existing.derived) return true;
 
   // No required subquestions → nothing to complete implicitly.
   if (reqRows.length === 0) {
@@ -2231,10 +2004,10 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
 
   if (allAnswered && reachedAt) {
     await db.insert(caseMilestones)
-      .values({ id: generateId(), caseId, milestoneId, outcome: 'achieved', reachedAt, recordedByCollector: null, derived: true })
+      .values({ id: generateId(), caseId, milestoneId, reachedAt, recordedByCollector: null, derived: true })
       .onConflictDoUpdate({
         target: [caseMilestones.caseId, caseMilestones.milestoneId],
-        set: { reachedAt, outcome: 'achieved', derived: true },
+        set: { reachedAt, derived: true },
       });
     return true;
   }
@@ -2307,54 +2080,6 @@ export async function getCaseMilestones(caseId: string) {
   return db.select().from(caseMilestones).where(eq(caseMilestones.caseId, caseId));
 }
 
-// Record-or-edit are the same call: upsert on (caseId, milestoneId). A
-// 'not_achieved' outcome halts the journey and closes the case; 'achieved'
-// (re)opens it — so a mis-click is recoverable. This is now the SINGLE lever on
-// case status (the legacy person-kind decision auto-close was retired 2026-06-18).
-export async function upsertCaseMilestone(caseId: string, data: {
-  milestoneId: string;
-  outcome: 'achieved' | 'not_achieved';
-  reachedAt?: Date;
-  recordedByCollector?: string | null;
-}) {
-  const values = {
-    id: generateId(),
-    caseId,
-    milestoneId: data.milestoneId,
-    outcome: data.outcome,
-    reachedAt: data.reachedAt || new Date(),
-    recordedByCollector: data.recordedByCollector || null,
-  };
-  await db.insert(caseMilestones).values(values).onConflictDoUpdate({
-    target: [caseMilestones.caseId, caseMilestones.milestoneId],
-    set: {
-      outcome: values.outcome,
-      reachedAt: values.reachedAt,
-      recordedByCollector: values.recordedByCollector,
-    },
-  });
-
-  if (data.outcome === 'not_achieved') {
-    await db.update(cases).set({ status: 'closed', closedAt: values.reachedAt }).where(eq(cases.id, caseId));
-  } else {
-    await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, caseId));
-  }
-
-  const rows = await db.select().from(caseMilestones)
-    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, data.milestoneId)));
-  return rows[0];
-}
-
-export async function deleteCaseMilestone(id: string) {
-  // Mirror the upsert rule: removing a 'not_achieved' milestone (which closed
-  // the case) reopens it. Removing an 'achieved' one needs no status change.
-  const row = (await db.select().from(caseMilestones).where(eq(caseMilestones.id, id)))[0];
-  await db.delete(caseMilestones).where(eq(caseMilestones.id, id));
-  if (row && row.outcome === 'not_achieved') {
-    await db.update(cases).set({ status: 'open', closedAt: null }).where(eq(cases.id, row.caseId));
-  }
-}
-
 // --- Capability-chart annotations (2026-06-18) — exclude/note per measure ---
 
 export async function getCapabilityAnnotations(studyId: string, fromEvent: string, toEvent: string) {
@@ -2392,84 +2117,6 @@ export async function upsertCapabilityAnnotation(studyId: string, data: {
     target: [capabilityAnnotations.caseId, capabilityAnnotations.fromEvent, capabilityAnnotations.toEvent],
     set,
   });
-}
-
-export async function getCaseDecisions(caseId: string) {
-  return db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.caseId, caseId));
-}
-
-// Record-or-edit are the same call: upsert on (caseId, decisionPointTypeId).
-export async function upsertCaseDecision(caseId: string, data: {
-  decisionPointTypeId: string;
-  outcome: 'positive' | 'negative';
-  // 2026-07-01: the specific outcome chosen (drives the coarse positive/negative
-  // `outcome` above). Null for legacy/compat callers that send only `outcome`.
-  decisionOutcomeTypeId?: string | null;
-  // Clean/dirty capture removed 2026-06-26 (migration 0035) — now optional.
-  cleanliness?: 'clean' | 'dirty' | null;
-  dirtyCause?: string | null;
-  decidedAt?: Date;
-  recordedByCollector?: string | null;
-  // C9 (2026-06-17): affordability sub-states for 'person'-kind milestones.
-  willingnessToPay?: boolean | null;
-  abilityToPay?: boolean | null;
-}) {
-  const values = {
-    id: generateId(),
-    caseId,
-    decisionPointTypeId: data.decisionPointTypeId,
-    outcome: data.outcome,
-    decisionOutcomeTypeId: data.decisionOutcomeTypeId ?? null,
-    cleanliness: data.cleanliness ?? null,
-    // Cause only makes sense for dirty decisions (legacy); null otherwise.
-    dirtyCause: data.cleanliness === 'dirty' ? (data.dirtyCause || null) : null,
-    decidedAt: data.decidedAt || new Date(),
-    recordedByCollector: data.recordedByCollector || null,
-    willingnessToPay: data.willingnessToPay ?? null,
-    abilityToPay: data.abilityToPay ?? null,
-  };
-  await db.insert(caseDecisionPoints).values(values).onConflictDoUpdate({
-    target: [caseDecisionPoints.caseId, caseDecisionPoints.decisionPointTypeId],
-    set: {
-      outcome: values.outcome,
-      decisionOutcomeTypeId: values.decisionOutcomeTypeId,
-      cleanliness: values.cleanliness,
-      dirtyCause: values.dirtyCause,
-      decidedAt: values.decidedAt,
-      recordedByCollector: values.recordedByCollector,
-      willingnessToPay: values.willingnessToPay,
-      abilityToPay: values.abilityToPay,
-    },
-  });
-
-  // 2026-06-18: case status is no longer driven by the person-kind decision.
-  // It is driven solely by milestone outcomes (see upsertCaseMilestone) — a
-  // 'not_achieved' milestone closes the case. The person decision is now just
-  // detail inside milestone 1.
-
-  const rows = await db.select().from(caseDecisionPoints)
-    .where(and(eq(caseDecisionPoints.caseId, caseId), eq(caseDecisionPoints.decisionPointTypeId, data.decisionPointTypeId)));
-  return rows[0];
-}
-
-export async function deleteCaseDecision(id: string) {
-  // 2026-06-18: deleting a decision no longer touches case status (milestone
-  // outcomes are the single lever now — see deleteCaseMilestone).
-  // 2026-07-02: removing a decision also clears the case's captured values for
-  // that decision type's fields — the values are meaningless without the
-  // decision, and re-recording starts clean.
-  const rows = await db.select().from(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
-  if (rows[0]) {
-    const fields = await db.select({ id: decisionCaptureFields.id }).from(decisionCaptureFields)
-      .where(eq(decisionCaptureFields.decisionPointTypeId, rows[0].decisionPointTypeId));
-    if (fields.length) {
-      await db.delete(caseDecisionValues).where(and(
-        eq(caseDecisionValues.caseId, rows[0].caseId),
-        inArray(caseDecisionValues.fieldId, fields.map((f) => f.id)),
-      ));
-    }
-  }
-  await db.delete(caseDecisionPoints).where(eq(caseDecisionPoints.id, id));
 }
 
 export async function getEntries(studyId: string, from?: Date, to?: Date) {

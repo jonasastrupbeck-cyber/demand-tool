@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDecisionPoints, caseMilestones, caseWhatMatters, capabilityAnnotations, decisionPointTypes, decisionCaptureFields, caseDecisionValues, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -780,7 +780,7 @@ function eventTimestamp(
   token: EventToken,
   ctx: {
     openedAt: Date; closedAt: Date | null; firstContactAt: Date | null;
-    decisions: Map<string, Date>; milestones: Map<string, Date>;
+    milestones: Map<string, Date>;
     whatMattersTargets: Map<string, Date>;
     // Types this case selected + the study's typeId→anchor-token map, so the ASAP
     // measure auto-scopes to cases that actually chose the ASAP factor.
@@ -790,7 +790,6 @@ function eventTimestamp(
   if (token === 'caseOpen') return ctx.openedAt;
   if (token === 'firstContact') return ctx.firstContactAt;
   if (token === 'caseClose') return ctx.closedAt;
-  if (token.startsWith('decision:')) return ctx.decisions.get(token.slice('decision:'.length)) ?? null;
   if (token.startsWith('milestone:')) return ctx.milestones.get(token.slice('milestone:'.length)) ?? null;
   if (token.startsWith('whatMattersTarget:')) return ctx.whatMattersTargets.get(token.slice('whatMattersTarget:'.length)) ?? null;
   if (token.startsWith('whatMattersAsap:')) {
@@ -880,25 +879,18 @@ export async function getCapabilityData(
   // created_at alone made first contact land "today", after backdated milestones/
   // decisions → negative window → the case was silently dropped. Mirrors the
   // over-time charts' COALESCE(blockDate, createdAt) bucketing (migration 0031).
-  const [fcRows, decRows, msRows] = await Promise.all([
+  const [fcRows, msRows] = await Promise.all([
     db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))` })
       .from(demandEntries)
       .leftJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
       .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)))
       .groupBy(demandEntries.caseId),
-    db.select({ caseId: caseDecisionPoints.caseId, decisionPointTypeId: caseDecisionPoints.decisionPointTypeId, decidedAt: caseDecisionPoints.decidedAt })
-      .from(caseDecisionPoints).where(inArray(caseDecisionPoints.caseId, caseIds)),
     db.select({ caseId: caseMilestones.caseId, milestoneId: caseMilestones.milestoneId, reachedAt: caseMilestones.reachedAt })
       .from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)),
   ]);
 
   const fcMap = new Map<string, Date>();
   for (const r of fcRows) if (r.caseId && r.firstAt) fcMap.set(r.caseId, new Date(r.firstAt));
-  const decByCase = new Map<string, Map<string, Date>>();
-  for (const r of decRows) {
-    if (!decByCase.has(r.caseId)) decByCase.set(r.caseId, new Map());
-    decByCase.get(r.caseId)!.set(r.decisionPointTypeId, new Date(r.decidedAt as unknown as string));
-  }
   const msByCase = new Map<string, Map<string, Date>>();
   for (const r of msRows) {
     if (!msByCase.has(r.caseId)) msByCase.set(r.caseId, new Map());
@@ -932,7 +924,6 @@ export async function getCapabilityData(
       openedAt: new Date(c.openedAt as unknown as string),
       closedAt: c.closedAt ? new Date(c.closedAt as unknown as string) : null,
       firstContactAt: fcMap.get(c.id) ?? null,
-      decisions: decByCase.get(c.id) ?? new Map<string, Date>(),
       milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
       whatMattersTargets: wmTargetByCase.get(c.id) ?? new Map<string, Date>(),
       whatMattersSelected: wmSelectedByCase.get(c.id) ?? new Set<string>(),
