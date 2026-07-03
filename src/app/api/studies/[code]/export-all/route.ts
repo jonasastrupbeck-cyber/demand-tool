@@ -4,17 +4,18 @@ import {
   getStudyByCode, getCases, getEntries, getHandlingTypes, getDemandTypes,
   getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getLifeProblems,
   getSystemConditions, getThinkings, getMilestones, getDecisionPointTypes, getWorkStepTypes,
+  getSubquestions,
   getWhatMattersForEntries, getSystemConditionsForEntries, getThinkingsForEntries, getWorkBlocksForEntries,
 } from '@/lib/queries';
 import { db } from '@/lib/db';
-import { caseDecisionPoints, caseMilestones, capabilityAnnotations } from '@/lib/schema';
+import { caseSubquestionAnswers, caseMilestones, capabilityAnnotations } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
 // R11 (2026-06-18): "download everything" — a multi-sheet workbook with all the
-// input captured for a study (cases, touches, work blocks, decisions, milestones,
-// capability annotations), labels resolved inline. Read-only. Works for flow
-// (Cases/Decisions/Milestones populated) and transactional (those just empty).
+// input captured for a study (cases, touches, work blocks, subquestion answers,
+// milestone completions, capability annotations), labels resolved inline.
+// Read-only. Works for flow (those sheets populated) and transactional (empty).
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> },
@@ -32,6 +33,8 @@ export async function GET(
     getLifeProblems(study.id), getSystemConditions(study.id), getThinkings(study.id),
     getMilestones(study.id), getDecisionPointTypes(study.id), getWorkStepTypes(study.id),
   ]);
+  const subqs = await getSubquestions(study.id);
+  const sqById = new Map(subqs.map((s) => [s.id, s]));
 
   const caseRefById = new Map(cases.map((c) => [c.id, c.caseRef]));
   const hMap = new Map(hTypes.map((h) => [h.id, h.label]));
@@ -66,8 +69,8 @@ export async function GET(
     entryIds.length ? getThinkingsForEntries(entryIds) : Promise.resolve([]),
     entryIds.length ? getWorkBlocksForEntries(entryIds) : Promise.resolve([]),
   ]);
-  const [decisions, milestones, annotations] = await Promise.all([
-    caseIds.length ? db.select().from(caseDecisionPoints).where(inArray(caseDecisionPoints.caseId, caseIds)) : Promise.resolve([]),
+  const [answers, milestones, annotations] = await Promise.all([
+    caseIds.length ? db.select().from(caseSubquestionAnswers).where(inArray(caseSubquestionAnswers.caseId, caseIds)) : Promise.resolve([]),
     caseIds.length ? db.select().from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)) : Promise.resolve([]),
     caseIds.length ? db.select().from(capabilityAnnotations).where(inArray(capabilityAnnotations.caseId, caseIds)) : Promise.resolve([]),
   ]);
@@ -130,26 +133,38 @@ export async function GET(
     'Order': b.sortOrder,
   }));
 
-  // ── Sheet: Decisions ──
-  const decisionsData = decisions.map((d) => ({
-    'Case Ref': caseRefById.get(d.caseId) || '',
-    'Decision': dpMap.get(d.decisionPointTypeId) || '',
-    'Outcome': d.outcome,
-    'Cleanliness': d.cleanliness,
-    'Dirty Cause': d.dirtyCause || '',
-    'Willingness To Pay': d.willingnessToPay == null ? '' : (d.willingnessToPay ? 'Yes' : 'No'),
-    'Ability To Pay': d.abilityToPay == null ? '' : (d.abilityToPay ? 'Yes' : 'No'),
-    'Decided At': d.decidedAt ? new Date(d.decidedAt).toLocaleString() : '',
-    'Recorded By': d.recordedByCollector || '',
-  }));
+  // ── Sheet: Answers (decision-box redesign 0042) — one row per captured
+  // subquestion answer; the value is read from the column matching its kind. ──
+  const fmtAnswer = (kind: string, a: typeof answers[number]): string => {
+    switch (kind) {
+      case 'amount':
+      case 'number': return a.valueNumber == null ? '' : String(a.valueNumber);
+      case 'date': return a.valueDate ? new Date(a.valueDate).toLocaleDateString() : '';
+      case 'duration': return (a.valueYears == null && a.valueMonths == null) ? '' : `${a.valueYears ?? 0}y ${a.valueMonths ?? 0}m`;
+      case 'choice': return a.valueChoice || '';
+      case 'text': return a.valueText || '';
+      default: return '';
+    }
+  };
+  const answersData = answers.map((a) => {
+    const sq = sqById.get(a.subquestionId);
+    return {
+      'Case Ref': caseRefById.get(a.caseId) || '',
+      'Milestone': sq ? (msMap.get(sq.milestoneId) || '') : '',
+      'Subquestion': sq ? sq.label : '',
+      'Value': sq ? fmtAnswer(sq.kind, a) : '',
+      'Answered At': a.answeredAt ? new Date(a.answeredAt).toLocaleString() : '',
+      'Recorded By': a.recordedByCollector || '',
+    };
+  });
 
-  // ── Sheet: Milestones ──
+  // ── Sheet: Milestones — completion is derived (0042); a row means the
+  // milestone is complete for the case, dated by its last answer. ──
   const milestonesData = milestones.map((m) => ({
     'Case Ref': caseRefById.get(m.caseId) || '',
     'Milestone': msMap.get(m.milestoneId) || '',
-    'Outcome': m.outcome,
-    'Reached At': m.reachedAt ? new Date(m.reachedAt).toLocaleString() : '',
-    'Recorded By': m.recordedByCollector || '',
+    'Completed': 'Yes',
+    'Completed At': m.reachedAt ? new Date(m.reachedAt).toLocaleString() : '',
   }));
 
   // ── Sheet: Capability annotations ──
@@ -171,7 +186,7 @@ export async function GET(
   add(casesData, 'Cases');
   add(touchesData, 'Touches');
   add(blocksData, 'Work Blocks');
-  add(decisionsData, 'Decisions');
+  add(answersData, 'Answers');
   add(milestonesData, 'Milestones');
   add(annotationsData, 'Capability Annotations');
 
