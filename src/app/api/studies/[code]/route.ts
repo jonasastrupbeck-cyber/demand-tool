@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, getDecisionOutcomeTypes, getDecisionCaptureFields, seedDefaultDecisionPointTypes, getMilestones, getSubquestions } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, getDecisionPointTypes, getDecisionOutcomeTypes, getDecisionCaptureFields, seedDefaultSubquestions, getMilestones, getSubquestions } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -174,11 +174,11 @@ export async function PUT(
     await seedDefaultLifecycleStages(study.id, body.locale || 'en');
   }
 
-  // Seed the three decision points when the toggle turns on — keyed off
-  // `updates` (not body) so the systemType→flow preset path seeds too.
-  // seedDefaultDecisionPointTypes no-ops if the study already has types.
+  // Seed the default milestone + subquestions when the toggle turns on — keyed
+  // off `updates` (not body) so the systemType→flow preset path seeds too.
+  // seedDefaultSubquestions no-ops if the study already has subquestions.
   if (updates.decisionPointsEnabled === true) {
-    await seedDefaultDecisionPointTypes(study.id, body.locale || 'en');
+    await seedDefaultSubquestions(study.id, body.locale || 'en');
   }
 
   return NextResponse.json({ success: true });

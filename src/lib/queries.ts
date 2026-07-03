@@ -273,10 +273,10 @@ export async function createStudy(name: string, description: string = '', locale
     }
   }
 
-  // Flow studies start with the three decision points seeded (dotted box) and
-  // the two standard time-based what-matters types ("When I want it" / "ASAP").
+  // Flow studies start with a milestone of seeded subquestions (the flattened
+  // decision box) and the two standard time-based what-matters types.
   if (isFlow) {
-    await seedDefaultDecisionPointTypes(id, locale);
+    await seedDefaultSubquestions(id, locale);
     await ensureStandardWhatMattersTypes(id);
   }
 
@@ -1790,6 +1790,40 @@ async function seedDefaultDecisionOutcomes(decisionPointTypeId: string, positive
     { id: generateId(), decisionPointTypeId, label: positiveLabel, tone: 'on_target', sortOrder: 0 },
     { id: generateId(), decisionPointTypeId, label: negativeLabel, tone: 'negative', sortOrder: 1 },
   ]);
+}
+
+// Decision-box redesign (0042): the new-study seed. Replaces
+// seedDefaultDecisionPointTypes — a fresh study gets one milestone with the
+// person/property/value decisions as required CHOICE subquestions, each with an
+// Accept (positive) / Decline (negative) option. Same starter shape consultants
+// know, in the flattened model; they add richer subquestions (amount, date,
+// duration, text, preset choice lists like confidence A–U or payment dates)
+// per study in Settings.
+export async function seedDefaultSubquestions(studyId: string, locale: Locale = 'en') {
+  // Skip if the study already has subquestions (fresh seed OR migrated).
+  const existingSq = await db.select({ id: subquestions.id }).from(subquestions)
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(eq(milestones.studyId, studyId)).limit(1);
+  if (existingSq.length > 0) return;
+  // Reuse the first milestone if one exists (e.g. legacy default), else create.
+  let milestoneId = (await db.select({ id: milestones.id }).from(milestones)
+    .where(eq(milestones.studyId, studyId)).orderBy(asc(milestones.sortOrder)).limit(1))[0]?.id;
+  if (!milestoneId) {
+    milestoneId = generateId();
+    await db.insert(milestones).values({ id: milestoneId, studyId, label: DEFAULT_MILESTONE_LABEL[locale], sortOrder: 0 });
+  }
+  const defaults = DEFAULT_DECISION_POINT_TYPES[locale];
+  for (let i = 0; i < defaults.length; i++) {
+    const sqId = generateId();
+    await db.insert(subquestions).values({
+      id: sqId, milestoneId, label: defaults[i].label, kind: 'choice', required: true,
+      linkedWhatMattersTypeId: null, sortOrder: i, migratedFromFieldId: null,
+    });
+    await db.insert(subquestionOptions).values([
+      { id: generateId(), subquestionId: sqId, label: defaults[i].positiveLabel, polarity: 'positive', sortOrder: 0 },
+      { id: generateId(), subquestionId: sqId, label: defaults[i].negativeLabel, polarity: 'negative', sortOrder: 1 },
+    ]);
+  }
 }
 
 export async function getDecisionPointTypes(studyId: string) {
