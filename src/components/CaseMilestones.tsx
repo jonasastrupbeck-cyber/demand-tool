@@ -29,6 +29,9 @@ export interface MilestoneWithSubqs {
   label: string;
   sortOrder: number;
   subquestions: Subquestion[];
+  // Dynamic milestones (0051): demand-type ids this milestone is scoped to.
+  // Empty = applies to every case.
+  demandTypeConditions: string[];
 }
 
 export interface CaseSubquestionAnswer {
@@ -66,6 +69,9 @@ interface Props {
   milestones: MilestoneWithSubqs[];
   answers: CaseSubquestionAnswer[];
   caseMilestones: CaseMilestone[];
+  // Dynamic milestones (0051): this case's demand-type ids, to filter which
+  // milestones apply.
+  caseDemandTypeIds?: string[];
   whatMattersValues?: Record<string, AskValue>;
   whatMattersTypes?: LinkedWhatMattersType[];
   collectorName: string;
@@ -84,7 +90,7 @@ const draftFromAnswer = (a?: CaseSubquestionAnswer): Draft => ({
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, compact = false }: Props) {
+export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, caseDemandTypeIds = [], whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, compact = false }: Props) {
   const { t, tl } = useLocale();
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
@@ -237,7 +243,10 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
 
   if (milestones.length === 0) return null;
 
-  const ordered = [...milestones].sort((a, b) => a.sortOrder - b.sortOrder);
+  // Dynamic milestones (0051): only show milestones that apply to this case's
+  // demand types (no scope = applies to all). Mirrors getApplicableMilestoneIds.
+  const applicableMilestones = milestones.filter((m) => m.demandTypeConditions.length === 0 || m.demandTypeConditions.some((id) => caseDemandTypeIds.includes(id)));
+  const ordered = [...applicableMilestones].sort((a, b) => a.sortOrder - b.sortOrder);
   const firstIncompleteIdx = ordered.findIndex((m) => !completeByMilestone.has(m.id));
 
   return (

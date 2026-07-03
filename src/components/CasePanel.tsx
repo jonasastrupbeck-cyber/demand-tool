@@ -986,6 +986,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                     milestones={milestones}
                     answers={subquestionAnswers}
                     caseMilestones={caseMilestones}
+                    caseDemandTypeIds={caseRow.demandTypeIds ?? []}
                     whatMattersValues={wmValues}
                     whatMattersTypes={whatMattersTypes}
                     collectorName={collectorName}

@@ -404,6 +404,18 @@ export const subquestionOptions = pgTable('subquestion_options', {
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
+// Dynamic milestones (0051): scope a milestone to demand type(s). A milestone
+// with NO rows applies to every case (back-compat); with rows it applies only to
+// a case whose demand-type set intersects them. Drives capture visibility,
+// completion gating and auto-close (see getApplicableMilestoneIds).
+export const milestoneDemandTypeConditions = pgTable('milestone_demand_type_conditions', {
+  id: text('id').primaryKey(),
+  milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
+  demandTypeId: text('demand_type_id').notNull().references(() => demandTypes.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  uniqMsDt: unique('milestone_dt_conditions_unique').on(t.milestoneId, t.demandTypeId),
+}));
+
 // Conditional visibility (0050): a CHILD subquestion is shown only when its
 // PARENT choice-subquestion's answer equals one of the trigger option labels.
 // No rows for a child = always shown (back-compat). Multiple rows = OR.

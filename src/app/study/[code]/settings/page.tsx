@@ -6,6 +6,7 @@ import { useLocale } from '@/lib/locale-context';
 import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
 import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
+import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import InlineTypeAdder from '@/components/InlineTypeAdder';
@@ -108,7 +109,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -601,7 +602,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, subquestions: [] }] } : s)),
+      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, demandTypeConditions: [], subquestions: [] }] } : s)),
     );
   }
 
@@ -1531,6 +1532,13 @@ export default function SettingsPage() {
                   {idx === orderedMs.length - 1 && orderedMs.length > 1 && (
                     <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.finalMilestoneHint')}</p>
                   )}
+                  <MilestoneAppliesTo
+                    code={code}
+                    milestoneId={m.id}
+                    selected={m.demandTypeConditions}
+                    demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
+                    onRefresh={loadStudy}
+                  />
                   <ul className="space-y-2">
                     {[...m.subquestions].sort((a, b) => a.sortOrder - b.sortOrder).map((sq) => renderSubqRow(m.id, sq))}
                   </ul>

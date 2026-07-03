@@ -3711,6 +3711,18 @@ const translations = {
     sv: 'Lägg till en ja/nej- eller valfråga i studien först och förgrena därifrån.',
     de: 'Füge der Studie zuerst eine Ja/Nein- oder Auswahlfrage hinzu und verzweige davon.',
   },
+  'settings.milestoneAppliesTo': {
+    en: 'Applies to',
+    da: 'Gælder for',
+    sv: 'Gäller för',
+    de: 'Gilt für',
+  },
+  'settings.milestoneAppliesToAll': {
+    en: 'all cases',
+    da: 'alle sager',
+    sv: 'alla ärenden',
+    de: 'alle Fälle',
+  },
   'settings.optionPolarity': {
     en: 'Outcome polarity',
     da: 'Udfaldets polaritet',

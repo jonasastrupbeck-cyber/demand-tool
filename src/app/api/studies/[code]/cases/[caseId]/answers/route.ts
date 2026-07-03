@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
+import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
 
 // Decision-box redesign (0042): per-case subquestion answers. POST upserts a
 // batch of answers (full objects, blanks clear), then re-derives the completion
@@ -75,8 +75,9 @@ export async function POST(
   await clearHiddenCaseAnswers(caseId, study.id);
   if (touched.length > 0) {
     const visible = await getCaseVisibleSubquestionIds(caseId, study.id);
+    const applicable = await getApplicableMilestoneIds(caseId, study.id);
     const allMs = await getMilestones(study.id);
-    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible);
+    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible, applicable);
     // Completing the final milestone auto-closes the case (un-completing reopens).
     await recomputeCaseClosure(caseId, study.id);
   }

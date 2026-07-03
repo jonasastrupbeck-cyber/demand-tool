@@ -110,7 +110,7 @@ interface StudyData {
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
   systemConditions: { id: string; label: string; operationalDefinition: string | null }[];
   thinkings: { id: string; label: string; operationalDefinition: string | null }[];
-  milestones: { id: string; label: string; sortOrder: number; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
 }
 
 export default function CapturePage() {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -169,6 +169,17 @@ export async function PATCH(
   await updateCase(caseId, data);
   if (wmDate) await setCaseWhatMattersDate(caseId, wmDate.whatMattersTypeId, wmDate.date);
   if (wmValue) await setCaseWhatMattersValue(caseId, wmValue.whatMattersTypeId, wmValue.value);
+  // Dynamic milestones (0051): changing the case's demand types changes which
+  // milestones apply — and thus which is the "final" one — so recompute every
+  // milestone and the auto-close/reopen. (Adding a type can reopen a case;
+  // removing one can complete/close it.)
+  if (data.demandTypeIds !== undefined) {
+    const visible = await getCaseVisibleSubquestionIds(caseId, study.id);
+    const applicable = await getApplicableMilestoneIds(caseId, study.id);
+    const allMs = await getMilestones(study.id);
+    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible, applicable);
+    await recomputeCaseClosure(caseId, study.id);
+  }
   const [updated, wmRows, lifeProblemIds, demandTypeIds] = await Promise.all([
     getCase(caseId),
     getCaseWhatMatters(caseId),
