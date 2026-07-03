@@ -129,6 +129,10 @@ export interface CapabilityData {
   lnpl: number | null; // lower control limit (LCL); null when n < 2 included
   n: number;          // included count (drives the limits)
   nExcluded: number;
+  // Lead-time metric only (2026-07-03): cases hidden because the customer chose a
+  // "When I want it" (by_date) what-matters — duration isn't their measure. 0 for
+  // other metrics / studies without by_date types. Surfaced in the info "eye".
+  nWantedByDate: number;
 }
 
 // One day's touch counts for the "Touches over time" chart. Bucketed by the

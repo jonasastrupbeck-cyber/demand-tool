@@ -1635,6 +1635,19 @@ const translations = {
     sv: 'Kapabilitet — E2E-tid mellan händelser',
     de: 'Kapabilität — E2E-Zeit zwischen Ereignissen',
   },
+  // E2E exclusion of "When I want it" cases (2026-07-03).
+  'dashboard.leadTimeExcludeHelp': {
+    en: 'End-to-end time measures how long the work took, so it only counts customers who wanted it as soon as possible. Customers who chose a specific date ("When I want it") aren’t shown here — for them, hitting the date is what matters, so use the days early / late measure instead.',
+    da: 'E2E-tid måler, hvor lang tid arbejdet tog, så den tæller kun kunder, der ville have det så hurtigt som muligt. Kunder, der valgte en bestemt dato ("Hvornår jeg vil have det"), vises ikke her — for dem handler det om at ramme datoen, så brug i stedet målet dage før / efter.',
+    sv: 'E2E-tid mäter hur lång tid arbetet tog, så den räknar bara kunder som ville ha det så snart som möjligt. Kunder som valde ett specifikt datum ("När jag vill ha det") visas inte här — för dem handlar det om att träffa datumet, så använd måttet dagar tidigt / sent i stället.',
+    de: 'Die E2E-Zeit misst, wie lange die Arbeit gedauert hat, und zählt daher nur Kunden, die es so schnell wie möglich wollten. Kunden, die ein bestimmtes Datum gewählt haben ("Wann ich es möchte"), werden hier nicht angezeigt — für sie zählt das Einhalten des Datums, nutzen Sie stattdessen das Maß Tage früher / später.',
+  },
+  'dashboard.leadTimeExcludedCount': {
+    en: '{count} customer(s) who wanted it by a set date are not shown.',
+    da: '{count} kunde(r), der ville have det på en bestemt dato, vises ikke.',
+    sv: '{count} kund(er) som ville ha det ett bestämt datum visas inte.',
+    de: '{count} Kunde(n), die es zu einem festen Datum wollten, werden nicht angezeigt.',
+  },
   'dashboard.eventFrom': {
     en: 'From',
     da: 'Fra',

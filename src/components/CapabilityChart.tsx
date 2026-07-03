@@ -7,6 +7,7 @@ import {
 import type { CapabilityData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect, { type PillSelectOption } from '@/components/PillSelect';
+import InfoPopover from '@/components/InfoPopover';
 import { exportNodeToPng } from '@/lib/chart-image';
 
 // R11 (2026-06-18): one capability (XmR) chart, self-contained so the flow
@@ -115,7 +116,15 @@ export default function CapabilityChart({
   return (
     <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">{t('dashboard.capabilityLeadTime')}</h3>
+        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+          {t('dashboard.capabilityLeadTime')}
+          {capMetric === 'leadTime' && (
+            <InfoPopover label={t('dashboard.leadTimeExcludeHelp')}>
+              {t('dashboard.leadTimeExcludeHelp')}
+              {capData && capData.nWantedByDate > 0 ? ` ${t('dashboard.leadTimeExcludedCount', { count: String(capData.nWantedByDate) })}` : ''}
+            </InfoPopover>
+          )}
+        </h3>
         <div className="flex items-center gap-2">
           <button
             type="button"

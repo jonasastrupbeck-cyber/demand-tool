@@ -851,7 +851,7 @@ export async function getCapabilityData(
   whatMattersScopeTypeId?: string,
 ): Promise<CapabilityData> {
   const unit = metric === 'touches' ? 'touches' : 'days';
-  const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0 };
+  const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
 
   // P2BS scope: capability is case-level, so filter the case set directly.
   const caseWhere = lifeProblemId
@@ -869,6 +869,29 @@ export async function getCapabilityData(
     const scopeSet = new Set(scopeRows.map((r) => r.caseId));
     caseRows = caseRows.filter((c) => scopeSet.has(c.id));
     if (caseRows.length === 0) return empty;
+  }
+
+  // End-to-end scope (2026-07-03): lead time measures how long the work took,
+  // which is only the right lens for customers who wanted it AS SOON AS POSSIBLE.
+  // Customers who chose a "When I want it" (by_date) what-matters are hidden from
+  // the lead-time metric — for them, hitting the date is what matters (the
+  // variance metric). ASAP + un-timed cases stay. Count the hidden ones for the
+  // info "eye". Lead-time only; variance/touches are unaffected.
+  let nWantedByDate = 0;
+  if (metric === 'leadTime') {
+    const byDateTypes = await db.select({ id: whatMattersTypes.id })
+      .from(whatMattersTypes)
+      .where(and(eq(whatMattersTypes.studyId, studyId), eq(whatMattersTypes.timing, 'by_date')));
+    if (byDateTypes.length > 0) {
+      const byDateRows = await db.select({ caseId: caseWhatMatters.caseId })
+        .from(caseWhatMatters)
+        .where(and(inArray(caseWhatMatters.caseId, caseRows.map((c) => c.id)), inArray(caseWhatMatters.whatMattersTypeId, byDateTypes.map((t) => t.id))));
+      const byDateSet = new Set(byDateRows.map((r) => r.caseId));
+      const before = caseRows.length;
+      caseRows = caseRows.filter((c) => !byDateSet.has(c.id));
+      nWantedByDate = before - caseRows.length;
+      if (caseRows.length === 0) return { ...empty, nWantedByDate };
+    }
   }
   const caseIds = caseRows.map((c) => c.id);
 
@@ -1050,6 +1073,7 @@ export async function getCapabilityData(
     lnpl: lnpl !== null ? round1(lnpl) : null,
     n,
     nExcluded: raw.length - n,
+    nWantedByDate,
   };
 }
 
