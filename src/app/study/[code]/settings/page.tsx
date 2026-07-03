@@ -159,13 +159,6 @@ export default function SettingsPage() {
   const [newWhatMattersType, setNewWhatMattersType] = useState('');
   const [newPointOfTransaction, setNewPointOfTransaction] = useState('');
   const [newWorkSource, setNewWorkSource] = useState('');
-  // Decision points: which row has its milestone picker open (Move link).
-  const [movingDpId, setMovingDpId] = useState<string | null>(null);
-  // Capture-field add form (2026-07-02): one open at a time, keyed by DP id.
-  // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
-  const [fieldAdderDpId, setFieldAdderDpId] = useState<string | null>(null);
-  const [newFieldLabel, setNewFieldLabel] = useState('');
-  const [newFieldKind, setNewFieldKind] = useState<'amount' | 'date' | 'duration' | 'choice'>('amount');
   // Decision-box redesign (0042): subquestion add form, one open per milestone.
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
@@ -432,43 +425,6 @@ export default function SettingsPage() {
     }));
   }
 
-  // Decision capture fields (2026-07-02) — optimistic, mirroring the outcome
-  // handlers below.
-  function patchCaptureField(dpId: string, fieldId: string, patch: { label?: string; choiceOptions?: string | null; linkedWhatMattersTypeId?: string | null }) {
-    const clean: typeof patch = {};
-    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
-    if (patch.choiceOptions !== undefined) clean.choiceOptions = patch.choiceOptions;
-    if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
-    if (Object.keys(clean).length === 0) return;
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, captureFields: (d.captureFields ?? []).map((f) => (f.id === fieldId ? { ...f, ...clean } : f)) } : d)) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${fieldId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(clean),
-    }));
-  }
-
-  function removeCaptureField(dpId: string, fieldId: string) {
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, captureFields: (d.captureFields ?? []).filter((f) => f.id !== fieldId) } : d)) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-capture-fields/${fieldId}`, { method: 'DELETE' }));
-  }
-
-  function addCaptureFieldHandler(dpId: string) {
-    const label = newFieldLabel.trim();
-    if (!label) return;
-    setNewFieldLabel('');
-    setFieldAdderDpId(null);
-    // Reload after add so the new field's id is real (mirrors outcome adds).
-    mutateAdd(
-      () => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${dpId}/capture-fields`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label, kind: newFieldKind }),
-      }),
-      () => loadStudy(),
-    );
-  }
-
   // ── Subquestions on milestones (0042) — optimistic where the id is stable ──
   const patchMsSubqs = (msId: string, fn: (subs: StudyData['milestones'][number]['subquestions']) => StudyData['milestones'][number]['subquestions']) =>
     setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === msId ? { ...m, subquestions: fn(m.subquestions) } : m)) } : s));
@@ -624,58 +580,6 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ customerFacing }),
     }));
-  }
-
-  // --- Decision outcomes (2026-07-01): a decision point's list of answers. ---
-  // Update one outcome's local state (label or tone) under its parent dp.
-  function patchOutcomeLocal(dpId: string, outcomeId: string, patch: Partial<{ label: string; tone: 'on_target' | 'variation' | 'negative' }>) {
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, outcomes: (d.outcomes ?? []).map((o) => (o.id === outcomeId ? { ...o, ...patch } : o)) } : d)) } : s));
-  }
-
-  function patchDecisionOutcome(dpId: string, outcomeId: string, patch: { label?: string; tone?: 'on_target' | 'variation' | 'negative' }) {
-    const clean: typeof patch = {};
-    if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
-    if (patch.tone) clean.tone = patch.tone;
-    if (Object.keys(clean).length === 0) return;
-    patchOutcomeLocal(dpId, outcomeId, clean);
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-outcome-types/${outcomeId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(clean),
-    }));
-  }
-
-  function removeDecisionOutcome(dpId: string, outcomeId: string) {
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === dpId ? { ...d, outcomes: (d.outcomes ?? []).filter((o) => o.id !== outcomeId) } : d)) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-outcome-types/${outcomeId}`, { method: 'DELETE' }));
-  }
-
-  function patchDecisionPointType(id: string, data: { label?: string; positiveLabel?: string; negativeLabel?: string }) {
-    const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'string' && v.trim()));
-    if (Object.keys(clean).length === 0) return;
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === id ? { ...d, ...clean } : d)) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(clean),
-    }));
-  }
-
-  // Move a decision point into a milestone (or unassign with null).
-  function assignDecisionToMilestone(id: string, milestoneId: string | null) {
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.map((d) => (d.id === id ? { ...d, milestoneId } : d)) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ milestoneId }),
-    }));
-  }
-
-  function removeDecisionPointType(id: string) {
-    // Per-case decision records cascade server-side (deliberate).
-    setMovingDpId((v) => (v === id ? null : v));
-    setStudy((s) => (s ? { ...s, decisionPointTypes: s.decisionPointTypes.filter((d) => d.id !== id) } : s));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/decision-point-types/${id}`, { method: 'DELETE' }));
   }
 
   // --- Milestones (2026-06-18) — optimistic, mirroring the taxonomy handlers ---
@@ -1872,8 +1776,8 @@ export default function SettingsPage() {
                         </select>
                       </label>
                     )}
-                    {/* ASAP is measured case open → this event (a milestone OR a
-                        decision point), set once per study. Value is a token. */}
+                    {/* ASAP is measured case open → this milestone, set once per
+                        study. Value is a 'milestone:<id>' token. */}
                     {wm.timing === 'asap' && (
                       <label className="flex items-center gap-1 text-xs text-gray-600">
                         {t('settings.measuredToMilestone')}
@@ -1883,12 +1787,7 @@ export default function SettingsPage() {
                           className="max-w-[14rem] truncate px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                         >
                           <option value="">—</option>
-                          <optgroup label={t('settings.milestones')}>
-                            {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => <option key={m.id} value={`milestone:${m.id}`}>◇ {m.label}</option>)}
-                          </optgroup>
-                          <optgroup label={t('settings.decisionPointTypes')}>
-                            {[...(study.decisionPointTypes || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((d) => <option key={d.id} value={`decision:${d.id}`}>{d.label}</option>)}
-                          </optgroup>
+                          {[...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((m) => <option key={m.id} value={`milestone:${m.id}`}>◇ {m.label}</option>)}
                         </select>
                       </label>
                     )}
