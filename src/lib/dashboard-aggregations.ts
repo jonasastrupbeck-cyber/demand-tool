@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -40,6 +40,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   const systemConditionsEnabled = study[0]?.systemConditionsEnabled ?? false;
   const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
   const flowFailureDemandTypesEnabled = study[0]?.flowFailureDemandTypesEnabled ?? false;
+  const valueStepsEnabled = study[0]?.valueStepsEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
   //
@@ -659,6 +660,36 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     flowFailureDemandTypeCounts = rows.map(r => ({ label: r.label, count: r.count }));
   }
 
+  // ── WORK BY VALUE STEP (migration 0047) ──
+  // Where does failure/sequence (and value) work land across the customer value
+  // journey? Count flow work blocks per value step, split by tag. P2BS-scoped
+  // via baseConditions; ordered by the value step's own order. Feature-gated.
+  let workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }> = [];
+  if (valueStepsEnabled) {
+    const rows = await db.select({
+      label: valueSteps.label,
+      sortOrder: valueSteps.sortOrder,
+      tag: workDescriptionBlocks.tag,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
+      .where(and(...baseConditions))
+      .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, workDescriptionBlocks.tag);
+    const byStep = new Map<string, { label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>();
+    for (const r of rows) {
+      const key = `${r.sortOrder}::${r.label}`;
+      const e = byStep.get(key) ?? { label: r.label, sortOrder: r.sortOrder, value: 0, sequence: 0, failure: 0, failureDemand: 0 };
+      if (r.tag === 'value') e.value += r.count;
+      else if (r.tag === 'sequence') e.sequence += r.count;
+      else if (r.tag === 'failure') e.failure += r.count;
+      else if (r.tag === 'failure_demand') e.failureDemand += r.count;
+      byStep.set(key, e);
+    }
+    workByValueStep = [...byStep.values()].sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
   return {
     totalEntries,
     valueCount,
@@ -697,6 +728,8 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     workStepByLifeProblem,
     capabilityByDemandType,
     flowFailureDemandTypeCounts,
+    valueStepsEnabled,
+    workByValueStep,
   };
 }
 

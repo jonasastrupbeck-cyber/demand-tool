@@ -96,6 +96,8 @@ interface StudyData {
   flowAnalyticsEnabled: boolean;
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
+  valueStepsEnabled: boolean;
+  valueSteps: { id: string; label: string; sortOrder: number }[];
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -219,7 +221,7 @@ export default function CapturePage() {
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
   // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
   // set only when the block's tag is 'failure' (flow work path). Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
   // One date for the WHOLE work entry (2026-07-02): flow work used to carry a
   // per-block "Step date"; now a single date near Save applies to every block.
   // Defaults today; set a past day to backdate a retrospectively-captured touch.
@@ -323,7 +325,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }]);
     }
   }, [loading, study, entryType]);
 
@@ -409,7 +411,7 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }] : []);
     // Next entry defaults back to today (the previous entry may have backdated it).
     setWorkEntryDate(todayIso());
     setError('');
@@ -572,7 +574,7 @@ export default function CapturePage() {
     // Work tab: send workBlocks; server auto-populates verbatim from them.
     // Strip the UI-only `freeText` flag before sending; carry the per-block SC.
     if (isWorkSubmit && validWorkBlocks.length > 0) {
-      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date: workEntryDate }));
+      body.workBlocks = validWorkBlocks.map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId, date: workEntryDate }));
     }
 
     // Handling — only when the toggle is on.
@@ -1507,8 +1509,8 @@ export default function CapturePage() {
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }, ...prev.slice(idx)])}
-                          className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
+                          className="self-center -mt-1 text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
                         >
@@ -1696,13 +1698,29 @@ export default function CapturePage() {
                           </div>
                         </div>
                       )}
+                      {/* Value step (migration 0047): which stage of the customer
+                          value journey this work relates to. One per step, on any
+                          tag. Gated by the study opt-in; list edited in Settings. */}
+                      {flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 && (
+                        <div className="p-2 rounded-md border bg-green-50 border-green-200">
+                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.valueStepQuestion')}</p>
+                          <PillSelect
+                            ariaLabel={t('capture.valueStepQuestion')}
+                            placeholder={t('capture.selectValueStep')}
+                            value={block.valueStepId ?? ''}
+                            onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, valueStepId: id || null } : b))}
+                            options={[...study.valueSteps].sort((a, b) => a.sortOrder - b.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
+                            variant="value"
+                          />
+                        </div>
+                      )}
 
                     </div>
                   );
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >
@@ -2276,6 +2294,7 @@ export default function CapturePage() {
             flowWorkEnabled: study.flowWorkEnabled,
             systemConditionsEnabled: study.systemConditionsEnabled,
             flowFailureDemandTypesEnabled: study.flowFailureDemandTypesEnabled,
+            valueStepsEnabled: study.valueStepsEnabled,
             whatMattersEnabled: study.whatMattersEnabled,
             thinkingsEnabled: study.thinkingsEnabled,
             lifeProblemsEnabled: study.lifeProblemsEnabled,
@@ -2288,6 +2307,7 @@ export default function CapturePage() {
             lifeProblems: study.lifeProblems.map(lp => ({ id: lp.id, label: lp.label })),
             workTypes: study.workTypes,
             workStepTypes: study.workStepTypes || [],
+            valueSteps: study.valueSteps || [],
             systemConditions: (study.systemConditions || []).map(s => ({ id: s.id, label: s.label, operationalDefinition: s.operationalDefinition })),
             thinkings: (study.thinkings || []).map(t => ({ id: t.id, label: t.label })),
           }}

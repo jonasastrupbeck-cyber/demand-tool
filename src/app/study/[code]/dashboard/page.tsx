@@ -1750,6 +1750,29 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
+              {/* Work by value step (migration 0047): where value / sequence /
+                  failure work lands across the customer value journey. Stacked
+                  bars per value step, ordered by the value step's own order.
+                  P2BS-scoped. Self-gates on the feature + having data. */}
+              {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
+                <ChartCard title={t('dashboard.workByValueStepTitle')}>
+                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.workByValueStepHint')}</p>
+                  <ResponsiveContainer width="100%" height={Math.max(220, data.workByValueStep.length * 44 + 48)}>
+                    <BarChart data={data.workByValueStep.map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ color: THEME.textSecondary }} />
+                      <Bar dataKey="value" stackId="a" name={t('capture.value')} fill={COLORS.value} />
+                      <Bar dataKey="sequence" stackId="a" name={t('capture.classificationWorkSequence')} fill={COLORS.sequence} />
+                      <Bar dataKey="failure" stackId="a" name={t('capture.failure')} fill={COLORS.failure} />
+                      <Bar dataKey="failureDemand" stackId="a" name={t('capture.workBlockTagFailureDemand')} fill="#e11d48" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
               {data.workOverTime.length > 1 && (
                 <ChartCard title={t('dashboard.workOverTime')}>
                   <ResponsiveContainer width="100%" height={300}>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getValueSteps, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -12,7 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, scTypes, thTypes, lcStages, lpTypes, msTypes, subqs] = await Promise.all([
+  const [hTypes, dTypes, cMethods, potTypes, wSources, wmTypes, wTypes, wsTypes, vSteps, scTypes, thTypes, lcStages, lpTypes, msTypes, subqs] = await Promise.all([
     getHandlingTypes(study.id),
     getDemandTypes(study.id),
     getContactMethods(study.id),
@@ -21,6 +21,7 @@ export async function GET(
     getWhatMattersTypes(study.id),
     getWorkTypes(study.id),
     getWorkStepTypes(study.id),
+    getValueSteps(study.id),
     getSystemConditions(study.id),
     getThinkings(study.id),
     getLifecycleStages(study.id),
@@ -48,6 +49,7 @@ export async function GET(
     whatMattersTypes: wmTypes,
     workTypes: wTypes,
     workStepTypes: wsTypes,
+    valueSteps: vSteps,
     systemConditions: scTypes,
     thinkings: thTypes,
     lifecycleStages: lcStages,
@@ -120,6 +122,7 @@ export async function PUT(
   if (body.flowAnalyticsEnabled !== undefined) updates.flowAnalyticsEnabled = body.flowAnalyticsEnabled;
   // Flow per-block failure-demand type picker toggle (migration 0033, 2026-06-26).
   if (body.flowFailureDemandTypesEnabled !== undefined) updates.flowFailureDemandTypesEnabled = body.flowFailureDemandTypesEnabled;
+  if (body.valueStepsEnabled !== undefined) updates.valueStepsEnabled = body.valueStepsEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.

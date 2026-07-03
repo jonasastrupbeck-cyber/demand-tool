@@ -60,6 +60,7 @@ export async function GET(
       systemConditionId: r.systemConditionId ?? null,
       systemConditionIds: scByBlock.get(r.id) ?? (r.systemConditionId ? [r.systemConditionId] : []),
       demandTypeId: r.demandTypeId ?? null,
+      valueStepId: r.valueStepId ?? null,
       blockDate: r.blockDate ?? null,
     })),
   });
@@ -147,13 +148,14 @@ export async function PATCH(
     )) {
       return NextResponse.json({ error: 'workBlocks must be an array of { tag: "value"|"sequence"|"failure"|"failure_demand", text: string }' }, { status: 400 });
     }
-    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; date?: string | null }) => ({
+    updates.workBlocks = body.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: unknown; demandTypeId?: string | null; valueStepId?: string | null; date?: string | null }) => ({
       tag: b.tag,
       text: b.text,
       workStepTypeId: typeof b.workStepTypeId === 'string' ? b.workStepTypeId : null,
       systemConditionId: typeof b.systemConditionId === 'string' ? b.systemConditionId : null,
       systemConditionIds: Array.isArray(b.systemConditionIds) ? b.systemConditionIds.filter((x): x is string => typeof x === 'string') : undefined,
       demandTypeId: typeof b.demandTypeId === 'string' ? b.demandTypeId : null,
+      valueStepId: typeof b.valueStepId === 'string' ? b.valueStepId : null,
       date: typeof b.date === 'string' ? b.date : null,
     }));
   }

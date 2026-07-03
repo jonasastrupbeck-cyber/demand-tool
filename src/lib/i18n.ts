@@ -1125,6 +1125,19 @@ const translations = {
     sv: 'Infoga steg h\u00e4r',
     de: 'Schritt hier einf\u00fcgen',
   },
+  // Value steps (migration 0047).
+  'capture.valueStepQuestion': {
+    en: 'What value step is this work related to?',
+    da: 'Hvilket v\u00e6rditrin er dette arbejde knyttet til?',
+    sv: 'Vilket v\u00e4rdesteg h\u00f6r det h\u00e4r arbetet till?',
+    de: 'Auf welchen Wertschritt bezieht sich diese Arbeit?',
+  },
+  'capture.selectValueStep': {
+    en: 'Select value step',
+    da: 'V\u00e6lg v\u00e6rditrin',
+    sv: 'V\u00e4lj v\u00e4rdesteg',
+    de: 'Wertschritt w\u00e4hlen',
+  },
   'capture.workBlockDate': {
     en: 'Step date',
     da: 'Trindato',
@@ -1413,6 +1426,19 @@ const translations = {
     da: 'Syntetisér',
     sv: 'Syntetisera',
     de: 'Synthese',
+  },
+  // Value steps (migration 0047).
+  'dashboard.workByValueStepTitle': {
+    en: 'Work by value step',
+    da: 'Arbejde pr. værditrin',
+    sv: 'Arbete per värdesteg',
+    de: 'Arbeit nach Wertschritt',
+  },
+  'dashboard.workByValueStepHint': {
+    en: 'Where value, sequence and failure work land across the value journey.',
+    da: 'Hvor værdiskabende, sekvens- og ikke-værdiskabende arbejde falder i værdirejsen.',
+    sv: 'Var värdeskapande, sekvens- och icke-värdeskapande arbete hamnar i värderesan.',
+    de: 'Wo Wert-, Sequenz- und Fehlerarbeit auf der Wertreise anfallen.',
   },
   'dashboard.synthesisTabHelp': {
     en: 'Study what you have captured and merge the labels that are really the same onto one agreed name.',
@@ -2515,6 +2541,37 @@ const translations = {
     da: 'Tilføj arbejdstrin...',
     sv: 'Lägg till arbetssteg...',
     de: 'Arbeitsschritt hinzufügen...',
+  },
+  // Value steps (migration 0047).
+  'settings.valueSteps': {
+    en: 'Value Steps',
+    da: 'Værditrin',
+    sv: 'Värdesteg',
+    de: 'Wertschritte',
+  },
+  'settings.valueStepsDesc': {
+    en: 'The ordered stages of the customer value journey. On flow work steps, each step is tagged with one value step — so the dashboard can show where failure and sequence work most appears.',
+    da: 'De ordnede trin i kundens værdirejse. På flow-arbejdstrin tagges hvert trin med ét værditrin — så dashboardet kan vise, hvor ikke-værdiskabende og sekvensarbejde oftest optræder.',
+    sv: 'De ordnade stegen i kundens värderesa. På flödesarbetssteg taggas varje steg med ett värdesteg — så att dashboarden kan visa var icke-värdeskapande arbete och sekvensarbete oftast uppträder.',
+    de: 'Die geordneten Phasen der Kundenwertreise. Bei Flow-Arbeitsschritten wird jeder Schritt mit einem Wertschritt versehen — so zeigt das Dashboard, wo Fehler- und Sequenzarbeit am häufigsten auftreten.',
+  },
+  'settings.addValueStep': {
+    en: 'Add value step...',
+    da: 'Tilføj værditrin...',
+    sv: 'Lägg till värdesteg...',
+    de: 'Wertschritt hinzufügen...',
+  },
+  'settings.valueStepsToggle': {
+    en: 'Value steps',
+    da: 'Værditrin',
+    sv: 'Värdesteg',
+    de: 'Wertschritte',
+  },
+  'settings.valueStepsToggleDesc': {
+    en: 'Add a "What value step is this work related to?" picker to flow work steps.',
+    da: 'Tilføj en "Hvilket værditrin er dette arbejde knyttet til?"-vælger til flow-arbejdstrin.',
+    sv: 'Lägg till en "Vilket värdesteg hör det här arbetet till?"-väljare på flödesarbetssteg.',
+    de: 'Fügt Flow-Arbeitsschritten eine Auswahl "Auf welchen Wertschritt bezieht sich diese Arbeit?" hinzu.',
   },
   // Phase 4B (2026-04-16) — synthesis helper
   'settings.synthesiseWorkSteps': {

@@ -192,6 +192,11 @@ export interface DashboardData {
   // failure demand captured inline in flow (from failure_demand work blocks).
   // P2BS-scoped. Empty unless the per-study feature is enabled.
   flowFailureDemandTypeCounts: Array<{ label: string; count: number }>;
+  // Value steps (migration 0047): work-block counts per value step, split by
+  // tag, so we can see where failure/sequence work lands across the value
+  // journey. Ordered by value-step order. P2BS-scoped. Empty unless enabled.
+  valueStepsEnabled: boolean;
+  workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>;
 }
 
 export interface CreateEntryInput {

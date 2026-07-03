@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import {
   getStudyByCode, getCases, getEntries, getHandlingTypes, getDemandTypes,
   getContactMethods, getPointsOfTransaction, getWhatMattersTypes, getLifeProblems,
-  getSystemConditions, getThinkings, getMilestones, getWorkStepTypes,
+  getSystemConditions, getThinkings, getMilestones, getWorkStepTypes, getValueSteps,
   getSubquestions,
   getWhatMattersForEntries, getSystemConditionsForEntries, getThinkingsForEntries, getWorkBlocksForEntries,
 } from '@/lib/queries';
@@ -35,6 +35,7 @@ export async function GET(
   ]);
   const subqs = await getSubquestions(study.id);
   const sqById = new Map(subqs.map((s) => [s.id, s]));
+  const vsMap = new Map((await getValueSteps(study.id)).map((v) => [v.id, v.label]));
 
   const caseRefById = new Map(cases.map((c) => [c.id, c.caseRef]));
   const hMap = new Map(hTypes.map((h) => [h.id, h.label]));
@@ -127,6 +128,7 @@ export async function GET(
     'Tag': b.tag,
     'Text': b.text,
     'Work Step Type': b.workStepTypeId ? wsMap.get(b.workStepTypeId) || '' : '',
+    'Value Step': b.valueStepId ? vsMap.get(b.valueStepId) || '' : '',
     'Block System Condition': b.systemConditionId ? scMap.get(b.systemConditionId) || '' : '',
     'Order': b.sortOrder,
   }));

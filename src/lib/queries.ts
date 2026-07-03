@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, subquestions, subquestionOptions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import type { Locale } from './i18n';
@@ -1237,6 +1237,32 @@ export async function deleteWorkStepType(id: string) {
   await db.delete(workStepTypes).where(eq(workStepTypes.id, id));
 }
 
+// Value steps (migration 0047) — editable ORDERED study-level list; a work
+// block tags one. Mirrors workStepTypes minus the tag.
+export async function getValueSteps(studyId: string) {
+  return db.select().from(valueSteps).where(eq(valueSteps.studyId, studyId)).orderBy(asc(valueSteps.sortOrder));
+}
+
+export async function addValueStep(studyId: string, label: string) {
+  const id = generateId();
+  const existing = await getValueSteps(studyId);
+  await db.insert(valueSteps).values({ id, studyId, label, sortOrder: existing.length });
+  return id;
+}
+
+export async function updateValueStep(id: string, data: { label?: string; sortOrder?: number }) {
+  const set: typeof data = {};
+  if (typeof data.label === 'string' && data.label.trim()) set.label = data.label.trim();
+  if (typeof data.sortOrder === 'number') set.sortOrder = data.sortOrder;
+  if (Object.keys(set).length === 0) return;
+  await db.update(valueSteps).set(set).where(eq(valueSteps.id, id));
+}
+
+export async function deleteValueStep(id: string) {
+  // work_description_blocks.value_step_id is ON DELETE SET NULL — blocks unset.
+  await db.delete(valueSteps).where(eq(valueSteps.id, id));
+}
+
 // Phase 4B (2026-04-16) — synthesis helper support.
 // Returns all orphan free-text work blocks in a study (those with no step FK
 // and non-empty text) — the input to clusterBlocks().
@@ -1342,7 +1368,7 @@ export async function createEntry(studyId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; valueStepId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): which case this touch belongs to.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
@@ -1467,6 +1493,7 @@ export async function createEntry(studyId: string, data: {
         blockDate: block.date ? new Date(block.date) : null,
         // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
         demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
+        valueStepId: block.valueStepId ?? null,
       });
       for (const scId of scIds) {
         await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
@@ -2201,7 +2228,7 @@ export async function updateEntry(entryId: string, data: {
   lifeProblemId?: string | null;
   // Phase 4 (2026-04-16): optional `workStepTypeId` links a block to a
   // managed Work Step Type. Null/undefined = free-text block (current behaviour).
-  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; date?: string | null }[];
+  workBlocks?: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; valueStepId?: string | null; date?: string | null }[];
   // Case stitching (Skipton slice 1): re-attach or detach an entry from a case.
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch?
@@ -2316,6 +2343,7 @@ export async function updateEntry(entryId: string, data: {
         blockDate: block.date ? new Date(block.date) : null,
         // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
         demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
+        valueStepId: block.valueStepId ?? null,
       });
       for (const scId of scIds) {
         await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });

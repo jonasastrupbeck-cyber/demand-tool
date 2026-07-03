@@ -42,6 +42,7 @@ export interface EntryEditModalStudy {
   systemConditionsEnabled: boolean;
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
+  valueStepsEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -51,6 +52,7 @@ export interface EntryEditModalStudy {
   lifeProblems: LifeProblem[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
+  valueSteps: { id: string; label: string; sortOrder: number }[];
   systemConditions: SystemCondition[];
   thinkings: Thinking[];
 }
@@ -113,7 +115,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
   // One date for the whole work entry (2026-07-02) — mirrors the capture composer.
   // Initialised from the entry on load; on save it's written to every block.
   const [entryDate, setEntryDate] = useState(todayIso());
@@ -168,13 +170,14 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // Normalise on load: workStepTypeId may be missing on older rows; freeText is
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
-          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null }) => ({
+          ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; valueStepId?: string | null }) => ({
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
               freeText: !b.workStepTypeId && !!b.text,
               systemConditionIds: Array.isArray(b.systemConditionIds) ? b.systemConditionIds : (b.systemConditionId ? [b.systemConditionId] : []),
               demandTypeId: b.demandTypeId ?? null,
+              valueStepId: b.valueStepId ?? null,
             }))
           : []);
         // The entry's single date = earliest block date (matches effectiveAt),
@@ -215,7 +218,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       // Strip the UI-only freeText flag before PATCH.
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
-        .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, date: entryDate }));
+        .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId, date: entryDate }));
     }
     await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
       method: 'PATCH',
@@ -653,8 +656,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           {flowWorkPath && (
                             <button
                               type="button"
-                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }, ...prev.slice(idx)])}
-                              className="self-center text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
+                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
+                              className="self-center -mt-1 text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                               aria-label={t('capture.insertWorkBlock')}
                               title={t('capture.insertWorkBlock')}
                             >
@@ -834,12 +837,27 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               </div>
                             </div>
                           )}
+                          {/* Value step (migration 0047) — which value-journey stage
+                              this work relates to. One per step, any tag. */}
+                          {flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 && (
+                            <div className="mt-1 p-2 rounded-md border bg-green-50 border-green-200">
+                              <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.valueStepQuestion')}</p>
+                              <PillSelect
+                                ariaLabel={t('capture.valueStepQuestion')}
+                                placeholder={t('capture.selectValueStep')}
+                                value={b.valueStepId ?? ''}
+                                onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, valueStepId: id || null } : p))}
+                                options={[...study.valueSteps].sort((a, c) => a.sortOrder - c.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
+                                variant="value"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >

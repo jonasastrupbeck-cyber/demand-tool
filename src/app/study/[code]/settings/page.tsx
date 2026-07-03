@@ -67,6 +67,7 @@ interface StudyData {
   demandTypesEnabled: boolean;
   workTypesEnabled: boolean;
   workStepTypesEnabled: boolean;
+  valueStepsEnabled: boolean;
   // Flow toggles (migration 0014).
   flowDemandEnabled: boolean;
   flowWorkEnabled: boolean;
@@ -109,6 +110,7 @@ interface StudyData {
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
   workStepTypes: { id: string; label: string; tag: 'value' | 'sequence' | 'failure'; operationalDefinition: string | null; sortOrder: number }[];
+  valueSteps: { id: string; label: string; sortOrder: number }[];
   systemConditions: SystemConditionType[];
   thinkings: SystemConditionType[];
   lifecycleStages: LifecycleStage[];
@@ -171,6 +173,7 @@ export default function SettingsPage() {
   // Phase 4 (2026-04-16) — Work Step Types add-form state.
   const [newWorkStep, setNewWorkStep] = useState('');
   const [newWorkStepTag, setNewWorkStepTag] = useState<'value' | 'sequence' | 'failure'>('value');
+  const [newValueStep, setNewValueStep] = useState('');
 
   // Phase 4B (2026-04-16) — Synthesis modal state.
   type Cluster = {
@@ -719,6 +722,57 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag }),
     }));
+  }
+
+  // Value steps (migration 0047) — ordered study-level list; mirror workStepTypes.
+  function toggleValueSteps() {
+    const newValue = !study?.valueStepsEnabled;
+    setStudy((s) => (s ? { ...s, valueStepsEnabled: newValue } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ valueStepsEnabled: newValue }),
+    }));
+  }
+
+  function addValueStepHandler(e: React.FormEvent) {
+    e.preventDefault();
+    const label = newValueStep.trim();
+    if (!label) return;
+    setNewValueStep('');
+    mutateAdd(
+      () => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label }),
+      }),
+      (id) => setStudy((s) => (s ? { ...s, valueSteps: [...(s.valueSteps || []), { id, label, sortOrder: (s.valueSteps || []).length }] } : s)),
+    );
+  }
+
+  function patchValueStep(id: string, label: string) {
+    const clean = label.trim();
+    if (!clean) return;
+    setStudy((s) => (s ? { ...s, valueSteps: (s.valueSteps || []).map((v) => (v.id === id ? { ...v, label: clean } : v)) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: clean }),
+    }));
+  }
+
+  function removeValueStep(id: string) {
+    setStudy((s) => (s ? { ...s, valueSteps: (s.valueSteps || []).filter((v) => v.id !== id) } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${id}`, { method: 'DELETE' }));
+  }
+
+  // Swap a value step with its neighbour and persist both new sortOrders.
+  function moveValueStep(id: string, dir: -1 | 1) {
+    const ordered = [...(study?.valueSteps || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const i = ordered.findIndex((v) => v.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    const renumbered = ordered.map((v, k) => ({ ...v, sortOrder: k }));
+    setStudy((s) => (s ? { ...s, valueSteps: renumbered } : s));
+    const a = renumbered.find((v) => v.id === ordered[j].id)!; // the two that swapped
+    const b = renumbered.find((v) => v.id === ordered[i].id)!;
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: a.sortOrder }) }));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: b.sortOrder }) }));
   }
 
   // Phase 4B — synthesis helper actions.
@@ -1950,6 +2004,48 @@ export default function SettingsPage() {
                   {t('settings.synthesiseWorkSteps')} →
                 </button>
                 <p className="text-xs text-gray-500 mt-1">{t('settings.synthesiseDesc')}</p>
+              </>
+            )}
+          </div>
+        )}
+        {/* Value Steps (migration 0047): ordered study-level list; one per flow
+             work step. Only when Work Tracking is on. */}
+        {study.workTrackingEnabled && (
+          <div className={cardCls}>
+            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.valueSteps')}</h2>
+            <p className="text-sm text-gray-600 mb-3">{t('settings.valueStepsDesc')}</p>
+            <label className="flex items-center gap-3 cursor-pointer mb-4">
+              <div className="relative">
+                <input type="checkbox" checked={study.valueStepsEnabled} onChange={toggleValueSteps} className="sr-only peer" />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer-checked:bg-brand transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-5" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">{t('settings.valueStepsToggle')}</span>
+            </label>
+            {study.valueStepsEnabled && (
+              <>
+                <p className="text-xs text-gray-500 mb-2">{t('settings.valueStepsToggleDesc')}</p>
+                <ul className="space-y-2 mb-4">
+                  {[...(study.valueSteps || [])].sort((a, b) => a.sortOrder - b.sortOrder).map((vs, idx, arr) => (
+                    <li key={vs.id} className={`${itemCls} bg-green-50`}>
+                      <span className="shrink-0 w-5 text-xs text-gray-400 tabular-nums text-center">{idx + 1}</span>
+                      <input
+                        type="text"
+                        defaultValue={vs.label}
+                        aria-label={t('settings.valueSteps')}
+                        onBlur={(e) => patchValueStep(vs.id, e.target.value)}
+                        className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                      />
+                      <button type="button" aria-label={t('settings.moveUp')} disabled={idx === 0} onClick={() => moveValueStep(vs.id, -1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
+                      <button type="button" aria-label={t('settings.moveDown')} disabled={idx === arr.length - 1} onClick={() => moveValueStep(vs.id, 1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
+                      <button onClick={() => removeValueStep(vs.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
+                    </li>
+                  ))}
+                </ul>
+                <form onSubmit={addValueStepHandler} className="flex gap-2 items-center">
+                  <input type="text" value={newValueStep} onChange={(e) => setNewValueStep(e.target.value)} placeholder={t('settings.addValueStep')} className={inputCls} />
+                  <button type="submit" disabled={!newValueStep.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand hover:bg-[#8a2425]">{t('settings.add')}</button>
+                </form>
               </>
             )}
           </div>

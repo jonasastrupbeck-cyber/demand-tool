@@ -90,6 +90,9 @@ export const studies = pgTable('studies', {
   // step can record what kind of failure demand hit at that point. Default
   // false so transactional / non-flow capture is unchanged.
   flowFailureDemandTypesEnabled: boolean('flow_failure_demand_types_enabled').notNull().default(false),
+  // Value steps (migration 0047, 2026-07-03): opt-in per-block "What value step
+  // is this work related to?" picker on flow work blocks. Default false.
+  valueStepsEnabled: boolean('value_steps_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -223,6 +226,17 @@ export const workStepTypes = pgTable('work_step_types', {
   // Synthesis soft-archive (migration 0030) — see systemConditions.
   archivedAt: timestamp('archived_at', { withTimezone: true }),
   mergedIntoId: text('merged_into_id'),
+});
+
+// Value steps (migration 0047, 2026-07-03): a study-level, editable, ORDERED
+// list of the customer value-journey stages (e.g. the mortgage flow's
+// Willingness to Pay … 1st Direct Debit). Each flow work block tags ONE value
+// step, so the dashboard can show where failure/sequence work most appears.
+export const valueSteps = pgTable('value_steps', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  label: text('label').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
 });
 
 // Generic audit log for single-FK taxonomy merges (migration 0030): work types
@@ -581,6 +595,9 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // 'failure' — what kind of failure demand hit at this step. NULL for
   // value/sequence blocks and all older rows. SET NULL mirrors workStepTypeId.
   demandTypeId: text('demand_type_id').references(() => demandTypes.id, { onDelete: 'set null' }),
+  // Value step (migration 0047, 2026-07-03): ONE value step this work relates to.
+  // NULL when unset / value_steps disabled. SET NULL mirrors workStepTypeId.
+  valueStepId: text('value_step_id').references(() => valueSteps.id, { onDelete: 'set null' }),
 });
 
 // Block ↔ system-condition junction (migration 0032): a flow work block can be
