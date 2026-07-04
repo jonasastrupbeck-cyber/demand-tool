@@ -1505,23 +1505,26 @@ export default function CapturePage() {
                   // Value step (migration 0047): which stage of the customer
                   // value journey this work relates to. One per step, on any
                   // tag. Gated by the study opt-in; list edited in Settings.
-                  // Compact single-row layout (2026-07-04): label + tight pill
-                  // share one line so the box stays slim ABOVE the textarea in
-                  // free-text mode; badge/picker modes keep it at the card
-                  // bottom (they have no textarea).
+                  // One-line row (2026-07-04): label left, row-filling pill
+                  // right (fullWidth → long step names truncate), milestone
+                  // sky pill per Jonas. Sits ABOVE the tag toggle in free-text
+                  // mode; badge/picker modes keep the card-bottom slot.
                   const valueStepSelector = flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 ? (
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 p-1.5 rounded-md border bg-green-50 border-green-200">
-                      <p className="text-[10px] font-medium text-gray-700">{t('capture.valueStepQuestion')}</p>
-                      <PillSelect
-                        ariaLabel={t('capture.valueStepQuestion')}
-                        placeholder={t('capture.selectValueStep')}
-                        value={block.valueStepId ?? ''}
-                        onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, valueStepId: id || null } : b))}
-                        options={[...study.valueSteps].sort((a, b) => a.sortOrder - b.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
-                        variant="value"
-                        compact
-                        compactMenu
-                      />
+                    <div className="flex items-center gap-1.5 p-1.5 rounded-md border bg-green-50 border-green-200">
+                      <p className="shrink-0 text-[10px] font-medium text-gray-700">{t('capture.valueStepQuestion')}</p>
+                      <div className="flex-1 min-w-0">
+                        <PillSelect
+                          ariaLabel={t('capture.valueStepQuestion')}
+                          placeholder={t('capture.selectValueStep')}
+                          value={block.valueStepId ?? ''}
+                          onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, valueStepId: id || null } : b))}
+                          options={[...study.valueSteps].sort((a, b) => a.sortOrder - b.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
+                          variant="milestone"
+                          compact
+                          compactMenu
+                          fullWidth
+                        />
+                      </div>
                     </div>
                   ) : null;
 
@@ -1625,6 +1628,9 @@ export default function CapturePage() {
                       {/* Mode C — free text (picker off, explicit free-text choice, or legacy orphan) */}
                       {showFreeText && !hasStep && (
                         <>
+                          {/* Value step FIRST (2026-07-04) — the journey-stage
+                              question is answered before classifying the step. */}
+                          {valueStepSelector}
                           <div className="flex items-center justify-between gap-1">
                             <SegmentedToggle
                               value={block.tag}
@@ -1645,9 +1651,6 @@ export default function CapturePage() {
                               &times;
                             </button>
                           </div>
-                          {/* Value step ABOVE the description (2026-07-04) so the
-                              journey-stage question is answered before writing. */}
-                          {valueStepSelector}
                           <textarea
                             value={block.text}
                             onChange={(e) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, text: e.target.value } : b))}

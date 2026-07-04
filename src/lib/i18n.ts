@@ -1212,10 +1212,10 @@ const translations = {
     de: 'Auf welchen Wertschritt bezogen?',
   },
   'capture.selectValueStep': {
-    en: 'Select value step',
-    da: 'V\u00e6lg v\u00e6rditrin',
-    sv: 'V\u00e4lj v\u00e4rdesteg',
-    de: 'Wertschritt w\u00e4hlen',
+    en: 'Value step',
+    da: 'V\u00e6rditrin',
+    sv: 'V\u00e4rdesteg',
+    de: 'Wertschritt',
   },
   'capture.workBlockDate': {
     en: 'Step date',

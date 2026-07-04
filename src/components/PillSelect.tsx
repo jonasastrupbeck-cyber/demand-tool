@@ -24,7 +24,7 @@ export interface PillSelectOption {
   operationalDefinition?: string | null;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'sequence' | 'failure' | 'add' | 'thinking';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'sequence' | 'failure' | 'add' | 'thinking' | 'milestone';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -66,6 +66,12 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   if (variant === 'add') {
     // "+ Add ..." style — solid light-blue (sky) outline. Used for system condition.
     return 'bg-white text-sky-700 border-sky-300 hover:border-sky-500 hover:bg-sky-50';
+  }
+  if (variant === 'milestone') {
+    // Pale sky wash — matches the decision-box milestone pill headers
+    // (bg-sky-50 wash, sky-200 border, sky-700 text) on the flow board and
+    // in settings. Used for the value-step picker per Jonas 2026-07-04.
+    return 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100';
   }
   if (variant === 'thinking') {
     // Deeper-blue twin of the 'add' variant, used for the Thinking strand so
@@ -129,8 +135,9 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
     // fullWidth pills match their trigger exactly (no 240px floor) so the
     // popover never exceeds the work block the pill sits in. compactMenu
     // lowers the floor to 180px — a 240px menu under a tight compact pill
-    // reads oversized.
-    const minWidth = fullWidth ? r.width : compactMenu ? 180 : 240;
+    // reads oversized. fullWidth + compactMenu keeps the 180px floor so a
+    // narrow row-filling pill (value step) still opens a readable menu.
+    const minWidth = fullWidth ? (compactMenu ? Math.max(r.width, 180) : r.width) : compactMenu ? 180 : 240;
     const width = Math.min(Math.max(r.width, minWidth), window.innerWidth - margin * 2);
     let left = r.left;
     if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;

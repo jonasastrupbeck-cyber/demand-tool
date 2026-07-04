@@ -652,23 +652,26 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       const showFreeText = b.tag === 'failure_demand' || !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
                       // Value step (migration 0047) — which value-journey stage
-                      // this work relates to. One per step, any tag. Compact
-                      // single-row layout (2026-07-04), rendered ABOVE the
-                      // textarea in free-text mode, card bottom otherwise —
-                      // mirrors capture/page.tsx.
+                      // this work relates to. One per step, any tag. One-line
+                      // row (2026-07-04): label left, row-filling milestone-sky
+                      // pill right, ABOVE the tag toggle in free-text mode,
+                      // card bottom otherwise — mirrors capture/page.tsx.
                       const valueStepSelector = flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 p-1.5 rounded-md border bg-green-50 border-green-200">
-                          <p className="text-[10px] font-medium text-gray-700">{t('capture.valueStepQuestion')}</p>
-                          <PillSelect
-                            ariaLabel={t('capture.valueStepQuestion')}
-                            placeholder={t('capture.selectValueStep')}
-                            value={b.valueStepId ?? ''}
-                            onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, valueStepId: id || null } : p))}
-                            options={[...study.valueSteps].sort((a, c) => a.sortOrder - c.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
-                            variant="value"
-                            compact
-                            compactMenu
-                          />
+                        <div className="flex items-center gap-1.5 p-1.5 rounded-md border bg-green-50 border-green-200">
+                          <p className="shrink-0 text-[10px] font-medium text-gray-700">{t('capture.valueStepQuestion')}</p>
+                          <div className="flex-1 min-w-0">
+                            <PillSelect
+                              ariaLabel={t('capture.valueStepQuestion')}
+                              placeholder={t('capture.selectValueStep')}
+                              value={b.valueStepId ?? ''}
+                              onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, valueStepId: id || null } : p))}
+                              options={[...study.valueSteps].sort((a, c) => a.sortOrder - c.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
+                              variant="milestone"
+                              compact
+                              compactMenu
+                              fullWidth
+                            />
+                          </div>
                         </div>
                       ) : null;
                       return (
@@ -753,6 +756,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           })()}
                           {showFreeText && !hasStep && (
                             <>
+                              {/* Value step FIRST (2026-07-04) — mirrors the
+                                  capture composer. */}
+                              {valueStepSelector}
                               <div className="flex items-center justify-between gap-1">
                                 <SegmentedToggle
                                   options={[
@@ -775,9 +781,6 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   aria-label="Remove"
                                 >&times;</button>
                               </div>
-                              {/* Value step ABOVE the description (2026-07-04) —
-                                  mirrors the capture composer. */}
-                              {valueStepSelector}
                               <textarea
                                 value={b.text}
                                 onChange={(e) => {
