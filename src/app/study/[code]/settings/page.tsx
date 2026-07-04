@@ -8,6 +8,7 @@ import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
 import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
 import ChildQuestionAdder from '@/components/ChildQuestionAdder';
+import CollapsibleCard from '@/components/CollapsibleCard';
 import { buildSubquestionTree, type SubqTreeNode, type RootNote } from '@/lib/subquestion-tree';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
@@ -155,8 +156,6 @@ export default function SettingsPage() {
   const [purposeInput, setPurposeInput] = useState('');
   const [purposeSaved, setPurposeSaved] = useState(false);
 
-  // Form preview
-  const [showPreview, setShowPreview] = useState(false);
 
   // Add forms
   const [newHandling, setNewHandling] = useState('');
@@ -176,6 +175,9 @@ export default function SettingsPage() {
   // Builder UX (2026-07-04): which subquestion row has its "⋯ Advanced"
   // (ConditionEditor) section open. Rows with a visibility note always show it.
   const [advancedSqId, setAdvancedSqId] = useState<string | null>(null);
+  // Which milestones are expanded in settings (blue-pill collapse, default all closed).
+  const [expandedMsIds, setExpandedMsIds] = useState<Set<string>>(new Set());
+  const toggleMs = (id: string) => setExpandedMsIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -626,7 +628,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
       }),
-      (id) => setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, demandTypeConditions: [], subquestions: [] }] } : s)),
+      (id) => { setExpandedMsIds((prev) => new Set(prev).add(id)); setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, demandTypeConditions: [], subquestions: [] }] } : s)); },
     );
   }
 
@@ -1164,7 +1166,15 @@ export default function SettingsPage() {
   return (
     <div className="pb-8">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
-        <h1 className="text-xl font-bold text-gray-900">{t('settings.title')}</h1>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h1 className="text-xl font-bold text-gray-900">{t('settings.title')}</h1>
+          {/* Access code — compact, always visible at the top (share with collectors). */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-500">{t('settings.accessCode')}</span>
+            <span className="font-mono font-bold tracking-wider text-brand bg-red-50 px-2 py-0.5 rounded">{study.accessCode}</span>
+            <button onClick={copyCode} className="text-xs text-gray-500 hover:text-gray-700 underline">{copied ? t('settings.copied') : t('settings.copy')}</button>
+          </div>
+        </div>
 
         {/* Set PIN prompt (for studies without a PIN) */}
         {!study.consultantPin && (
@@ -1188,9 +1198,7 @@ export default function SettingsPage() {
         )}
 
         {/* Purpose statement — first per Vanguard Method */}
-        {!isFlow && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.purpose')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.purposeDesc')}</p>
+        {!isFlow && <CollapsibleCard title={t('settings.purpose')} description={t('settings.purposeDesc')}>
           <textarea
             value={purposeInput}
             onChange={(e) => setPurposeInput(e.target.value)}
@@ -1208,16 +1216,14 @@ export default function SettingsPage() {
             </button>
             {purposeSaved && <span className="text-sm text-green-600">{t('settings.saved')}</span>}
           </div>
-        </div>}
+        </CollapsibleCard>}
 
         {/* System type — the layout regime (2026-06-11). A regime, not a
             strand toggle, so it lives outside CaptureTogglesPanel. Switching
             to flow re-applies the additive preset server-side; switching back
             only changes the layout — nothing is ever turned off. Hidden for
             flow studies (R9): you never switch a flow study back. */}
-        {!isFlow && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.systemTypeTitle')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.systemTypeDesc')}</p>
+        {!isFlow && <CollapsibleCard title={t('settings.systemTypeTitle')} description={t('settings.systemTypeDesc')}>
           <SegmentedToggle
             ariaLabel={t('settings.systemTypeTitle')}
             value={study.systemType}
@@ -1240,7 +1246,7 @@ export default function SettingsPage() {
               { value: 'flow', label: t('create.systemTypeFlow'), activeColor: 'green' },
             ]}
           />
-        </div>}
+        </CollapsibleCard>}
 
         {/* What are we capturing? — toggles that replaced layer activation.
             Hidden for flow (R9): flow strands are preset, not consultant-tuned. */}
@@ -1259,9 +1265,7 @@ export default function SettingsPage() {
             panel (R9 — strands are preset), but Synthesise + Flow analytics are
             dashboard/analysis views the consultant DOES choose, so surface just
             those two here for flow. Non-flow studies get them in the panel above. */}
-        {isFlow && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.dashboardFeaturesTitle')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.dashboardFeaturesDesc')}</p>
+        {isFlow && <CollapsibleCard title={t('settings.dashboardFeaturesTitle')} description={t('settings.dashboardFeaturesDesc')}>
           <div className="flex flex-col items-center gap-3">
             {([
               { field: 'synthesisEnabled' as const, label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
@@ -1291,28 +1295,10 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
-        </div>}
-
-        {/* Access code */}
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-3 text-gray-900">{t('settings.accessCode')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.shareCode')}</p>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-mono font-bold tracking-widest px-4 py-2 rounded-lg text-brand bg-red-50">
-              {study.accessCode}
-            </span>
-            <button onClick={copyCode} className="px-4 py-2 text-sm rounded-lg transition-colors text-gray-600 bg-gray-100 hover:bg-gray-200">
-              {copied ? t('settings.copied') : t('settings.copy')}
-            </button>
-          </div>
-        </div>
-
-
+        </CollapsibleCard>}
 
         {/* Handling types — visible whenever handling is enabled */}
-        {study.handlingEnabled && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.handlingTypes')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.handlingDesc')}</p>
+        {study.handlingEnabled && <CollapsibleCard title={t('settings.handlingTypes')} description={t('settings.handlingDesc')}>
           <ul className="space-y-2 mb-4">
             {study.handlingTypes.map((ht) => (
               <li key={ht.id} className="py-2 px-3 rounded-lg">
@@ -1369,12 +1355,10 @@ export default function SettingsPage() {
             <input type="text" value={newHandling} onChange={(e) => setNewHandling(e.target.value)} placeholder={t('settings.addHandling')} className={inputCls} />
             <button type="submit" disabled={!newHandling.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>}
+        </CollapsibleCard>}
 
         {/* Contact methods — demand-only, hidden for flow (R9). */}
-        {!isFlow && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.contactMethods')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.contactMethodsDesc')}</p>
+        {!isFlow && <CollapsibleCard title={t('settings.contactMethods')} description={t('settings.contactMethodsDesc')}>
           <ul className="space-y-2 mb-4">
             {study.contactMethods.map((cm) => (
               <li key={cm.id} className={itemCls}>
@@ -1387,12 +1371,10 @@ export default function SettingsPage() {
             <input type="text" value={newContactMethod} onChange={(e) => setNewContactMethod(e.target.value)} placeholder={t('settings.addContactMethod')} className={inputCls} />
             <button type="submit" disabled={!newContactMethod.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>}
+        </CollapsibleCard>}
 
         {/* Points of transaction — demand-only, hidden for flow (R9). */}
-        {!isFlow && <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.pointsOfTransaction')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.pointsOfTransactionDesc')}</p>
+        {!isFlow && <CollapsibleCard title={t('settings.pointsOfTransaction')} description={t('settings.pointsOfTransactionDesc')}>
           <ul className="space-y-2 mb-4">
             {(study.pointsOfTransaction || []).map((pot) => (
               <li key={pot.id} className={itemCls}>
@@ -1416,7 +1398,7 @@ export default function SettingsPage() {
             <input type="text" value={newPointOfTransaction} onChange={(e) => setNewPointOfTransaction(e.target.value)} placeholder={t('settings.addPointOfTransaction')} className={inputCls} />
             <button type="submit" disabled={!newPointOfTransaction.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>}
+        </CollapsibleCard>}
 
         {/* Decision box (redesigned 0042): milestones hold SUBQUESTIONS directly.
             Completion is implicit — every REQUIRED subquestion answered — so
@@ -1604,14 +1586,18 @@ export default function SettingsPage() {
             );
           };
           return (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.milestones')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.subquestionsDesc')}</p>
-            <div className="space-y-3 mb-4">
-              {orderedMs.map((m, idx) => (
-                <div key={m.id} className="rounded-lg border border-gray-200 bg-gray-100/70 p-2">
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="shrink-0 w-5 text-xs text-gray-400 tabular-nums text-center">{idx + 1}</span>
+          <CollapsibleCard title={t('settings.milestones')} description={t('settings.subquestionsDesc')}>
+            <div className="space-y-5 mb-4">
+              {orderedMs.map((m, idx) => {
+                const msOpen = expandedMsIds.has(m.id);
+                return (
+                <div key={m.id} className="rounded-xl border-2 border-sky-200 overflow-hidden">
+                  {/* Blue pill header — always visible; the chevron toggles the body. */}
+                  <div className="flex items-center gap-1.5 bg-sky-50/70 px-2 py-1.5">
+                    <button type="button" onClick={() => toggleMs(m.id)} aria-label={t(msOpen ? 'capture.milestoneCollapse' : 'capture.milestoneExpand')} className="shrink-0 flex items-center gap-1 text-sky-700 hover:text-sky-900">
+                      <span className="w-3 text-center text-xs">{msOpen ? '▾' : '▸'}</span>
+                      <span className="w-4 text-xs tabular-nums text-center text-gray-500">{idx + 1}</span>
+                    </button>
                     <input
                       type="text"
                       defaultValue={m.label}
@@ -1619,10 +1605,13 @@ export default function SettingsPage() {
                       onBlur={(e) => patchMilestone(m.id, e.target.value)}
                       className="flex-1 px-2 py-1 rounded text-sm font-semibold text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                     />
+                    {!msOpen && <span className="shrink-0 text-[10px] text-gray-400 tabular-nums">{t('settings.milestoneFieldCount', { count: String(m.subquestions.length) })}</span>}
                     <button type="button" aria-label={t('settings.moveUp')} disabled={idx === 0} onClick={() => moveMilestone(m.id, -1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
                     <button type="button" aria-label={t('settings.moveDown')} disabled={idx === orderedMs.length - 1} onClick={() => moveMilestone(m.id, 1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
                     <button type="button" onClick={() => removeMilestone(m.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0">{t('settings.remove')}</button>
                   </div>
+                  {msOpen && (
+                  <div className="p-2 space-y-1.5 bg-white">
                   {idx === orderedMs.length - 1 && orderedMs.length > 1 && (
                     <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.finalMilestoneHint')}</p>
                   )}
@@ -1715,22 +1704,23 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   )}
+                  </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
             <form onSubmit={addMilestoneHandler} className="flex gap-2 mb-2">
               <input type="text" value={newMilestoneLabel} onChange={(e) => setNewMilestoneLabel(e.target.value)} placeholder={t('settings.milestoneLabel')} className={inputCls} />
               <button type="submit" disabled={!newMilestoneLabel.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand shrink-0">{t('settings.addMilestone')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
           );
         })()}
 
         {/* Work sources — gated on workSourcesEnabled (toggle lives in CaptureTogglesPanel above). */}
         {study.workSourcesEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workSources')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.workSourcesDesc')}</p>
+          <CollapsibleCard title={t('settings.workSources')} description={t('settings.workSourcesDesc')}>
             <ul className="space-y-2 mb-4">
               {(study.workSources || []).map((ws) => (
                 <li key={ws.id} className={itemCls}>
@@ -1754,14 +1744,12 @@ export default function SettingsPage() {
               <input type="text" value={newWorkSource} onChange={(e) => setNewWorkSource(e.target.value)} placeholder={t('settings.addWorkSource')} className={inputCls} />
               <button type="submit" disabled={!newWorkSource.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* Demand Types — gated on demandTypesEnabled (toggle lives in CaptureTogglesPanel above) */}
         {study.demandTypesEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.demandTypes')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.demandTypesDesc')}</p>
+          <CollapsibleCard title={t('settings.demandTypes')} description={t('settings.demandTypesDesc')}>
             {/* Value demand types */}
             <h3 className="text-sm font-semibold mb-1 text-green-700">{t('settings.valueDemandTypes')}</h3>
             <p className="text-xs text-gray-500 mb-2">{t('settings.valueDesc')}</p>
@@ -1793,14 +1781,12 @@ export default function SettingsPage() {
               <input type="text" value={newFailureType} onChange={(e) => setNewFailureType(e.target.value)} placeholder={t('settings.addFailureType')} className={inputCls} />
               <button type="submit" disabled={!newFailureType.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* System Conditions — gated on systemConditionsEnabled (toggle lives in CaptureTogglesPanel above) */}
         {study.systemConditionsEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.systemConditions')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.systemConditionsDesc')}</p>
+          <CollapsibleCard title={t('settings.systemConditions')} description={t('settings.systemConditionsDesc')}>
             <ul className="space-y-2 mb-4">
               {(study.systemConditions || []).map((sc) => (
                 <li key={sc.id} className={`${itemCls} bg-red-50`}>
@@ -1813,15 +1799,13 @@ export default function SettingsPage() {
               <input type="text" value={newSystemCondition} onChange={(e) => setNewSystemCondition(e.target.value)} placeholder={t('settings.addSystemCondition')} className={inputCls} />
               <button type="submit" disabled={!newSystemCondition.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* Thinking — library mirrors System Conditions. Gated on its own toggle
             (migration 0013); decoupled from SC so teams can adopt them independently. */}
         {study.thinkingsEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.thinkings')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.thinkingsDesc')}</p>
+          <CollapsibleCard title={t('settings.thinkings')} description={t('settings.thinkingsDesc')}>
             <ul className="space-y-2 mb-4">
               {(study.thinkings || []).map((th) => (
                 <li key={th.id} className={`${itemCls} bg-red-50`}>
@@ -1834,13 +1818,11 @@ export default function SettingsPage() {
               <input type="text" value={newThinking} onChange={(e) => setNewThinking(e.target.value)} placeholder={t('settings.addThinking')} className={inputCls} />
               <button type="submit" disabled={!newThinking.trim()} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* Customer Lifecycle (optional) */}
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.lifecycle')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.lifecycleDesc')}</p>
+        <CollapsibleCard title={t('settings.lifecycle')} description={t('settings.lifecycleDesc')}>
           <label className="flex items-center gap-3 cursor-pointer mb-4">
             <div className="relative">
               <input
@@ -1925,13 +1907,11 @@ export default function SettingsPage() {
               )}
             </>
           )}
-        </div>
+        </CollapsibleCard>
 
         {/* What Matters Types — hidden unless the "What Matters" capture toggle is on. */}
         {study.whatMattersEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.whatMattersTypes')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.whatMattersTypesDesc')}</p>
+          <CollapsibleCard title={t('settings.whatMattersTypes')} description={t('settings.whatMattersTypesDesc')}>
             <ul className="space-y-2 mb-4">
               {/* Stacked two-line rows (2026-07-02): line 1 = identity (label
                   wraps, tag/remove pinned right), line 2 = controls that WRAP
@@ -2008,14 +1988,12 @@ export default function SettingsPage() {
               <input type="text" value={newWhatMattersType} onChange={(e) => setNewWhatMattersType(e.target.value)} placeholder={t('settings.addWhatMattersType')} className={inputCls} />
               <button type="submit" disabled={!newWhatMattersType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* Life Problem To Be Solved (Phase 2 item 1) — hidden unless toggle is on. */}
         {study.lifeProblemsEnabled && (
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.lifeProblems')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.lifeProblemsDesc')}</p>
+        <CollapsibleCard title={t('settings.lifeProblems')} description={t('settings.lifeProblemsDesc')}>
           <ul className="space-y-2 mb-4">
             {study.lifeProblems.map((lp) => (
               <li key={lp.id} className="py-2 px-3 rounded-lg">
@@ -2052,14 +2030,12 @@ export default function SettingsPage() {
             <input type="text" value={newLifeProblem} onChange={(e) => setNewLifeProblem(e.target.value)} placeholder={t('settings.addLifeProblem')} className={inputCls} />
             <button type="submit" disabled={!newLifeProblem.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand">{t('settings.add')}</button>
           </form>
-        </div>
+        </CollapsibleCard>
         )}
 
         {/* Work Types — gated on workTrackingEnabled + workTypesEnabled (both toggles live in CaptureTogglesPanel above) */}
         {study.workTrackingEnabled && study.workTypesEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workTypes')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.workTypesDesc')}</p>
+          <CollapsibleCard title={t('settings.workTypes')} description={t('settings.workTypesDesc')}>
             <ul className="space-y-2 mb-4">
               {(study.workTypes || []).map((wt) => (
                 <li key={wt.id} className={`${itemCls} ${wt.category === 'value' ? 'bg-green-50' : wt.category === 'sequence' ? 'bg-emerald-50' : 'bg-red-50'}`}>
@@ -2092,16 +2068,14 @@ export default function SettingsPage() {
               />
               <button type="submit" disabled={!newWorkType.trim()} className="px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-amber-600 hover:bg-amber-700">{t('settings.add')}</button>
             </form>
-          </div>
+          </CollapsibleCard>
         )}
 
         {/* Phase 4 (2026-04-16) — Work Steps: managed taxonomy for Flow blocks.
              Only visible when Work Tracking is on. Mirrors Work Types pattern;
              each step carries a fixed tag (value/failure). */}
         {study.workTrackingEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.workSteps')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.workStepsDesc')}</p>
+          <CollapsibleCard title={t('settings.workSteps')} description={t('settings.workStepsDesc')}>
             <label className="flex items-center gap-3 cursor-pointer mb-4">
               <div className="relative">
                 <input
@@ -2160,14 +2134,12 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">{t('settings.synthesiseDesc')}</p>
               </>
             )}
-          </div>
+          </CollapsibleCard>
         )}
         {/* Value Steps (migration 0047): ordered study-level list; one per flow
              work step. Only when Work Tracking is on. */}
         {study.workTrackingEnabled && (
-          <div className={cardCls}>
-            <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.valueSteps')}</h2>
-            <p className="text-sm text-gray-600 mb-3">{t('settings.valueStepsDesc')}</p>
+          <CollapsibleCard title={t('settings.valueSteps')} description={t('settings.valueStepsDesc')}>
             <label className="flex items-center gap-3 cursor-pointer mb-4">
               <div className="relative">
                 <input type="checkbox" checked={study.valueStepsEnabled} onChange={toggleValueSteps} className="sr-only peer" />
@@ -2202,12 +2174,10 @@ export default function SettingsPage() {
                 </form>
               </>
             )}
-          </div>
+          </CollapsibleCard>
         )}
         {/* Volume Mode */}
-        <div className={cardCls}>
-          <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.volumeMode')}</h2>
-          <p className="text-sm text-gray-600 mb-3">{t('settings.volumeModeDesc')}</p>
+        <CollapsibleCard title={t('settings.volumeMode')} description={t('settings.volumeModeDesc')}>
           <label className="flex items-center gap-3 cursor-pointer">
             <div className="relative">
               <input
@@ -2221,19 +2191,11 @@ export default function SettingsPage() {
             </div>
             <span className="text-sm text-gray-700 font-medium">{t('settings.enableVolumeMode')}</span>
           </label>
-        </div>
+        </CollapsibleCard>
 
         {/* Capture form preview — demand-only, hidden for flow (R9). */}
-        {!isFlow && <div className={cardCls}>
-          <button
-            onClick={() => setShowPreview(!showPreview)}
-            className="w-full flex items-center justify-between text-left"
-          >
-            <h2 className="text-base font-semibold text-gray-900">{t('settings.formPreview')}</h2>
-            <span className="text-gray-400 text-xs">{showPreview ? '▲' : '▼'}</span>
-          </button>
-          {showPreview && (
-            <div className="mt-4 space-y-3 pointer-events-none opacity-75">
+        {!isFlow && <CollapsibleCard title={t('settings.formPreview')}>
+            <div className="space-y-3 pointer-events-none opacity-75">
               <p className="text-xs text-gray-500 italic">{t('settings.formPreviewDesc')}</p>
               {/* Verbatim */}
               <div>
@@ -2310,8 +2272,7 @@ export default function SettingsPage() {
                 {t('capture.save')}
               </button>
             </div>
-          )}
-        </div>}
+        </CollapsibleCard>}
       </div>
 
       {/* Phase 4B (2026-04-16) — Synthesis modal: cluster existing free-text

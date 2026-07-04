@@ -3645,6 +3645,12 @@ const translations = {
     sv: 'År & månader → månader',
     de: 'Jahre & Monate → Monate',
   },
+  'settings.milestoneFieldCount': {
+    en: '{count} fields',
+    da: '{count} felter',
+    sv: '{count} fält',
+    de: '{count} Felder',
+  },
   'settings.subquestionCurrencyCode': {
     en: 'Currency',
     da: 'Valuta',
