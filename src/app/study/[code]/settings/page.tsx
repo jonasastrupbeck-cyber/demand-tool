@@ -7,7 +7,7 @@ import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
 import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
 import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
-import SubquestionExcludeFor from '@/components/SubquestionExcludeFor';
+import DemandTypeMultiSelect from '@/components/DemandTypeMultiSelect';
 import { compatibleKinds } from '@/lib/subquestion-kinds';
 import ChildQuestionAdder from '@/components/ChildQuestionAdder';
 import CollapsibleCard from '@/components/CollapsibleCard';
@@ -114,7 +114,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -1695,12 +1695,25 @@ export default function SettingsPage() {
                   <div className="space-y-1.5 pt-0.5">
                     <label className="flex items-center gap-1 text-xs text-gray-500">
                       <input type="checkbox" checked={!sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: !e.target.checked })} className="accent-brand" />
-                      {t('settings.subquestionNotMandatory')}
+                      {t('settings.subquestionNotMandatoryAll')}
                       <span className="text-[10px] text-gray-400">— {t('settings.subquestionNotMandatoryHint')}</span>
                     </label>
-                    <SubquestionExcludeFor
+                    <DemandTypeMultiSelect
                       code={code}
                       sqId={sq.id}
+                      resource="optional"
+                      variant="amber"
+                      label={t('settings.subquestionNotMandatoryFor')}
+                      selected={sq.demandTypeOptional}
+                      demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
+                      onRefresh={loadStudy}
+                    />
+                    <DemandTypeMultiSelect
+                      code={code}
+                      sqId={sq.id}
+                      resource="exclusions"
+                      variant="red"
+                      label={t('settings.subquestionExcludeFor')}
                       selected={sq.demandTypeExclusions}
                       demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
                       onRefresh={loadStudy}

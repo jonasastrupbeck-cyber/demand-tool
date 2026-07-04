@@ -445,6 +445,18 @@ export const subquestionDemandTypeExclusions = pgTable('subquestion_demand_type_
   uniqSubqDt: unique('subquestion_dt_exclusions_unique').on(t.subquestionId, t.demandTypeId),
 }));
 
+// Per-subquestion demand-type NOT-MANDATORY set (0055): a required subquestion
+// with rows here is still SHOWN but does not gate milestone completion for a case
+// whose demand-type set intersects them (parallel to the exclusions table, which
+// additionally HIDES the question). No rows = normal gating.
+export const subquestionDemandTypeOptional = pgTable('subquestion_demand_type_optional', {
+  id: text('id').primaryKey(),
+  subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  demandTypeId: text('demand_type_id').notNull().references(() => demandTypes.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  uniqSubqDtOpt: unique('subquestion_dt_optional_unique').on(t.subquestionId, t.demandTypeId),
+}));
+
 // Conditional visibility (0050): a CHILD subquestion is shown only when its
 // PARENT choice-subquestion's answer equals one of the trigger option labels.
 // No rows for a child = always shown (back-compat). Multiple rows = OR.

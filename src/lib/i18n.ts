@@ -3708,17 +3708,35 @@ const translations = {
     sv: 'Inte obligatorisk',
     de: 'Nicht obligatorisch',
   },
+  'settings.subquestionNotMandatoryAll': {
+    en: 'Not mandatory (all cases)',
+    da: 'Ikke obligatorisk (alle sager)',
+    sv: 'Inte obligatorisk (alla ärenden)',
+    de: 'Nicht obligatorisch (alle Fälle)',
+  },
   'settings.subquestionNotMandatoryHint': {
     en: 'milestone can complete without it',
     da: 'milepælen kan fuldføres uden den',
     sv: 'milstolpen kan slutföras utan den',
     de: 'Meilenstein kann ohne sie abgeschlossen werden',
   },
+  'settings.subquestionNotMandatoryFor': {
+    en: 'Not mandatory for',
+    da: 'Ikke obligatorisk for',
+    sv: 'Inte obligatorisk för',
+    de: 'Nicht obligatorisch für',
+  },
   'settings.subquestionExcludeFor': {
     en: 'Exclude for',
     da: 'Udelad for',
     sv: 'Uteslut för',
     de: 'Ausschließen für',
+  },
+  'settings.demandTypePickerEmpty': {
+    en: 'all cases',
+    da: 'alle sager',
+    sv: 'alla ärenden',
+    de: 'alle Fälle',
   },
   'settings.subquestionFieldType': {
     en: 'Field type',

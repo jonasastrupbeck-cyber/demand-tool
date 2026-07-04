@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
@@ -1885,9 +1885,12 @@ export async function getSubquestions(studyId: string) {
     .orderBy(asc(subquestionOptions.sortOrder));
   const conds = await db.select().from(subquestionConditions)
     .where(inArray(subquestionConditions.subquestionId, ids));
-  // Per-subquestion demand-type exclusions (0054): nested like milestone scoping.
+  // Per-subquestion demand-type exclusions (0054) + not-mandatory set (0055):
+  // nested like milestone scoping.
   const excls = await db.select().from(subquestionDemandTypeExclusions)
     .where(inArray(subquestionDemandTypeExclusions.subquestionId, ids));
+  const opts2 = await db.select().from(subquestionDemandTypeOptional)
+    .where(inArray(subquestionDemandTypeOptional.subquestionId, ids));
   return rows.map((r) => ({
     ...r,
     options: opts.filter((o) => o.subquestionId === r.id)
@@ -1895,6 +1898,7 @@ export async function getSubquestions(studyId: string) {
     conditions: conds.filter((c) => c.subquestionId === r.id)
       .map((c) => ({ id: c.id, parentSubquestionId: c.parentSubquestionId, triggerValue: c.triggerValue })),
     demandTypeExclusions: excls.filter((e) => e.subquestionId === r.id).map((e) => e.demandTypeId),
+    demandTypeOptional: opts2.filter((e) => e.subquestionId === r.id).map((e) => e.demandTypeId),
   }));
 }
 
@@ -2124,11 +2128,13 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
 
   // Conditional visibility (0050): a required-but-HIDDEN subquestion does not
   // gate — only currently-visible required subquestions must be answered.
-  // Per-subquestion demand-type exclusions (0054): an excluded subquestion is
-  // likewise dropped — it never gates completion for this case.
+  // Per-subquestion demand-type exclusions (0054) hide + un-gate; the
+  // not-mandatory set (0055) keeps the question shown but drops it from gating.
+  // Both are removed here for this case (exclude-wins is automatic).
   const vis = visible ?? (studyId ? await getCaseVisibleSubquestionIds(caseId, studyId) : new Set<string>());
   const excluded = studyId ? await getCaseExcludedSubquestionIds(caseId, studyId) : new Set<string>();
-  const visibleReq = reqRows.filter((r) => vis!.has(r.id) && !excluded.has(r.id));
+  const optional = studyId ? await getCaseOptionalSubquestionIds(caseId, studyId) : new Set<string>();
+  const visibleReq = reqRows.filter((r) => vis!.has(r.id) && !excluded.has(r.id) && !optional.has(r.id));
   // Every required subquestion is conditionally hidden for this case → there is
   // nothing to gate on. Don't auto-complete an empty milestone (whole-milestone
   // skipping by demand type is a separate concern — see Slice 5). Leave open.
@@ -2283,6 +2289,35 @@ export async function getCaseExcludedSubquestionIds(caseId: string, studyId: str
   const excluded = new Set<string>();
   for (const r of rows) if (caseDT.has(r.demandTypeId)) excluded.add(r.subquestionId);
   return excluded;
+}
+
+// Diff-set the demand types a subquestion is NOT MANDATORY for (0055; empty = normal).
+export async function setSubquestionDemandTypeOptional(subquestionId: string, demandTypeIds: string[]) {
+  const desired = new Set(demandTypeIds);
+  const current = await db.select().from(subquestionDemandTypeOptional).where(eq(subquestionDemandTypeOptional.subquestionId, subquestionId));
+  const currentIds = new Set(current.map((r) => r.demandTypeId));
+  for (const r of current) {
+    if (!desired.has(r.demandTypeId)) await db.delete(subquestionDemandTypeOptional).where(eq(subquestionDemandTypeOptional.id, r.id));
+  }
+  for (const dtId of demandTypeIds) {
+    if (currentIds.has(dtId)) continue;
+    await db.insert(subquestionDemandTypeOptional).values({ id: generateId(), subquestionId, demandTypeId: dtId });
+  }
+}
+
+// Subquestion ids NOT MANDATORY for a case (0055): still shown, but dropped from
+// completion gating when their optional set intersects the case's demand types.
+export async function getCaseOptionalSubquestionIds(caseId: string, studyId: string): Promise<Set<string>> {
+  const caseDT = new Set(await getCaseDemandTypeIds(caseId));
+  if (caseDT.size === 0) return new Set();
+  const rows = await db.select({ subquestionId: subquestionDemandTypeOptional.subquestionId, demandTypeId: subquestionDemandTypeOptional.demandTypeId })
+    .from(subquestionDemandTypeOptional)
+    .innerJoin(subquestions, eq(subquestionDemandTypeOptional.subquestionId, subquestions.id))
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(eq(milestones.studyId, studyId));
+  const optional = new Set<string>();
+  for (const r of rows) if (caseDT.has(r.demandTypeId)) optional.add(r.subquestionId);
+  return optional;
 }
 
 // Milestones that APPLY to a case: no scope rows → applies to all; otherwise the

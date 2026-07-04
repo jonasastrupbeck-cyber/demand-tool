@@ -47,6 +47,9 @@ export interface Subquestion {
   // Demand-type ids this subquestion is EXCLUDED for (0054). Empty/undefined =
   // applies to every case.
   demandTypeExclusions?: string[];
+  // Demand-type ids this subquestion is NOT MANDATORY for (0055) — still shown,
+  // just not gating. Empty/undefined = normal.
+  demandTypeOptional?: string[];
 }
 
 export interface Draft {
