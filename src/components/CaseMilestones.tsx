@@ -136,8 +136,15 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
       const s = subqById.get(id);
       if (s && s.kind === 'calculated') return { number: computeCalc(s, next), years: null, months: null, date: null };
       const dd = drafts[id] ?? EMPTY_DRAFT;
+      const y = parseInt10(dd.years), mo = parseInt10(dd.months);
+      // A duration_months sibling resolves to its total months for BOTH a bare
+      // {sq:id} reference AND MONTHS({sq:id}).
+      if (s?.kind === 'duration_months') {
+        const total = (y != null || mo != null) ? (y ?? 0) * 12 + (mo ?? 0) : null;
+        return { number: total, years: y, months: mo, date: null };
+      }
       const num = s?.kind === 'currency' ? parseAmountLoose(dd.num) : parseNum(dd.num);
-      return { number: num, years: parseInt10(dd.years), months: parseInt10(dd.months), date: dd.date || null };
+      return { number: num, years: y, months: mo, date: dd.date || null };
     };
     return evalFormula(sq.formula, resolve);
   };
@@ -148,10 +155,11 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
       subquestionId: sq.id,
       valueNumber: sq.kind === 'calculated' ? computeCalc(sq)
         : sq.kind === 'currency' ? parseAmountLoose(d.num)
-        : (sq.kind === 'amount' || sq.kind === 'number' || sq.kind === 'percent') ? parseNum(d.num) : null,
+        : (sq.kind === 'amount' || sq.kind === 'number' || sq.kind === 'percent') ? parseNum(d.num)
+        : sq.kind === 'duration_months' ? ((parseInt10(d.years) != null || parseInt10(d.months) != null) ? (parseInt10(d.years) ?? 0) * 12 + (parseInt10(d.months) ?? 0) : null) : null,
       valueDate: sq.kind === 'date' && d.date ? `${d.date}T12:00:00.000Z` : null,
-      valueYears: sq.kind === 'duration' ? parseInt10(d.years) : null,
-      valueMonths: sq.kind === 'duration' ? parseInt10(d.months) : null,
+      valueYears: (sq.kind === 'duration' || sq.kind === 'duration_months') ? parseInt10(d.years) : null,
+      valueMonths: (sq.kind === 'duration' || sq.kind === 'duration_months') ? parseInt10(d.months) : null,
       valueChoice: sq.kind === 'choice' && d.choice ? d.choice : null,
       valueText: sq.kind === 'text' && d.text.trim() ? d.text.trim() : null,
       answeredAt: `${answeredAt}T12:00:00.000Z`,
@@ -200,8 +208,8 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
 
   const renderAskLine = (sq: Subquestion, d: Draft) => {
     if (!sq.linkedWhatMattersTypeId) return null;
-    // text/choice/percent/calculated aren't comparable to a timed/amount ask; number compares like amount.
-    if (sq.kind === 'text' || sq.kind === 'choice' || sq.kind === 'percent' || sq.kind === 'calculated') return null;
+    // text/choice/percent/calculated/duration_months aren't comparable to a timed/amount ask; number compares like amount.
+    if (sq.kind === 'text' || sq.kind === 'choice' || sq.kind === 'percent' || sq.kind === 'calculated' || sq.kind === 'duration_months') return null;
     const ask = whatMattersValues[sq.linkedWhatMattersTypeId];
     if (!ask) return null;
     const text = askText(ask);

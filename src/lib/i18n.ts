@@ -3639,6 +3639,12 @@ const translations = {
     sv: 'Valuta',
     de: 'Währung',
   },
+  'settings.subquestionKindDurationMonths': {
+    en: 'Years & months → months',
+    da: 'År & måneder → måneder',
+    sv: 'År & månader → månader',
+    de: 'Jahre & Monate → Monate',
+  },
   'settings.subquestionCurrencyCode': {
     en: 'Currency',
     da: 'Valuta',

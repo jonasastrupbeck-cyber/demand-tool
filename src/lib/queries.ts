@@ -1824,7 +1824,7 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
 // is a typed box under a milestone; choice options can carry polarity; filling
 // the required ones completes the milestone (recomputeCaseMilestone).
 
-export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
 export type OptionPolarity = 'positive' | 'negative';
 
 export interface AnswerShape {
@@ -1845,7 +1845,8 @@ export function answerIsFilled(kind: SubquestionKind, a: Partial<AnswerShape>): 
     case 'currency':
     case 'calculated': return a.valueNumber != null;
     case 'date': return a.valueDate != null;
-    case 'duration': return a.valueYears != null || a.valueMonths != null;
+    case 'duration':
+    case 'duration_months': return a.valueYears != null || a.valueMonths != null;
     case 'text': return a.valueText != null && a.valueText.trim() !== '';
     case 'choice': return a.valueChoice != null && a.valueChoice !== '';
     default: return false;

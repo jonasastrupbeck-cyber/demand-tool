@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStudyByCode, getMilestones, getWhatMattersTypes, addSubquestion, type SubquestionKind } from '@/lib/queries';
 
-const KINDS: SubquestionKind[] = ['amount', 'number', 'percent', 'currency', 'calculated', 'date', 'duration', 'text', 'choice'];
+const KINDS: SubquestionKind[] = ['amount', 'number', 'percent', 'currency', 'calculated', 'date', 'duration', 'duration_months', 'text', 'choice'];
 
 // POST — add a subquestion (a typed box) to a milestone of this study. Kind is
 // immutable after create (see updateSubquestion).

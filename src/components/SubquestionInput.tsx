@@ -14,7 +14,7 @@
 import { useLocale } from '@/lib/locale-context';
 import { formatCurrency, currencyForSubquestion, parseAmountLoose } from '@/lib/format-currency';
 
-export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
 export type OptionPolarity = 'positive' | 'negative' | null;
 
 export interface SubquestionOption {
@@ -125,6 +125,18 @@ export default function SubquestionInput({ subquestion: sq, draft: d, onChange, 
         <div className="flex items-center gap-1">
           <input type="number" value={d.years} onChange={(e) => onChange({ years: e.target.value })} placeholder={t('capture.wmYearsPlaceholder')} aria-label={`${tl(sq.label)} — ${t('capture.wmYearsPlaceholder')}`} className={`${inputCls} w-14`} />
           <input type="number" value={d.months} onChange={(e) => onChange({ months: e.target.value })} placeholder={t('capture.wmMonthsPlaceholder')} aria-label={`${tl(sq.label)} — ${t('capture.wmMonthsPlaceholder')}`} className={`${inputCls} w-14`} />
+        </div>
+      )}
+
+      {sq.kind === 'duration_months' && (
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <input type="number" value={d.years} onChange={(e) => onChange({ years: e.target.value })} placeholder={t('capture.wmYearsPlaceholder')} aria-label={`${tl(sq.label)} — ${t('capture.wmYearsPlaceholder')}`} className={`${inputCls} w-14`} />
+            <input type="number" value={d.months} onChange={(e) => onChange({ months: e.target.value })} placeholder={t('capture.wmMonthsPlaceholder')} aria-label={`${tl(sq.label)} — ${t('capture.wmMonthsPlaceholder')}`} className={`${inputCls} w-14`} />
+          </div>
+          {(d.years !== '' || d.months !== '') && (
+            <output className="text-[10px] text-gray-500 tabular-nums">= {(parseInt(d.years, 10) || 0) * 12 + (parseInt(d.months, 10) || 0)} {t('capture.unitMonthsShort')}</output>
+          )}
         </div>
       )}
 

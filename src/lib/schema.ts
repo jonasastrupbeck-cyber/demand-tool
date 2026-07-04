@@ -378,7 +378,7 @@ export const subquestions = pgTable('subquestions', {
   id: text('id').primaryKey(),
   milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
-  kind: text('kind').$type<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>().notNull(),
+  kind: text('kind').$type<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'>().notNull(),
   // Milestone completion = every REQUIRED subquestion answered.
   required: boolean('required').notNull().default(true),
   linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),

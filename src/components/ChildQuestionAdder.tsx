@@ -27,7 +27,7 @@ interface Props {
   onRefresh: () => Promise<void> | void;
 }
 
-type AdderKind = 'yesno' | 'choice' | 'amount' | 'number' | 'percent' | 'currency' | 'date' | 'duration' | 'text';
+type AdderKind = 'yesno' | 'choice' | 'amount' | 'number' | 'percent' | 'currency' | 'date' | 'duration' | 'duration_months' | 'text';
 
 export default function ChildQuestionAdder({ code, milestoneId, parentSubquestionId, triggerValue, triggerDisplay, onRefresh }: Props) {
   const { t } = useLocale();
@@ -46,6 +46,7 @@ export default function ChildQuestionAdder({ code, milestoneId, parentSubquestio
     { value: 'currency', label: t('settings.subquestionKindCurrency') },
     { value: 'date', label: t('settings.captureFieldKindDate') },
     { value: 'duration', label: t('settings.captureFieldKindDuration') },
+    { value: 'duration_months', label: t('settings.subquestionKindDurationMonths') },
   ];
 
   const reset = () => { setOpen(false); setLabel(''); setKind('yesno'); };

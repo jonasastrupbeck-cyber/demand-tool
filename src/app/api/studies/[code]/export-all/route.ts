@@ -146,6 +146,7 @@ export async function GET(
       case 'calculated': return a.valueNumber == null ? '' : String(a.valueNumber);
       case 'date': return a.valueDate ? new Date(a.valueDate).toLocaleDateString() : '';
       case 'duration': return (a.valueYears == null && a.valueMonths == null) ? '' : `${a.valueYears ?? 0}y ${a.valueMonths ?? 0}m`;
+      case 'duration_months': return a.valueNumber == null ? '' : String(a.valueNumber);
       case 'choice': return a.valueChoice || '';
       case 'text': return a.valueText || '';
       default: return '';

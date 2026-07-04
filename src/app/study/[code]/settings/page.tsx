@@ -111,7 +111,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -170,7 +170,7 @@ export default function SettingsPage() {
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
   const [newSubqLabel, setNewSubqLabel] = useState('');
-  const [newSubqKind, setNewSubqKind] = useState<'yesno' | 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>('yesno');
+  const [newSubqKind, setNewSubqKind] = useState<'yesno' | 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'>('yesno');
   // Which milestone's preset menu is open (add a ready-made choice subquestion).
   const [presetMenuMsId, setPresetMenuMsId] = useState<string | null>(null);
   // Builder UX (2026-07-04): which subquestion row has its "⋯ Advanced"
@@ -1433,6 +1433,7 @@ export default function SettingsPage() {
             : k === 'calculated' ? t('settings.subquestionKindCalculated')
             : k === 'date' ? t('settings.captureFieldKindDate')
             : k === 'duration' ? t('settings.captureFieldKindDuration')
+            : k === 'duration_months' ? t('settings.subquestionKindDurationMonths')
             : k === 'text' ? t('settings.subquestionKindText')
             : t('settings.captureFieldKindChoice');
           const canLink = (k: string) => k === 'amount' || k === 'number' || k === 'currency' || k === 'date' || k === 'duration';
@@ -1666,6 +1667,7 @@ export default function SettingsPage() {
                         <option value="calculated">{t('settings.subquestionKindCalculated')}</option>
                         <option value="date">{t('settings.captureFieldKindDate')}</option>
                         <option value="duration">{t('settings.captureFieldKindDuration')}</option>
+                        <option value="duration_months">{t('settings.subquestionKindDurationMonths')}</option>
                         <option value="text">{t('settings.subquestionKindText')}</option>
                       </select>
                       <button type="button" onClick={() => addSubquestionHandler(m.id)} disabled={!newSubqLabel.trim()} className="shrink-0 px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-50 bg-brand">{t('settings.add')}</button>
