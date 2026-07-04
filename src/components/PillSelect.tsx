@@ -55,6 +55,11 @@ interface Props {
    *  the default `text-sm px-3 py-1.5`. Matches the flow saved-touch card sizing.
    *  The popover options stay readable. Default false. */
   compact?: boolean;
+  /** Shrinks the POPOVER too — `text-xs px-2.5 py-1.5` options (and a 180px
+   *  min-width instead of 240px) to match a `compact` trigger. Opt-in and
+   *  separate from `compact` so existing compact pills keep readable menus.
+   *  Default false. */
+  compactMenu?: boolean;
 }
 
 function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string {
@@ -97,7 +102,7 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   return 'bg-white text-gray-500 border-gray-300 hover:border-gray-400';
 }
 
-export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, onCreate, addNewLabel, fullWidth = false, compact = false }: Props) {
+export default function PillSelect({ value, onChange, options, placeholder, ariaLabel, className = '', variant = 'default', onAddNew, onCreate, addNewLabel, fullWidth = false, compact = false, compactMenu = false }: Props) {
   const [open, setOpen] = useState(false);
   // Inline-create state (only used when onCreate is provided).
   const [adding, setAdding] = useState(false);
@@ -122,8 +127,10 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
     const margin = 8;
     const gap = 6;
     // fullWidth pills match their trigger exactly (no 240px floor) so the
-    // popover never exceeds the work block the pill sits in.
-    const minWidth = fullWidth ? r.width : 240;
+    // popover never exceeds the work block the pill sits in. compactMenu
+    // lowers the floor to 180px — a 240px menu under a tight compact pill
+    // reads oversized.
+    const minWidth = fullWidth ? r.width : compactMenu ? 180 : 240;
     const width = Math.min(Math.max(r.width, minWidth), window.innerWidth - margin * 2);
     let left = r.left;
     if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
@@ -226,7 +233,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
           className="z-50 overflow-y-auto py-1 rounded-lg bg-white border border-gray-200 shadow-lg"
         >
           {options.length === 0 && !onAddNew && !onCreate ? (
-            <div className="px-3 py-2 text-sm text-gray-400">—</div>
+            <div className={`${compactMenu ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-gray-400`}>—</div>
           ) : (
             <>
               {options.map((opt) => {
@@ -242,7 +249,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                       onChange(opt.id);
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    className={`w-full text-left ${compactMenu ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} transition-colors ${
                       isSelected
                         ? 'bg-gray-100 text-gray-900 font-medium'
                         : 'text-gray-700 hover:bg-gray-50'
@@ -250,7 +257,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                   >
                     <div className="break-words leading-snug">{opt.label}</div>
                     {def && (
-                      <div className="mt-0.5 text-xs text-gray-500 font-normal whitespace-normal leading-snug">
+                      <div className={`mt-0.5 ${compactMenu ? 'text-[10px]' : 'text-xs'} text-gray-500 font-normal whitespace-normal leading-snug`}>
                         {def}
                       </div>
                     )}
@@ -292,7 +299,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                       <button
                         type="button"
                         onClick={() => { setAdding(true); setNewLabel(''); }}
-                        className={`w-full text-left px-3 py-2 text-sm transition-colors ${greenAdd ? 'text-green-700 hover:bg-green-50' : 'text-sky-700 hover:bg-sky-50'}`}
+                        className={`w-full text-left ${compactMenu ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} transition-colors ${greenAdd ? 'text-green-700 hover:bg-green-50' : 'text-sky-700 hover:bg-sky-50'}`}
                       >
                         + {addNewLabel ?? 'Add new'}
                       </button>
@@ -304,7 +311,7 @@ export default function PillSelect({ value, onChange, options, placeholder, aria
                         onAddNew!();
                         setOpen(false);
                       }}
-                      className="w-full text-left px-3 py-2 text-sm text-sky-700 hover:bg-sky-50 transition-colors"
+                      className={`w-full text-left ${compactMenu ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'} text-sky-700 hover:bg-sky-50 transition-colors`}
                     >
                       + {addNewLabel ?? 'Add new'}
                     </button>

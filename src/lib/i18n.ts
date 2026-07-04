@@ -1206,10 +1206,10 @@ const translations = {
   },
   // Value steps (migration 0047).
   'capture.valueStepQuestion': {
-    en: 'What value step is this work related to?',
-    da: 'Hvilket v\u00e6rditrin er dette arbejde knyttet til?',
-    sv: 'Vilket v\u00e4rdesteg h\u00f6r det h\u00e4r arbetet till?',
-    de: 'Auf welchen Wertschritt bezieht sich diese Arbeit?',
+    en: 'Related to what value step?',
+    da: 'Relateret til hvilket v\u00e6rditrin?',
+    sv: 'Relaterat till vilket v\u00e4rdesteg?',
+    de: 'Auf welchen Wertschritt bezogen?',
   },
   'capture.selectValueStep': {
     en: 'Select value step',

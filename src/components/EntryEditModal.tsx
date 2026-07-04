@@ -651,6 +651,26 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                       // failure_demand has no managed work-step types — free-text only.
                       const showFreeText = b.tag === 'failure_demand' || !pickerOn || (!hasStep && (b.freeText || b.text !== ''));
                       const showPicker = pickerOn && !hasStep && !showFreeText;
+                      // Value step (migration 0047) — which value-journey stage
+                      // this work relates to. One per step, any tag. Compact
+                      // single-row layout (2026-07-04), rendered ABOVE the
+                      // textarea in free-text mode, card bottom otherwise —
+                      // mirrors capture/page.tsx.
+                      const valueStepSelector = flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 p-1.5 rounded-md border bg-green-50 border-green-200">
+                          <p className="text-[10px] font-medium text-gray-700">{t('capture.valueStepQuestion')}</p>
+                          <PillSelect
+                            ariaLabel={t('capture.valueStepQuestion')}
+                            placeholder={t('capture.selectValueStep')}
+                            value={b.valueStepId ?? ''}
+                            onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, valueStepId: id || null } : p))}
+                            options={[...study.valueSteps].sort((a, c) => a.sortOrder - c.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
+                            variant="value"
+                            compact
+                            compactMenu
+                          />
+                        </div>
+                      ) : null;
                       return (
                         <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                           {flowWorkPath && (
@@ -755,6 +775,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   aria-label="Remove"
                                 >&times;</button>
                               </div>
+                              {/* Value step ABOVE the description (2026-07-04) —
+                                  mirrors the capture composer. */}
+                              {valueStepSelector}
                               <textarea
                                 value={b.text}
                                 onChange={(e) => {
@@ -837,21 +860,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               </div>
                             </div>
                           )}
-                          {/* Value step (migration 0047) — which value-journey stage
-                              this work relates to. One per step, any tag. */}
-                          {flowWorkPath && study.valueStepsEnabled && study.valueSteps.length > 0 && (
-                            <div className="mt-1 p-2 rounded-md border bg-green-50 border-green-200">
-                              <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.valueStepQuestion')}</p>
-                              <PillSelect
-                                ariaLabel={t('capture.valueStepQuestion')}
-                                placeholder={t('capture.selectValueStep')}
-                                value={b.valueStepId ?? ''}
-                                onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, valueStepId: id || null } : p))}
-                                options={[...study.valueSteps].sort((a, c) => a.sortOrder - c.sortOrder).map((v) => ({ id: v.id, label: tl(v.label) }))}
-                                variant="value"
-                              />
-                            </div>
-                          )}
+                          {/* Value step in badge/picker modes (no textarea) —
+                              keeps its old bottom slot; free-text mode renders
+                              it above the textarea instead. */}
+                          {!(showFreeText && !hasStep) && valueStepSelector}
                         </div>
                       );
                     })}
