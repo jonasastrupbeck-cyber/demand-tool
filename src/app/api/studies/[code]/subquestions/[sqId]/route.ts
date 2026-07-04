@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getSubquestions, getMilestones, getWhatMattersTypes, updateSubquestion, deleteSubquestion } from '@/lib/queries';
+import { getStudyByCode, getSubquestions, getMilestones, getWhatMattersTypes, updateSubquestion, deleteSubquestion, kindsCompatible, type SubquestionKind } from '@/lib/queries';
 
-async function ownsSubquestion(studyId: string, sqId: string) {
-  const subqs = await getSubquestions(studyId);
-  return subqs.some((s) => s.id === sqId);
-}
+const KINDS: SubquestionKind[] = ['amount', 'number', 'percent', 'currency', 'calculated', 'date', 'duration', 'duration_months', 'text', 'choice'];
 
-// PATCH — rename / toggle required / relink what-matters / move to another
-// milestone / reorder. Kind is immutable (omitted deliberately).
+// PATCH — rename / toggle required / change field type (compatible kinds only) /
+// relink what-matters / move to another milestone / reorder.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ code: string; sqId: string }> }
@@ -15,7 +12,9 @@ export async function PATCH(
   const { code, sqId } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
-  if (!(await ownsSubquestion(study.id, sqId))) {
+  const subqs = await getSubquestions(study.id);
+  const current = subqs.find((s) => s.id === sqId);
+  if (!current) {
     return NextResponse.json({ error: 'Subquestion not found' }, { status: 404 });
   }
 
@@ -23,6 +22,17 @@ export async function PATCH(
   const data: Parameters<typeof updateSubquestion>[1] = {};
   if (typeof body.label === 'string' && body.label.trim()) data.label = body.label.trim();
   if (typeof body.required === 'boolean') data.required = body.required;
+  // Field type is editable only within its compatibility class (same answer
+  // column → no captured answer stranded). Reject a cross-class change.
+  if (body.kind !== undefined) {
+    if (!KINDS.includes(body.kind)) {
+      return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
+    }
+    if (!kindsCompatible(current.kind as SubquestionKind, body.kind)) {
+      return NextResponse.json({ error: 'kind can only change within its compatibility class' }, { status: 400 });
+    }
+    data.kind = body.kind;
+  }
   if (typeof body.sortOrder === 'number') data.sortOrder = body.sortOrder;
   if (body.currencyCode === null) {
     data.currencyCode = null;
@@ -68,7 +78,8 @@ export async function DELETE(
   const { code, sqId } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
-  if (!(await ownsSubquestion(study.id, sqId))) {
+  const subqs = await getSubquestions(study.id);
+  if (!subqs.some((s) => s.id === sqId)) {
     return NextResponse.json({ error: 'Subquestion not found' }, { status: 404 });
   }
   await deleteSubquestion(sqId);

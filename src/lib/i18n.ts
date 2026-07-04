@@ -1037,6 +1037,18 @@ const translations = {
     sv: 'dagar sent',
     de: 'Tage später',
   },
+  'capture.evalUnderBudget': {
+    en: 'under budget',
+    da: 'under budget',
+    sv: 'under budget',
+    de: 'unter Budget',
+  },
+  'capture.evalOverBudget': {
+    en: 'over budget',
+    da: 'over budget',
+    sv: 'över budget',
+    de: 'über Budget',
+  },
   'capture.unitYearsShort': {
     en: 'yr',
     da: 'år',
@@ -1068,6 +1080,12 @@ const translations = {
     da: 'Gns. afvigelse',
     sv: 'Snitt avvikelse',
     de: 'Ø Abweichung',
+  },
+  'dashboard.askAvgOverBudget': {
+    en: 'Avg over budget',
+    da: 'Gns. over budget',
+    sv: 'Snitt över budget',
+    de: 'Ø über Budget',
   },
   // Ask + recorded decision but no delivered value — a capture miss, surfaced
   // rather than silently excluded (2026-07-02).
@@ -3683,6 +3701,30 @@ const translations = {
     da: 'Påkrævet',
     sv: 'Obligatorisk',
     de: 'Erforderlich',
+  },
+  'settings.subquestionNotMandatory': {
+    en: 'Not mandatory',
+    da: 'Ikke obligatorisk',
+    sv: 'Inte obligatorisk',
+    de: 'Nicht obligatorisch',
+  },
+  'settings.subquestionNotMandatoryHint': {
+    en: 'milestone can complete without it',
+    da: 'milepælen kan fuldføres uden den',
+    sv: 'milstolpen kan slutföras utan den',
+    de: 'Meilenstein kann ohne sie abgeschlossen werden',
+  },
+  'settings.subquestionExcludeFor': {
+    en: 'Exclude for',
+    da: 'Udelad for',
+    sv: 'Uteslut för',
+    de: 'Ausschließen für',
+  },
+  'settings.subquestionFieldType': {
+    en: 'Field type',
+    da: 'Felttype',
+    sv: 'Fälttyp',
+    de: 'Feldtyp',
   },
   'settings.subquestionKindNumber': {
     en: 'Number',

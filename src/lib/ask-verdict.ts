@@ -41,9 +41,11 @@ export interface AskVerdict {
   diffDays: number | null;
   /** duration kind: delivered − asked, in months. */
   diffMonths: number | null;
+  /** amount kind: delivered − cap (negative = under budget, positive = over). */
+  diffAmount: number | null;
 }
 
-const NOT_COMPARABLE: AskVerdict = { comparable: false, met: null, diffDays: null, diffMonths: null };
+const NOT_COMPARABLE: AskVerdict = { comparable: false, met: null, diffDays: null, diffMonths: null, diffAmount: null };
 
 // Whole-day index; date-only strings are pinned to noon UTC so timezone
 // offsets can't shift them a day (same convention as the capture inputs).
@@ -55,23 +57,25 @@ const dayIndex = (d: string | Date): number => {
 export function askVerdict(kind: CaptureKind, ask: AskShape, delivered: DeliveredShape): AskVerdict {
   if ((kind === 'amount' || kind === 'number' || kind === 'currency') && (ask.amountSpecific != null || ask.amountMin != null || ask.amountMax != null)) {
     const cap = ask.amountSpecific ?? ask.amountMax; // at-or-under rule
-    if (cap == null) return { comparable: true, met: null, diffDays: null, diffMonths: null };
-    if (delivered.valueNumber == null) return { comparable: true, met: null, diffDays: null, diffMonths: null };
-    return { comparable: true, met: delivered.valueNumber <= cap, diffDays: null, diffMonths: null };
+    if (cap == null) return { comparable: true, met: null, diffDays: null, diffMonths: null, diffAmount: null };
+    if (delivered.valueNumber == null) return { comparable: true, met: null, diffDays: null, diffMonths: null, diffAmount: null };
+    // diffAmount = delivered − cap: negative = under budget, 0 = met, positive = over.
+    const diffAmount = delivered.valueNumber - cap;
+    return { comparable: true, met: diffAmount <= 0, diffDays: null, diffMonths: null, diffAmount };
   }
   if (kind === 'date' && ask.targetDate != null) {
-    if (delivered.valueDate == null) return { comparable: true, met: null, diffDays: null, diffMonths: null };
+    if (delivered.valueDate == null) return { comparable: true, met: null, diffDays: null, diffMonths: null, diffAmount: null };
     const diff = dayIndex(delivered.valueDate) - dayIndex(ask.targetDate);
-    return { comparable: true, met: diff <= 0, diffDays: diff, diffMonths: null };
+    return { comparable: true, met: diff <= 0, diffDays: diff, diffMonths: null, diffAmount: null };
   }
   if (kind === 'duration' && (ask.termYears != null || ask.termMonths != null)) {
     if (delivered.valueYears == null && delivered.valueMonths == null) {
-      return { comparable: true, met: null, diffDays: null, diffMonths: null };
+      return { comparable: true, met: null, diffDays: null, diffMonths: null, diffAmount: null };
     }
     const deliveredMonths = (delivered.valueYears ?? 0) * 12 + (delivered.valueMonths ?? 0);
     const askedMonths = (ask.termYears ?? 0) * 12 + (ask.termMonths ?? 0);
     const diff = deliveredMonths - askedMonths;
-    return { comparable: true, met: diff === 0, diffDays: null, diffMonths: diff };
+    return { comparable: true, met: diff === 0, diffDays: null, diffMonths: diff, diffAmount: null };
   }
   return NOT_COMPARABLE;
 }

@@ -7,6 +7,8 @@ import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
 import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
 import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
+import SubquestionExcludeFor from '@/components/SubquestionExcludeFor';
+import { compatibleKinds } from '@/lib/subquestion-kinds';
 import ChildQuestionAdder from '@/components/ChildQuestionAdder';
 import CollapsibleCard from '@/components/CollapsibleCard';
 import { buildSubquestionTree, type SubqTreeNode, type RootNote } from '@/lib/subquestion-tree';
@@ -112,7 +114,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -450,10 +452,11 @@ export default function SettingsPage() {
   const patchMsSubqs = (msId: string, fn: (subs: StudyData['milestones'][number]['subquestions']) => StudyData['milestones'][number]['subquestions']) =>
     setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === msId ? { ...m, subquestions: fn(m.subquestions) } : m)) } : s));
 
-  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null }) {
+  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; kind?: StudyData['milestones'][number]['subquestions'][number]['kind']; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null }) {
     const clean: typeof patch = {};
     if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
     if (typeof patch.required === 'boolean') clean.required = patch.required;
+    if (patch.kind !== undefined) clean.kind = patch.kind;
     if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
     if (patch.currencyCode !== undefined) clean.currencyCode = patch.currencyCode;
     if (patch.formula !== undefined) clean.formula = patch.formula;
@@ -1551,7 +1554,18 @@ export default function SettingsPage() {
                   onBlur={(e) => patchSubquestion(msId, sq.id, { label: e.target.value })}
                   className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                 />
-                <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{kindLabel(sq.kind)}</span>
+                {compatibleKinds(sq.kind).length > 1 ? (
+                  <select
+                    value={sq.kind}
+                    aria-label={t('settings.subquestionFieldType')}
+                    onChange={(e) => patchSubquestion(msId, sq.id, { kind: e.target.value as typeof sq.kind })}
+                    className="shrink-0 text-[10px] uppercase tracking-wide text-gray-500 font-medium bg-white border border-gray-200 rounded px-1 py-0.5 focus:ring-2 focus:ring-brand outline-none"
+                  >
+                    {compatibleKinds(sq.kind).map((k) => <option key={k} value={k}>{kindLabel(k)}</option>)}
+                  </select>
+                ) : (
+                  <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{kindLabel(sq.kind)}</span>
+                )}
                 <button type="button" aria-label={t('settings.moveUp')} disabled={sibIdx <= 0} onClick={() => moveSubquestion(msId, siblingIds, sq.id, -1)} className="shrink-0 px-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
                 <button type="button" aria-label={t('settings.moveDown')} disabled={sibIdx < 0 || sibIdx >= siblingIds.length - 1} onClick={() => moveSubquestion(msId, siblingIds, sq.id, 1)} className="shrink-0 px-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
                 <button onClick={() => removeSubquestion(msId, sq.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
@@ -1560,10 +1574,6 @@ export default function SettingsPage() {
                 <p className={`text-[10px] ${note.type === 'staleTrigger' ? 'text-amber-600' : 'text-gray-400'}`}>{noteText(note)}</p>
               )}
               <div className="flex items-center gap-3">
-                <label className="flex items-center gap-1 text-xs text-gray-500">
-                  <input type="checkbox" checked={sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: e.target.checked })} className="accent-brand" />
-                  {t('settings.subquestionRequired')}
-                </label>
                 {canLink(sq.kind) && (
                   <label className="flex items-center gap-1 text-xs text-gray-500 flex-1 min-w-0">
                     {t('settings.captureFieldLink')}
@@ -1676,28 +1686,25 @@ export default function SettingsPage() {
                   onSave={(f) => patchSubquestion(msId, sq.id, { formula: f })}
                 />
               )}
-              {/* Visibility wiring: rows with a note (cross-milestone / OR /
-                  stale trigger) always show the editor; ordinary rows tuck it
-                  behind "⋯ Advanced" — the primary path is the "+ If X, ask…"
-                  adder on the parent's answer rows. */}
-              {note ? (
-                <ConditionEditor
-                  code={code}
-                  sqId={sq.id}
-                  conditions={sq.conditions}
-                  parents={allSubqsFlat.filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
-                  onRefresh={loadStudy}
-                />
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setAdvancedSqId(advancedSqId === sq.id ? null : sq.id)}
-                    className="text-[10px] text-gray-400 hover:text-gray-600"
-                  >
-                    ⋯ {t('settings.advancedToggle')}
-                  </button>
-                  {advancedSqId === sq.id && (
+              {/* Advanced (⋯): per-question optionality, demand-type exclusions and
+                  conditional visibility. Rows with a visibility note (cross-milestone
+                  / OR / stale trigger) always show it open; ordinary rows tuck it
+                  behind the toggle. */}
+              {(() => {
+                const advContent = (
+                  <div className="space-y-1.5 pt-0.5">
+                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                      <input type="checkbox" checked={!sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: !e.target.checked })} className="accent-brand" />
+                      {t('settings.subquestionNotMandatory')}
+                      <span className="text-[10px] text-gray-400">— {t('settings.subquestionNotMandatoryHint')}</span>
+                    </label>
+                    <SubquestionExcludeFor
+                      code={code}
+                      sqId={sq.id}
+                      selected={sq.demandTypeExclusions}
+                      demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
+                      onRefresh={loadStudy}
+                    />
                     <ConditionEditor
                       code={code}
                       sqId={sq.id}
@@ -1705,9 +1712,21 @@ export default function SettingsPage() {
                       parents={allSubqsFlat.filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
                       onRefresh={loadStudy}
                     />
-                  )}
-                </>
-              )}
+                  </div>
+                );
+                return note ? advContent : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedSqId(advancedSqId === sq.id ? null : sq.id)}
+                      className="text-[10px] text-gray-400 hover:text-gray-600"
+                    >
+                      ⋯ {t('settings.advancedToggle')}
+                    </button>
+                    {advancedSqId === sq.id && advContent}
+                  </>
+                );
+              })()}
             </li>
             );
           };

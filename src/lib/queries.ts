@@ -1,8 +1,9 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, subquestions, subquestionOptions, subquestionConditions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
+import { kindsCompatible, compatibleKinds } from './subquestion-kinds';
 import type { Locale } from './i18n';
 import { STANDARD_LIFECYCLE_STAGES } from './ai/classify-lifecycle';
 
@@ -1827,6 +1828,10 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
 export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
 export type OptionPolarity = 'positive' | 'negative';
 
+// Field-type edit compatibility lives in a client-safe module (see 0054); re-export
+// so server callers can import it from here alongside the rest of the data layer.
+export { kindsCompatible, compatibleKinds };
+
 export interface AnswerShape {
   valueNumber: number | null;
   valueDate: Date | null;
@@ -1880,12 +1885,16 @@ export async function getSubquestions(studyId: string) {
     .orderBy(asc(subquestionOptions.sortOrder));
   const conds = await db.select().from(subquestionConditions)
     .where(inArray(subquestionConditions.subquestionId, ids));
+  // Per-subquestion demand-type exclusions (0054): nested like milestone scoping.
+  const excls = await db.select().from(subquestionDemandTypeExclusions)
+    .where(inArray(subquestionDemandTypeExclusions.subquestionId, ids));
   return rows.map((r) => ({
     ...r,
     options: opts.filter((o) => o.subquestionId === r.id)
       .map((o) => ({ id: o.id, label: o.label, polarity: o.polarity, sortOrder: o.sortOrder })),
     conditions: conds.filter((c) => c.subquestionId === r.id)
       .map((c) => ({ id: c.id, parentSubquestionId: c.parentSubquestionId, triggerValue: c.triggerValue })),
+    demandTypeExclusions: excls.filter((e) => e.subquestionId === r.id).map((e) => e.demandTypeId),
   }));
 }
 
@@ -1911,10 +1920,17 @@ export async function addSubquestion(milestoneId: string, data: { label: string;
 // Kind is immutable after create (a subquestion's shape is fundamental; changing
 // it would strand typed case answers). Moving to another milestone is allowed —
 // case answers survive (keyed on case+subquestion).
-export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null; sortOrder?: number; milestoneId?: string }) {
+export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; kind?: SubquestionKind; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null; sortOrder?: number; milestoneId?: string }) {
   const set: Record<string, unknown> = {};
   if (data.label !== undefined) set.label = data.label;
   if (data.required !== undefined) set.required = data.required;
+  // Kind is editable only within its compatibility class (same answer column, so
+  // captured answers survive) — see kindsCompatible. A cross-class change is
+  // silently ignored here; the API route rejects it with 400.
+  if (data.kind !== undefined) {
+    const current = (await db.select({ kind: subquestions.kind }).from(subquestions).where(eq(subquestions.id, id)))[0];
+    if (current && kindsCompatible(current.kind as SubquestionKind, data.kind)) set.kind = data.kind;
+  }
   if (data.linkedWhatMattersTypeId !== undefined) set.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
   if (data.currencyCode !== undefined) set.currencyCode = data.currencyCode;
   if (data.formula !== undefined) set.formula = data.formula;
@@ -2108,8 +2124,11 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
 
   // Conditional visibility (0050): a required-but-HIDDEN subquestion does not
   // gate — only currently-visible required subquestions must be answered.
+  // Per-subquestion demand-type exclusions (0054): an excluded subquestion is
+  // likewise dropped — it never gates completion for this case.
   const vis = visible ?? (studyId ? await getCaseVisibleSubquestionIds(caseId, studyId) : new Set<string>());
-  const visibleReq = reqRows.filter((r) => vis!.has(r.id));
+  const excluded = studyId ? await getCaseExcludedSubquestionIds(caseId, studyId) : new Set<string>();
+  const visibleReq = reqRows.filter((r) => vis!.has(r.id) && !excluded.has(r.id));
   // Every required subquestion is conditionally hidden for this case → there is
   // nothing to gate on. Don't auto-complete an empty milestone (whole-milestone
   // skipping by demand type is a separate concern — see Slice 5). Leave open.
@@ -2234,6 +2253,36 @@ export async function setMilestoneDemandTypeConditions(milestoneId: string, dema
     if (currentIds.has(dtId)) continue;
     await db.insert(milestoneDemandTypeConditions).values({ id: generateId(), milestoneId, demandTypeId: dtId });
   }
+}
+
+// ── Per-subquestion demand-type exclusions (0054) ────────────────────────────
+// Diff-set the demand types a subquestion is EXCLUDED for (empty = applies to all).
+export async function setSubquestionDemandTypeExclusions(subquestionId: string, demandTypeIds: string[]) {
+  const desired = new Set(demandTypeIds);
+  const current = await db.select().from(subquestionDemandTypeExclusions).where(eq(subquestionDemandTypeExclusions.subquestionId, subquestionId));
+  const currentIds = new Set(current.map((r) => r.demandTypeId));
+  for (const r of current) {
+    if (!desired.has(r.demandTypeId)) await db.delete(subquestionDemandTypeExclusions).where(eq(subquestionDemandTypeExclusions.id, r.id));
+  }
+  for (const dtId of demandTypeIds) {
+    if (currentIds.has(dtId)) continue;
+    await db.insert(subquestionDemandTypeExclusions).values({ id: generateId(), subquestionId, demandTypeId: dtId });
+  }
+}
+
+// Subquestion ids EXCLUDED for a case, i.e. whose exclusion set intersects the
+// case's demand types. These are hidden in capture and never gate completion.
+export async function getCaseExcludedSubquestionIds(caseId: string, studyId: string): Promise<Set<string>> {
+  const caseDT = new Set(await getCaseDemandTypeIds(caseId));
+  if (caseDT.size === 0) return new Set();
+  const rows = await db.select({ subquestionId: subquestionDemandTypeExclusions.subquestionId, demandTypeId: subquestionDemandTypeExclusions.demandTypeId })
+    .from(subquestionDemandTypeExclusions)
+    .innerJoin(subquestions, eq(subquestionDemandTypeExclusions.subquestionId, subquestions.id))
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(eq(milestones.studyId, studyId));
+  const excluded = new Set<string>();
+  for (const r of rows) if (caseDT.has(r.demandTypeId)) excluded.add(r.subquestionId);
+  return excluded;
 }
 
 // Milestones that APPLY to a case: no scope rows → applies to all; otherwise the

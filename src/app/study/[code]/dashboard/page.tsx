@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const [flowCausesLoading, setFlowCausesLoading] = useState(false);
   // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
   // mattered, per linked capture field. Fetched when the Analytics tab opens.
-  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null }> | null>(null);
+  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null; overCount: number; avgAmountOver: number | null }> | null>(null);
   const [showEntries, setShowEntries] = useState(false);
   const [entries, setEntries] = useState<Array<{ id: string; verbatim: string; classification: string; createdAt: string; demandTypeId: string | null; entryType: string; collectorName: string | null }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
@@ -1850,6 +1850,9 @@ export default function DashboardPage() {
                             )}
                             {r.kind === 'duration' && r.avgDiffMonths !== null && (
                               <span className="text-[11px] text-red-600">{t('dashboard.askAvgDeviation')}: {r.avgDiffMonths} {t('capture.unitMonthsShort')}</span>
+                            )}
+                            {r.kind === 'amount' && r.avgAmountOver !== null && (
+                              <span className="text-[11px] text-red-600">{t('dashboard.askAvgOverBudget')}: {new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(r.avgAmountOver)}</span>
                             )}
                           </div>
                         </div>

@@ -20,7 +20,7 @@ import { useState, type ReactElement } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
-import { parseAmountLoose } from '@/lib/format-currency';
+import { parseAmountLoose, formatCurrency, currencyForSubquestion } from '@/lib/format-currency';
 import { evalFormula, formatCalcResult, type Resolved } from '@/lib/formula';
 import { visibleSubquestionIds } from '@/lib/subquestion-visibility';
 import { buildSubquestionTree, type SubqTreeNode } from '@/lib/subquestion-tree';
@@ -92,7 +92,7 @@ const draftFromAnswer = (a?: CaseSubquestionAnswer): Draft => ({
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, caseDemandTypeIds = [], whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, compact = false }: Props) {
-  const { t, tl } = useLocale();
+  const { t, tl, locale } = useLocale();
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
     const byId = new Map(answers.map((a) => [a.subquestionId, a]));
@@ -118,7 +118,15 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   // any stale hidden answer).
   const allSubqsFlat = milestones.flatMap((m) => m.subquestions);
   const choiceBySubqId = new Map(allSubqsFlat.map((s) => [s.id, (drafts[s.id] ?? EMPTY_DRAFT).choice || null]));
-  const visibleIds = visibleSubquestionIds(allSubqsFlat.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
+  const conditionVisible = visibleSubquestionIds(allSubqsFlat.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
+  // Per-subquestion demand-type exclusions (0054): a subquestion whose exclusion
+  // set intersects the case's demand types is hidden + not saved + non-gating —
+  // fold it into the same visibility set the render and save paths use.
+  const isExcluded = (s: Subquestion) => (s.demandTypeExclusions ?? []).some((id) => caseDemandTypeIds.includes(id));
+  const visibleIds = new Set([...conditionVisible].filter((id) => {
+    const s = allSubqsFlat.find((x) => x.id === id);
+    return s ? !isExcluded(s) : true;
+  }));
 
   // --- Save a milestone's answers (0042) ---------------------------------
   const parseNum = (s: string) => { const n = parseFloat(s); return Number.isFinite(n) ? n : null; };
@@ -232,6 +240,16 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
       } else if (vkind === 'duration' && v.diffMonths !== null && !v.met) {
         const sign = v.diffMonths > 0 ? '+' : '−';
         badge = `${sign}${fmtDuration(Math.floor(Math.abs(v.diffMonths) / 12), Math.abs(v.diffMonths) % 12)}`;
+      } else if (vkind === 'amount' && v.diffAmount !== null) {
+        // Under / Met / Over budget + by how much. Currency fields format the
+        // delta with their currency; plain amount/number use a grouped number.
+        const abs = Math.abs(v.diffAmount);
+        const amt = sq.kind === 'currency'
+          ? formatCurrency(abs, currencyForSubquestion(sq.currencyCode, locale), locale)
+          : new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(abs);
+        badge = v.diffAmount === 0 ? t('capture.evalMet')
+          : v.diffAmount < 0 ? `${t('capture.evalUnderBudget')} ${amt}`
+          : `${t('capture.evalOverBudget')} ${amt}`;
       } else {
         badge = v.met ? t('capture.evalMet') : t('capture.evalNotMet');
       }

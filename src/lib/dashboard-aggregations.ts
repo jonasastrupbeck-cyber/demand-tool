@@ -1173,6 +1173,8 @@ export interface AskDeliveryRow {
   lateCount: number;  // date kind only: not-met cases
   avgDaysLate: number | null; // date kind only: mean days late among lateCount
   avgDiffMonths: number | null; // duration kind only: mean |diff| among not-met
+  overCount: number;  // amount kind only: over-budget cases
+  avgAmountOver: number | null; // amount kind only: mean amount over among overCount
 }
 
 export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<AskDeliveryRow[]> {
@@ -1239,6 +1241,8 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
     let lateDaysSum = 0;
     let diffMonthsSum = 0;
     let diffMonthsN = 0;
+    let overCount = 0;
+    let overAmountSum = 0;
     // Iterate COMPLETED-milestone cases: a milestone completed without a value
     // for this subquestion still counts — as notCaptured, when the ask exists.
     for (const caseId of completedCasesByMs.get(f.milestoneId) ?? []) {
@@ -1271,6 +1275,9 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
       } else if (f.kind === 'duration' && verdict.diffMonths !== null) {
         diffMonthsSum += Math.abs(verdict.diffMonths);
         diffMonthsN += 1;
+      } else if ((f.kind === 'amount' || f.kind === 'number' || f.kind === 'currency') && verdict.diffAmount !== null && verdict.diffAmount > 0) {
+        overCount += 1;
+        overAmountSum += verdict.diffAmount;
       }
     }
     // A field with ONLY uncaptured cases must surface — that's the point.
@@ -1288,6 +1295,8 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
       lateCount,
       avgDaysLate: lateCount > 0 ? Math.round((lateDaysSum / lateCount) * 10) / 10 : null,
       avgDiffMonths: diffMonthsN > 0 ? Math.round((diffMonthsSum / diffMonthsN) * 10) / 10 : null,
+      overCount,
+      avgAmountOver: overCount > 0 ? Math.round(overAmountSum / overCount) : null,
     });
   }
   return rows;

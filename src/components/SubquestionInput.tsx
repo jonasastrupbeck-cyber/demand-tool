@@ -44,6 +44,9 @@ export interface Subquestion {
   sortOrder: number;
   options: SubquestionOption[];
   conditions: SubquestionCondition[];
+  // Demand-type ids this subquestion is EXCLUDED for (0054). Empty/undefined =
+  // applies to every case.
+  demandTypeExclusions?: string[];
 }
 
 export interface Draft {

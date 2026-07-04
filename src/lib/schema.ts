@@ -433,6 +433,18 @@ export const milestoneDemandTypeConditions = pgTable('milestone_demand_type_cond
   uniqMsDt: unique('milestone_dt_conditions_unique').on(t.milestoneId, t.demandTypeId),
 }));
 
+// Per-subquestion demand-type EXCLUSIONS (0054): a subquestion with rows here is
+// hidden + non-gating for a case whose demand-type set intersects them. No rows =
+// applies to every case. Exclude model (opposite of milestoneDemandTypeConditions'
+// include model). Drives capture visibility + completion gating per subquestion.
+export const subquestionDemandTypeExclusions = pgTable('subquestion_demand_type_exclusions', {
+  id: text('id').primaryKey(),
+  subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
+  demandTypeId: text('demand_type_id').notNull().references(() => demandTypes.id, { onDelete: 'cascade' }),
+}, (t) => ({
+  uniqSubqDt: unique('subquestion_dt_exclusions_unique').on(t.subquestionId, t.demandTypeId),
+}));
+
 // Conditional visibility (0050): a CHILD subquestion is shown only when its
 // PARENT choice-subquestion's answer equals one of the trigger option labels.
 // No rows for a child = always shown (back-compat). Multiple rows = OR.
