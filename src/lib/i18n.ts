@@ -610,6 +610,67 @@ const translations = {
     sv: 'Kopierad!',
     de: 'Kopiert!',
   },
+  // Study templates (0052): save this study's settings as a named template.
+  'settings.saveAsTemplate': {
+    en: 'Save as template',
+    da: 'Gem som skabelon',
+    sv: 'Spara som mall',
+    de: 'Als Vorlage speichern',
+  },
+  'settings.templateNamePlaceholder': {
+    en: 'e.g. EG mortgages',
+    da: 'f.eks. EG mortgages',
+    sv: 't.ex. EG mortgages',
+    de: 'z. B. EG mortgages',
+  },
+  'settings.saveTemplate': {
+    en: 'Save',
+    da: 'Gem',
+    sv: 'Spara',
+    de: 'Speichern',
+  },
+  'settings.templateSaved': {
+    en: 'Saved ✓',
+    da: 'Gemt ✓',
+    sv: 'Sparad ✓',
+    de: 'Gespeichert ✓',
+  },
+  'settings.templateSaveFailed': {
+    en: 'Could not save the template',
+    da: 'Skabelonen kunne ikke gemmes',
+    sv: 'Mallen kunde inte sparas',
+    de: 'Die Vorlage konnte nicht gespeichert werden',
+  },
+  'settings.templateReplaceConfirm': {
+    en: 'A template with this name exists — replace it?',
+    da: 'Der findes allerede en skabelon med dette navn — vil du erstatte den?',
+    sv: 'Det finns redan en mall med det här namnet — vill du ersätta den?',
+    de: 'Es gibt bereits eine Vorlage mit diesem Namen — ersetzen?',
+  },
+  'settings.templateReplace': {
+    en: 'Replace',
+    da: 'Erstat',
+    sv: 'Ersätt',
+    de: 'Ersetzen',
+  },
+  'create.chooseTemplate': {
+    en: 'Choose a template',
+    da: 'Vælg en skabelon',
+    sv: 'Välj en mall',
+    de: 'Vorlage wählen',
+  },
+  'create.templateHint': {
+    en: 'Settings only — captured data is never copied',
+    da: 'Kun indstillinger — indsamlede data kopieres aldrig',
+    sv: 'Endast inställningar — insamlade data kopieras aldrig',
+    de: 'Nur Einstellungen — erfasste Daten werden nie kopiert',
+  },
+  'create.templateDeleteConfirm': {
+    en: 'Delete this template?',
+    da: 'Slet denne skabelon?',
+    sv: 'Ta bort den här mallen?',
+    de: 'Diese Vorlage löschen?',
+  },
   'settings.handlingTypes': {
     en: 'Capability of Response',
     da: 'Reaktionskapacitet',

@@ -98,6 +98,20 @@ export const studies = pgTable('studies', {
   isActive: boolean('is_active').notNull().default(true),
 });
 
+// Study templates (migration 0052, 2026-07-04). A named, frozen JSON snapshot
+// of a study's SETTINGS (taxonomies, milestones/subquestions, toggles) — never
+// captured data. `settings` is JSON-encoded text (see src/lib/study-templates.ts
+// for the versioned shape); systemType categorizes the library (transactional/flow).
+export const studyTemplates = pgTable('study_templates', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  systemType: text('system_type').$type<'transactional' | 'flow'>().notNull(),
+  snapshotVersion: integer('snapshot_version').notNull().default(1),
+  settings: text('settings').notNull(),
+  sourceStudyId: text('source_study_id').references(() => studies.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+});
+
 export const handlingTypes = pgTable('handling_types', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),

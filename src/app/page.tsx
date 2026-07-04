@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
@@ -25,6 +25,28 @@ export default function Home() {
   const [adminSecret, setAdminSecret] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Study templates (0052): the library, grouped client-side per system type.
+  // Choosing one creates the new study from the template's frozen settings
+  // snapshot (name/description/PIN still come from this form).
+  const [templates, setTemplates] = useState<{ id: string; name: string; systemType: 'transactional' | 'flow' }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showCreate) return;
+    fetch('/api/templates')
+      .then((res) => (res.ok ? res.json() : { templates: [] }))
+      .then((data) => setTemplates(data.templates ?? []))
+      .catch(() => {});
+  }, [showCreate]);
+
+  async function deleteTemplate(id: string) {
+    if (!window.confirm(t('create.templateDeleteConfirm'))) return;
+    const res = await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+    if (res.ok) {
+      setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
+      setSelectedTemplateId((prev) => (prev === id ? null : prev));
+    }
+  }
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -90,17 +112,30 @@ export default function Home() {
     setLoading(true);
     setError('');
 
-    // Resolve primary contact method label
+    // Resolve primary contact method label. Irrelevant when a template is
+    // chosen — the template carries contact methods + points of transaction.
     let primaryContactMethod: string | undefined;
-    if (contactMethodChoice === 'phone') primaryContactMethod = t('landing.contactPhone');
-    else if (contactMethodChoice === 'mail') primaryContactMethod = t('landing.contactMail');
-    else if (contactMethodChoice === 'face2face') primaryContactMethod = t('landing.contactFaceToFace');
-    else if (contactMethodChoice === 'other' && customContactMethod.trim()) primaryContactMethod = customContactMethod.trim();
+    if (!selectedTemplateId) {
+      if (contactMethodChoice === 'phone') primaryContactMethod = t('landing.contactPhone');
+      else if (contactMethodChoice === 'mail') primaryContactMethod = t('landing.contactMail');
+      else if (contactMethodChoice === 'face2face') primaryContactMethod = t('landing.contactFaceToFace');
+      else if (contactMethodChoice === 'other' && customContactMethod.trim()) primaryContactMethod = customContactMethod.trim();
+    }
 
     const res = await fetch('/api/studies', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: studyName.trim(), description: studyDesc.trim(), locale, primaryContactMethod, pointOfTransaction: pointOfTransaction.trim() || undefined, consultantPin: consultantPin.trim() || undefined, systemType, adminSecret }),
+      body: JSON.stringify({
+        name: studyName.trim(),
+        description: studyDesc.trim(),
+        locale,
+        primaryContactMethod,
+        pointOfTransaction: selectedTemplateId ? undefined : pointOfTransaction.trim() || undefined,
+        consultantPin: consultantPin.trim() || undefined,
+        systemType,
+        adminSecret,
+        templateId: selectedTemplateId ?? undefined,
+      }),
     });
 
     if (!res.ok) {
@@ -234,13 +269,21 @@ export default function Home() {
                       const selectedStyle = isSelected && isFlowType
                         ? ({ backgroundColor: '#0072C5', '--tw-ring-color': '#0072C5' } as React.CSSProperties)
                         : undefined;
+                      const typeTemplates = templates.filter((tpl) => tpl.systemType === type);
                       return (
+                        <div key={type}>
                         <button
-                          key={type}
                           type="button"
-                          onClick={() => setSystemType(type)}
+                          onClick={() => {
+                            setSystemType(type);
+                            // A template belongs to one regime — switching cards
+                            // drops a selection from the other one.
+                            if (selectedTemplateId && templates.find((tpl) => tpl.id === selectedTemplateId)?.systemType !== type) {
+                              setSelectedTemplateId(null);
+                            }
+                          }}
                           style={selectedStyle}
-                          className={`px-4 py-3 rounded-lg text-left transition-all ${
+                          className={`w-full px-4 py-3 rounded-lg text-left transition-all ${
                             isSelected
                               ? isFlowType
                                 ? 'text-white ring-2 ring-offset-1'
@@ -255,6 +298,55 @@ export default function Home() {
                             {t(type === 'flow' ? 'create.systemTypeFlowDesc' : 'create.systemTypeTransactionalDesc')}
                           </span>
                         </button>
+                        {/* Template library (0052): a smaller box under each card —
+                            pick a saved settings-template to start the study from. */}
+                        {typeTemplates.length > 0 && (
+                          <div className="ml-3 mt-1.5 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                            <p className="text-xs font-medium text-gray-500 mb-1.5">{t('create.chooseTemplate')}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {typeTemplates.map((tpl) => {
+                                const tplSelected = selectedTemplateId === tpl.id;
+                                const tplStyle = tplSelected && isFlowType
+                                  ? ({ backgroundColor: '#0072C5' } as React.CSSProperties)
+                                  : undefined;
+                                return (
+                                  <span
+                                    key={tpl.id}
+                                    className={`inline-flex items-center rounded-full text-xs font-medium ${
+                                      tplSelected
+                                        ? isFlowType ? 'text-white' : 'bg-brand text-white'
+                                        : 'bg-white text-gray-700 border border-gray-300 hover:border-gray-400'
+                                    }`}
+                                    style={tplStyle}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSystemType(type);
+                                        setSelectedTemplateId(tplSelected ? null : tpl.id);
+                                      }}
+                                      className="pl-2.5 py-1"
+                                    >
+                                      {tpl.name}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => deleteTemplate(tpl.id)}
+                                      aria-label={`${t('create.chooseTemplate')}: ${tpl.name} ×`}
+                                      className={`px-1.5 py-1 ${tplSelected ? 'text-white/70 hover:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                            {selectedTemplateId && typeTemplates.some((tpl) => tpl.id === selectedTemplateId) && (
+                              <p className="text-[11px] text-gray-400 mt-1.5">{t('create.templateHint')}</p>
+                            )}
+                          </div>
+                        )}
+                        </div>
                       );
                     })}
                   </div>
@@ -285,8 +377,9 @@ export default function Home() {
                 </div>
                 {/* Flow studies capture context per case, not per study — a flow
                     consultant only needs name/description/PIN. Transactional keeps
-                    the full create form (contact method + point of transaction). */}
-                {systemType !== 'flow' && (
+                    the full create form (contact method + point of transaction),
+                    unless a template is chosen — the template carries both. */}
+                {systemType !== 'flow' && !selectedTemplateId && (
                 <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

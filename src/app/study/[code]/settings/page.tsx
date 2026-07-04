@@ -144,6 +144,14 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  // Save-as-template (0052): name input + transient saved state; a name clash
+  // (409) parks the pending name in templateConflict until Replace/Cancel.
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateSaved, setTemplateSaved] = useState(false);
+  const [templateConflict, setTemplateConflict] = useState<string | null>(null);
+  const [templateError, setTemplateError] = useState(false);
+
   // PIN gate
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
@@ -1136,6 +1144,36 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function saveTemplate(replace: boolean) {
+    const name = (replace ? templateConflict : templateName)?.trim();
+    if (!name) return;
+    setSavingTemplate(true);
+    setTemplateError(false);
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studyCode: code, name, replace }),
+      });
+      if (res.status === 409) {
+        setTemplateConflict(name);
+        return;
+      }
+      if (!res.ok) {
+        setTemplateError(true);
+        return;
+      }
+      setTemplateConflict(null);
+      setTemplateName('');
+      setTemplateSaved(true);
+      setTimeout(() => setTemplateSaved(false), 2000);
+    } catch {
+      setTemplateError(true);
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
+
   const cardCls = 'rounded-xl shadow-sm p-5 bg-white border border-gray-200';
   const inputCls = 'flex-1 px-3 py-2 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none';
   const itemCls = 'flex items-center justify-between py-2 px-3 rounded-lg';
@@ -1189,13 +1227,59 @@ export default function SettingsPage() {
   return (
     <div className="pb-8">
       <div className="max-w-2xl mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h1 className="text-xl font-bold text-gray-900">{t('settings.title')}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{t('settings.title')}</h1>
+        {/* Top bar split in two (0052): access code | save-as-template. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Access code — compact, always visible at the top (share with collectors). */}
-          <div className="flex items-center gap-2 text-sm">
+          <div className="rounded-xl shadow-sm px-4 py-3 bg-white border border-gray-200 flex items-center gap-2 text-sm">
             <span className="text-gray-500">{t('settings.accessCode')}</span>
             <span className="font-mono font-bold tracking-wider text-brand bg-red-50 px-2 py-0.5 rounded">{study.accessCode}</span>
             <button onClick={copyCode} className="text-xs text-gray-500 hover:text-gray-700 underline">{copied ? t('settings.copied') : t('settings.copy')}</button>
+          </div>
+          {/* Save this study's SETTINGS (never captured data) as a named template. */}
+          <div className="rounded-xl shadow-sm px-4 py-3 bg-white border border-gray-200">
+            {templateConflict ? (
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                <span className="text-gray-600">{t('settings.templateReplaceConfirm')}</span>
+                <button
+                  onClick={() => saveTemplate(true)}
+                  disabled={savingTemplate}
+                  className="px-3 py-1 text-white rounded-lg text-xs font-medium disabled:opacity-50 bg-brand"
+                >
+                  {t('settings.templateReplace')}
+                </button>
+                <button
+                  onClick={() => setTemplateConflict(null)}
+                  className="px-3 py-1 rounded-lg text-xs font-medium text-gray-600 border border-gray-300 hover:border-gray-400"
+                >
+                  {t('synthesis.cancel')}
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => { e.preventDefault(); saveTemplate(false); }}
+                className="flex items-center gap-2"
+              >
+                <span className="text-sm text-gray-500 whitespace-nowrap">{t('settings.saveAsTemplate')}</span>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => { setTemplateName(e.target.value); setTemplateError(false); }}
+                  placeholder={t('settings.templateNamePlaceholder')}
+                  className="flex-1 min-w-0 px-3 py-1.5 rounded-lg text-sm text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!templateName.trim() || savingTemplate}
+                  className="px-3 py-1.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 bg-brand whitespace-nowrap"
+                >
+                  {templateSaved ? t('settings.templateSaved') : t('settings.saveTemplate')}
+                </button>
+              </form>
+            )}
+            {templateError && (
+              <p className="text-xs text-red-600 mt-1">{t('settings.templateSaveFailed')}</p>
+            )}
           </div>
         </div>
 
