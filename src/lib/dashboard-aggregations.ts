@@ -660,6 +660,21 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     flowFailureDemandTypeCounts = rows.map(r => ({ label: r.label, count: r.count }));
   }
 
+  // ── CAPABILITY OF RESPONSE (CoR) DISTRIBUTION ──
+  // Share of each CoR type across flow touches. Flow touches are work entries
+  // carrying handlingTypeId; the existing handlingTypeCounts is demand-only, so
+  // count here over work entries. P2BS + date scoped via workConditions.
+  const corRows = await db.select({
+    label: handlingTypes.label,
+    count: sql<number>`count(*)::int`,
+  })
+    .from(demandEntries)
+    .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
+    .where(and(...workConditions))
+    .groupBy(handlingTypes.label)
+    .orderBy(desc(sql`count(*)`));
+  const corTypeCounts = corRows.map(r => ({ label: r.label, count: r.count }));
+
   // ── WORK BY VALUE STEP (migration 0047) ──
   // Where does failure/sequence (and value) work land across the customer value
   // journey? Count flow work blocks per value step, split by tag. P2BS-scoped
@@ -728,6 +743,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     workStepByLifeProblem,
     capabilityByDemandType,
     flowFailureDemandTypeCounts,
+    corTypeCounts,
     valueStepsEnabled,
     workByValueStep,
   };

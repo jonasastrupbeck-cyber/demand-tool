@@ -1701,6 +1701,30 @@ export default function DashboardPage() {
                 })()}
               </div>
 
+              {/* Capability of Response distribution across flow touches
+                  (work entries with a CoR). Self-gates on having any; P2BS +
+                  date scoped like the rest of the tab. Mirrors the Demand-tab
+                  CoR pie for visual parity. */}
+              {data.corTypeCounts.length > 0 && (
+                <ChartCard title={t('dashboard.corDistributionTitle')}>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <PieChart>
+                      <Pie
+                        data={data.corTypeCounts.map(d => ({ ...d, label: tl(d.label) }))}
+                        cx="50%" cy="50%" outerRadius={80} innerRadius={32}
+                        dataKey="count" nameKey="label"
+                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
+                        labelLine={{ strokeWidth: 1 }}
+                      >
+                        {data.corTypeCounts.map((_, i) => (<Cell key={i} fill={COLORS.neutral[i % COLORS.neutral.length]} />))}
+                      </Pie>
+                      <Tooltip {...tooltipStyle} />
+                      <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
               {data.workTypeCounts.length > 0 && (
                 <ChartCard title={t('dashboard.workTypes')}>
                   <ResponsiveContainer width="100%" height={Math.max(200, data.workTypeCounts.length * 40 + 40)}>

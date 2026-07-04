@@ -196,6 +196,9 @@ export interface DashboardData {
   // failure demand captured inline in flow (from failure_demand work blocks).
   // P2BS-scoped. Empty unless the per-study feature is enabled.
   flowFailureDemandTypeCounts: Array<{ label: string; count: number }>;
+  // CoR distribution across flow touches (work entries with a handling type),
+  // P2BS + date scoped. Empty when no touch recorded a CoR.
+  corTypeCounts: Array<{ label: string; count: number }>;
   // Value steps (migration 0047): work-block counts per value step, split by
   // tag, so we can see where failure/sequence work lands across the value
   // journey. Ordered by value-step order. P2BS-scoped. Empty unless enabled.

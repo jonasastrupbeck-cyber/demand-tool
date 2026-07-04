@@ -2020,6 +2020,14 @@ const translations = {
     sv: 'Reaktionsf\u00f6rm\u00e5ga vid transaktionspunkten',
     de: 'Reaktionsf\u00e4higkeit am Transaktionspunkt',
   },
+  // Flow Analytics CoR pie \u2014 canonical short term (matches settings.handlingTypes);
+  // flow CoR is per touch, not tied to a single point of transaction.
+  'dashboard.corDistributionTitle': {
+    en: 'Capability of Response',
+    da: 'Reaktionskapacitet',
+    sv: 'Reaktionsf\u00f6rm\u00e5ga',
+    de: 'Reaktionsf\u00e4higkeit',
+  },
   'dashboard.handlingByClass': {
     en: 'Capability of Response: Value vs Failure',
     da: 'Reaktionskapacitet: V\u00e6rdiskabende vs. ikke-v\u00e6rdiskabende',
