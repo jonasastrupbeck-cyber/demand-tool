@@ -20,9 +20,9 @@ import { useLocale } from '@/lib/locale-context';
 export interface DemandTypeOption { id: string; label: string; }
 
 interface Props {
-  code: string;
-  sqId: string;
-  resource: 'exclusions' | 'optional';
+  // Full PUT URL that persists { demandTypeIds }. Lets the same dropdown drive
+  // subquestion exclusions/optional AND milestone exclusions.
+  endpoint: string;
   label: string;
   variant: 'red' | 'amber';
   selected: string[];
@@ -30,7 +30,7 @@ interface Props {
   onRefresh: () => Promise<void> | void;
 }
 
-export default function DemandTypeMultiSelect({ code, sqId, resource, label, variant, selected, demandTypes, onRefresh }: Props) {
+export default function DemandTypeMultiSelect({ endpoint, label, variant, selected, demandTypes, onRefresh }: Props) {
   const { t, tl } = useLocale();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,7 @@ export default function DemandTypeMultiSelect({ code, sqId, resource, label, var
     setBusy(true);
     const next = new Set(set);
     if (next.has(dtId)) next.delete(dtId); else next.add(dtId);
-    await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}/${resource}`, {
+    await fetch(endpoint, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ demandTypeIds: [...next] }),
     });

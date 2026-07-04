@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
+import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseDemandTypeIds, getCaseMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
 
 // Decision-box redesign (0042): per-case subquestion answers. POST upserts a
 // batch of answers (full objects, blanks clear), then re-derives the completion
@@ -23,9 +23,8 @@ export async function POST(
   { params }: { params: Promise<{ code: string; caseId: string }> }
 ) {
   const { code, caseId } = await params;
-  const study = await getStudyByCode(code);
+  const [study, caseRow] = await Promise.all([getStudyByCode(code), getCase(caseId)]);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
-  const caseRow = await getCase(caseId);
   if (!caseRow || caseRow.studyId !== study.id) {
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
@@ -71,15 +70,30 @@ export async function POST(
   const touched = await setCaseSubquestionAnswers(caseId, parsed);
   // Conditional visibility (0050): drop answers to now-hidden subquestions, then
   // recompute EVERY milestone — a changed choice can hide/reveal children on
-  // other milestones, not just the directly-touched ones.
-  await clearHiddenCaseAnswers(caseId, study.id);
+  // other milestones, not just the directly-touched ones. Perf: `subqs` is reused
+  // (already loaded above) and the case demand-type / exclude / optional /
+  // applicable sets are computed ONCE and threaded into the recompute loop, so a
+  // save no longer re-queries them per milestone.
+  await clearHiddenCaseAnswers(caseId, study.id, subqs);
   if (touched.length > 0) {
-    const visible = await getCaseVisibleSubquestionIds(caseId, study.id);
-    const applicable = await getApplicableMilestoneIds(caseId, study.id);
-    const allMs = await getMilestones(study.id);
-    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible, applicable);
+    // Independent reads — fetch concurrently to avoid stacking Neon latency.
+    const [caseDT, visible, allMs, existingCms] = await Promise.all([
+      getCaseDemandTypeIds(caseId),
+      getCaseVisibleSubquestionIds(caseId, study.id, subqs),
+      getMilestones(study.id),
+      getCaseMilestones(caseId),
+    ]);
+    // Excluded / not-mandatory subquestion ids derived in memory from subqs
+    // (each nests its demand-type sets) intersected with the case's demand types.
+    const excluded = new Set(subqs.filter((s) => s.demandTypeExclusions.some((id) => caseDT.includes(id))).map((s) => s.id));
+    const optional = new Set(subqs.filter((s) => s.demandTypeOptional.some((id) => caseDT.includes(id))).map((s) => s.id));
+    const applicable = await getApplicableMilestoneIds(caseId, study.id, caseDT);
+    const existingByMs = new Map(existingCms.map((r) => [r.milestoneId, r]));
+    // Each milestone's recompute writes an independent row and reads only the
+    // shared (immutable) precomputed sets — run them concurrently.
+    await Promise.all(allMs.map((m) => recomputeCaseMilestone(caseId, m.id, visible, applicable, excluded, optional, subqs, study.id, existingByMs)));
     // Completing the final milestone auto-closes the case (un-completing reopens).
-    await recomputeCaseClosure(caseId, study.id);
+    await recomputeCaseClosure(caseId, study.id, applicable);
   }
   return NextResponse.json(await getCaseSubquestionAnswers(caseId), { status: 201 });
 }

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
@@ -1880,17 +1880,14 @@ export async function getSubquestions(studyId: string) {
     .orderBy(asc(subquestions.sortOrder));
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const opts = await db.select().from(subquestionOptions)
-    .where(inArray(subquestionOptions.subquestionId, ids))
-    .orderBy(asc(subquestionOptions.sortOrder));
-  const conds = await db.select().from(subquestionConditions)
-    .where(inArray(subquestionConditions.subquestionId, ids));
-  // Per-subquestion demand-type exclusions (0054) + not-mandatory set (0055):
-  // nested like milestone scoping.
-  const excls = await db.select().from(subquestionDemandTypeExclusions)
-    .where(inArray(subquestionDemandTypeExclusions.subquestionId, ids));
-  const opts2 = await db.select().from(subquestionDemandTypeOptional)
-    .where(inArray(subquestionDemandTypeOptional.subquestionId, ids));
+  // The four child selects are independent — run them concurrently to avoid
+  // stacking Neon round-trip latency (0056 perf).
+  const [opts, conds, excls, opts2] = await Promise.all([
+    db.select().from(subquestionOptions).where(inArray(subquestionOptions.subquestionId, ids)).orderBy(asc(subquestionOptions.sortOrder)),
+    db.select().from(subquestionConditions).where(inArray(subquestionConditions.subquestionId, ids)),
+    db.select().from(subquestionDemandTypeExclusions).where(inArray(subquestionDemandTypeExclusions.subquestionId, ids)),
+    db.select().from(subquestionDemandTypeOptional).where(inArray(subquestionDemandTypeOptional.subquestionId, ids)),
+  ]);
   return rows.map((r) => ({
     ...r,
     options: opts.filter((o) => o.subquestionId === r.id)
@@ -1901,6 +1898,10 @@ export async function getSubquestions(studyId: string) {
     demandTypeOptional: opts2.filter((e) => e.subquestionId === r.id).map((e) => e.demandTypeId),
   }));
 }
+
+// A study's nested subquestions (from getSubquestions) — passed around so the
+// save path loads them once and reuses them across the recompute helpers.
+export type SubquestionList = Awaited<ReturnType<typeof getSubquestions>>;
 
 export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null }) {
   const existing = await db.select().from(subquestions).where(eq(subquestions.milestoneId, milestoneId));
@@ -2014,8 +2015,8 @@ export async function getSubquestionConditionsForSubquestion(subquestionId: stri
 // Visible subquestion ids for a case: the study's subquestions (with their
 // conditions) resolved against the case's current choice answers, via the shared
 // pure rule. A subquestion with no conditions is always visible (back-compat).
-export async function getCaseVisibleSubquestionIds(caseId: string, studyId: string): Promise<Set<string>> {
-  const subqs = await getSubquestions(studyId);
+export async function getCaseVisibleSubquestionIds(caseId: string, studyId: string, preSubqs?: SubquestionList): Promise<Set<string>> {
+  const subqs = preSubqs ?? await getSubquestions(studyId);
   const answers = await db.select({ subquestionId: caseSubquestionAnswers.subquestionId, valueChoice: caseSubquestionAnswers.valueChoice })
     .from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
   const choiceBySubqId = new Map(answers.map((a) => [a.subquestionId, a.valueChoice]));
@@ -2024,10 +2025,11 @@ export async function getCaseVisibleSubquestionIds(caseId: string, studyId: stri
 
 // Delete any case answers whose subquestion is currently HIDDEN (a since-changed
 // parent), so a stale answer never lingers nor counts toward completion. Returns
-// the milestoneIds whose answers were cleared.
-export async function clearHiddenCaseAnswers(caseId: string, studyId: string): Promise<string[]> {
-  const subqs = await getSubquestions(studyId);
-  const visible = await getCaseVisibleSubquestionIds(caseId, studyId);
+// the milestoneIds whose answers were cleared. Accepts precomputed subqs/visible
+// (from a caller that already loaded them) to avoid re-querying.
+export async function clearHiddenCaseAnswers(caseId: string, studyId: string, preSubqs?: SubquestionList, preVisible?: Set<string>): Promise<string[]> {
+  const subqs = preSubqs ?? await getSubquestions(studyId);
+  const visible = preVisible ?? await getCaseVisibleSubquestionIds(caseId, studyId, subqs);
   const answers = await db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
   const msBySubq = new Map(subqs.map((s) => [s.id, s.milestoneId]));
   const clearedMs = new Set<string>();
@@ -2099,18 +2101,34 @@ export async function setCaseSubquestionAnswers(
 // subquestion is answered; its reachedAt is the latest of those answers. Keeps
 // a derived=true case_milestones row in sync; never touches a derived=false
 // (legacy/manual) row. Returns whether the milestone is (now) complete.
-export async function recomputeCaseMilestone(caseId: string, milestoneId: string, visible?: Set<string>, applicable?: Set<string>): Promise<boolean> {
-  const reqRows = await db.select({ id: subquestions.id, kind: subquestions.kind })
-    .from(subquestions)
-    .where(and(eq(subquestions.milestoneId, milestoneId), eq(subquestions.required, true)));
+export async function recomputeCaseMilestone(
+  caseId: string,
+  milestoneId: string,
+  visible?: Set<string>,
+  applicable?: Set<string>,
+  excludedIn?: Set<string>,
+  optionalIn?: Set<string>,
+  // Precomputed to avoid per-milestone round-trips when a caller (the save loop)
+  // already holds them: the study's subquestions, its id, and the case's existing
+  // caseMilestones keyed by milestoneId.
+  preSubqs?: SubquestionList,
+  studyIdIn?: string,
+  existingByMs?: Map<string, { id: string; derived: boolean | null }>,
+): Promise<boolean> {
+  const reqRows = preSubqs
+    ? preSubqs.filter((s) => s.milestoneId === milestoneId && s.required).map((s) => ({ id: s.id, kind: s.kind }))
+    : await db.select({ id: subquestions.id, kind: subquestions.kind })
+        .from(subquestions)
+        .where(and(eq(subquestions.milestoneId, milestoneId), eq(subquestions.required, true)));
 
-  const existing = (await db.select().from(caseMilestones)
-    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, milestoneId))))[0];
+  const existing = existingByMs
+    ? existingByMs.get(milestoneId)
+    : (await db.select().from(caseMilestones)
+        .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, milestoneId))))[0];
   // Frozen legacy/manual completion — its existence means complete; leave as is.
   if (existing && !existing.derived) return true;
 
-  const msRow = (await db.select({ studyId: milestones.studyId }).from(milestones).where(eq(milestones.id, milestoneId)))[0];
-  const studyId = msRow?.studyId ?? null;
+  const studyId = studyIdIn ?? (await db.select({ studyId: milestones.studyId }).from(milestones).where(eq(milestones.id, milestoneId)))[0]?.studyId ?? null;
 
   // Dynamic milestones (0051): a milestone that doesn't apply to this case (its
   // demand-type scope doesn't intersect) never completes — drop any derived row.
@@ -2132,8 +2150,8 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
   // not-mandatory set (0055) keeps the question shown but drops it from gating.
   // Both are removed here for this case (exclude-wins is automatic).
   const vis = visible ?? (studyId ? await getCaseVisibleSubquestionIds(caseId, studyId) : new Set<string>());
-  const excluded = studyId ? await getCaseExcludedSubquestionIds(caseId, studyId) : new Set<string>();
-  const optional = studyId ? await getCaseOptionalSubquestionIds(caseId, studyId) : new Set<string>();
+  const excluded = excludedIn ?? (studyId ? await getCaseExcludedSubquestionIds(caseId, studyId) : new Set<string>());
+  const optional = optionalIn ?? (studyId ? await getCaseOptionalSubquestionIds(caseId, studyId) : new Set<string>());
   const visibleReq = reqRows.filter((r) => vis!.has(r.id) && !excluded.has(r.id) && !optional.has(r.id));
   // Every required subquestion is conditionally hidden for this case → there is
   // nothing to gate on. Don't auto-complete an empty milestone (whole-milestone
@@ -2171,12 +2189,12 @@ export async function recomputeCaseMilestone(caseId: string, milestoneId: string
 // Implicit closure (0043): completing the FINAL milestone (highest sort_order in
 // the study) auto-closes the case; un-completing it reopens — but ONLY if the
 // case was auto-closed (closedReason='final_milestone'), never a manual close.
-export async function recomputeCaseClosure(caseId: string, studyId: string): Promise<void> {
+export async function recomputeCaseClosure(caseId: string, studyId: string, applicableIn?: Set<string>): Promise<void> {
   // Dynamic milestones (0051): the "final" milestone is the highest-sortOrder one
   // that APPLIES to this case, not the global last — so a case whose last
   // milestones are scoped out (e.g. additional borrowing) closes on its own last
   // relevant milestone instead of hanging on an irrelevant one.
-  const applicable = await getApplicableMilestoneIds(caseId, studyId);
+  const applicable = applicableIn ?? await getApplicableMilestoneIds(caseId, studyId);
   const ms = (await db.select({ id: milestones.id, sortOrder: milestones.sortOrder })
     .from(milestones).where(eq(milestones.studyId, studyId))
     .orderBy(desc(milestones.sortOrder)))
@@ -2239,25 +2257,25 @@ export async function getCaseMilestones(caseId: string) {
   return db.select().from(caseMilestones).where(eq(caseMilestones.caseId, caseId));
 }
 
-// ── Dynamic milestones by demand type (0051) ─────────────────────────────────
-export async function getMilestoneDemandTypeConditions(studyId: string) {
-  return db.select({ id: milestoneDemandTypeConditions.id, milestoneId: milestoneDemandTypeConditions.milestoneId, demandTypeId: milestoneDemandTypeConditions.demandTypeId })
-    .from(milestoneDemandTypeConditions)
-    .innerJoin(milestones, eq(milestoneDemandTypeConditions.milestoneId, milestones.id))
+// ── Milestone demand-type EXCLUSIONS (0056; replaces the 0051 include model) ──
+export async function getMilestoneDemandTypeExclusions(studyId: string) {
+  return db.select({ id: milestoneDemandTypeExclusions.id, milestoneId: milestoneDemandTypeExclusions.milestoneId, demandTypeId: milestoneDemandTypeExclusions.demandTypeId })
+    .from(milestoneDemandTypeExclusions)
+    .innerJoin(milestones, eq(milestoneDemandTypeExclusions.milestoneId, milestones.id))
     .where(eq(milestones.studyId, studyId));
 }
 
-// Diff-set the demand types a milestone is scoped to (empty = applies to all).
-export async function setMilestoneDemandTypeConditions(milestoneId: string, demandTypeIds: string[]) {
+// Diff-set the demand types a milestone is EXCLUDED for (empty = applies to all).
+export async function setMilestoneDemandTypeExclusions(milestoneId: string, demandTypeIds: string[]) {
   const desired = new Set(demandTypeIds);
-  const current = await db.select().from(milestoneDemandTypeConditions).where(eq(milestoneDemandTypeConditions.milestoneId, milestoneId));
+  const current = await db.select().from(milestoneDemandTypeExclusions).where(eq(milestoneDemandTypeExclusions.milestoneId, milestoneId));
   const currentIds = new Set(current.map((r) => r.demandTypeId));
   for (const r of current) {
-    if (!desired.has(r.demandTypeId)) await db.delete(milestoneDemandTypeConditions).where(eq(milestoneDemandTypeConditions.id, r.id));
+    if (!desired.has(r.demandTypeId)) await db.delete(milestoneDemandTypeExclusions).where(eq(milestoneDemandTypeExclusions.id, r.id));
   }
   for (const dtId of demandTypeIds) {
     if (currentIds.has(dtId)) continue;
-    await db.insert(milestoneDemandTypeConditions).values({ id: generateId(), milestoneId, demandTypeId: dtId });
+    await db.insert(milestoneDemandTypeExclusions).values({ id: generateId(), milestoneId, demandTypeId: dtId });
   }
 }
 
@@ -2320,19 +2338,19 @@ export async function getCaseOptionalSubquestionIds(caseId: string, studyId: str
   return optional;
 }
 
-// Milestones that APPLY to a case: no scope rows → applies to all; otherwise the
-// case's demand-type set must intersect the milestone's scope. Empty demand-type
-// set on a case only matches milestones that have no scope (applies-to-all).
-export async function getApplicableMilestoneIds(caseId: string, studyId: string): Promise<Set<string>> {
+// Milestones that APPLY to a case (0056 exclude model): a milestone applies
+// unless its exclusion set intersects the case's demand types. No rows = applies
+// to all. Optional precomputed `caseDemandTypeIds` avoids a re-query in the save loop.
+export async function getApplicableMilestoneIds(caseId: string, studyId: string, caseDemandTypeIds?: string[]): Promise<Set<string>> {
   const ms = await getMilestones(studyId);
-  const conds = await getMilestoneDemandTypeConditions(studyId);
-  const caseDT = new Set(await getCaseDemandTypeIds(caseId));
+  const excls = await getMilestoneDemandTypeExclusions(studyId);
+  const caseDT = new Set(caseDemandTypeIds ?? await getCaseDemandTypeIds(caseId));
   const byMs = new Map<string, string[]>();
-  for (const c of conds) { const l = byMs.get(c.milestoneId) ?? []; l.push(c.demandTypeId); byMs.set(c.milestoneId, l); }
+  for (const c of excls) { const l = byMs.get(c.milestoneId) ?? []; l.push(c.demandTypeId); byMs.set(c.milestoneId, l); }
   const applies = new Set<string>();
   for (const m of ms) {
     const dts = byMs.get(m.id) ?? [];
-    if (dts.length === 0 || dts.some((id) => caseDT.has(id))) applies.add(m.id);
+    if (!dts.some((id) => caseDT.has(id))) applies.add(m.id);
   }
   return applies;
 }

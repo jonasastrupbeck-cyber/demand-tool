@@ -30,9 +30,9 @@ export interface MilestoneWithSubqs {
   label: string;
   sortOrder: number;
   subquestions: Subquestion[];
-  // Dynamic milestones (0051): demand-type ids this milestone is scoped to.
+  // Milestone demand-type EXCLUSIONS (0056): ids this milestone is skipped for.
   // Empty = applies to every case.
-  demandTypeConditions: string[];
+  demandTypeExclusions: string[];
 }
 
 export interface CaseSubquestionAnswer {
@@ -271,7 +271,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
 
   // Dynamic milestones (0051): only show milestones that apply to this case's
   // demand types (no scope = applies to all). Mirrors getApplicableMilestoneIds.
-  const applicableMilestones = milestones.filter((m) => m.demandTypeConditions.length === 0 || m.demandTypeConditions.some((id) => caseDemandTypeIds.includes(id)));
+  const applicableMilestones = milestones.filter((m) => !(m.demandTypeExclusions ?? []).some((id) => caseDemandTypeIds.includes(id)));
   const ordered = [...applicableMilestones].sort((a, b) => a.sortOrder - b.sortOrder);
   const firstIncompleteIdx = ordered.findIndex((m) => !completeByMilestone.has(m.id));
 

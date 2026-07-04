@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getMilestones, getDemandTypes, setMilestoneDemandTypeConditions } from '@/lib/queries';
+import { getStudyByCode, getMilestones, getDemandTypes, setMilestoneDemandTypeExclusions } from '@/lib/queries';
 
-// Dynamic milestones (0051): scope a milestone to demand type(s). PUT the full
-// desired set of demand-type ids (diff-set server-side); an empty array means the
-// milestone applies to every case.
+// Milestone demand-type EXCLUSIONS (0056): PUT the full desired set of demand-type
+// ids this milestone is skipped for (diff-set server-side). An empty array means
+// the milestone applies to every case.
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ code: string; id: string }> }
@@ -26,6 +26,6 @@ export async function PUT(
     return NextResponse.json({ error: 'every demandTypeId must be a demand type of this study' }, { status: 400 });
   }
 
-  await setMilestoneDemandTypeConditions(id, body.demandTypeIds);
+  await setMilestoneDemandTypeExclusions(id, body.demandTypeIds);
   return NextResponse.json({ ok: true });
 }

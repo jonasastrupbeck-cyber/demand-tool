@@ -6,7 +6,6 @@ import { useLocale } from '@/lib/locale-context';
 import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
 import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
-import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
 import DemandTypeMultiSelect from '@/components/DemandTypeMultiSelect';
 import { compatibleKinds } from '@/lib/subquestion-kinds';
 import ChildQuestionAdder from '@/components/ChildQuestionAdder';
@@ -114,7 +113,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeExclusions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -663,7 +662,7 @@ export default function SettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label }),
       }),
-      (id) => { setExpandedMsIds((prev) => new Set(prev).add(id)); setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, demandTypeConditions: [], subquestions: [] }] } : s)); },
+      (id) => { setExpandedMsIds((prev) => new Set(prev).add(id)); setStudy((s) => (s ? { ...s, milestones: [...s.milestones, { id, label, sortOrder: s.milestones.length, demandTypeExclusions: [], subquestions: [] }] } : s)); },
     );
   }
 
@@ -1693,31 +1692,6 @@ export default function SettingsPage() {
               {(() => {
                 const advContent = (
                   <div className="space-y-1.5 pt-0.5">
-                    <label className="flex items-center gap-1 text-xs text-gray-500">
-                      <input type="checkbox" checked={!sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: !e.target.checked })} className="accent-brand" />
-                      {t('settings.subquestionNotMandatoryAll')}
-                      <span className="text-[10px] text-gray-400">— {t('settings.subquestionNotMandatoryHint')}</span>
-                    </label>
-                    <DemandTypeMultiSelect
-                      code={code}
-                      sqId={sq.id}
-                      resource="optional"
-                      variant="amber"
-                      label={t('settings.subquestionNotMandatoryFor')}
-                      selected={sq.demandTypeOptional}
-                      demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
-                      onRefresh={loadStudy}
-                    />
-                    <DemandTypeMultiSelect
-                      code={code}
-                      sqId={sq.id}
-                      resource="exclusions"
-                      variant="red"
-                      label={t('settings.subquestionExcludeFor')}
-                      selected={sq.demandTypeExclusions}
-                      demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
-                      onRefresh={loadStudy}
-                    />
                     <ConditionEditor
                       code={code}
                       sqId={sq.id}
@@ -1725,6 +1699,31 @@ export default function SettingsPage() {
                       parents={allSubqsFlat.filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
                       onRefresh={loadStudy}
                     />
+                    {/* Scope group — mandatory / demand-type rules, boxed as one unit. */}
+                    <div className="rounded-lg border border-gray-200 bg-gray-50/40 p-2 space-y-1.5">
+                      <p className="text-[10px] font-medium text-gray-500">{t('settings.subquestionScopeHeading')}</p>
+                      <label className="flex items-center gap-1 text-xs text-gray-500">
+                        <input type="checkbox" checked={!sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: !e.target.checked })} className="accent-brand" />
+                        {t('settings.subquestionNotMandatoryAll')}
+                        <span className="text-[10px] text-gray-400">— {t('settings.subquestionNotMandatoryHint')}</span>
+                      </label>
+                      <DemandTypeMultiSelect
+                        endpoint={`/api/studies/${encodeURIComponent(code)}/subquestions/${sq.id}/optional`}
+                        variant="amber"
+                        label={t('settings.subquestionNotMandatoryFor')}
+                        selected={sq.demandTypeOptional}
+                        demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
+                        onRefresh={loadStudy}
+                      />
+                      <DemandTypeMultiSelect
+                        endpoint={`/api/studies/${encodeURIComponent(code)}/subquestions/${sq.id}/exclusions`}
+                        variant="red"
+                        label={t('settings.subquestionExcludeFor')}
+                        selected={sq.demandTypeExclusions}
+                        demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
+                        onRefresh={loadStudy}
+                      />
+                    </div>
                   </div>
                 );
                 return note ? advContent : (
@@ -1773,10 +1772,11 @@ export default function SettingsPage() {
                   {idx === orderedMs.length - 1 && orderedMs.length > 1 && (
                     <p className="px-1 mb-1.5 text-[11px] text-gray-400">{t('settings.finalMilestoneHint')}</p>
                   )}
-                  <MilestoneAppliesTo
-                    code={code}
-                    milestoneId={m.id}
-                    selected={m.demandTypeConditions}
+                  <DemandTypeMultiSelect
+                    endpoint={`/api/studies/${encodeURIComponent(code)}/milestones/${m.id}/exclusions`}
+                    label={t('settings.subquestionExcludeFor')}
+                    variant="red"
+                    selected={m.demandTypeExclusions}
                     demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
                     onRefresh={loadStudy}
                   />

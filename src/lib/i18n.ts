@@ -3732,6 +3732,12 @@ const translations = {
     sv: 'Uteslut för',
     de: 'Ausschließen für',
   },
+  'settings.subquestionScopeHeading': {
+    en: 'When this question applies',
+    da: 'Hvornår dette spørgsmål gælder',
+    sv: 'När denna fråga gäller',
+    de: 'Wann diese Frage gilt',
+  },
   'settings.demandTypePickerEmpty': {
     en: 'all cases',
     da: 'alle sager',

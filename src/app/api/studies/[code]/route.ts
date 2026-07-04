@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getValueSteps, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions, getMilestoneDemandTypeConditions } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getValueSteps, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions, getMilestoneDemandTypeExclusions } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -28,7 +28,7 @@ export async function GET(
     getLifeProblems(study.id),
     getMilestones(study.id),
     getSubquestions(study.id),
-    getMilestoneDemandTypeConditions(study.id),
+    getMilestoneDemandTypeExclusions(study.id),
   ]);
 
   // Decision-box redesign (0042): nest subquestions under their milestone.
@@ -38,14 +38,14 @@ export async function GET(
     list.push(sq);
     subqsByMilestone.set(sq.milestoneId, list);
   }
-  // Dynamic milestones (0051): nest each milestone's demand-type scope (ids).
-  const dtCondsByMilestone = new Map<string, string[]>();
+  // Milestone demand-type exclusions (0056): nest each milestone's exclude set (ids).
+  const dtExclsByMilestone = new Map<string, string[]>();
   for (const c of msDtConds) {
-    const list = dtCondsByMilestone.get(c.milestoneId) ?? [];
+    const list = dtExclsByMilestone.get(c.milestoneId) ?? [];
     list.push(c.demandTypeId);
-    dtCondsByMilestone.set(c.milestoneId, list);
+    dtExclsByMilestone.set(c.milestoneId, list);
   }
-  const msTypesWithSubqs = msTypes.map((m) => ({ ...m, subquestions: subqsByMilestone.get(m.id) ?? [], demandTypeConditions: dtCondsByMilestone.get(m.id) ?? [] }));
+  const msTypesWithSubqs = msTypes.map((m) => ({ ...m, subquestions: subqsByMilestone.get(m.id) ?? [], demandTypeExclusions: dtExclsByMilestone.get(m.id) ?? [] }));
 
   return NextResponse.json({
     ...study,
