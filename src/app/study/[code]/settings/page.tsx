@@ -456,6 +456,29 @@ export default function SettingsPage() {
     }));
   }
 
+  // Reorder a subquestion within its sibling group (roots of a milestone, or the
+  // children under one answer option) — swaps sortOrder with the adjacent sibling.
+  // Swapping (not renumbering) is safe with the tree: roots sort among themselves
+  // and children within their group, both by sortOrder.
+  function moveSubquestion(msId: string, siblingIds: string[], sqId: string, dir: -1 | 1) {
+    const idx = siblingIds.indexOf(sqId);
+    const j = idx + dir;
+    if (idx < 0 || j < 0 || j >= siblingIds.length) return;
+    const otherId = siblingIds[j];
+    const ms = (study?.milestones || []).find((m) => m.id === msId);
+    const a = ms?.subquestions.find((s) => s.id === sqId);
+    const b = ms?.subquestions.find((s) => s.id === otherId);
+    if (!a || !b) return;
+    const aSort = a.sortOrder, bSort = b.sortOrder;
+    patchMsSubqs(msId, (subs) => subs.map((s) => s.id === sqId ? { ...s, sortOrder: bSort } : s.id === otherId ? { ...s, sortOrder: aSort } : s));
+    const patch = (id: string, sortOrder: number) => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder }),
+    });
+    Promise.all([patch(sqId, bSort), patch(otherId, aSort)])
+      .then((rs) => { if (rs.some((r) => !r.ok)) loadStudy(); })
+      .catch(() => loadStudy());
+  }
+
   function removeSubquestion(msId: string, sqId: string) {
     patchMsSubqs(msId, (subs) => subs.filter((f) => f.id !== sqId));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}`, { method: 'DELETE' }));
@@ -1430,8 +1453,9 @@ export default function SettingsPage() {
             : note.type === 'multiCondition'
               ? note.conditions.map((c) => t('settings.shownWhenNote', { parent: tl(subqLabelById.get(c.parentId) ?? '—'), value: tl(c.triggerValue) })).join(' · ')
               : t('settings.shownWhenNote', { parent: tl(subqLabelById.get(note.parentId) ?? '—'), value: tl(note.triggerValue) });
-          const renderSubqRow = (msId: string, node: SubqTreeNode<SettingsSubq>, depth: number, note?: RootNote): ReactElement => {
+          const renderSubqRow = (msId: string, node: SubqTreeNode<SettingsSubq>, depth: number, note?: RootNote, siblingIds: string[] = []): ReactElement => {
             const sq = node.subq;
+            const sibIdx = siblingIds.indexOf(sq.id);
             return (
             <li key={sq.id} className="p-2 rounded-lg bg-white border border-gray-200 space-y-1.5">
               <div className="flex items-center gap-1.5">
@@ -1443,6 +1467,8 @@ export default function SettingsPage() {
                   className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                 />
                 <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{kindLabel(sq.kind)}</span>
+                <button type="button" aria-label={t('settings.moveUp')} disabled={sibIdx <= 0} onClick={() => moveSubquestion(msId, siblingIds, sq.id, -1)} className="shrink-0 px-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
+                <button type="button" aria-label={t('settings.moveDown')} disabled={sibIdx < 0 || sibIdx >= siblingIds.length - 1} onClick={() => moveSubquestion(msId, siblingIds, sq.id, 1)} className="shrink-0 px-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↓</button>
                 <button onClick={() => removeSubquestion(msId, sq.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
               </div>
               {note && (
@@ -1516,7 +1542,7 @@ export default function SettingsPage() {
                             <>
                               <p className="text-[10px] font-medium text-sky-700">{t('settings.ifValueHeader', { value: tl(o.label) })}</p>
                               <ul className="space-y-2">
-                                {children.map((c) => renderSubqRow(msId, c, depth + 1))}
+                                {children.map((c) => renderSubqRow(msId, c, depth + 1, undefined, children.map((cc) => cc.subq.id)))}
                               </ul>
                             </>
                           )}
@@ -1591,9 +1617,9 @@ export default function SettingsPage() {
               {orderedMs.map((m, idx) => {
                 const msOpen = expandedMsIds.has(m.id);
                 return (
-                <div key={m.id} className="rounded-xl border-2 border-sky-200 overflow-hidden">
+                <div key={m.id} className="rounded-xl border-2 border-sky-200">
                   {/* Blue pill header — always visible; the chevron toggles the body. */}
-                  <div className="flex items-center gap-1.5 bg-sky-50/70 px-2 py-1.5">
+                  <div className={`flex items-center gap-1.5 bg-sky-50/70 px-2 py-1.5 ${msOpen ? 'rounded-t-[10px]' : 'rounded-[10px]'}`}>
                     <button type="button" onClick={() => toggleMs(m.id)} aria-label={t(msOpen ? 'capture.milestoneCollapse' : 'capture.milestoneExpand')} className="shrink-0 flex items-center gap-1 text-sky-700 hover:text-sky-900">
                       <span className="w-3 text-center text-xs">{msOpen ? '▾' : '▸'}</span>
                       <span className="w-4 text-xs tabular-nums text-center text-gray-500">{idx + 1}</span>
@@ -1626,7 +1652,7 @@ export default function SettingsPage() {
                     const tree = buildSubquestionTree(m.subquestions, allSubqsFlat);
                     return (
                       <ul className="space-y-2">
-                        {tree.roots.map((n) => renderSubqRow(m.id, n, 0, tree.rootNoteById.get(n.subq.id)))}
+                        {tree.roots.map((n) => renderSubqRow(m.id, n, 0, tree.rootNoteById.get(n.subq.id), tree.roots.map((r) => r.subq.id)))}
                       </ul>
                     );
                   })()}
