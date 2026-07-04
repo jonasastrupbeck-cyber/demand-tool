@@ -1797,6 +1797,74 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
+              {/* Per-value-step overview (2026-07-04): for each step, the work
+                  mix (consequences) + top system conditions on its blocks
+                  (causes). Complements the stacked bar above — that one
+                  compares steps, this one explains each step. Self-gates like
+                  the chart; plain CSS bars, no recharts. */}
+              {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
+                <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200">
+                  <h3 className="text-sm font-semibold mb-1 text-gray-700">{t('dashboard.valueStepOverviewTitle')}</h3>
+                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.valueStepOverviewHint')}</p>
+                  <div className="space-y-3">
+                    {data.workByValueStep.map((step) => {
+                      const total = step.value + step.sequence + step.failure + step.failureDemand;
+                      const waste = step.sequence + step.failure + step.failureDemand;
+                      const wastePct = total > 0 ? Math.round((waste / total) * 100) : 0;
+                      const scs = data.valueStepSystemConditions
+                        .filter((r) => r.stepLabel === step.label && r.stepSortOrder === step.sortOrder)
+                        .slice(0, 5); // already count-desc from the query
+                      const scMax = scs[0]?.count ?? 0;
+                      const mix = [
+                        { key: 'value', n: step.value, color: COLORS.value, name: t('capture.value') },
+                        { key: 'sequence', n: step.sequence, color: COLORS.sequence, name: t('capture.classificationWorkSequence') },
+                        { key: 'failure', n: step.failure, color: COLORS.failure, name: t('capture.failure') },
+                        { key: 'failureDemand', n: step.failureDemand, color: '#e11d48', name: t('capture.workBlockTagFailureDemand') },
+                      ].filter((m) => m.n > 0);
+                      return (
+                        <div key={`${step.sortOrder}::${step.label}`} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <p className="text-sm font-medium text-gray-800 break-words">{tl(step.label)}</p>
+                            <p className="text-[11px] text-gray-500 shrink-0">
+                              {total} {t('dashboard.vsWorkSteps')} ·{' '}
+                              <span className={`font-medium ${wastePct > 0 ? 'text-red-600' : 'text-green-700'}`}>{wastePct}% {t('dashboard.vsNonValueShare')}</span>
+                            </p>
+                          </div>
+                          {/* Work-mix strip: 100%-stacked, same palette as the chart above. */}
+                          <div className="mt-1.5 flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
+                            {mix.map((m) => (<div key={m.key} style={{ width: `${(m.n / total) * 100}%`, backgroundColor: m.color }} />))}
+                          </div>
+                          <p className="mt-1 text-[11px] text-gray-500">
+                            {mix.map((m, i) => (
+                              <span key={m.key}>{i > 0 && ' · '}<span style={{ color: m.color }}>●</span> {m.name} {m.n}</span>
+                            ))}
+                          </p>
+                          {scs.length > 0 ? (
+                            <div className="mt-2 space-y-1">
+                              <p className="text-[11px] font-medium text-gray-600">{t('dashboard.vsTopSystemConditions')}</p>
+                              {scs.map((sc) => (
+                                <div key={sc.scLabel} className="flex items-center gap-2">
+                                  <span className="w-40 shrink-0 truncate text-[11px] text-gray-700" title={tl(sc.scLabel)}>{tl(sc.scLabel)}</span>
+                                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200">
+                                    <div className="h-full rounded-full bg-sky-500" style={{ width: `${scMax > 0 ? (sc.count / scMax) * 100 : 0}%` }} />
+                                  </div>
+                                  <span className="w-6 shrink-0 text-right text-[11px] text-gray-500">{sc.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : waste > 0 ? (
+                            // Only nudge when the step actually carries waste — a
+                            // pure-value step legitimately has no SCs (the SC picker
+                            // only renders on sequence/failure/failure-demand steps).
+                            <p className="mt-2 text-[11px] italic text-gray-400">{t('dashboard.vsNoSystemConditions')}</p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {data.workOverTime.length > 1 && (
                 <ChartCard title={t('dashboard.workOverTime')}>
                   <ResponsiveContainer width="100%" height={300}>

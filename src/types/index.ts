@@ -204,6 +204,11 @@ export interface DashboardData {
   // journey. Ordered by value-step order. P2BS-scoped. Empty unless enabled.
   valueStepsEnabled: boolean;
   workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>;
+  // Per (value step × system condition) flow-block counts — the causes behind
+  // the waste at each step. Flat rows ordered by count desc; the client groups
+  // per step (match on stepLabel + stepSortOrder, mirroring workByValueStep's
+  // key). Empty unless valueStepsEnabled AND systemConditionsEnabled.
+  valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }>;
 }
 
 export interface CreateEntryInput {

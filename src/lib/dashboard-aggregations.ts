@@ -1,7 +1,7 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
-import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData, TouchSeriesPoint } from '@/types';
 import type { SQL } from 'drizzle-orm';
@@ -680,18 +680,43 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   // journey? Count flow work blocks per value step, split by tag. P2BS-scoped
   // via baseConditions; ordered by the value step's own order. Feature-gated.
   let workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }> = [];
+  let valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }> = [];
   if (valueStepsEnabled) {
-    const rows = await db.select({
-      label: valueSteps.label,
-      sortOrder: valueSteps.sortOrder,
-      tag: workDescriptionBlocks.tag,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(workDescriptionBlocks)
-      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-      .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
-      .where(and(...baseConditions))
-      .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, workDescriptionBlocks.tag);
+    const [rows, scRows] = await Promise.all([
+      db.select({
+        label: valueSteps.label,
+        sortOrder: valueSteps.sortOrder,
+        tag: workDescriptionBlocks.tag,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(workDescriptionBlocks)
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
+        .where(and(...baseConditions))
+        .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, workDescriptionBlocks.tag),
+      // Per (value step × system condition) block counts — the CAUSES behind
+      // the waste at each step, for the per-step overview cards. Junction rows
+      // are re-pointed to the surviving SC at merge time, so excluding archived
+      // conditions here reproduces getSystemConditionFrequencies' behaviour.
+      // Same base scoping (study + P2BS + dates) as workByValueStep.
+      systemConditionsEnabled
+        ? db.select({
+            stepLabel: valueSteps.label,
+            stepSortOrder: valueSteps.sortOrder,
+            scLabel: systemConditions.label,
+            count: sql<number>`count(*)::int`,
+          })
+            .from(workBlockSystemConditions)
+            .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
+            .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+            .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
+            .innerJoin(systemConditions, eq(workBlockSystemConditions.systemConditionId, systemConditions.id))
+            .where(and(...baseConditions, isNull(systemConditions.archivedAt)))
+            .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, systemConditions.id, systemConditions.label)
+            .orderBy(desc(sql`count(*)`))
+        : Promise.resolve([]),
+    ]);
+    valueStepSystemConditions = scRows;
     const byStep = new Map<string, { label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>();
     for (const r of rows) {
       const key = `${r.sortOrder}::${r.label}`;
@@ -746,6 +771,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     corTypeCounts,
     valueStepsEnabled,
     workByValueStep,
+    valueStepSystemConditions,
   };
 }
 

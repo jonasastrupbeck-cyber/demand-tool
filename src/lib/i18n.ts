@@ -1519,6 +1519,44 @@ const translations = {
     sv: 'Var värdeskapande, sekvens- och icke-värdeskapande arbete hamnar i värderesan.',
     de: 'Wo Wert-, Sequenz- und Fehlerarbeit auf der Wertreise anfallen.',
   },
+  // Per-value-step overview (2026-07-04): causes (system conditions) vs
+  // consequences (non-value work + failure demand) for each value step.
+  'dashboard.valueStepOverviewTitle': {
+    en: 'Value step overview',
+    da: 'Overblik pr. værditrin',
+    sv: 'Översikt per värdesteg',
+    de: 'Überblick je Wertschritt',
+  },
+  'dashboard.valueStepOverviewHint': {
+    en: 'For each value step: the mix of work related to it, and the biggest system conditions driving it. System conditions are the causes — failure work and failure demand are the consequences.',
+    da: 'For hvert værditrin: sammensætningen af arbejdet knyttet til det, og de største systemforhold der driver det. Systemforhold er årsagerne — ikke-værdiskabende arbejde og ikke-værdiskabende efterspørgsel er konsekvenserne.',
+    sv: 'För varje värdesteg: sammansättningen av arbetet som hör till det, och de största systemvillkor som driver det. Systemvillkor är orsakerna — icke-värdeskapande arbete och icke-värdeskapande efterfrågan är konsekvenserna.',
+    de: 'Für jeden Wertschritt: die Zusammensetzung der zugehörigen Arbeit und die größten Systembedingungen dahinter. Systembedingungen sind die Ursachen — Fehlerarbeit und Fehlernachfrage sind die Folgen.',
+  },
+  'dashboard.vsWorkSteps': {
+    en: 'work steps',
+    da: 'arbejdstrin',
+    sv: 'arbetssteg',
+    de: 'Arbeitsschritte',
+  },
+  'dashboard.vsNonValueShare': {
+    en: 'non-value',
+    da: 'ikke-værdi',
+    sv: 'icke-värde',
+    de: 'Nicht-Wert',
+  },
+  'dashboard.vsTopSystemConditions': {
+    en: 'Biggest system conditions driving this step',
+    da: 'Største systemforhold der driver dette trin',
+    sv: 'Största systemvillkor som driver detta steg',
+    de: 'Größte Systembedingungen hinter diesem Schritt',
+  },
+  'dashboard.vsNoSystemConditions': {
+    en: 'No system conditions tagged on this step’s work yet.',
+    da: 'Ingen systemforhold registreret på arbejdet i dette trin endnu.',
+    sv: 'Inga systemvillkor registrerade på arbetet i detta steg ännu.',
+    de: 'Noch keine Systembedingungen an der Arbeit dieses Schritts erfasst.',
+  },
   'dashboard.synthesisTabHelp': {
     en: 'Study what you have captured and merge the labels that are really the same onto one agreed name.',
     da: 'Studér det, du har opfanget, og slå de betegnelser sammen, der reelt er det samme, til ét aftalt navn.',
