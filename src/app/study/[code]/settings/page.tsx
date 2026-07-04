@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type ReactElement } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
 import FormulaEditor from '@/components/FormulaEditor';
 import ConditionEditor from '@/components/ConditionEditor';
 import MilestoneAppliesTo from '@/components/MilestoneAppliesTo';
+import ChildQuestionAdder from '@/components/ChildQuestionAdder';
+import { buildSubquestionTree, type SubqTreeNode, type RootNote } from '@/lib/subquestion-tree';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
 import InlineTypeAdder from '@/components/InlineTypeAdder';
@@ -168,9 +170,12 @@ export default function SettingsPage() {
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
   const [newSubqLabel, setNewSubqLabel] = useState('');
-  const [newSubqKind, setNewSubqKind] = useState<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>('choice');
+  const [newSubqKind, setNewSubqKind] = useState<'yesno' | 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'text' | 'choice'>('yesno');
   // Which milestone's preset menu is open (add a ready-made choice subquestion).
   const [presetMenuMsId, setPresetMenuMsId] = useState<string | null>(null);
+  // Builder UX (2026-07-04): which subquestion row has its "⋯ Advanced"
+  // (ConditionEditor) section open. Rows with a visibility note always show it.
+  const [advancedSqId, setAdvancedSqId] = useState<string | null>(null);
   const [newMilestoneLabel, setNewMilestoneLabel] = useState('');
   const [newWorkType, setNewWorkType] = useState('');
   const [newWorkTypeCategory, setNewWorkTypeCategory] = useState<'value' | 'failure' | 'sequence'>('value');
@@ -460,6 +465,25 @@ export default function SettingsPage() {
     setNewSubqLabel('');
     setSubqAdderMsId(null);
     const kind = newSubqKind;
+    // Builder UX (2026-07-04): 'yesno' is a pseudo-kind — one action creates a
+    // choice question WITH localized Yes/No options (neutral polarity; the
+    // author opts into "Suggest closing case" per answer afterwards).
+    if (kind === 'yesno') {
+      void (async () => {
+        const res = await fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${msId}/subquestions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, kind: 'choice' }),
+        });
+        if (!res.ok) return;
+        const sq = await res.json();
+        for (const optLabel of [t('capture.dpYes'), t('capture.dpNo')]) {
+          await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sq.id}/options`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label: optLabel }),
+          });
+        }
+        await loadStudy();
+      })();
+      return;
+    }
     mutateAdd(
       () => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/${msId}/subquestions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, kind }),
@@ -1412,7 +1436,20 @@ export default function SettingsPage() {
             : k === 'text' ? t('settings.subquestionKindText')
             : t('settings.captureFieldKindChoice');
           const canLink = (k: string) => k === 'amount' || k === 'number' || k === 'currency' || k === 'date' || k === 'duration';
-          const renderSubqRow = (msId: string, sq: StudyData['milestones'][number]['subquestions'][number]) => (
+          // Builder UX (2026-07-04): group each milestone's subquestions into a
+          // tree so follow-ups render indented under the answer that reveals
+          // them (shared helper — capture uses the same one).
+          type SettingsSubq = StudyData['milestones'][number]['subquestions'][number];
+          const allSubqsFlat = orderedMs.flatMap((mm) => mm.subquestions);
+          const subqLabelById = new Map(allSubqsFlat.map((s) => [s.id, s.label]));
+          const noteText = (note: RootNote): string =>
+            note.type === 'staleTrigger' ? t('settings.staleTriggerNote')
+            : note.type === 'multiCondition'
+              ? note.conditions.map((c) => t('settings.shownWhenNote', { parent: tl(subqLabelById.get(c.parentId) ?? '—'), value: tl(c.triggerValue) })).join(' · ')
+              : t('settings.shownWhenNote', { parent: tl(subqLabelById.get(note.parentId) ?? '—'), value: tl(note.triggerValue) });
+          const renderSubqRow = (msId: string, node: SubqTreeNode<SettingsSubq>, depth: number, note?: RootNote): ReactElement => {
+            const sq = node.subq;
+            return (
             <li key={sq.id} className="p-2 rounded-lg bg-white border border-gray-200 space-y-1.5">
               <div className="flex items-center gap-1.5">
                 <input
@@ -1425,6 +1462,9 @@ export default function SettingsPage() {
                 <span className="shrink-0 text-[10px] uppercase tracking-wide text-gray-400 font-medium">{kindLabel(sq.kind)}</span>
                 <button onClick={() => removeSubquestion(msId, sq.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
               </div>
+              {note && (
+                <p className={`text-[10px] ${note.type === 'staleTrigger' ? 'text-amber-600' : 'text-gray-400'}`}>{noteText(note)}</p>
+              )}
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1 text-xs text-gray-500">
                   <input type="checkbox" checked={sq.required} onChange={(e) => patchSubquestion(msId, sq.id, { required: e.target.checked })} className="accent-brand" />
@@ -1458,30 +1498,57 @@ export default function SettingsPage() {
                 )}
               </div>
               {sq.kind === 'choice' && (
-                <div className="space-y-1 pl-1 border-l-2 border-gray-100">
-                  {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => (
-                    <div key={o.id} className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        defaultValue={o.label}
-                        aria-label={t('settings.addOption')}
-                        onBlur={(e) => patchOption(msId, sq.id, o.id, { label: e.target.value })}
-                        className="flex-1 px-2 py-0.5 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
-                      />
-                      <SegmentedToggle
-                        compact
-                        ariaLabel={t('settings.optionPolarity')}
-                        value={o.polarity ?? 'none'}
-                        onChange={(v) => patchOption(msId, sq.id, o.id, { polarity: v === 'none' ? null : (v as 'positive' | 'negative') })}
-                        options={[
-                          { value: 'positive', label: t('settings.polarityPositive'), activeColor: 'green' },
-                          { value: 'none', label: t('settings.polarityNone'), activeColor: 'blue' },
-                          { value: 'negative', label: t('settings.polarityNegative'), activeColor: 'red' },
-                        ]}
-                      />
-                      <button onClick={() => removeOption(msId, sq.id, o.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
-                    </div>
-                  ))}
+                <div className="space-y-1.5 pl-1 border-l-2 border-gray-100">
+                  {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => {
+                    const children = node.childrenByTrigger.get(o.label) ?? [];
+                    return (
+                      <div key={o.id} className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            defaultValue={o.label}
+                            aria-label={t('settings.addOption')}
+                            onBlur={(e) => patchOption(msId, sq.id, o.id, { label: e.target.value })}
+                            className="flex-1 px-2 py-0.5 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                          />
+                          <SegmentedToggle
+                            compact
+                            ariaLabel={t('settings.optionPolarity')}
+                            value={o.polarity ?? 'none'}
+                            onChange={(v) => patchOption(msId, sq.id, o.id, { polarity: v === 'none' ? null : (v as 'positive' | 'negative') })}
+                            options={[
+                              { value: 'positive', label: t('settings.optionOnTrack'), activeColor: 'green' },
+                              { value: 'none', label: t('settings.optionNeutral'), activeColor: 'blue' },
+                              { value: 'negative', label: t('settings.optionSuggestClose'), activeColor: 'red' },
+                            ]}
+                          />
+                          <button onClick={() => removeOption(msId, sq.id, o.id)} className="text-xs text-red-500 hover:text-red-700 shrink-0 px-1" aria-label={t('settings.remove')}>×</button>
+                        </div>
+                        {o.polarity === 'negative' && (
+                          <p className="text-[10px] text-red-500">{t('settings.optionSuggestCloseHint')}</p>
+                        )}
+                        {/* Follow-ups revealed by this answer: indented group + inline adder. */}
+                        <div className={`${depth < 2 ? 'ml-3 pl-2 border-l-2 border-sky-200 ' : ''}space-y-1`}>
+                          {children.length > 0 && (
+                            <>
+                              <p className="text-[10px] font-medium text-sky-700">{t('settings.ifValueHeader', { value: tl(o.label) })}</p>
+                              <ul className="space-y-2">
+                                {children.map((c) => renderSubqRow(msId, c, depth + 1))}
+                              </ul>
+                            </>
+                          )}
+                          <ChildQuestionAdder
+                            code={code}
+                            milestoneId={msId}
+                            parentSubquestionId={sq.id}
+                            triggerValue={o.label}
+                            triggerDisplay={tl(o.label)}
+                            onRefresh={loadStudy}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                   <InlineTypeAdder
                     code={code}
                     apiPath={`subquestions/${sq.id}/options`}
@@ -1500,15 +1567,41 @@ export default function SettingsPage() {
                   onSave={(f) => patchSubquestion(msId, sq.id, { formula: f })}
                 />
               )}
-              <ConditionEditor
-                code={code}
-                sqId={sq.id}
-                conditions={sq.conditions}
-                parents={orderedMs.flatMap((mm) => mm.subquestions).filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
-                onRefresh={loadStudy}
-              />
+              {/* Visibility wiring: rows with a note (cross-milestone / OR /
+                  stale trigger) always show the editor; ordinary rows tuck it
+                  behind "⋯ Advanced" — the primary path is the "+ If X, ask…"
+                  adder on the parent's answer rows. */}
+              {note ? (
+                <ConditionEditor
+                  code={code}
+                  sqId={sq.id}
+                  conditions={sq.conditions}
+                  parents={allSubqsFlat.filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
+                  onRefresh={loadStudy}
+                />
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedSqId(advancedSqId === sq.id ? null : sq.id)}
+                    className="text-[10px] text-gray-400 hover:text-gray-600"
+                  >
+                    ⋯ {t('settings.advancedToggle')}
+                  </button>
+                  {advancedSqId === sq.id && (
+                    <ConditionEditor
+                      code={code}
+                      sqId={sq.id}
+                      conditions={sq.conditions}
+                      parents={allSubqsFlat.filter((s) => s.kind === 'choice' && s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, options: s.options.map((o) => ({ label: o.label })) }))}
+                      onRefresh={loadStudy}
+                    />
+                  )}
+                </>
+              )}
             </li>
-          );
+            );
+          };
           return (
           <div className={cardCls}>
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('settings.milestones')}</h2>
@@ -1539,9 +1632,14 @@ export default function SettingsPage() {
                     demandTypes={study.demandTypes.map((d) => ({ id: d.id, label: d.label }))}
                     onRefresh={loadStudy}
                   />
-                  <ul className="space-y-2">
-                    {[...m.subquestions].sort((a, b) => a.sortOrder - b.sortOrder).map((sq) => renderSubqRow(m.id, sq))}
-                  </ul>
+                  {(() => {
+                    const tree = buildSubquestionTree(m.subquestions, allSubqsFlat);
+                    return (
+                      <ul className="space-y-2">
+                        {tree.roots.map((n) => renderSubqRow(m.id, n, 0, tree.rootNoteById.get(n.subq.id)))}
+                      </ul>
+                    );
+                  })()}
                   {subqAdderMsId === m.id ? (
                     <div className="flex gap-1.5 items-center mt-1.5">
                       <input
@@ -1559,6 +1657,7 @@ export default function SettingsPage() {
                         aria-label={t('settings.wmValueKind')}
                         className="shrink-0 px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                       >
+                        <option value="yesno">{t('settings.addYesNoQuestion')}</option>
                         <option value="choice">{t('settings.captureFieldKindChoice')}</option>
                         <option value="amount">{t('settings.captureFieldKindAmount')}</option>
                         <option value="number">{t('settings.subquestionKindNumber')}</option>
@@ -1574,6 +1673,13 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => { setSubqAdderMsId(m.id); setNewSubqLabel(''); setNewSubqKind('yesno'); }}
+                        className="px-2 py-1 rounded text-xs font-medium text-sky-700 hover:text-sky-900 border border-dashed border-sky-300 hover:border-sky-400"
+                      >
+                        + {t('settings.addYesNoQuestion')}
+                      </button>
                       <button
                         type="button"
                         onClick={() => { setSubqAdderMsId(m.id); setNewSubqLabel(''); setNewSubqKind('choice'); }}

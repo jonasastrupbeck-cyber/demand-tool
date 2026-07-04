@@ -3723,29 +3723,81 @@ const translations = {
     sv: 'alla ärenden',
     de: 'alle Fälle',
   },
-  'settings.optionPolarity': {
-    en: 'Outcome polarity',
-    da: 'Udfaldets polaritet',
-    sv: 'Utfallets polaritet',
-    de: 'Ergebnis-Polarität',
+  // Decision-box builder UX (2026-07-04): build branching downward from the
+  // parent answer instead of wiring children upward via "Show only when".
+  'settings.ifValueAsk': {
+    en: 'If "{value}", ask…',
+    da: 'Hvis "{value}", spørg…',
+    sv: 'Om "{value}", fråga…',
+    de: 'Wenn „{value}", frage…',
   },
-  'settings.polarityPositive': {
-    en: 'Positive',
-    da: 'Positiv',
-    sv: 'Positiv',
-    de: 'Positiv',
+  'settings.ifValueHeader': {
+    en: 'If "{value}":',
+    da: 'Hvis "{value}":',
+    sv: 'Om "{value}":',
+    de: 'Wenn „{value}":',
   },
-  'settings.polarityNone': {
+  'settings.childQuestionLabelPlaceholder': {
+    en: 'Follow-up question…',
+    da: 'Opfølgende spørgsmål…',
+    sv: 'Följdfråga…',
+    de: 'Folgefrage…',
+  },
+  'settings.addYesNoQuestion': {
+    en: 'Yes/No question',
+    da: 'Ja/nej-spørgsmål',
+    sv: 'Ja/nej-fråga',
+    de: 'Ja/Nein-Frage',
+  },
+  'settings.optionOnTrack': {
+    en: 'On track',
+    da: 'På sporet',
+    sv: 'På rätt spår',
+    de: 'Auf Kurs',
+  },
+  'settings.optionNeutral': {
     en: 'Neutral',
     da: 'Neutral',
     sv: 'Neutral',
     de: 'Neutral',
   },
-  'settings.polarityNegative': {
-    en: 'Negative',
-    da: 'Negativ',
-    sv: 'Negativ',
-    de: 'Negativ',
+  'settings.optionSuggestClose': {
+    en: 'Suggest closing case',
+    da: 'Foreslå at lukke sagen',
+    sv: 'Föreslå att stänga ärendet',
+    de: 'Fallabschluss vorschlagen',
+  },
+  'settings.optionSuggestCloseHint': {
+    en: 'Picking this answer offers to close the case',
+    da: 'Vælges dette svar, tilbydes det at lukke sagen',
+    sv: 'Väljs det här svaret erbjuds att stänga ärendet',
+    de: 'Bei dieser Antwort wird angeboten, den Fall zu schließen',
+  },
+  'settings.shownWhenNote': {
+    en: 'Shown when {parent} = {value}',
+    da: 'Vises når {parent} = {value}',
+    sv: 'Visas när {parent} = {value}',
+    de: 'Angezeigt wenn {parent} = {value}',
+  },
+  'settings.staleTriggerNote': {
+    en: 'Points at a removed answer option — re-wire or remove the rule below',
+    da: 'Peger på en fjernet svarmulighed — omkobl eller fjern reglen nedenfor',
+    sv: 'Pekar på ett borttaget svarsalternativ — koppla om eller ta bort regeln nedan',
+    de: 'Verweist auf eine entfernte Antwortoption — unten neu verknüpfen oder Regel entfernen',
+  },
+  'settings.advancedToggle': {
+    en: 'Advanced',
+    da: 'Avanceret',
+    sv: 'Avancerat',
+    de: 'Erweitert',
+  },
+  // Plain-language answer meaning (2026-07-04). Data model unchanged: maps to
+  // the option polarity column (positive/null/negative).
+  'settings.optionPolarity': {
+    en: 'What this answer means',
+    da: 'Hvad dette svar betyder',
+    sv: 'Vad det här svaret betyder',
+    de: 'Was diese Antwort bedeutet',
   },
   'settings.addOption': {
     en: 'Add option',
@@ -4303,6 +4355,10 @@ export function t(key: TranslationKey, locale: Locale, params?: Record<string, s
 // Known default labels with translations across all languages.
 // Each inner array contains [en, da, sv, de] variants of the same label.
 const DEFAULT_LABEL_GROUPS: string[][] = [
+  // Decision-box Yes/No answer options (2026-07-04): created in the author's UI
+  // language, rendered localized in every UI language.
+  ['Yes', 'Ja', 'Ja', 'Ja'],
+  ['No', 'Nej', 'Nej', 'Nein'],
   // Capability of response (formerly "Handling Types")
   ['One Stop', 'One Stop', 'One Stop', 'One Stop'],
   ['Pass-on', 'Sendt videre', 'Skickat vidare', 'Weitergeleitet'],

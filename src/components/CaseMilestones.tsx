@@ -16,13 +16,14 @@
  * (no reseed effect → no clobber of in-progress typing).
  */
 
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
 import { parseAmountLoose } from '@/lib/format-currency';
 import { evalFormula, type Resolved } from '@/lib/formula';
 import { visibleSubquestionIds } from '@/lib/subquestion-visibility';
+import { buildSubquestionTree, type SubqTreeNode } from '@/lib/subquestion-tree';
 
 export interface MilestoneWithSubqs {
   id: string;
@@ -255,6 +256,31 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
         const rec = completeByMilestone.get(m.id);
         const complete = !!rec;
         const subqs = [...m.subquestions].filter((sq) => visibleIds.has(sq.id)).sort((a, b) => a.sortOrder - b.sortOrder);
+        // Builder UX (2026-07-04): follow-ups render indented directly under
+        // the answer that revealed them (same tree helper as settings). This is
+        // render-only — visibility, drafts and the save payload are untouched.
+        const tree = buildSubquestionTree(m.subquestions, allSubqsFlat);
+        const renderNode = (node: SubqTreeNode<Subquestion>, depth: number): ReactElement | null => {
+          const sq = node.subq;
+          if (!visibleIds.has(sq.id)) return null;
+          return (
+            <div key={sq.id} className={depth > 0 && depth <= 2 ? 'ml-2 pl-2 border-l-2 border-sky-100 space-y-1.5' : 'space-y-1.5'}>
+              <div className="flex flex-col items-center gap-0.5">
+                <SubquestionInput
+                  subquestion={sq}
+                  draft={drafts[sq.id] ?? EMPTY_DRAFT}
+                  onChange={(patch) => setDraft(sq.id, patch)}
+                  compact={compact}
+                  onNegativePick={() => setClosePrompt(true)}
+                  computed={sq.kind === 'calculated' ? fmtCalc(computeCalc(sq)) : undefined}
+                />
+                {renderAskLine(sq, drafts[sq.id] ?? EMPTY_DRAFT)}
+              </div>
+              {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).flatMap((o) =>
+                (node.childrenByTrigger.get(o.label) ?? []).map((c) => renderNode(c, depth + 1)))}
+            </div>
+          );
+        };
         const defaultOpen = idx === firstIncompleteIdx;
         const isOpen = m.id in overrides ? overrides[m.id] : defaultOpen;
         const toggleOpen = (open: boolean) => setOverrides((o) => ({ ...o, [m.id]: open }));
@@ -288,19 +314,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
             {subqs.length === 0 && (
               <p className="text-[10px] text-gray-400 text-center italic">{t('capture.milestoneNoSubquestions')}</p>
             )}
-            {subqs.map((sq) => (
-              <div key={sq.id} className="flex flex-col items-center gap-0.5">
-                <SubquestionInput
-                  subquestion={sq}
-                  draft={drafts[sq.id] ?? EMPTY_DRAFT}
-                  onChange={(patch) => setDraft(sq.id, patch)}
-                  compact={compact}
-                  onNegativePick={() => setClosePrompt(true)}
-                  computed={sq.kind === 'calculated' ? fmtCalc(computeCalc(sq)) : undefined}
-                />
-                {renderAskLine(sq, drafts[sq.id] ?? EMPTY_DRAFT)}
-              </div>
-            ))}
+            {tree.roots.map((n) => renderNode(n, 0))}
 
             {subqs.length > 0 && (
               <div className="space-y-1.5 pt-1">
