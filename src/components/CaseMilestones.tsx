@@ -21,7 +21,7 @@ import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
 import { parseAmountLoose } from '@/lib/format-currency';
-import { evalFormula, type Resolved } from '@/lib/formula';
+import { evalFormula, formatCalcResult, type Resolved } from '@/lib/formula';
 import { visibleSubquestionIds } from '@/lib/subquestion-visibility';
 import { buildSubquestionTree, type SubqTreeNode } from '@/lib/subquestion-tree';
 
@@ -148,7 +148,6 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
     };
     return evalFormula(sq.formula, resolve);
   };
-  const fmtCalc = (v: number | null): string => v == null ? '' : (Number.isInteger(v) ? String(v) : (Math.round(v * 100) / 100).toString());
 
   function toAnswer(sq: Subquestion, d: Draft, answeredAt: string) {
     return {
@@ -280,7 +279,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
                   onChange={(patch) => setDraft(sq.id, patch)}
                   compact={compact}
                   onNegativePick={() => setClosePrompt(true)}
-                  computed={sq.kind === 'calculated' ? fmtCalc(computeCalc(sq)) : undefined}
+                  computed={sq.kind === 'calculated' ? formatCalcResult(computeCalc(sq), sq.resultFormat) : undefined}
                 />
                 {renderAskLine(sq, drafts[sq.id] ?? EMPTY_DRAFT)}
               </div>

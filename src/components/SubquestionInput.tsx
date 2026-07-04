@@ -39,6 +39,8 @@ export interface Subquestion {
   linkedWhatMattersTypeId: string | null;
   currencyCode: string | null;
   formula: string | null;
+  // Display format for a kind='calculated' result: null = number, 'percent' = ×100 + %.
+  resultFormat?: string | null;
   sortOrder: number;
   options: SubquestionOption[];
   conditions: SubquestionCondition[];

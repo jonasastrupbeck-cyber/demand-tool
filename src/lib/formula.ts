@@ -204,3 +204,44 @@ export function validateFormula(expr: string): boolean {
   if (!expr || !expr.trim()) return true;
   return parse(expr) !== null;
 }
+
+// ── Human-readable rendering (authoring preview) ──────────────────────────────
+// Turn the stored expression into words: {sq:<id>} → its label, ASCII operators
+// → display glyphs, MONTHS()/MONTHS_BETWEEN() → plain phrases. Value-independent;
+// used only for the settings preview so an author sees WHAT they're calculating
+// instead of {sq:…} codes. Unknown refs fall back to a generic 'field'.
+export function renderFormula(
+  expr: string,
+  labelById: Map<string, string>,
+  opts?: { milestoneById?: Map<string, string>; fieldFallback?: string; monthsOfWord?: string; monthsBetweenWord?: string; betweenAndWord?: string },
+): string {
+  if (!expr || !expr.trim()) return '';
+  const fallback = opts?.fieldFallback ?? 'field';
+  let out = expr;
+  // Function words first (so their inner {sq:…} refs are still substituted after).
+  out = out.replace(/MONTHS_BETWEEN\s*\(([^,]*),([^)]*)\)/g, (_m, a: string, b: string) =>
+    `${opts?.monthsBetweenWord ?? 'months between'} (${a.trim()} ${opts?.betweenAndWord ?? 'and'} ${b.trim()})`);
+  out = out.replace(/MONTHS\s*\(([^)]*)\)/g, (_m, a: string) => `${opts?.monthsOfWord ?? 'months of'} (${a.trim()})`);
+  // Field references → labels (+ a short milestone tag when one is supplied).
+  out = out.replace(/\{sq:([^}]+)\}/g, (_m, id: string) => {
+    const label = labelById.get(id) ?? fallback;
+    const ms = opts?.milestoneById?.get(id);
+    return ms ? `${label} · ${ms}` : label;
+  });
+  // Operators → display glyphs.
+  out = out.replace(/\s*\*\s*/g, ' × ').replace(/\s*\/\s*/g, ' ÷ ').replace(/(?<=\S)\s*-\s*(?=\S)/g, ' − ');
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+// Format a computed calculated-field value for display. null → ''. 'percent'
+// multiplies by 100 and appends % (LTV 0.8 → "80%"); otherwise integer as-is,
+// else rounded to 2dp. Shared by capture, CSV export and any dashboard display
+// so the same field reads identically everywhere.
+export function formatCalcResult(value: number | null, resultFormat?: string | null): string {
+  if (value == null) return '';
+  if (resultFormat === 'percent') {
+    const pct = value * 100;
+    return `${Number.isInteger(pct) ? String(pct) : String(Math.round(pct * 100) / 100)}%`;
+  }
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+}

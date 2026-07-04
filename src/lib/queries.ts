@@ -1866,6 +1866,7 @@ export async function getSubquestions(studyId: string) {
       linkedWhatMattersTypeId: subquestions.linkedWhatMattersTypeId,
       currencyCode: subquestions.currencyCode,
       formula: subquestions.formula,
+      resultFormat: subquestions.resultFormat,
       sortOrder: subquestions.sortOrder,
     })
     .from(subquestions)
@@ -1888,7 +1889,7 @@ export async function getSubquestions(studyId: string) {
   }));
 }
 
-export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null }) {
+export async function addSubquestion(milestoneId: string, data: { label: string; kind: SubquestionKind; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null }) {
   const existing = await db.select().from(subquestions).where(eq(subquestions.milestoneId, milestoneId));
   const row = {
     id: generateId(),
@@ -1899,6 +1900,7 @@ export async function addSubquestion(milestoneId: string, data: { label: string;
     linkedWhatMattersTypeId: data.linkedWhatMattersTypeId ?? null,
     currencyCode: data.currencyCode ?? null,
     formula: data.formula ?? null,
+    resultFormat: data.resultFormat ?? null,
     sortOrder: existing.length,
     migratedFromFieldId: null,
   };
@@ -1909,13 +1911,14 @@ export async function addSubquestion(milestoneId: string, data: { label: string;
 // Kind is immutable after create (a subquestion's shape is fundamental; changing
 // it would strand typed case answers). Moving to another milestone is allowed —
 // case answers survive (keyed on case+subquestion).
-export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; sortOrder?: number; milestoneId?: string }) {
+export async function updateSubquestion(id: string, data: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null; sortOrder?: number; milestoneId?: string }) {
   const set: Record<string, unknown> = {};
   if (data.label !== undefined) set.label = data.label;
   if (data.required !== undefined) set.required = data.required;
   if (data.linkedWhatMattersTypeId !== undefined) set.linkedWhatMattersTypeId = data.linkedWhatMattersTypeId;
   if (data.currencyCode !== undefined) set.currencyCode = data.currencyCode;
   if (data.formula !== undefined) set.formula = data.formula;
+  if (data.resultFormat !== undefined) set.resultFormat = data.resultFormat;
   if (data.sortOrder !== undefined) set.sortOrder = data.sortOrder;
   if (data.milestoneId !== undefined) {
     set.milestoneId = data.milestoneId;

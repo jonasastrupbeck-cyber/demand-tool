@@ -402,6 +402,9 @@ export const subquestions = pgTable('subquestions', {
   // Expression for kind='calculated' (references siblings by {sq:<id>}; see
   // src/lib/formula.ts). Ignored for every other kind.
   formula: text('formula'),
+  // Display format for a kind='calculated' result (migration 0053). null = plain
+  // number; 'percent' = ×100 with a % sign (LTV 0.8 → 80%). Ignored otherwise.
+  resultFormat: text('result_format'),
   sortOrder: integer('sort_order').notNull().default(0),
   // Provenance for the 0042 backfill (raw field id, or 'outcome:'/'willingness:'
   // /'ability:' + decision-point id). Null for subquestions created after.

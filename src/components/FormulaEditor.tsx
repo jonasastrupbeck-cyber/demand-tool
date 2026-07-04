@@ -3,26 +3,32 @@
 /**
  * FormulaEditor — authoring UI for a 'calculated' subquestion (2026-07-03).
  *
- * A free-form expression editor with a token picker: click a sibling field to
- * insert its stable {sq:<id>} reference, or a helper/operator button. The
- * expression is validated structurally (src/lib/formula.ts) as you type; it is
- * persisted via onSave on blur and whenever a token button is used. Inputs are
- * the OTHER subquestions on the same milestone.
+ * A token picker builds a formula: click a field to insert its stable
+ * {sq:<id>} reference, or a helper/operator button. The expression is validated
+ * structurally (src/lib/formula.ts) as you type; it persists via onSave on blur
+ * and whenever a button is used. Fields come from THIS milestone (shown first)
+ * AND every other milestone (grouped below) — a formula resolves case-wide at
+ * capture, so cross-milestone references (e.g. LTV = amount ÷ valuation) work.
+ * A live preview renders the labels so the author reads what they're building,
+ * not {sq:…} codes (2026-07-04).
  */
 
 import { useRef, useState } from 'react';
 import { useLocale } from '@/lib/locale-context';
-import { validateFormula } from '@/lib/formula';
+import { validateFormula, renderFormula } from '@/lib/formula';
 
 export interface FormulaSibling {
   id: string;
   label: string;
   kind: string;
+  milestoneId: string;
 }
 
 interface Props {
   initialFormula: string | null;
   siblings: FormulaSibling[];
+  currentMilestoneId: string;
+  milestones: { id: string; label: string }[];
   onSave: (formula: string | null) => void;
 }
 
@@ -30,7 +36,7 @@ const OPS = ['+', '−', '×', '÷', '(', ')'] as const;
 // Display → stored operator (formula.ts expects ASCII * and /).
 const OP_TOKEN: Record<string, string> = { '+': ' + ', '−': ' - ', '×': ' * ', '÷': ' / ', '(': '(', ')': ')' };
 
-export default function FormulaEditor({ initialFormula, siblings, onSave }: Props) {
+export default function FormulaEditor({ initialFormula, siblings, currentMilestoneId, milestones, onSave }: Props) {
   const { t, tl } = useLocale();
   const [value, setValue] = useState(initialFormula ?? '');
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -55,9 +61,52 @@ export default function FormulaEditor({ initialFormula, siblings, onSave }: Prop
   const tokenFor = (s: FormulaSibling) =>
     s.kind === 'duration' ? `MONTHS({sq:${s.id}})` : `{sq:${s.id}}`;
 
+  const fieldButton = (s: FormulaSibling) => (
+    <button
+      key={s.id}
+      type="button"
+      onClick={() => insert(tokenFor(s))}
+      className="px-1.5 py-0.5 rounded text-[10px] text-sky-800 bg-sky-50 border border-sky-200 hover:bg-sky-100"
+    >
+      {tl(s.label)}
+    </button>
+  );
+
+  const currentFields = siblings.filter((s) => s.milestoneId === currentMilestoneId);
+  // Other milestones, in study order, each with its own (non-empty) field group.
+  const otherGroups = milestones
+    .filter((m) => m.id !== currentMilestoneId)
+    .map((m) => ({ milestone: m, fields: siblings.filter((s) => s.milestoneId === m.id) }))
+    .filter((g) => g.fields.length > 0);
+
+  // Preview: translated field labels + a short milestone tag for cross-milestone fields.
+  const labelById = new Map<string, string>();
+  const milestoneTagById = new Map<string, string>();
+  for (const s of siblings) {
+    labelById.set(s.id, tl(s.label));
+    if (s.milestoneId !== currentMilestoneId) {
+      const label = milestones.find((m) => m.id === s.milestoneId)?.label;
+      if (label) milestoneTagById.set(s.id, tl(label));
+    }
+  }
+  const preview = renderFormula(value, labelById, {
+    milestoneById: milestoneTagById,
+    fieldFallback: t('settings.subquestionFormulaFieldFallback'),
+    monthsOfWord: t('settings.formulaMonthsOf'),
+    monthsBetweenWord: t('settings.formulaMonthsBetween'),
+    betweenAndWord: t('settings.formulaBetweenAnd'),
+  });
+
   return (
     <div className="space-y-1 pl-1 border-l-2 border-gray-100">
       <label className="block text-[11px] font-medium text-gray-500">{t('settings.subquestionFormula')}</label>
+
+      {/* Human-readable preview — what this actually calculates. */}
+      <div className="rounded bg-sky-50/60 border border-sky-100 px-2 py-1">
+        <span className="text-[9px] uppercase tracking-wide text-sky-500">{t('settings.subquestionFormulaPreview')} </span>
+        <span className="text-[11px] text-gray-800">{preview || <span className="text-gray-400 italic">{t('settings.subquestionFormulaPreviewEmpty')}</span>}</span>
+      </div>
+
       <textarea
         ref={ref}
         value={value}
@@ -65,25 +114,26 @@ export default function FormulaEditor({ initialFormula, siblings, onSave }: Prop
         onBlur={() => onSave(value.trim() ? value : null)}
         aria-label={t('settings.subquestionFormula')}
         rows={2}
-        className={`w-full px-2 py-1 rounded text-xs font-mono text-gray-900 bg-white border ${valid ? 'border-gray-300 focus:ring-brand' : 'border-red-400 focus:ring-red-400'} focus:ring-2 outline-none`}
+        className={`w-full px-2 py-1 rounded text-[10px] font-mono text-gray-500 bg-gray-50 border ${valid ? 'border-gray-200 focus:ring-brand' : 'border-red-400 focus:ring-red-400'} focus:ring-2 outline-none`}
       />
       {!valid && <p className="text-[10px] text-red-600">{t('settings.subquestionFormulaInvalid')}</p>}
+
       {siblings.length === 0 ? (
         <p className="text-[10px] text-gray-400 italic">{t('settings.subquestionFormulaNoFields')}</p>
       ) : (
-        <div className="flex flex-wrap gap-1">
-          {siblings.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => insert(tokenFor(s))}
-              className="px-1.5 py-0.5 rounded text-[10px] text-sky-800 bg-sky-50 border border-sky-200 hover:bg-sky-100"
-            >
-              {tl(s.label)}
-            </button>
+        <div className="space-y-1">
+          {currentFields.length > 0 && (
+            <div className="flex flex-wrap gap-1">{currentFields.map(fieldButton)}</div>
+          )}
+          {otherGroups.map((g) => (
+            <div key={g.milestone.id} className="space-y-0.5">
+              <p className="text-[9px] font-medium text-gray-400">{tl(g.milestone.label)}</p>
+              <div className="flex flex-wrap gap-1">{g.fields.map(fieldButton)}</div>
+            </div>
           ))}
         </div>
       )}
+
       <div className="flex flex-wrap gap-1">
         {OPS.map((op) => (
           <button key={op} type="button" onClick={() => insert(OP_TOKEN[op])} className="px-1.5 py-0.5 rounded text-[10px] font-mono text-gray-700 bg-gray-100 border border-gray-200 hover:bg-gray-200">{op}</button>

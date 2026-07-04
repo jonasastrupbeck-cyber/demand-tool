@@ -34,6 +34,11 @@ export async function PATCH(
   } else if (typeof body.formula === 'string') {
     data.formula = body.formula.trim() || null;
   }
+  if (body.resultFormat === null) {
+    data.resultFormat = null;
+  } else if (typeof body.resultFormat === 'string') {
+    data.resultFormat = body.resultFormat === 'percent' ? 'percent' : null;
+  }
   if (body.linkedWhatMattersTypeId === null) {
     data.linkedWhatMattersTypeId = null;
   } else if (typeof body.linkedWhatMattersTypeId === 'string' && body.linkedWhatMattersTypeId) {

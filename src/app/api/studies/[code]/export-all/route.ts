@@ -8,6 +8,7 @@ import {
   getWhatMattersForEntries, getSystemConditionsForEntries, getThinkingsForEntries, getWorkBlocksForEntries,
 } from '@/lib/queries';
 import { db } from '@/lib/db';
+import { formatCalcResult } from '@/lib/formula';
 import { caseSubquestionAnswers, caseMilestones, capabilityAnnotations } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
@@ -135,7 +136,7 @@ export async function GET(
 
   // ── Sheet: Answers (decision-box redesign 0042) — one row per captured
   // subquestion answer; the value is read from the column matching its kind. ──
-  const fmtAnswer = (kind: string, a: typeof answers[number]): string => {
+  const fmtAnswer = (kind: string, a: typeof answers[number], resultFormat?: string | null): string => {
     switch (kind) {
       case 'amount':
       case 'number': return a.valueNumber == null ? '' : String(a.valueNumber);
@@ -143,7 +144,8 @@ export async function GET(
       // Currency: raw number so the sheet stays numeric-analysable; the code is
       // exported in its own 'Currency' column below.
       case 'currency': return a.valueNumber == null ? '' : String(a.valueNumber);
-      case 'calculated': return a.valueNumber == null ? '' : String(a.valueNumber);
+      // Calculated: apply the field's number/percent format so exports match capture.
+      case 'calculated': return formatCalcResult(a.valueNumber, resultFormat);
       case 'date': return a.valueDate ? new Date(a.valueDate).toLocaleDateString() : '';
       case 'duration': return (a.valueYears == null && a.valueMonths == null) ? '' : `${a.valueYears ?? 0}y ${a.valueMonths ?? 0}m`;
       case 'duration_months': return a.valueNumber == null ? '' : String(a.valueNumber);
@@ -158,7 +160,7 @@ export async function GET(
       'Case Ref': caseRefById.get(a.caseId) || '',
       'Milestone': sq ? (msMap.get(sq.milestoneId) || '') : '',
       'Subquestion': sq ? sq.label : '',
-      'Value': sq ? fmtAnswer(sq.kind, a) : '',
+      'Value': sq ? fmtAnswer(sq.kind, a, sq.resultFormat) : '',
       'Currency': sq && sq.kind === 'currency' ? (sq.currencyCode || '') : '',
       'Answered At': a.answeredAt ? new Date(a.answeredAt).toLocaleString() : '',
       'Recorded By': a.recordedByCollector || '',

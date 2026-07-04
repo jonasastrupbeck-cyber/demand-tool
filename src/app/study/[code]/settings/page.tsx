@@ -112,7 +112,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeConditions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -450,13 +450,14 @@ export default function SettingsPage() {
   const patchMsSubqs = (msId: string, fn: (subs: StudyData['milestones'][number]['subquestions']) => StudyData['milestones'][number]['subquestions']) =>
     setStudy((s) => (s ? { ...s, milestones: s.milestones.map((m) => (m.id === msId ? { ...m, subquestions: fn(m.subquestions) } : m)) } : s));
 
-  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null }) {
+  function patchSubquestion(msId: string, sqId: string, patch: { label?: string; required?: boolean; linkedWhatMattersTypeId?: string | null; currencyCode?: string | null; formula?: string | null; resultFormat?: string | null }) {
     const clean: typeof patch = {};
     if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
     if (typeof patch.required === 'boolean') clean.required = patch.required;
     if (patch.linkedWhatMattersTypeId !== undefined) clean.linkedWhatMattersTypeId = patch.linkedWhatMattersTypeId;
     if (patch.currencyCode !== undefined) clean.currencyCode = patch.currencyCode;
     if (patch.formula !== undefined) clean.formula = patch.formula;
+    if (patch.resultFormat !== undefined) clean.resultFormat = patch.resultFormat;
     if (Object.keys(clean).length === 0) return;
     patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, ...clean } : f)));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}`, {
@@ -1589,6 +1590,19 @@ export default function SettingsPage() {
                     </select>
                   </label>
                 )}
+                {sq.kind === 'calculated' && (
+                  <label className="flex items-center gap-1 text-xs text-gray-500">
+                    {t('settings.subquestionResultFormat')}
+                    <select
+                      value={sq.resultFormat ?? ''}
+                      onChange={(e) => patchSubquestion(msId, sq.id, { resultFormat: e.target.value || null })}
+                      className="px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
+                    >
+                      <option value="">{t('settings.resultFormatNumber')}</option>
+                      <option value="percent">{t('settings.resultFormatPercent')}</option>
+                    </select>
+                  </label>
+                )}
               </div>
               {sq.kind === 'choice' && (
                 <div className="space-y-1.5 pl-1 border-l-2 border-gray-100">
@@ -1656,7 +1670,9 @@ export default function SettingsPage() {
               {sq.kind === 'calculated' && (
                 <FormulaEditor
                   initialFormula={sq.formula}
-                  siblings={(orderedMs.find((mm) => mm.id === msId)?.subquestions ?? []).filter((s) => s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, kind: s.kind }))}
+                  siblings={allSubqsFlat.filter((s) => s.id !== sq.id).map((s) => ({ id: s.id, label: s.label, kind: s.kind, milestoneId: s.milestoneId }))}
+                  currentMilestoneId={msId}
+                  milestones={orderedMs.map((mm) => ({ id: mm.id, label: mm.label }))}
                   onSave={(f) => patchSubquestion(msId, sq.id, { formula: f })}
                 />
               )}

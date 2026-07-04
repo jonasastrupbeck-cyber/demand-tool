@@ -27,6 +27,7 @@ export async function POST(
   }
   const currencyCode = typeof body.currencyCode === 'string' && body.currencyCode ? body.currencyCode : null;
   const formula = typeof body.formula === 'string' && body.formula.trim() ? body.formula : null;
+  const resultFormat = body.resultFormat === 'percent' ? 'percent' : null;
   let linkedWhatMattersTypeId: string | null = null;
   if (typeof body.linkedWhatMattersTypeId === 'string' && body.linkedWhatMattersTypeId) {
     const wmTypes = await getWhatMattersTypes(study.id);
@@ -37,6 +38,6 @@ export async function POST(
   }
   const required = typeof body.required === 'boolean' ? body.required : true;
 
-  const row = await addSubquestion(id, { label: body.label.trim(), kind: body.kind, required, linkedWhatMattersTypeId, currencyCode, formula });
+  const row = await addSubquestion(id, { label: body.label.trim(), kind: body.kind, required, linkedWhatMattersTypeId, currencyCode, formula, resultFormat });
   return NextResponse.json(row, { status: 201 });
 }
