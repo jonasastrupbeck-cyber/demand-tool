@@ -177,6 +177,17 @@ export async function PATCH(
     }
   }
 
+  // Validate per-block dates before the (delete-then-insert) block replacement —
+  // an invalid date would otherwise wipe the existing blocks then throw on insert,
+  // losing the touch's work steps.
+  if (Array.isArray(body.workBlocks)) {
+    for (const b of body.workBlocks) {
+      if (b && typeof b.date === 'string' && b.date && isNaN(new Date(b.date).getTime())) {
+        return NextResponse.json({ error: 'A work block has an invalid date' }, { status: 400 });
+      }
+    }
+  }
+
   // Reject cross-study references before writing.
   const refError = await validateStudyRefs(study.id, collectEntryRefs(body));
   if (refError) return NextResponse.json({ error: refError }, { status: 400 });

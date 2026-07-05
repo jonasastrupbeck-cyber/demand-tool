@@ -6,6 +6,7 @@ import {
   getSystemConditions, getThinkings, getMilestones, getWorkStepTypes, getValueSteps,
   getSubquestions,
   getWhatMattersForEntries, getSystemConditionsForEntries, getThinkingsForEntries, getWorkBlocksForEntries,
+  getBlockSystemConditions,
 } from '@/lib/queries';
 import { db } from '@/lib/db';
 import { formatCalcResult } from '@/lib/formula';
@@ -69,6 +70,16 @@ export async function GET(
     entryIds.length ? getThinkingsForEntries(entryIds) : Promise.resolve([]),
     entryIds.length ? getWorkBlocksForEntries(entryIds) : Promise.resolve([]),
   ]);
+  // All SCs per block (0032 junction) — the legacy per-block column holds only
+  // the first, so the workbook must read the junction to export them all.
+  const blockScJ = wbJ.length ? await getBlockSystemConditions(wbJ.map((b) => b.id)) : [];
+  const scLabelsByBlock = new Map<string, string[]>();
+  for (const r of blockScJ) {
+    const label = scMap.get(r.systemConditionId);
+    if (!label) continue;
+    const arr = scLabelsByBlock.get(r.workBlockId);
+    if (arr) arr.push(label); else scLabelsByBlock.set(r.workBlockId, [label]);
+  }
   const [answers, milestones, annotations] = await Promise.all([
     caseIds.length ? db.select().from(caseSubquestionAnswers).where(inArray(caseSubquestionAnswers.caseId, caseIds)) : Promise.resolve([]),
     caseIds.length ? db.select().from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)) : Promise.resolve([]),
@@ -130,7 +141,7 @@ export async function GET(
     'Text': b.text,
     'Work Step Type': b.workStepTypeId ? wsMap.get(b.workStepTypeId) || '' : '',
     'Value Step': b.valueStepId ? vsMap.get(b.valueStepId) || '' : '',
-    'Block System Condition': b.systemConditionId ? scMap.get(b.systemConditionId) || '' : '',
+    'Block System Conditions': (scLabelsByBlock.get(b.id) ?? (b.systemConditionId ? [scMap.get(b.systemConditionId) || ''] : [])).filter(Boolean).join('; '),
     'Order': b.sortOrder,
   }));
 

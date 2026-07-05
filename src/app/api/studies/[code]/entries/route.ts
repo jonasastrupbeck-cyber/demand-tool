@@ -66,6 +66,16 @@ export async function POST(
     validatedCaseId = caseRow.id;
   }
 
+  // Validate per-block dates up front — an unparseable string would throw only
+  // once Drizzle serializes the insert, after other rows are written.
+  if (Array.isArray(body.workBlocks)) {
+    for (const b of body.workBlocks) {
+      if (b && typeof b.date === 'string' && b.date && isNaN(new Date(b.date).getTime())) {
+        return NextResponse.json({ error: 'A work block has an invalid date' }, { status: 400 });
+      }
+    }
+  }
+
   // Reject cross-study references before writing (foreign ids would corrupt this
   // study's aggregations or FK-500 mid-write).
   const refError = await validateStudyRefs(study.id, collectEntryRefs(body));

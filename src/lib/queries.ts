@@ -2584,7 +2584,9 @@ export async function updateEntry(entryId: string, data: {
   if (data.customerFelt !== undefined) updateFields.customerFelt = data.customerFelt;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
   // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
-  if (workBlocks !== undefined && workBlocks.length > 0) {
+  // An empty array clears verbatim too (else the stale concatenation of the
+  // now-deleted blocks would linger in search/export/dashboard).
+  if (workBlocks !== undefined) {
     updateFields.verbatim = concatWorkBlocks(workBlocks);
   }
 

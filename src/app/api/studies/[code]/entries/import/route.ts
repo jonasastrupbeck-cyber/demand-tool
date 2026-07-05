@@ -144,7 +144,10 @@ export async function POST(
     const handlingLabel = String(row['Handling'] || '').trim().toLowerCase();
     const contactMethodLabel = String(row['Contact Method'] || '').trim().toLowerCase();
     const potLabel = String(row['Point of Transaction'] || '').trim().toLowerCase();
-    const whatMattersTypeLabel = String(row['What Matters Category'] || '').trim().toLowerCase();
+    // Export writes the plural header 'What Matters Categories'; accept the
+    // singular too for any hand-made sheets. (Previously only read singular, so
+    // the category was silently dropped on every export→import round-trip.)
+    const whatMattersTypeLabel = String(row['What Matters Categories'] || row['What Matters Category'] || '').trim().toLowerCase();
 
     const demandTypeId = demandTypeLabel ? demandTypeMap.get(demandTypeLabel) : undefined;
     const workTypeId = workTypeLabel ? workTypeMap.get(workTypeLabel) : undefined;
@@ -206,26 +209,34 @@ export async function POST(
       if (parsed.length > 0) workBlocks = parsed;
     }
 
-    await createEntry(study.id, {
-      verbatim,
-      classification,
-      entryType,
-      demandTypeId: demandTypeId || undefined,
-      workTypeId: workTypeId || undefined,
-      handlingTypeId: handlingTypeId || undefined,
-      contactMethodId: contactMethodId || undefined,
-      pointOfTransactionId: pointOfTransactionId || undefined,
-      whatMattersTypeId: whatMattersTypeId || undefined,
-      originalValueDemandTypeId: originalValueDemandTypeId || undefined,
-      failureCause,
-      whatMatters,
-      collectorName,
-      lifeProblemId: lifeProblemId || undefined,
-      systemConditions: systemConditions.length > 0 ? systemConditions : undefined,
-      thinkings: thinkings.length > 0 ? thinkings : undefined,
-      workBlocks,
-    }, createdAt);
-    imported++;
+    // Per-row try/catch: a single row-level DB failure must not 500 the whole
+    // request after earlier rows are already committed (there is no transaction),
+    // which would lose the {imported, errors} report and make a re-upload
+    // duplicate everything that had succeeded.
+    try {
+      await createEntry(study.id, {
+        verbatim,
+        classification,
+        entryType,
+        demandTypeId: demandTypeId || undefined,
+        workTypeId: workTypeId || undefined,
+        handlingTypeId: handlingTypeId || undefined,
+        contactMethodId: contactMethodId || undefined,
+        pointOfTransactionId: pointOfTransactionId || undefined,
+        whatMattersTypeId: whatMattersTypeId || undefined,
+        originalValueDemandTypeId: originalValueDemandTypeId || undefined,
+        failureCause,
+        whatMatters,
+        collectorName,
+        lifeProblemId: lifeProblemId || undefined,
+        systemConditions: systemConditions.length > 0 ? systemConditions : undefined,
+        thinkings: thinkings.length > 0 ? thinkings : undefined,
+        workBlocks,
+      }, createdAt);
+      imported++;
+    } catch (err) {
+      errors.push({ row: rowNum, message: err instanceof Error ? err.message : 'Failed to save row' });
+    }
   }
 
   return NextResponse.json({ imported, errors });
