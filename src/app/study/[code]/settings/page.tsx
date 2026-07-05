@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, type ReactElement } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactElement } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { CURRENCY_CHOICES, LOCALE_CURRENCY } from '@/lib/format-currency';
@@ -145,6 +145,18 @@ export default function SettingsPage() {
   const [study, setStudy] = useState<StudyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  // Decision-box structure derived purely from the milestones — memoized so a
+  // keystroke in any settings input doesn't re-sort, re-flatten, and rebuild
+  // every milestone's subquestion tree (SET-17). Rebuilt only when milestones
+  // change (add/rename/reorder/type edit all replace study.milestones).
+  const decisionBoxData = useMemo(() => {
+    const orderedMs = [...(study?.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const allSubqsFlat = orderedMs.flatMap((mm) => mm.subquestions);
+    const subqLabelById = new Map(allSubqsFlat.map((s) => [s.id, s.label]));
+    const treesByMilestone = new Map(orderedMs.map((m) => [m.id, buildSubquestionTree(m.subquestions, allSubqsFlat)]));
+    return { orderedMs, allSubqsFlat, subqLabelById, treesByMilestone };
+  }, [study?.milestones]);
 
   // Save-as-template (0052): name input + transient saved state; a name clash
   // (409) parks the pending name in templateConflict until Replace/Cancel.
@@ -1559,7 +1571,7 @@ export default function SettingsPage() {
             choice option can carry positive/negative polarity (negative prompts
             to close the case at capture). */}
         {study.decisionPointsEnabled && (() => {
-          const orderedMs = [...(study.milestones || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+          const { orderedMs, allSubqsFlat, subqLabelById, treesByMilestone } = decisionBoxData;
           const kindLabel = (k: string) =>
             k === 'amount' ? t('settings.captureFieldKindAmount')
             : k === 'number' ? t('settings.subquestionKindNumber')
@@ -1576,8 +1588,6 @@ export default function SettingsPage() {
           // tree so follow-ups render indented under the answer that reveals
           // them (shared helper — capture uses the same one).
           type SettingsSubq = StudyData['milestones'][number]['subquestions'][number];
-          const allSubqsFlat = orderedMs.flatMap((mm) => mm.subquestions);
-          const subqLabelById = new Map(allSubqsFlat.map((s) => [s.id, s.label]));
           const noteText = (note: RootNote): string =>
             note.type === 'staleTrigger' ? t('settings.staleTriggerNote')
             : note.type === 'multiCondition'
@@ -1824,7 +1834,7 @@ export default function SettingsPage() {
                     onRefresh={loadStudy}
                   />
                   {(() => {
-                    const tree = buildSubquestionTree(m.subquestions, allSubqsFlat);
+                    const tree = treesByMilestone.get(m.id)!;
                     return (
                       <ul className="space-y-2">
                         {tree.roots.map((n) => renderSubqRow(m.id, n, 0, tree.rootNoteById.get(n.subq.id), tree.roots.map((r) => r.subq.id)))}
