@@ -30,6 +30,9 @@ import {
   subquestionOptions,
   subquestionConditions,
   milestoneDemandTypeConditions,
+  milestoneDemandTypeExclusions,
+  subquestionDemandTypeExclusions,
+  subquestionDemandTypeOptional,
 } from './schema';
 import { eq, asc, and, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
@@ -87,10 +90,15 @@ export type StudyTemplateSnapshotV1 = {
   lifeProblems: { id: string; label: string; operationalDefinition: string | null; sortOrder: number }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; sortOrder: number; timing: 'by_date' | 'asap' | null; anchorEvent: string | null; enabled: boolean; valueKind: 'amount' | 'date_or_duration' | null }[];
   milestones: { id: string; label: string; sortOrder: number }[];
-  subquestions: { id: string; milestoneId: string; label: string; kind: SubquestionKind; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; sortOrder: number }[];
+  subquestions: { id: string; milestoneId: string; label: string; kind: SubquestionKind; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number }[];
   subquestionOptions: { id: string; subquestionId: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[];
   subquestionConditions: { subquestionId: string; parentSubquestionId: string; triggerValue: string }[];
+  // Dormant include-model (kept for backward-compat with older templates).
   milestoneDemandTypeConditions: { milestoneId: string; demandTypeId: string }[];
+  // Live demand-type scoping (0054–0056) — optional so older snapshots parse.
+  milestoneDemandTypeExclusions?: { milestoneId: string; demandTypeId: string }[];
+  subquestionDemandTypeExclusions?: { subquestionId: string; demandTypeId: string }[];
+  subquestionDemandTypeOptional?: { subquestionId: string; demandTypeId: string }[];
 };
 
 export function parseSnapshot(text: string): StudyTemplateSnapshotV1 {
@@ -134,6 +142,18 @@ export async function snapshotStudySettings(studyId: string): Promise<StudyTempl
     : [];
   const msDtConds = msIds.length > 0
     ? await db.select().from(milestoneDemandTypeConditions).where(inArray(milestoneDemandTypeConditions.milestoneId, msIds))
+    : [];
+  // Live demand-type scoping (0054–0056): the runtime reads these, not the
+  // dormant include table above — without them a templated study loses all
+  // per-question/milestone exclude + not-mandatory rules.
+  const msDtExcl = msIds.length > 0
+    ? await db.select().from(milestoneDemandTypeExclusions).where(inArray(milestoneDemandTypeExclusions.milestoneId, msIds))
+    : [];
+  const sqDtExcl = sqIds.length > 0
+    ? await db.select().from(subquestionDemandTypeExclusions).where(inArray(subquestionDemandTypeExclusions.subquestionId, sqIds))
+    : [];
+  const sqDtOpt = sqIds.length > 0
+    ? await db.select().from(subquestionDemandTypeOptional).where(inArray(subquestionDemandTypeOptional.subquestionId, sqIds))
     : [];
 
   return {
@@ -200,10 +220,13 @@ export async function snapshotStudySettings(studyId: string): Promise<StudyTempl
     })),
     milestones: mss.map((m) => ({ id: m.id, label: m.label, sortOrder: m.sortOrder })),
     // migratedFromFieldId is 0042-backfill provenance, not a setting — dropped.
-    subquestions: sqs.map((s) => ({ id: s.id, milestoneId: s.milestoneId, label: s.label, kind: s.kind, required: s.required, linkedWhatMattersTypeId: s.linkedWhatMattersTypeId, currencyCode: s.currencyCode, formula: s.formula, sortOrder: s.sortOrder })),
+    subquestions: sqs.map((s) => ({ id: s.id, milestoneId: s.milestoneId, label: s.label, kind: s.kind, required: s.required, linkedWhatMattersTypeId: s.linkedWhatMattersTypeId, currencyCode: s.currencyCode, formula: s.formula, resultFormat: s.resultFormat, sortOrder: s.sortOrder })),
     subquestionOptions: opts.map((o) => ({ id: o.id, subquestionId: o.subquestionId, label: o.label, polarity: o.polarity, sortOrder: o.sortOrder })),
     subquestionConditions: conds.map((c) => ({ subquestionId: c.subquestionId, parentSubquestionId: c.parentSubquestionId, triggerValue: c.triggerValue })),
     milestoneDemandTypeConditions: msDtConds.map((c) => ({ milestoneId: c.milestoneId, demandTypeId: c.demandTypeId })),
+    milestoneDemandTypeExclusions: msDtExcl.map((c) => ({ milestoneId: c.milestoneId, demandTypeId: c.demandTypeId })),
+    subquestionDemandTypeExclusions: sqDtExcl.map((c) => ({ subquestionId: c.subquestionId, demandTypeId: c.demandTypeId })),
+    subquestionDemandTypeOptional: sqDtOpt.map((c) => ({ subquestionId: c.subquestionId, demandTypeId: c.demandTypeId })),
   };
 }
 
@@ -402,6 +425,7 @@ export async function createStudyFromTemplate(params: {
         linkedWhatMattersTypeId: r.linkedWhatMattersTypeId ? wmMap.get(r.linkedWhatMattersTypeId) ?? null : null,
         currencyCode: r.currencyCode,
         formula,
+        resultFormat: r.resultFormat ?? null,
         sortOrder: r.sortOrder,
       };
     }));
@@ -426,6 +450,24 @@ export async function createStudyFromTemplate(params: {
       id: generateId(), milestoneId: milestoneMap.get(r.milestoneId)!, demandTypeId: demandTypeMap.get(r.demandTypeId)!,
     })));
   }
+
+  // Live demand-type scoping (0054–0056). Guarded with ?? [] so older snapshots
+  // (made before this was added) still apply. Drop any row whose milestone/
+  // subquestion/demand-type didn't map (defensive; all should map).
+  const msDtExclRows = (snapshot.milestoneDemandTypeExclusions ?? [])
+    .map((r) => ({ id: generateId(), milestoneId: milestoneMap.get(r.milestoneId), demandTypeId: demandTypeMap.get(r.demandTypeId) }))
+    .filter((r) => r.milestoneId && r.demandTypeId) as { id: string; milestoneId: string; demandTypeId: string }[];
+  if (msDtExclRows.length > 0) await db.insert(milestoneDemandTypeExclusions).values(msDtExclRows);
+
+  const sqDtExclRows = (snapshot.subquestionDemandTypeExclusions ?? [])
+    .map((r) => ({ id: generateId(), subquestionId: sqMap.get(r.subquestionId), demandTypeId: demandTypeMap.get(r.demandTypeId) }))
+    .filter((r) => r.subquestionId && r.demandTypeId) as { id: string; subquestionId: string; demandTypeId: string }[];
+  if (sqDtExclRows.length > 0) await db.insert(subquestionDemandTypeExclusions).values(sqDtExclRows);
+
+  const sqDtOptRows = (snapshot.subquestionDemandTypeOptional ?? [])
+    .map((r) => ({ id: generateId(), subquestionId: sqMap.get(r.subquestionId), demandTypeId: demandTypeMap.get(r.demandTypeId) }))
+    .filter((r) => r.subquestionId && r.demandTypeId) as { id: string; subquestionId: string; demandTypeId: string }[];
+  if (sqDtOptRows.length > 0) await db.insert(subquestionDemandTypeOptional).values(sqDtOptRows);
 
   // 3. Internal refs on the studies row, now that their targets exist.
   await db.update(studies).set({
