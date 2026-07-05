@@ -1550,7 +1550,7 @@ export default function SettingsPage() {
                   type="text"
                   defaultValue={sq.label}
                   aria-label={t('settings.subquestions')}
-                  onBlur={(e) => patchSubquestion(msId, sq.id, { label: e.target.value })}
+                  onBlur={(e) => { if (e.target.value === sq.label) return; patchSubquestion(msId, sq.id, { label: e.target.value }); }}
                   className="flex-1 px-2 py-1 rounded text-sm font-medium text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                 />
                 {compatibleKinds(sq.kind).length > 1 ? (
@@ -1624,7 +1624,7 @@ export default function SettingsPage() {
                             type="text"
                             defaultValue={o.label}
                             aria-label={t('settings.addOption')}
-                            onBlur={(e) => patchOption(msId, sq.id, o.id, { label: e.target.value })}
+                            onBlur={(e) => { if (e.target.value === o.label) return; patchOption(msId, sq.id, o.id, { label: e.target.value }); }}
                             className="flex-1 px-2 py-0.5 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                           />
                           <SegmentedToggle
@@ -1759,7 +1759,7 @@ export default function SettingsPage() {
                       type="text"
                       defaultValue={m.label}
                       aria-label={t('settings.milestoneLabel')}
-                      onBlur={(e) => patchMilestone(m.id, e.target.value)}
+                      onBlur={(e) => { if (e.target.value === m.label) return; patchMilestone(m.id, e.target.value); }}
                       className="flex-1 px-2 py-1 rounded text-sm font-semibold text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                     />
                     {!msOpen && <span className="shrink-0 text-[10px] text-gray-400 tabular-nums">{t('settings.milestoneFieldCount', { count: String(m.subquestions.length) })}</span>}
@@ -2317,7 +2317,7 @@ export default function SettingsPage() {
                         type="text"
                         defaultValue={vs.label}
                         aria-label={t('settings.valueSteps')}
-                        onBlur={(e) => patchValueStep(vs.id, e.target.value)}
+                        onBlur={(e) => { if (e.target.value === vs.label) return; patchValueStep(vs.id, e.target.value); }}
                         className="flex-1 px-2 py-1 rounded text-sm text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none"
                       />
                       <button type="button" aria-label={t('settings.moveUp')} disabled={idx === 0} onClick={() => moveValueStep(vs.id, -1)} className="px-1.5 py-1 text-xs text-gray-600 disabled:opacity-30 hover:text-gray-900">↑</button>
