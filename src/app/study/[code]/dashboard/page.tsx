@@ -137,6 +137,13 @@ export default function DashboardPage() {
     return {};
   }, [dateRange, customFrom, customTo]);
 
+  // Stable range object for the capability view's chart props. Computed in the
+  // render body it would mint a fresh (ms-precision) object every render, and
+  // since dateFrom/dateTo are fetch-effect deps in each chart, that re-fired
+  // every chart's fetch on any unrelated re-render. Memoized on the same inputs
+  // as getDateRangeParams so the identity is stable until the filter changes.
+  const capRange = useMemo(() => getDateRangeParams(), [getDateRangeParams]);
+
   const dateRangeLabels: Record<DateRange, string> = {
     all: t('dashboard.allTime'),
     today: t('dashboard.today'),
@@ -1555,7 +1562,6 @@ export default function DashboardPage() {
         )}
         {/* ── CAPABILITY / LEAD-TIME VIEW (R11: stacked, independent charts) ── */}
         {dashboardView === 'capability' && (() => {
-          const capRange = getDateRangeParams();
           return (
           <div className="space-y-4">
             {/* Touches over time — per-day counts, scoped + count/%. Needs only

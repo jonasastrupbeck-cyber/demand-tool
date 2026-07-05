@@ -138,22 +138,29 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
     } finally { setBusy(false); }
   };
 
+  // Derived chart data — memoized so it isn't rebuilt (and the three charts
+  // re-rendered) on every keystroke in the rename/merge-name inputs. Depends
+  // only on rows + overTime. Hoisted above the early return so the hook order
+  // stays stable.
+  const { chartData, topConds, otTruncated, lineData } = useMemo(() => {
+    const chartData = rows.filter((r) => r.count > 0);
+    const topConds = chartData.slice(0, OVER_TIME_TOP_N);
+    const topIds = new Set(topConds.map((c) => c.id));
+    const otTruncated = chartData.length > OVER_TIME_TOP_N;
+    const byDate = new Map<string, Record<string, number | string>>();
+    for (const r of overTime) {
+      if (!topIds.has(r.id)) continue;
+      let row = byDate.get(r.date);
+      if (!row) { row = { date: r.date }; byDate.set(r.date, row); }
+      row[r.id] = ((row[r.id] as number) || 0) + r.count;
+    }
+    const lineData = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    return { chartData, topConds, otTruncated, lineData };
+  }, [rows, overTime]);
+
   if (loading) {
     return <div className="text-sm text-gray-400 py-8 text-center">{labels.loading}</div>;
   }
-
-  const chartData = rows.filter((r) => r.count > 0);
-  const topConds = chartData.slice(0, OVER_TIME_TOP_N);
-  const topIds = new Set(topConds.map((c) => c.id));
-  const otTruncated = chartData.length > OVER_TIME_TOP_N;
-  const byDate = new Map<string, Record<string, number | string>>();
-  for (const r of overTime) {
-    if (!topIds.has(r.id)) continue;
-    let row = byDate.get(r.date);
-    if (!row) { row = { date: r.date }; byDate.set(r.date, row); }
-    row[r.id] = ((row[r.id] as number) || 0) + r.count;
-  }
-  const lineData = [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
   return (
     <div className="space-y-5">

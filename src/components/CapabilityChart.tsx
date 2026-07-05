@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine,
 } from 'recharts';
@@ -114,6 +114,14 @@ export default function CapabilityChart({
     setCapTick((n) => n + 1);
   }, [code, capFrom, capTo]);
 
+  // Memoized so the recharts LineChart's `data` isn't rebuilt (new identity) on
+  // every keystroke in the inspector note/reason inputs, which live in this same
+  // component. Depends only on capData.
+  const chartPoints = useMemo(
+    () => (capData ? capData.points.map((p) => ({ ...p, includedValue: p.excluded ? null : p.leadTime, excludedValue: p.excluded ? p.leadTime : null })) : []),
+    [capData],
+  );
+
   return (
     <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between mb-3">
@@ -180,7 +188,6 @@ export default function CapabilityChart({
         <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilityNoData')}</p>
       ) : (() => {
         const data = capData;
-        const chartPoints = data.points.map((p) => ({ ...p, includedValue: p.excluded ? null : p.leadTime, excludedValue: p.excluded ? p.leadTime : null }));
         const selPoint = data.points.find((p) => p.caseId === selectedCapCaseId) || null;
         const openInspector = (pt: typeof data.points[number]) => { setSelectedCapCaseId(pt.caseId); setCapNote(pt.note ?? ''); setCapReason(''); setCapExcluded(pt.excluded); };
         const annotated = data.points.filter((p) => p.note || p.excluded);
