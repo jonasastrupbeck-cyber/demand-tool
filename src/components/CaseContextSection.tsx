@@ -199,9 +199,9 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
         {selectedIds.map((id) => {
           const tp = byId.get(id);
           return (
-            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-green-600 text-white border border-green-600 text-[11px] font-medium pl-2 pr-1 py-0.5">
+            <span key={id} className="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-800 border border-green-300 text-[11px] font-medium pl-2 pr-1 py-0.5">
               <span className="min-w-0 break-words">{tp ? tl(tp.label) : '—'}</span>
-              <button type="button" onClick={() => remove(id)} aria-label={t('capture.remove')} className="shrink-0 leading-none text-white/80 hover:text-white">×</button>
+              <button type="button" onClick={() => remove(id)} aria-label={t('capture.remove')} className="shrink-0 leading-none text-green-600 hover:text-green-800">×</button>
             </span>
           );
         })}
@@ -330,8 +330,8 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
                 onClick={() => toggleWhatMatters(wm.id)}
                 className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
                   on
-                    ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-white text-green-700 border-green-300 hover:bg-green-50'
+                    ? 'bg-green-100 text-green-800 border-green-400'
+                    : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
                 }`}
               >
                 {icon}{tl(wm.label)}
