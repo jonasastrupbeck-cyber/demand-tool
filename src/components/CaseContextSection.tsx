@@ -346,9 +346,6 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
                   className={smallInput}
                 />
               )}
-              {on && wm.timing === 'asap' && (
-                <span className="text-[10px] text-green-700/70">{t('capture.whatMattersAsapHint')}</span>
-              )}
               {/* Structured ask (2026-07-02): amount = specific or range. */}
               {on && wm.valueKind === 'amount' && (
                 <div className="flex flex-col items-center gap-1">

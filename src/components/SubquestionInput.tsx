@@ -63,10 +63,13 @@ export interface Draft {
 
 export const EMPTY_DRAFT: Draft = { num: '', date: '', years: '', months: '', choice: '', text: '' };
 
+// Selected outcome = the softer customer-context tone (2026-07-05), not the
+// heavy solid -600. RESTING below stays a lighter wash; the selected pill is a
+// step darker (bg -100, border -400) so it still reads as chosen.
 const POLARITY_ACTIVE: Record<'positive' | 'negative' | 'none', string> = {
-  positive: 'bg-green-600 text-white border-green-600',
-  negative: 'bg-red-600 text-white border-red-600',
-  none: 'bg-sky-600 text-white border-sky-600',
+  positive: 'bg-green-100 text-green-800 border-green-400',
+  negative: 'bg-red-100 text-red-800 border-red-400',
+  none: 'bg-sky-100 text-sky-800 border-sky-400',
 };
 const POLARITY_RESTING: Record<'positive' | 'negative' | 'none', string> = {
   positive: 'border-green-300 text-green-800 bg-green-50 hover:bg-green-100',

@@ -5,6 +5,8 @@ import { useLocale } from '@/lib/locale-context';
 import InlineTypeAdder from './InlineTypeAdder';
 import CapabilityRadioGroup from './CapabilityRadioGroup';
 import SegmentedToggle from './SegmentedToggle';
+import PillToggle from './PillToggle';
+import { WORK_TAG_PILLS } from '@/lib/work-tag-pills';
 import InfoPopover from './InfoPopover';
 import PillSelect from './PillSelect';
 
@@ -702,25 +704,22 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                           )}
                           {showPicker && (() => {
                             const tagSteps = b.tag === 'value' ? valueSteps : b.tag === 'sequence' ? sequenceSteps : b.tag === 'failure' ? failureSteps : [];
-                            const pillClass = (tag: 'value' | 'sequence' | 'failure' | 'failure_demand') => {
-                              const active = b.tag === tag;
-                              const activeStyle = tag === 'value' ? 'bg-green-600 text-white' : tag === 'sequence' ? 'bg-emerald-500 text-white' : tag === 'failure' ? 'bg-red-600 text-white' : 'bg-rose-600 text-white';
-                              return `px-2 py-1 text-xs font-medium transition-colors ${active ? activeStyle : 'bg-white text-gray-700 hover:bg-gray-50'}`;
-                            };
                             return (
                               <>
-                                <div className="flex items-center justify-between gap-1">
-                                  <div className="inline-flex rounded-lg border border-gray-300 bg-white overflow-hidden" role="group" aria-label={t('capture.workBlocksLabel')}>
-                                    <button type="button" className={pillClass('value')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'value', demandTypeId: null } : p))}>{t('capture.workBlockTagValue')}</button>
-                                    <button type="button" className={pillClass('sequence')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'sequence', demandTypeId: null } : p))}>{t('capture.workBlockTagSequence')}</button>
-                                    <button type="button" className={pillClass('failure')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure', demandTypeId: null } : p))}>{t('capture.workBlockTagFailure')}</button>
-                                    <button type="button" className={pillClass('failure_demand')} onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, tag: 'failure_demand', workStepTypeId: null, freeText: true } : p))}>{t('capture.workBlockTagFailureDemand')}</button>
-                                  </div>
+                                <div className="flex items-start justify-between gap-1">
+                                  <PillToggle
+                                    ariaLabel={t('capture.workBlocksLabel')}
+                                    value={b.tag}
+                                    onChange={(v) => setWorkBlocks((prev) => prev.map((p, i) => i !== idx ? p
+                                      : v === 'failure_demand' ? { ...p, tag: 'failure_demand', workStepTypeId: null, freeText: true }
+                                      : { ...p, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null }))}
+                                    options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
+                                  />
                                   <button
                                     type="button"
                                     aria-label="Remove"
                                     onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
-                                    className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                                    className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1 mt-0.5"
                                   >&times;</button>
                                 </div>
                                 <ul className="divide-y divide-gray-100 bg-white border border-gray-200 rounded-lg overflow-hidden">
@@ -759,25 +758,20 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               {/* Value step FIRST (2026-07-04) — mirrors the
                                   capture composer. */}
                               {valueStepSelector}
-                              <div className="flex items-center justify-between gap-1">
-                                <SegmentedToggle
-                                  options={[
-                                    { value: 'value', label: t('capture.workBlockTagValue'), activeColor: 'green' },
-                                    { value: 'sequence', label: t('capture.workBlockTagSequence'), activeColor: 'emerald' },
-                                    { value: 'failure', label: t('capture.workBlockTagFailure'), activeColor: 'red' },
-                                    { value: 'failure_demand', label: t('capture.workBlockTagFailureDemand'), activeColor: 'rose' },
-                                  ]}
+                              <div className="flex items-start justify-between gap-1">
+                                <PillToggle
+                                  ariaLabel={t('capture.workBlocksLabel')}
                                   value={b.tag}
                                   onChange={(v) => {
                                     const tag: 'value' | 'sequence' | 'failure' | 'failure_demand' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : v === 'failure_demand' ? 'failure_demand' : 'failure';
                                     setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionIds: tag === 'value' ? [] : p.systemConditionIds, demandTypeId: tag === 'failure_demand' ? p.demandTypeId : null } : p)));
                                   }}
-                                  ariaLabel={t('capture.workBlocksLabel')}
+                                  options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setWorkBlocks((prev) => prev.filter((_, i) => i !== idx))}
-                                  className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1"
+                                  className="text-gray-400 hover:text-gray-600 text-lg leading-none px-1 mt-0.5"
                                   aria-label="Remove"
                                 >&times;</button>
                               </div>

@@ -7,6 +7,10 @@ export interface PillToggleOption {
   label: ReactNode;
   /** Native tooltip on hover. */
   title?: string;
+  /** Override the selected-state classes (bg/text/border) for this option —
+   *  used to carry semantic colour (e.g. Value=green, Failure=red) instead of
+   *  the default sky. Unselected state is unchanged. */
+  activeClassName?: string;
 }
 
 interface Props {
@@ -36,7 +40,7 @@ export default function PillToggle({ options, value, onChange, ariaLabel }: Prop
             onClick={() => onChange(opt.value)}
             className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
               active
-                ? 'bg-sky-100 text-sky-700 border-sky-300'
+                ? (opt.activeClassName ?? 'bg-sky-100 text-sky-700 border-sky-300')
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-700'
             }`}
           >
