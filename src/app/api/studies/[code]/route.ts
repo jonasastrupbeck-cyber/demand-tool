@@ -47,8 +47,13 @@ export async function GET(
   }
   const msTypesWithSubqs = msTypes.map((m) => ({ ...m, subquestions: subqsByMilestone.get(m.id) ?? [], demandTypeExclusions: dtExclsByMilestone.get(m.id) ?? [] }));
 
+  // Never expose the settings PIN in the payload (every collector loads this) —
+  // publish only whether one is set. The PIN is checked server-side (pin-check).
+  const { consultantPin, ...safeStudy } = study;
+
   return NextResponse.json({
-    ...study,
+    ...safeStudy,
+    hasConsultantPin: !!consultantPin,
     handlingTypes: hTypes,
     demandTypes: dTypes,
     contactMethods: cMethods,

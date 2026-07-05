@@ -9,6 +9,13 @@ async function ownsOption(studyId: string, optId: string) {
   return subqs.some((s) => s.options.some((o) => o.id === optId));
 }
 
+// The sibling options of `optId` (same question), for the uniqueness check.
+async function siblingOptions(studyId: string, optId: string) {
+  const subqs = await getSubquestions(studyId);
+  const sq = subqs.find((s) => s.options.some((o) => o.id === optId));
+  return sq ? sq.options.filter((o) => o.id !== optId) : [];
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ code: string; optId: string }> }
@@ -22,7 +29,14 @@ export async function PATCH(
 
   const body = await request.json();
   const data: Parameters<typeof updateSubquestionOption>[1] = {};
-  if (typeof body.label === 'string' && body.label.trim()) data.label = body.label.trim();
+  if (typeof body.label === 'string' && body.label.trim()) {
+    // Keep option labels unique within their question (branching keys by label).
+    const newLabel = body.label.trim();
+    if ((await siblingOptions(study.id, optId)).some((o) => o.label.trim() === newLabel)) {
+      return NextResponse.json({ error: 'An option with this label already exists' }, { status: 409 });
+    }
+    data.label = newLabel;
+  }
   if (typeof body.sortOrder === 'number') data.sortOrder = body.sortOrder;
   if (body.polarity === null) data.polarity = null;
   else if (POLARITIES.includes(body.polarity)) data.polarity = body.polarity;

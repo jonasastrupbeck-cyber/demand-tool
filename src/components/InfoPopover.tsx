@@ -46,11 +46,24 @@ export default function InfoPopover({ label, children, className = '' }: Props) 
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
     }
+    // Keep the fixed-position card anchored to its trigger while the page
+    // scrolls/resizes (else it floated away mid-viewport). Capture-phase so it
+    // fires for scrolls in any ancestor scroll container.
+    function reposition() {
+      const btn = wrapperRef.current?.querySelector('button');
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      setCoords({ cx: r.left + r.width / 2, top: r.bottom + 8 });
+    }
     document.addEventListener('pointerdown', onDocPointer);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
     return () => {
       document.removeEventListener('pointerdown', onDocPointer);
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
     };
   }, [open]);
 

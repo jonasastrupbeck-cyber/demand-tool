@@ -23,6 +23,11 @@ export async function POST(
   if (!body.label || typeof body.label !== 'string' || !body.label.trim()) {
     return NextResponse.json({ error: 'label is required' }, { status: 400 });
   }
+  // Option labels must be unique per question — branching keys conditions and
+  // child groups by label, so a duplicate would merge two answers into one.
+  if (sq.options.some((o) => o.label.trim() === body.label.trim())) {
+    return NextResponse.json({ error: 'An option with this label already exists' }, { status: 409 });
+  }
   const polarity = POLARITIES.includes(body.polarity) ? body.polarity : null;
   const row = await addSubquestionOption(sqId, { label: body.label.trim(), polarity });
   return NextResponse.json(row, { status: 201 });

@@ -107,7 +107,8 @@ interface StudyData {
   flowAnalyticsEnabled: boolean;
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
-  consultantPin: string | null;
+  // The PIN itself is never sent to the browser — only whether one is set.
+  hasConsultantPin: boolean;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
   contactMethods: ContactMethod[];
@@ -269,28 +270,42 @@ export default function SettingsPage() {
     }
   }, [loadStudy]);
 
-  // Check localStorage for saved PIN on load
+  // Check localStorage for a saved PIN on load — verify it SERVER-side (the PIN
+  // is no longer in the payload to compare against).
   useEffect(() => {
-    if (study) {
-      if (!study.consultantPin) {
-        // No PIN set — unlocked but should prompt to set one
-        setIsUnlocked(true);
-      } else {
-        const savedPin = localStorage.getItem(`consultant_pin_${code}`);
-        if (savedPin === study.consultantPin) {
-          setIsUnlocked(true);
-        }
-      }
+    if (!study) return;
+    if (!study.hasConsultantPin) {
+      // No PIN set — unlocked but should prompt to set one.
+      setIsUnlocked(true);
+      return;
     }
+    const savedPin = localStorage.getItem(`consultant_pin_${code}`);
+    if (!savedPin) return;
+    let cancelled = false;
+    fetch(`/api/studies/${encodeURIComponent(code)}/pin-check`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: savedPin }),
+    })
+      .then((r) => (r.ok ? r.json() : { ok: false }))
+      .then((d) => { if (!cancelled && d.ok) setIsUnlocked(true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [study, code]);
 
-  function handlePinUnlock(e: React.FormEvent) {
+  async function handlePinUnlock(e: React.FormEvent) {
     e.preventDefault();
-    if (study && pinInput === study.consultantPin) {
-      setIsUnlocked(true);
-      setPinError(false);
-      localStorage.setItem(`consultant_pin_${code}`, pinInput);
-    } else {
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/pin-check`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pinInput }),
+      });
+      const d = res.ok ? await res.json() : { ok: false };
+      if (d.ok) {
+        setIsUnlocked(true);
+        setPinError(false);
+        localStorage.setItem(`consultant_pin_${code}`, pinInput);
+      } else {
+        setPinError(true);
+      }
+    } catch {
       setPinError(true);
     }
   }
@@ -299,7 +314,7 @@ export default function SettingsPage() {
     e.preventDefault();
     const pin = newPinInput.trim();
     if (!pin || pin.length < 4) return;
-    setStudy((s) => (s ? { ...s, consultantPin: pin } : s));
+    setStudy((s) => (s ? { ...s, hasConsultantPin: true } : s));
     localStorage.setItem(`consultant_pin_${code}`, pin);
     setNewPinInput('');
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}`, {
@@ -415,11 +430,14 @@ export default function SettingsPage() {
   // ASAP anchor: case open → this event. `event` is a capability token
   // ('milestone:<id>' | 'decision:<typeId>') or null. Optimistic.
   function setWhatMattersAnchor(id: string, event: string | null) {
-    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, anchorEvent: event } : w)) } : s));
+    // anchorEvent is the authoritative model; also null the legacy
+    // anchorMilestoneId so the select's `anchorEvent ?? anchorMilestoneId`
+    // fallback can't snap a cleared anchor back to the old milestone.
+    setStudy((s) => (s ? { ...s, whatMattersTypes: s.whatMattersTypes.map((w) => (w.id === id ? { ...w, anchorEvent: event, anchorMilestoneId: null } : w)) } : s));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/what-matters-types/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ anchorEvent: event }),
+      body: JSON.stringify({ anchorEvent: event, anchorMilestoneId: null }),
     }));
   }
 
@@ -558,7 +576,21 @@ export default function SettingsPage() {
     if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
     if (patch.polarity !== undefined) clean.polarity = patch.polarity;
     if (Object.keys(clean).length === 0) return;
-    patchMsSubqs(msId, (subs) => subs.map((f) => (f.id === sqId ? { ...f, options: f.options.map((o) => (o.id === optId ? { ...o, ...clean } : o)) } : f)));
+    // The server cascades an option rename into subquestion_conditions.trigger_value
+    // (children match their parent option by LABEL). Mirror that in local state so
+    // the follow-up questions don't transiently detach (amber "stale trigger")
+    // until the next full reload.
+    const ms = study?.milestones?.find((m) => m.id === msId);
+    const oldLabel = ms?.subquestions.find((s) => s.id === sqId)?.options.find((o) => o.id === optId)?.label;
+    const newLabel = clean.label;
+    const renamed = newLabel !== undefined && oldLabel !== undefined && newLabel !== oldLabel;
+    patchMsSubqs(msId, (subs) => subs.map((f) => {
+      let next = f.id === sqId ? { ...f, options: f.options.map((o) => (o.id === optId ? { ...o, ...clean } : o)) } : f;
+      if (renamed && next.conditions.some((c) => c.parentSubquestionId === sqId && c.triggerValue === oldLabel)) {
+        next = { ...next, conditions: next.conditions.map((c) => (c.parentSubquestionId === sqId && c.triggerValue === oldLabel ? { ...c, triggerValue: newLabel } : c)) };
+      }
+      return next;
+    }));
     mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/subquestion-options/${optId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(clean),
     }));
@@ -1196,7 +1228,7 @@ export default function SettingsPage() {
   if (!study) return <div className="p-4 text-red-600">{t('capture.studyNotFound')}</div>;
 
   // PIN gate: if study has a PIN and user hasn't unlocked
-  if (study.consultantPin && !isUnlocked) {
+  if (study.hasConsultantPin && !isUnlocked) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
@@ -1298,7 +1330,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Set PIN prompt (for studies without a PIN) */}
-        {!study.consultantPin && (
+        {!study.hasConsultantPin && (
           <div className="rounded-xl shadow-sm p-5 bg-amber-50 border border-amber-200">
             <h2 className="text-base font-semibold mb-1 text-gray-900">{t('consultant.setPin')}</h2>
             <p className="text-sm text-gray-600 mb-3">{t('consultant.setPinDesc')}</p>
