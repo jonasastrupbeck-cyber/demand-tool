@@ -794,20 +794,20 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               Chips for chosen SCs + an "add" dropdown to add more / create
                               new — same pattern as the capture composer. */}
                           {flowWorkPath && study.systemConditionsEnabled && (b.tag === 'sequence' || b.tag === 'failure' || b.tag === 'failure_demand') && (
-                            <div className={`mt-1 p-2 rounded-md border ${(b.tag === 'failure' || b.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                              <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                            <div className={`mt-1 p-1.5 rounded-md border ${(b.tag === 'failure' || b.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                              <p className="text-[10px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
                               <div className="flex flex-wrap gap-1.5 items-center">
                                 {b.systemConditionIds.map((scId) => {
                                   const sc = study.systemConditions.find((s) => s.id === scId);
                                   if (!sc) return null;
                                   return (
-                                    <span key={scId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-sky-600 text-white">
+                                    <span key={scId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-200 text-sky-900 border border-sky-500">
                                       {tl(sc.label)}
                                       <button
                                         type="button"
                                         aria-label={t('capture.removeSystemCondition')}
                                         onClick={() => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: p.systemConditionIds.filter((x) => x !== scId) } : p))}
-                                        className="text-sky-100 hover:text-white leading-none"
+                                        className="text-sky-700 hover:text-sky-900 leading-none"
                                       >
                                         &times;
                                       </button>
@@ -821,6 +821,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                   placeholder={t('capture.addSystemConditionButton')}
                                   options={study.systemConditions.filter((sc) => !b.systemConditionIds.includes(sc.id)).map((sc) => ({ id: sc.id, label: tl(sc.label) }))}
                                   onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, systemConditionIds: p.systemConditionIds.includes(id) ? p.systemConditionIds : [...p.systemConditionIds, id] } : p))}
+                                  compact
+                                  compactMenu
                                 />
                                 <InlineTypeAdder
                                   code={code}

@@ -1673,20 +1673,20 @@ export default function CapturePage() {
                           shifts the toggle. Add via a dropdown; chosen SCs show as
                           removable chips; the "+ add" pill stays to add more (0032). */}
                       {flowWorkPath && study.systemConditionsEnabled && (block.tag === 'sequence' || block.tag === 'failure' || block.tag === 'failure_demand') && (
-                        <div className={`p-2 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
-                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
+                        <div className={`p-1.5 rounded-md border ${(block.tag === 'failure' || block.tag === 'failure_demand') ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                          <p className="text-[10px] font-medium text-gray-700 mb-1">{t('capture.flowScQuestion')}</p>
                           <div className="flex flex-wrap gap-1.5 items-center">
                             {block.systemConditionIds.map((scId) => {
                               const sc = study.systemConditions.find((s) => s.id === scId);
                               if (!sc) return null;
                               return (
-                                <span key={scId} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-sky-600 text-white">
+                                <span key={scId} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-200 text-sky-900 border border-sky-500">
                                   {tl(sc.label)}
                                   <button
                                     type="button"
                                     aria-label={t('capture.removeSystemCondition')}
                                     onClick={() => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: b.systemConditionIds.filter((x) => x !== scId) } : b))}
-                                    className="text-sky-100 hover:text-white leading-none"
+                                    className="text-sky-700 hover:text-sky-900 leading-none"
                                   >
                                     &times;
                                   </button>
@@ -1702,6 +1702,8 @@ export default function CapturePage() {
                               onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, systemConditionIds: b.systemConditionIds.includes(id) ? b.systemConditionIds : [...b.systemConditionIds, id] } : b))}
                               onAddNew={() => { setScAddTargetBlockIdx(idx); setAddingType('systemCondition'); setNewTypeLabel(''); }}
                               addNewLabel={t('capture.addNew')}
+                              compact
+                              compactMenu
                             />
                           </div>
                         </div>
@@ -1769,36 +1771,37 @@ export default function CapturePage() {
               setWorkBlocks((prev) => prev.map((b, i) => i === demandTypeAddTargetBlockIdx ? { ...b, demandTypeId: id } : b));
               setDemandTypeAddTargetBlockIdx(null);
             }, { variant: 'red' })}
-          </div>
-        )}
 
-        {/* Flow composer: COR + Save sit BELOW the work blocks as a compact bar
-            that floats at the RIGHT of the composer viewport (sticky right-0,
-            right-aligned via ml-auto). The block row can grow very wide (blocks
-            flow left→right), so a centred/inline footer scrolls off-screen —
-            floating keeps COR + Save visible however far the rail is scrolled.
-            The `lg:mr-[18.5rem]` right margin (one block column `lg:w-72` = 18rem
-            + the `gap-2` = 0.5rem) insets the bar past the trailing "+ Add block"
-            button so it settles under the LAST FILLED block (not the empty add
-            placeholder) once that block scrolls into view. */}
-        {flowWorkPath && (
-          <div className="sticky right-0 ml-auto lg:mr-[18.5rem] z-[1] mt-1 w-fit max-w-full flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
-            {/* One date for the whole work entry — defaults today; change it to
-                backdate a retrospectively-captured touch before saving. */}
-            <label className="flex items-center justify-end gap-1.5">
-              <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
-              <input
-                type="date"
-                value={workEntryDate}
-                onChange={(e) => setWorkEntryDate(e.target.value)}
-                className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
-              />
-            </label>
-            <div className="flex items-center gap-3">
-              {corBlock}
-              {submitButton}
-            </div>
-            {regretButton}
+            {/* Flow composer: COR + Save sit BELOW the work blocks as a compact
+                bar, CENTRED under the composer box (2026-07-05, Jonas). Rendered
+                INSIDE the flow section (not the space-y-4 parent) so `mt-2` gives
+                a clean 8px gap = the `gap-2` between the block and the "+ Add a
+                step" box. Outer `lg:w-72` matches the first block-card column
+                (left-aligned under it); `justify-center` centres the compact bar
+                under it. (Previously floated sticky-right; dropped for the
+                centred look.) */}
+            {flowWorkPath && (
+              <div className="mt-2 lg:w-72 flex justify-center">
+                <div className="w-fit max-w-full flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+                  {/* One date for the whole work entry — defaults today; change
+                      it to backdate a retrospectively-captured touch before saving. */}
+                  <label className="flex items-center justify-center gap-1.5">
+                    <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
+                    <input
+                      type="date"
+                      value={workEntryDate}
+                      onChange={(e) => setWorkEntryDate(e.target.value)}
+                      className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                    />
+                  </label>
+                  <div className="flex items-center gap-3">
+                    {corBlock}
+                    {submitButton}
+                  </div>
+                  {regretButton}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
