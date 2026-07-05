@@ -80,7 +80,11 @@ function tokenize(expr: string): Tok[] | null {
     if (c >= '0' && c <= '9') {
       let j = i + 1;
       while (j < expr.length && ((expr[j] >= '0' && expr[j] <= '9') || expr[j] === '.')) j++;
-      const n = parseFloat(expr.slice(i, j));
+      const lit = expr.slice(i, j);
+      // Reject a malformed literal like "1.2.3" — parseFloat would silently keep
+      // "1.2" and swallow the rest, so validateFormula wrongly passed it.
+      if ((lit.match(/\./g) || []).length > 1) return null;
+      const n = parseFloat(lit);
       if (!Number.isFinite(n)) return null;
       toks.push({ t: 'num', v: n });
       i = j;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getStudyByCode, getSubquestions, getMilestones, getWhatMattersTypes, updateSubquestion, deleteSubquestion, kindsCompatible, type SubquestionKind } from '@/lib/queries';
+import { validateFormula } from '@/lib/formula';
 
 const KINDS: SubquestionKind[] = ['amount', 'number', 'percent', 'currency', 'calculated', 'date', 'duration', 'duration_months', 'text', 'choice'];
 
@@ -42,7 +43,13 @@ export async function PATCH(
   if (body.formula === null) {
     data.formula = null;
   } else if (typeof body.formula === 'string') {
-    data.formula = body.formula.trim() || null;
+    const trimmed = body.formula.trim();
+    // Reject a structurally invalid formula — it would store and then render
+    // blank forever at capture (the editor also guards this client-side).
+    if (trimmed && !validateFormula(trimmed)) {
+      return NextResponse.json({ error: 'Formula is not valid' }, { status: 400 });
+    }
+    data.formula = trimmed || null;
   }
   if (body.resultFormat === null) {
     data.resultFormat = null;

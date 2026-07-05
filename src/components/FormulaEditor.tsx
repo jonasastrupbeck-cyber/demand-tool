@@ -42,14 +42,23 @@ export default function FormulaEditor({ initialFormula, siblings, currentMilesto
   const ref = useRef<HTMLTextAreaElement>(null);
   const valid = validateFormula(value);
 
-  // Insert `snippet` at the caret (or append), keep focus, and persist.
+  // Persist only a valid (or empty) formula — an invalid/intermediate one would
+  // be stored and then render blank forever at capture. The live `value` keeps
+  // the in-progress text so the author can fix it before it's saved.
+  const persist = (v: string) => {
+    if (!v.trim()) onSave(null);
+    else if (validateFormula(v)) onSave(v);
+  };
+
+  // Insert `snippet` at the caret (or append) and keep focus. Does NOT persist
+  // per click (that stored a stream of intermediate, usually-invalid formulas);
+  // the onBlur save captures the final value.
   const insert = (snippet: string) => {
     const el = ref.current;
     const start = el?.selectionStart ?? value.length;
     const end = el?.selectionEnd ?? value.length;
     const nextVal = value.slice(0, start) + snippet + value.slice(end);
     setValue(nextVal);
-    onSave(nextVal.trim() ? nextVal : null);
     requestAnimationFrame(() => {
       if (!el) return;
       el.focus();
@@ -60,6 +69,12 @@ export default function FormulaEditor({ initialFormula, siblings, currentMilesto
 
   const tokenFor = (s: FormulaSibling) =>
     s.kind === 'duration' ? `MONTHS({sq:${s.id}})` : `{sq:${s.id}}`;
+
+  // Only fields that resolve to a number are offered as one-click operands.
+  // text/choice never produce a value (a bare {sq:id} ref → null → blank field);
+  // date is still available for MONTHS_BETWEEN via the operator buttons.
+  const NUMERIC_KINDS = new Set(['amount', 'number', 'percent', 'currency', 'calculated', 'duration', 'duration_months']);
+  const usableSiblings = siblings.filter((s) => NUMERIC_KINDS.has(s.kind));
 
   const fieldButton = (s: FormulaSibling) => (
     <button
@@ -72,11 +87,11 @@ export default function FormulaEditor({ initialFormula, siblings, currentMilesto
     </button>
   );
 
-  const currentFields = siblings.filter((s) => s.milestoneId === currentMilestoneId);
+  const currentFields = usableSiblings.filter((s) => s.milestoneId === currentMilestoneId);
   // Other milestones, in study order, each with its own (non-empty) field group.
   const otherGroups = milestones
     .filter((m) => m.id !== currentMilestoneId)
-    .map((m) => ({ milestone: m, fields: siblings.filter((s) => s.milestoneId === m.id) }))
+    .map((m) => ({ milestone: m, fields: usableSiblings.filter((s) => s.milestoneId === m.id) }))
     .filter((g) => g.fields.length > 0);
 
   // Preview: translated field labels + a short milestone tag for cross-milestone fields.
@@ -111,14 +126,14 @@ export default function FormulaEditor({ initialFormula, siblings, currentMilesto
         ref={ref}
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => onSave(value.trim() ? value : null)}
+        onBlur={() => persist(value)}
         aria-label={t('settings.subquestionFormula')}
         rows={2}
         className={`w-full px-2 py-1 rounded text-[10px] font-mono text-gray-500 bg-gray-50 border ${valid ? 'border-gray-200 focus:ring-brand' : 'border-red-400 focus:ring-red-400'} focus:ring-2 outline-none`}
       />
       {!valid && <p className="text-[10px] text-red-600">{t('settings.subquestionFormulaInvalid')}</p>}
 
-      {siblings.length === 0 ? (
+      {usableSiblings.length === 0 ? (
         <p className="text-[10px] text-gray-400 italic">{t('settings.subquestionFormulaNoFields')}</p>
       ) : (
         <div className="space-y-1">
