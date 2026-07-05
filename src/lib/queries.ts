@@ -1655,12 +1655,17 @@ export async function getCases(studyId: string) {
     // to demand_entries.id (always 0 rows).
     entryCount: sql<number>`(select count(*)::int from demand_entries de where de.case_id = cases.id)`,
     // Latest touch (2026-06-18): its date + verbatim so the entry-screen recent
-    // list can show "last touch" for recognition. Same `de` alias / explicit
-    // qualification as entryCount above (drizzle correlated-subquery gotcha).
-    lastEntryAt: sql<string | null>`(select de.created_at from demand_entries de where de.case_id = cases.id order by de.created_at desc limit 1)`,
-    lastEntryVerbatim: sql<string | null>`(select de.verbatim from demand_entries de where de.case_id = cases.id order by de.created_at desc limit 1)`,
+    // list can show "last touch" for recognition. One LEFT JOIN LATERAL sorts the
+    // case's entries once and serves both columns (was two separate correlated
+    // subqueries that each sorted). Same values, from the same tie-broken row.
+    lastEntryAt: sql<string | null>`le.at`,
+    lastEntryVerbatim: sql<string | null>`le.v`,
   })
     .from(cases)
+    .leftJoin(
+      sql`lateral (select de.created_at as at, de.verbatim as v from demand_entries de where de.case_id = ${cases.id} order by de.created_at desc limit 1) le`,
+      sql`true`,
+    )
     .where(eq(cases.studyId, studyId))
     .orderBy(desc(cases.createdAt));
 }
