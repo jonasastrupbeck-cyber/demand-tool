@@ -7,6 +7,7 @@ import {
 import type { CapabilityData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect, { type PillSelectOption } from '@/components/PillSelect';
+import PillToggle from '@/components/PillToggle';
 import InfoPopover from '@/components/InfoPopover';
 import { exportNodeToPng } from '@/lib/chart-image';
 
@@ -149,21 +150,26 @@ export default function CapabilityChart({
         <span className="text-xs font-medium text-gray-500">{t('dashboard.eventTo')}</span>
         <PillSelect value={capTo} onChange={setCapTo} options={eventOptions} placeholder={t('dashboard.eventTo')} ariaLabel={t('dashboard.eventTo')} />
         <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.metricLabel')}</span>
-        <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
-          {(['leadTime', 'touches', 'variance'] as const).map((m) => (
-            <button key={m} type="button" onClick={() => setCapMetric(m)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${capMetric === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {m === 'leadTime' ? t('dashboard.metricLeadTime') : m === 'touches' ? t('dashboard.metricTouches') : t('dashboard.metricVariance')}
-            </button>
-          ))}
-        </div>
+        <PillToggle
+          ariaLabel={t('dashboard.metricLabel')}
+          value={capMetric}
+          onChange={(v) => setCapMetric(v as 'leadTime' | 'touches' | 'variance')}
+          options={[
+            { value: 'leadTime', label: t('dashboard.metricLeadTime') },
+            { value: 'touches', label: t('dashboard.metricTouches') },
+            { value: 'variance', label: t('dashboard.metricVariance') },
+          ]}
+        />
         <span className="ml-2 text-xs font-medium text-gray-500">{t('dashboard.sortLabel')}</span>
-        <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
-          {(['start', 'closed'] as const).map((s) => (
-            <button key={s} type="button" onClick={() => setCapSort(s)} className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${capSort === s ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-              {s === 'start' ? t('dashboard.sortStart') : t('dashboard.sortClosed')}
-            </button>
-          ))}
-        </div>
+        <PillToggle
+          ariaLabel={t('dashboard.sortLabel')}
+          value={capSort}
+          onChange={(v) => setCapSort(v as 'start' | 'closed')}
+          options={[
+            { value: 'start', label: t('dashboard.sortStart') },
+            { value: 'closed', label: t('dashboard.sortClosed') },
+          ]}
+        />
       </div>
 
       {!capFrom || !capTo ? (

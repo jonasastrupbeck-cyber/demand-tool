@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import type { TouchSeriesPoint } from '@/types';
 import { useLocale } from '@/lib/locale-context';
+import PillToggle from '@/components/PillToggle';
 
 // "Touches over time" — per-day touch counts, scoped (all / life problem / case),
 // switchable between count and % of touches per day. A touch = a work entry;
@@ -89,18 +90,15 @@ export default function TouchSeriesChart({
           )}
         </select>
 
-        <div className="flex gap-1 rounded-lg p-0.5 bg-gray-100 border border-gray-200">
-          {(['count', 'pct'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              {m === 'count' ? t('dashboard.countMode') : t('dashboard.pctMode')}
-            </button>
-          ))}
-        </div>
+        <PillToggle
+          ariaLabel={t('dashboard.countMode')}
+          value={mode}
+          onChange={(v) => setMode(v as 'count' | 'pct')}
+          options={[
+            { value: 'count', label: t('dashboard.countMode') },
+            { value: 'pct', label: t('dashboard.pctMode') },
+          ]}
+        />
       </div>
 
       {loading && !series ? (

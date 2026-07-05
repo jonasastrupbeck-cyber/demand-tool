@@ -10,7 +10,7 @@ import {
 import type { NodeProps, LinkProps } from 'recharts/types/chart/Sankey';
 import type { DashboardData, BudgetCapabilityField } from '@/types';
 import { formatCurrency, currencyForSubquestion } from '@/lib/format-currency';
-import SegmentedToggle from '@/components/SegmentedToggle';
+import PillToggle from '@/components/PillToggle';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
@@ -518,31 +518,22 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (
-              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200">
-                {(['capability', ...(flowAnalyticsAvailable ? ['analytics'] : []), ...(synthesisAvailable ? ['synthesis'] : [])] as DashboardView[]).map((view) => (
-                  <button
-                    key={view}
-                    onClick={() => setDashboardView(view)}
-                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                  >
-                    {view === 'synthesis' ? t('dashboard.synthesisTab') : view === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab')}
-                  </button>
-                ))}
-              </div>
+              <PillToggle
+                ariaLabel={t('dashboard.capabilityTab')}
+                value={dashboardView}
+                onChange={(v) => setDashboardView(v as DashboardView)}
+                options={(['capability', ...(flowAnalyticsAvailable ? ['analytics'] : []), ...(synthesisAvailable ? ['synthesis'] : [])] as DashboardView[]).map((view) => ({
+                  value: view,
+                  label: view === 'synthesis' ? t('dashboard.synthesisTab') : view === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab'),
+                }))}
+              />
             )}
-            <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200">
-              {(['all', 'today', '7d', '30d', 'custom'] as DateRange[]).map((range) => (
-                <button
-                  key={range}
-                  onClick={() => setDateRange(range)}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    dateRange === range ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {dateRangeLabels[range]}
-                </button>
-              ))}
-            </div>
+            <PillToggle
+              ariaLabel={dateRangeLabels['all']}
+              value={dateRange}
+              onChange={(v) => setDateRange(v as DateRange)}
+              options={(['all', 'today', '7d', '30d', 'custom'] as DateRange[]).map((range) => ({ value: range, label: dateRangeLabels[range] }))}
+            />
             {dateRange === 'custom' && (
               <div className="flex items-center gap-1.5">
                 <input
@@ -620,19 +611,12 @@ export default function DashboardPage() {
           const help = dashboardView === 'demand' ? t('dashboard.demandTabHelp') : dashboardView === 'work' ? t('dashboard.workTabHelp') : dashboardView === 'overview' ? t('dashboard.overviewTabHelp') : dashboardView === 'synthesis' ? t('dashboard.synthesisTabHelp') : t('dashboard.capabilityTabHelp');
           return (
             <div>
-              <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
-                {tabs.map((view) => (
-                  <button
-                    key={view}
-                    onClick={() => setDashboardView(view)}
-                    className={`px-4 py-2 text-sm rounded-md font-medium transition-colors ${
-                      dashboardView === view ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    {tabLabel(view)}
-                  </button>
-                ))}
-              </div>
+              <PillToggle
+                ariaLabel={tabLabel(tabs[0])}
+                value={dashboardView}
+                onChange={(v) => setDashboardView(v as DashboardView)}
+                options={tabs.map((view) => ({ value: view, label: tabLabel(view) }))}
+              />
               <p className="text-xs text-gray-400 mt-1.5">{help}</p>
             </div>
           );
@@ -646,27 +630,12 @@ export default function DashboardPage() {
         {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('capture.caseTableP2bs')}</p>
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={() => setLifeProblemFilter(null)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  lifeProblemFilter === null ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {t('dashboard.scopeAll')}
-              </button>
-              {lifeProblems.map((lp) => (
-                <button
-                  key={lp.id}
-                  onClick={() => setLifeProblemFilter(lp.id)}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                    lifeProblemFilter === lp.id ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {tl(lp.label)}
-                </button>
-              ))}
-            </div>
+            <PillToggle
+              ariaLabel={t('capture.caseTableP2bs')}
+              value={lifeProblemFilter ?? ''}
+              onChange={(v) => setLifeProblemFilter(v || null)}
+              options={[{ value: '', label: t('dashboard.scopeAll') }, ...lifeProblems.map((lp) => ({ value: lp.id, label: tl(lp.label) }))]}
+            />
           </div>
         )}
 
@@ -676,23 +645,12 @@ export default function DashboardPage() {
         {isFlow && whatMattersTypes.some((w) => w.timing) && (
           <div className="rounded-lg border border-gray-200 bg-white p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.scopeWhatMatters')}</p>
-            <div className="flex flex-wrap gap-1">
-              <button
-                onClick={() => setWhatMattersScope(null)}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${whatMattersScope === null ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-              >
-                {t('dashboard.scopeAll')}
-              </button>
-              {whatMattersTypes.filter((w) => w.timing).map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => setWhatMattersScope(w.id)}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${whatMattersScope === w.id ? 'bg-brand text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-                >
-                  {w.timing === 'by_date' ? '📅 ' : '⏱ '}{tl(w.label)}
-                </button>
-              ))}
-            </div>
+            <PillToggle
+              ariaLabel={t('dashboard.scopeWhatMatters')}
+              value={whatMattersScope ?? ''}
+              onChange={(v) => setWhatMattersScope(v || null)}
+              options={[{ value: '', label: t('dashboard.scopeAll') }, ...whatMattersTypes.filter((w) => w.timing).map((w) => ({ value: w.id, label: `${w.timing === 'by_date' ? '📅 ' : '⏱ '}${tl(w.label)}` }))]}
+            />
           </div>
         )}
         </div>
@@ -1151,19 +1109,16 @@ export default function DashboardPage() {
               <ChartCard title={`${t('dashboard.whatMattersNotes')} (${data.whatMattersNotes.length})`}>
                 {/* Grouping toggle */}
                 {demandTypesEnabled && notesByDemandType.size > 1 && (
-                  <div className="flex gap-1 mb-3">
-                    <button
-                      onClick={() => setNotesGroupBy('date')}
-                      className={`text-xs px-2 py-1 rounded-full transition-colors ${notesGroupBy === 'date' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {t('dashboard.groupByDate')}
-                    </button>
-                    <button
-                      onClick={() => setNotesGroupBy('type')}
-                      className={`text-xs px-2 py-1 rounded-full transition-colors ${notesGroupBy === 'type' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {t('dashboard.groupByType')}
-                    </button>
+                  <div className="mb-3">
+                    <PillToggle
+                      ariaLabel={t('dashboard.groupByDate')}
+                      value={notesGroupBy}
+                      onChange={(v) => setNotesGroupBy(v as 'date' | 'type')}
+                      options={[
+                        { value: 'date', label: t('dashboard.groupByDate') },
+                        { value: 'type', label: t('dashboard.groupByType') },
+                      ]}
+                    />
                   </div>
                 )}
                 <div className="space-y-1 max-h-80 overflow-y-auto">
@@ -1629,19 +1584,12 @@ export default function DashboardPage() {
           return (
             <div className="space-y-4">
               {taxes.length > 1 && (
-                <div className="flex gap-1 rounded-lg p-1 bg-white border border-gray-200 w-fit">
-                  {taxes.map((x) => (
-                    <button
-                      key={x.key}
-                      onClick={() => setSynthTax(x.key)}
-                      className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
-                        active === x.key ? 'bg-sky-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {x.label}
-                    </button>
-                  ))}
-                </div>
+                <PillToggle
+                  ariaLabel={taxes[0].label}
+                  value={active}
+                  onChange={(v) => setSynthTax(v as 'sc' | 'wt' | 'wst')}
+                  options={taxes.map((x) => ({ value: x.key, label: x.label }))}
+                />
               )}
               <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} lifeProblemId={lifeProblemFilter} />
             </div>
@@ -1998,14 +1946,14 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500 mb-3">{t('dashboard.budgetCapabilityHint')}</p>
                     <div className="flex flex-wrap items-center gap-3 mb-3">
                       {budgetCapability.length > 1 && (
-                        <SegmentedToggle
+                        <PillToggle
                           options={sortedFields.map((f) => ({ value: f.fieldId, label: tl(f.whatMattersLabel) }))}
                           value={field.fieldId}
                           onChange={setBudgetFieldId}
                           ariaLabel={t('dashboard.budgetCapabilityTitle')}
                         />
                       )}
-                      <SegmentedToggle
+                      <PillToggle
                         options={[
                           { value: 'pct', label: t('dashboard.budgetUnitPct') },
                           { value: 'amount', label: t('dashboard.budgetUnitAmount') },
