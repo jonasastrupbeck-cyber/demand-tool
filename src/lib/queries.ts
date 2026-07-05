@@ -1412,13 +1412,10 @@ export async function createEntry(studyId: string, data: {
   // Insert what matters junction records
   const whatMattersIds = data.whatMattersTypeIds || (data.whatMattersTypeId ? [data.whatMattersTypeId] : []);
   if (isDemand && whatMattersIds.length > 0) {
-    for (const wmtId of whatMattersIds) {
-      await db.insert(demandEntryWhatMatters).values({
-        id: generateId(),
-        demandEntryId: id,
-        whatMattersTypeId: wmtId,
-      });
-    }
+    // Batched: one multi-row insert instead of one round-trip per row (neon-http).
+    await db.insert(demandEntryWhatMatters).values(
+      whatMattersIds.map((wmtId) => ({ id: generateId(), demandEntryId: id, whatMattersTypeId: wmtId })),
+    );
   }
 
   // Insert system condition junction records.
@@ -1430,23 +1427,25 @@ export async function createEntry(studyId: string, data: {
   const scs = data.systemConditions || [];
   const scVisible = !!data.classification && data.classification !== 'unknown';
   if (scVisible && scs.length > 0) {
-    for (const sc of scs) {
-      // Attachment defaults: if the caller didn't specify any, assume attaches
-      // to Demand — matches the old implicit semantics so existing callers
-      // (seeder, import, older UI) keep working.
-      const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
-      await db.insert(demandEntrySystemConditions).values({
-        id: generateId(),
-        demandEntryId: id,
-        systemConditionId: sc.id,
-        dimension: sc.dimension || 'hinders',
-        attachesToLifeProblem: !!sc.attachesToLifeProblem,
-        attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
-        attachesToWhatMatters: !!sc.attachesToWhatMatters,
-        attachesToCor:         !!sc.attachesToCor,
-        attachesToWork:        !!sc.attachesToWork,
-      });
-    }
+    await db.insert(demandEntrySystemConditions).values(
+      scs.map((sc) => {
+        // Attachment defaults: if the caller didn't specify any, assume attaches
+        // to Demand — matches the old implicit semantics so existing callers
+        // (seeder, import, older UI) keep working.
+        const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
+        return {
+          id: generateId(),
+          demandEntryId: id,
+          systemConditionId: sc.id,
+          dimension: sc.dimension || 'hinders',
+          attachesToLifeProblem: !!sc.attachesToLifeProblem,
+          attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
+          attachesToWhatMatters: !!sc.attachesToWhatMatters,
+          attachesToCor:         !!sc.attachesToCor,
+          attachesToWork:        !!sc.attachesToWork,
+        };
+      }),
+    );
   }
 
   // Insert thinking junction records (mirrors system conditions visibility).
@@ -1456,35 +1455,32 @@ export async function createEntry(studyId: string, data: {
   const ths = data.thinkings || [];
   if (scVisible && ths.length > 0) {
     const scIdsOnEntry = new Set(scs.map((s) => s.id));
-    for (const th of ths) {
-      await db.insert(demandEntryThinkings).values({
-        id: generateId(),
-        demandEntryId: id,
-        thinkingId: th.id,
-        logic: th.logic || '',
-        dimension: th.dimension === 'helps' ? 'helps' : 'hinders',
-      });
-      const attachments = th.scAttachments || [];
-      for (const att of attachments) {
+    const thRows = ths.map((th) => ({
+      id: generateId(),
+      demandEntryId: id,
+      thinkingId: th.id,
+      logic: th.logic || '',
+      dimension: (th.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+    }));
+    const thScRows = ths.flatMap((th) =>
+      (th.scAttachments || [])
         // Defensive: only persist attachments for SCs actually on this entry.
-        if (!scIdsOnEntry.has(att.systemConditionId)) continue;
-        await db.insert(demandEntryThinkingScs).values({
-          id: generateId(),
-          demandEntryId: id,
-          thinkingId: th.id,
-          systemConditionId: att.systemConditionId,
-        });
-      }
-    }
+        .filter((att) => scIdsOnEntry.has(att.systemConditionId))
+        .map((att) => ({ id: generateId(), demandEntryId: id, thinkingId: th.id, systemConditionId: att.systemConditionId })),
+    );
+    await db.insert(demandEntryThinkings).values(thRows);
+    if (thScRows.length > 0) await db.insert(demandEntryThinkingScs).values(thScRows);
   }
 
   // Insert work-description blocks (Work tab only, Phase 2 / Item 4).
   if (workBlocks.length > 0) {
+    const blockRows: (typeof workDescriptionBlocks.$inferInsert)[] = [];
+    const blockScRows: (typeof workBlockSystemConditions.$inferInsert)[] = [];
     let order = 0;
     for (const block of workBlocks) {
       const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
       const blockId = generateId();
-      await db.insert(workDescriptionBlocks).values({
+      blockRows.push({
         id: blockId,
         demandEntryId: id,
         tag: block.tag,
@@ -1498,9 +1494,11 @@ export async function createEntry(studyId: string, data: {
         valueStepId: block.valueStepId ?? null,
       });
       for (const scId of scIds) {
-        await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
+        blockScRows.push({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
       }
     }
+    await db.insert(workDescriptionBlocks).values(blockRows);
+    if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
   }
 
   return id;
@@ -2520,31 +2518,33 @@ export async function updateEntry(entryId: string, data: {
   // Update what matters junction records if provided
   if (whatMattersTypeIds !== undefined) {
     await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
-    for (const wmtId of whatMattersTypeIds) {
-      await db.insert(demandEntryWhatMatters).values({
-        id: generateId(),
-        demandEntryId: entryId,
-        whatMattersTypeId: wmtId,
-      });
+    if (whatMattersTypeIds.length > 0) {
+      await db.insert(demandEntryWhatMatters).values(
+        whatMattersTypeIds.map((wmtId) => ({ id: generateId(), demandEntryId: entryId, whatMattersTypeId: wmtId })),
+      );
     }
   }
 
   // Update system condition junction records if provided. Carries per-pair dimension + 5 field attachments.
   if (systemConditions !== undefined) {
     await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
-    for (const sc of systemConditions) {
-      const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
-      await db.insert(demandEntrySystemConditions).values({
-        id: generateId(),
-        demandEntryId: entryId,
-        systemConditionId: sc.id,
-        dimension: sc.dimension || 'hinders',
-        attachesToLifeProblem: !!sc.attachesToLifeProblem,
-        attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
-        attachesToWhatMatters: !!sc.attachesToWhatMatters,
-        attachesToCor:         !!sc.attachesToCor,
-        attachesToWork:        !!sc.attachesToWork,
-      });
+    if (systemConditions.length > 0) {
+      await db.insert(demandEntrySystemConditions).values(
+        systemConditions.map((sc) => {
+          const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
+          return {
+            id: generateId(),
+            demandEntryId: entryId,
+            systemConditionId: sc.id,
+            dimension: sc.dimension || 'hinders',
+            attachesToLifeProblem: !!sc.attachesToLifeProblem,
+            attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
+            attachesToWhatMatters: !!sc.attachesToWhatMatters,
+            attachesToCor:         !!sc.attachesToCor,
+            attachesToWork:        !!sc.attachesToWork,
+          };
+        }),
+      );
     }
   }
 
@@ -2559,35 +2559,32 @@ export async function updateEntry(entryId: string, data: {
       .from(demandEntrySystemConditions)
       .where(eq(demandEntrySystemConditions.demandEntryId, entryId));
     const scIdsOnEntry = new Set(currentScs.map((r) => r.id));
-    for (const th of thinkings) {
-      await db.insert(demandEntryThinkings).values({
-        id: generateId(),
-        demandEntryId: entryId,
-        thinkingId: th.id,
-        logic: th.logic || '',
-        dimension: th.dimension === 'helps' ? 'helps' : 'hinders',
-      });
-      const attachments = th.scAttachments || [];
-      for (const att of attachments) {
-        if (!scIdsOnEntry.has(att.systemConditionId)) continue;
-        await db.insert(demandEntryThinkingScs).values({
-          id: generateId(),
-          demandEntryId: entryId,
-          thinkingId: th.id,
-          systemConditionId: att.systemConditionId,
-        });
-      }
-    }
+    const thRows = thinkings.map((th) => ({
+      id: generateId(),
+      demandEntryId: entryId,
+      thinkingId: th.id,
+      logic: th.logic || '',
+      dimension: (th.dimension === 'helps' ? 'helps' : 'hinders') as 'helps' | 'hinders',
+    }));
+    const thScRows = thinkings.flatMap((th) =>
+      (th.scAttachments || [])
+        .filter((att) => scIdsOnEntry.has(att.systemConditionId))
+        .map((att) => ({ id: generateId(), demandEntryId: entryId, thinkingId: th.id, systemConditionId: att.systemConditionId })),
+    );
+    if (thRows.length > 0) await db.insert(demandEntryThinkings).values(thRows);
+    if (thScRows.length > 0) await db.insert(demandEntryThinkingScs).values(thScRows);
   }
 
   // Replace work-description blocks when provided (Work tab only, Phase 2 / Item 4).
   if (workBlocks !== undefined) {
     await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
+    const blockRows: (typeof workDescriptionBlocks.$inferInsert)[] = [];
+    const blockScRows: (typeof workBlockSystemConditions.$inferInsert)[] = [];
     let order = 0;
     for (const block of workBlocks) {
       const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
       const blockId = generateId();
-      await db.insert(workDescriptionBlocks).values({
+      blockRows.push({
         id: blockId,
         demandEntryId: entryId,
         tag: block.tag,
@@ -2601,9 +2598,11 @@ export async function updateEntry(entryId: string, data: {
         valueStepId: block.valueStepId ?? null,
       });
       for (const scId of scIds) {
-        await db.insert(workBlockSystemConditions).values({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
+        blockScRows.push({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
       }
     }
+    if (blockRows.length > 0) await db.insert(workDescriptionBlocks).values(blockRows);
+    if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
   }
 }
 
