@@ -110,7 +110,12 @@ export const studyTemplates = pgTable('study_templates', {
   settings: text('settings').notNull(),
   sourceStudyId: text('source_study_id').references(() => studies.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
-});
+}, (t) => ({
+  // A template name is unique per system type (0057) — enforces the "name is
+  // unique per system type" contract at the DB so a concurrent save can't create
+  // duplicates the check-then-insert misses.
+  uniqNameSystemType: unique('study_templates_name_system_type_unique').on(t.name, t.systemType),
+}));
 
 export const handlingTypes = pgTable('handling_types', {
   id: text('id').primaryKey(),

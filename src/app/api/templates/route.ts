@@ -66,14 +66,28 @@ export async function POST(request: Request) {
   }
 
   const id = generateId();
-  await db.insert(studyTemplates).values({
-    id,
-    name: trimmed,
-    systemType: study.systemType,
-    snapshotVersion: snapshot.version,
-    settings,
-    sourceStudyId: study.id,
-    createdAt: new Date(),
-  });
+  try {
+    await db.insert(studyTemplates).values({
+      id,
+      name: trimmed,
+      systemType: study.systemType,
+      snapshotVersion: snapshot.version,
+      settings,
+      sourceStudyId: study.id,
+      createdAt: new Date(),
+    });
+  } catch (err) {
+    // A concurrent save of the same name races past the check above; the DB
+    // unique constraint (0057) makes the second insert throw — surface it as the
+    // same 409 the check returns rather than a 500. Drizzle wraps the driver
+    // error, so the Postgres unique_violation (23505) is on err.cause.
+    const e = err as { code?: string; message?: string; cause?: { code?: string; message?: string } };
+    const code = e?.code ?? e?.cause?.code;
+    const msg = `${e?.message ?? ''} ${e?.cause?.message ?? ''}`;
+    if (code === '23505' || /unique|duplicate/i.test(msg)) {
+      return NextResponse.json({ error: 'A template with this name already exists' }, { status: 409 });
+    }
+    throw err;
+  }
   return NextResponse.json({ id, name: trimmed, systemType: study.systemType }, { status: 201 });
 }
