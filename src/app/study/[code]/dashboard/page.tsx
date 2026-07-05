@@ -145,6 +145,14 @@ export default function DashboardPage() {
     return {};
   }, [dateRange, customFrom, customTo]);
 
+  // Word-cloud theme extraction is O(notes × words) and was recomputed on every
+  // dashboard render; memoize on the notes it reads (DASH-10). The other derived
+  // arrays below are trivial O(n) maps, left inline.
+  const whatMattersThemes = useMemo(
+    () => (data?.whatMattersNotes ? extractThemes(data.whatMattersNotes.map((n) => n.text)) : []),
+    [data?.whatMattersNotes],
+  );
+
   // Stable range object for the capability view's chart props. Computed in the
   // render body it would mint a fresh (ms-precision) object every render, and
   // since dateFrom/dateTo are fetch-effect deps in each chart, that re-fired
@@ -1139,7 +1147,7 @@ export default function DashboardPage() {
 
             {/* What matters - word cloud */}
             {notesByDate.size > 0 && (() => {
-              const themes = extractThemes(data.whatMattersNotes.map(n => n.text));
+              const themes = whatMattersThemes;
               if (themes.length === 0) return null;
               const maxCount = themes[0].count;
               const minCount = themes[themes.length - 1].count;
