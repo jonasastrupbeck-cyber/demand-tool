@@ -841,7 +841,11 @@ export default function CapturePage() {
 
   return (
     <div className={freezeLayout ? 'max-w-none px-4 pb-6' : 'max-w-lg mx-auto p-4 pb-24'}>
-      {/* Header: study name, collector (with pencil), settings icon */}
+      {/* Header: study name, collector (with pencil), settings icon.
+          Flow + open case (2026-07-05): hidden — the collector name moves into
+          the sticky customer action bar (CasePanel). Still shown pre-case
+          ("who are you?" → "which customer") and always for transactional. */}
+      {!(flowMode && activeCase) && (
       <div className="flex items-center justify-between mb-4 gap-3">
         <div className="min-w-0">
           {/* Flow shows the study name as a quiet centred title atop the green
@@ -882,6 +886,7 @@ export default function CapturePage() {
           </button>
         )}
       </div>
+      )}
 
       {/* Session-sticky strip: Point of transaction + Contact method, set once per session.
           Positioned above the Demand/Work tabs — these are context that apply to every entry.
@@ -938,6 +943,7 @@ export default function CapturePage() {
         demandTypes={study.demandTypes}
         handlingTypes={study.handlingTypes}
         collectorName={collectorName}
+        onEditName={() => { localStorage.removeItem(`collector_${code}`); setCollectorName(''); setNameConfirmed(false); }}
         activeCaseId={activeCase?.id ?? null}
         onActiveCaseChange={setActiveCase}
         refreshSignal={caseRefreshTick}

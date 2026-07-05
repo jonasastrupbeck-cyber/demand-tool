@@ -64,6 +64,9 @@ interface Props {
   demandTypes: { id: string; category: 'value' | 'failure'; label: string; operationalDefinition: string | null }[];
   handlingTypes: { id: string; label: string }[];
   collectorName: string;
+  /** Pencil action in the flow action bar — clears the name to re-ask "Who
+   *  are you?". Undefined = no pencil (name shown read-only). */
+  onEditName?: () => void;
   activeCaseId: string | null;
   onActiveCaseChange: (c: { id: string; caseRef: string } | null) => void;
   /** Bump after each saved entry so the timeline refetches. */
@@ -103,7 +106,7 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   unknown: 'bg-gray-300',
 };
 
-export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, children }: Props) {
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -816,9 +819,28 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       <>
       {/* Customer action bar (2026-07-01): open-existing switcher + close /
           set-aside, above the board so you can finish a customer and hop to the
-          next in one click. Moved out of the green pane. */}
-      <div className="mb-3 flex flex-wrap items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-          {/* Case number stays in the green pane; this bar is just the actions. */}
+          next in one click. Moved out of the green pane. Sticky under the top
+          nav (2026-07-05) so the customer actions stay reachable while
+          scrolling the board; the collector name lives at its left. The
+          top-[113px] offset = the flow nav height (93px logo + pt-2/pb-3). */}
+      <div className="sticky top-[113px] z-10 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+          {/* Collector name (2026-07-05): moved here from the capture-page
+              header. Pencil re-asks "Who are you?". */}
+          {collectorName && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs text-gray-500 truncate">{collectorName}</span>
+              {onEditName && (
+                <button type="button" onClick={onEditName} title={t('capture.editName')} aria-label={t('capture.editName')} className="shrink-0 text-gray-400 hover:text-gray-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+          {/* Actions grouped right — case number stays in the green pane. */}
+          <div className="flex flex-wrap items-center gap-2">
           <div ref={switcherRef} className="relative">
             <button
               type="button"
@@ -887,6 +909,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           >
             {t('capture.caseSetAside')}
           </button>
+          </div>
       </div>
       {/* Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
           columns (customer left · touch rail + composer middle · decisions right).
