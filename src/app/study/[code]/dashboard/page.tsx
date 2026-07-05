@@ -1,7 +1,7 @@
 /* Dashboard – demand / work / overview tabs */
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -77,6 +77,10 @@ export default function DashboardPage() {
   const [budgetFieldId, setBudgetFieldId] = useState<string>('');
   const [budgetUnit, setBudgetUnit] = useState<'pct' | 'amount'>('pct');
   const [showEntries, setShowEntries] = useState(false);
+  // Bumped after an xlsx import so the open raw-entries list + demand-type map
+  // refresh (the aggregates refresh via loadDashboard, but the list effect only
+  // re-ran on showEntries/code).
+  const [entriesRefreshTick, setEntriesRefreshTick] = useState(0);
   const [entries, setEntries] = useState<Array<{ id: string; verbatim: string; classification: string; createdAt: string; demandTypeId: string | null; entryType: string; collectorName: string | null }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
   const [entryFilter, setEntryFilter] = useState('');
@@ -156,7 +160,12 @@ export default function DashboardPage() {
     custom: t('dashboard.custom'),
   };
 
+  // Latest-request token: a slower earlier response (e.g. after a fast filter
+  // change) must not overwrite the current view. Bumped per call; a resolved
+  // fetch only applies if it is still the latest.
+  const dashReqRef = useRef(0);
   const loadDashboard = useCallback(async () => {
+    const reqId = ++dashReqRef.current;
     setLoading(true);
     let url = `/api/studies/${encodeURIComponent(code)}/dashboard`;
     const range = getDateRangeParams();
@@ -166,11 +175,13 @@ export default function DashboardPage() {
     if (lifeProblemFilter) queryParams.push(`p2bs=${encodeURIComponent(lifeProblemFilter)}`);
     if (queryParams.length) url += '?' + queryParams.join('&');
 
-    const res = await fetch(url);
-    if (res.ok) {
-      setData(await res.json());
+    try {
+      const res = await fetch(url);
+      if (dashReqRef.current !== reqId) return; // superseded by a newer request
+      if (res.ok) setData(await res.json());
+    } finally {
+      if (dashReqRef.current === reqId) setLoading(false);
     }
-    setLoading(false);
   }, [code, getDateRangeParams, lifeProblemFilter]);
 
   useEffect(() => {
@@ -230,10 +241,12 @@ export default function DashboardPage() {
     const range = getDateRangeParams();
     if (range.from) qp.set('from', range.from);
     if (range.to) qp.set('to', range.to);
+    let cancelled = false;
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/flow-causes?${qp}`)
       .then(r => r.ok ? r.json() : { causes: [] })
-      .then(d => setFlowCauses(d.causes))
-      .finally(() => setFlowCausesLoading(false));
+      .then(d => { if (!cancelled) setFlowCauses(d.causes); })
+      .finally(() => { if (!cancelled) setFlowCausesLoading(false); });
+    return () => { cancelled = true; };
   }, [selectedFlow, code, getDateRangeParams]);
 
   // Ask delivery (slice 4): refetch when the Analytics tab is open and the
@@ -245,10 +258,12 @@ export default function DashboardPage() {
     if (range.from) qp.set('from', range.from);
     if (range.to) qp.set('to', range.to);
     if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    let cancelled = false;
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/ask-delivery?${qp}`)
       .then(r => r.ok ? r.json() : { rows: [] })
-      .then(d => setAskDelivery(d.rows))
-      .catch(() => setAskDelivery([]));
+      .then(d => { if (!cancelled) setAskDelivery(d.rows); })
+      .catch(() => { if (!cancelled) setAskDelivery([]); });
+    return () => { cancelled = true; };
   }, [dashboardView, code, getDateRangeParams, lifeProblemFilter]);
 
   // Budget capability (2026-07-05): fetch only when Ask delivery reports an
@@ -264,10 +279,12 @@ export default function DashboardPage() {
     if (range.from) qp.set('from', range.from);
     if (range.to) qp.set('to', range.to);
     if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    let cancelled = false;
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/budget-capability?${qp}`)
       .then(r => r.ok ? r.json() : { fields: [] })
-      .then(d => setBudgetCapability(d.fields))
-      .catch(() => setBudgetCapability([]));
+      .then(d => { if (!cancelled) setBudgetCapability(d.fields); })
+      .catch(() => { if (!cancelled) setBudgetCapability([]); });
+    return () => { cancelled = true; };
   }, [dashboardView, hasAmountAsk, code, getDateRangeParams, lifeProblemFilter]);
 
   // Capability: event options (fixed + milestones + decision points) for the
@@ -373,7 +390,7 @@ export default function DashboardPage() {
         setDemandTypeMap(map);
       })
       .finally(() => setEntriesLoading(false));
-  }, [showEntries, code]);
+  }, [showEntries, code, entriesRefreshTick]);
 
   function handleExport() {
     let url = `/api/studies/${encodeURIComponent(code)}/entries/export`;
@@ -430,6 +447,8 @@ export default function DashboardPage() {
         }
         setUploadMessage({ type: 'success', text: msg });
         loadDashboard();
+        // Also refresh the open raw-entries list + demand-type map.
+        setEntriesRefreshTick((n) => n + 1);
       }
     } catch {
       setUploadMessage({ type: 'error', text: t('dashboard.uploadError', { error: 'Network error' }) });
@@ -1547,7 +1566,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-center p-2 rounded-lg bg-blue-50">
                     <p className="text-lg font-bold text-blue-700">
-                      {data.collectorCounts.length > 0 ? data.collectorCounts.sort((a, b) => b.lastActive.localeCompare(a.lastActive))[0].lastActive : '—'}
+                      {data.collectorCounts.length > 0 ? [...data.collectorCounts].sort((a, b) => b.lastActive.localeCompare(a.lastActive))[0].lastActive : '—'}
                     </p>
                     <p className="text-xs text-gray-500">{t('dashboard.lastCapture')}</p>
                   </div>

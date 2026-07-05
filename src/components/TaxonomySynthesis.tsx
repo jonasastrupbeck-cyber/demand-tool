@@ -76,12 +76,21 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
   const selectedRows = rows.filter((r) => selected.has(r.id));
 
   useEffect(() => {
+    // Prune selected ids that no longer exist (e.g. a rename-to-existing merge
+    // archived one via load()), then keep keepId valid against the LIVE rows —
+    // otherwise doMerge could post a merge into an already-archived target.
+    const liveIds = new Set(rows.map((r) => r.id));
+    const stillSelected = [...selected].filter((id) => liveIds.has(id));
+    if (stillSelected.length !== selected.size) {
+      setSelected(new Set(stillSelected)); // re-runs this effect
+      return;
+    }
     if (selectedRows.length === 0) { setKeepId(null); return; }
-    if (!keepId || !selected.has(keepId)) {
+    if (!keepId || !selected.has(keepId) || !liveIds.has(keepId)) {
       const top = [...selectedRows].sort((a, b) => b.count - a.count)[0];
       setKeepId(top.id);
     }
-  }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selected, rows]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (id: string) => {
     setError(null);
