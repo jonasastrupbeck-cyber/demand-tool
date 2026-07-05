@@ -20,6 +20,7 @@ import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
 import CaseMilestones, { type MilestoneWithSubqs, type CaseMilestone, type CaseSubquestionAnswer } from '@/components/CaseMilestones';
+import { localDay, localDayOf } from '@/lib/local-date';
 
 interface CaseRow {
   id: string;
@@ -193,7 +194,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   // Drop the dragged touch BEFORE the target touch, then open the date-confirm
   // panel pre-filled with a sensible guess (the date of the touch it now sits
   // after; else the one it now precedes; else today). Order isn't applied until Save.
-  const isoDay = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const isoDay = (iso?: string) => localDayOf(iso) || localDay();
 
   // Edge auto-scroll: native HTML5 drag doesn't scroll the horizontal touch rail,
   // so dragging to an off-screen target is impossible without this. While a drag
@@ -615,12 +616,16 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         {t('capture.caseOpenedAt')}
         <input
           type="date"
-          value={caseRow.openedAt ? caseRow.openedAt.slice(0, 10) : ''}
+          value={localDayOf(caseRow.openedAt)}
           onChange={(e) => {
             if (!e.target.value) return;
-            // Keep the original time-of-day; only the date is edited here.
-            const time = caseRow.openedAt ? caseRow.openedAt.slice(10) : 'T09:00:00.000Z';
-            patchCase({ openedAt: `${e.target.value}${time}` });
+            // Set the LOCAL calendar day while keeping the original local
+            // time-of-day, so the field shows the same day it round-trips to.
+            const [y, m, d] = e.target.value.split('-').map(Number);
+            const dt = caseRow.openedAt ? new Date(caseRow.openedAt) : new Date();
+            if (!caseRow.openedAt) dt.setHours(9, 0, 0, 0);
+            dt.setFullYear(y, m - 1, d);
+            patchCase({ openedAt: dt.toISOString() });
           }}
           className="px-2 py-1 rounded-lg text-xs text-gray-700 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none"
         />

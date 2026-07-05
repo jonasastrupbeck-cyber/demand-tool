@@ -9,10 +9,12 @@ import PillToggle from './PillToggle';
 import { WORK_TAG_PILLS } from '@/lib/work-tag-pills';
 import InfoPopover from './InfoPopover';
 import PillSelect from './PillSelect';
+import { localDay, localDayOf } from '@/lib/local-date';
 
-// Per-block date (slice 2): YYYY-MM-DD helpers for <input type="date">.
-const todayIso = () => new Date().toISOString().slice(0, 10);
-const isoDay = (v?: string | null) => (v ? new Date(v).toISOString().slice(0, 10) : '');
+// Per-block date (slice 2): LOCAL-day YYYY-MM-DD helpers for <input type="date">
+// (must match the local-day display; see local-date.ts).
+const todayIso = () => localDay();
+const isoDay = (v?: string | null) => localDayOf(v);
 
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }

@@ -24,6 +24,7 @@ import { parseAmountLoose, formatCurrency, currencyForSubquestion } from '@/lib/
 import { evalFormula, formatCalcResult, type Resolved } from '@/lib/formula';
 import { visibleSubquestionIds } from '@/lib/subquestion-visibility';
 import { buildSubquestionTree, type SubqTreeNode } from '@/lib/subquestion-tree';
+import { localDay } from '@/lib/local-date';
 
 export interface MilestoneWithSubqs {
   id: string;
@@ -89,7 +90,7 @@ const draftFromAnswer = (a?: CaseSubquestionAnswer): Draft => ({
   text: a?.valueText ?? '',
 });
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => localDay();
 
 export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, caseDemandTypeIds = [], whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, compact = false }: Props) {
   const { t, tl, locale } = useLocale();

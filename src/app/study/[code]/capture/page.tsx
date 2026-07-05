@@ -13,9 +13,11 @@ import { WORK_TAG_PILLS } from '@/lib/work-tag-pills';
 import InfoPopover from '@/components/InfoPopover';
 import PillSelect from '@/components/PillSelect';
 import CasePanel from '@/components/CasePanel';
+import { localDay } from '@/lib/local-date';
 
-// Per-block date default (slice 2): today as YYYY-MM-DD for <input type="date">.
-const todayIso = () => new Date().toISOString().slice(0, 10);
+// Per-block date default (slice 2): today (LOCAL day) as YYYY-MM-DD for the
+// <input type="date">. Must be local, not UTC — see local-date.ts.
+const todayIso = () => localDay();
 
 interface HandlingType {
   id: string;

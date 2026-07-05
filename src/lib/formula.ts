@@ -34,7 +34,10 @@ export function monthsBetween(a: string | null, b: string | null): number | null
   const da = new Date(a);
   const db = new Date(b);
   if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
-  return (db.getFullYear() - da.getFullYear()) * 12 + (db.getMonth() - da.getMonth());
+  // UTC accessors: the inputs are date-only strings parsed as UTC midnight, so
+  // reading local month/year could shift a month-boundary date into the adjacent
+  // month (and give a different result on the server vs the browser).
+  return (db.getUTCFullYear() - da.getUTCFullYear()) * 12 + (db.getUTCMonth() - da.getUTCMonth());
 }
 
 // All {sq:<id>} references in an expression (for the token picker / to know which

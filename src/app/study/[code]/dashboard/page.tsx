@@ -127,9 +127,13 @@ export default function DashboardPage() {
       return { from: d.toISOString() };
     } else if (dateRange === 'custom') {
       const params: { from?: string; to?: string } = {};
-      if (customFrom) params.from = new Date(customFrom).toISOString();
+      // Parse the picked day as LOCAL midnight..end-of-day. `new Date('YYYY-MM-DD')`
+      // is UTC midnight, which dropped the first 1–2 local hours of the start day
+      // for UTC+ users; appending T00:00:00 (no Z) parses in local time to match
+      // the local end-of-day `to` below and the local-day 'today' branch.
+      if (customFrom) { const d = new Date(`${customFrom}T00:00:00`); params.from = d.toISOString(); }
       if (customTo) {
-        const toDate = new Date(customTo); toDate.setHours(23, 59, 59, 999);
+        const toDate = new Date(`${customTo}T00:00:00`); toDate.setHours(23, 59, 59, 999);
         params.to = toDate.toISOString();
       }
       return params;
