@@ -2404,6 +2404,13 @@ export async function getEntries(studyId: string, from?: Date, to?: Date) {
     .orderBy(desc(demandEntries.createdAt));
 }
 
+export async function getEntryInStudy(studyId: string, entryId: string) {
+  const rows = await db.select().from(demandEntries)
+    .where(and(eq(demandEntries.id, entryId), eq(demandEntries.studyId, studyId)))
+    .limit(1);
+  return rows[0];
+}
+
 export async function getFailureCauseSuggestions(studyId: string) {
   const results = await db.select({
     cause: demandEntries.failureCause,

@@ -53,9 +53,18 @@ export async function GET(
   const cMethods = activeLayer >= 3 ? results[6] as Awaited<ReturnType<typeof getContactMethods>> : [];
   const potTypes = activeLayer >= 3 ? results[7] as Awaited<ReturnType<typeof getPointsOfTransaction>> : [];
 
-  // Build what-matters junction lookup
+  // Build what-matters junction lookup.
+  // The three junction fetches and the three taxonomy lookups are mutually
+  // independent (all keyed only on entryIds / study.id), so fetch them together.
   const entryIds = entries.map(e => e.id);
-  const wmJunctions = entryIds.length > 0 ? await getWhatMattersForEntries(entryIds) : [];
+  const [wmJunctions, scJunctions, thJunctions, lProblems, scTypes, thTypes] = await Promise.all([
+    entryIds.length > 0 ? getWhatMattersForEntries(entryIds) : Promise.resolve([]),
+    entryIds.length > 0 ? getSystemConditionsForEntries(entryIds) : Promise.resolve([]),
+    entryIds.length > 0 ? getThinkingsForEntries(entryIds) : Promise.resolve([]),
+    getLifeProblems(study.id),
+    getSystemConditions(study.id),
+    getThinkings(study.id),
+  ]);
   const wmByEntry = new Map<string, string[]>();
   for (const j of wmJunctions) {
     const existing = wmByEntry.get(j.demandEntryId) || [];
@@ -64,16 +73,10 @@ export async function GET(
   }
 
   // Phase 2/3 backfill: lookups for Life Problem, System Conditions (with dimension), Thinkings (with logic)
-  const [lProblems, scTypes, thTypes] = await Promise.all([
-    getLifeProblems(study.id),
-    getSystemConditions(study.id),
-    getThinkings(study.id),
-  ]);
   const lpMap = new Map(lProblems.map(l => [l.id, l.label]));
   const scTypeMap = new Map(scTypes.map(s => [s.id, s.label]));
   const thTypeMap = new Map(thTypes.map(t => [t.id, t.label]));
 
-  const scJunctions = entryIds.length > 0 ? await getSystemConditionsForEntries(entryIds) : [];
   const scByEntry = new Map<string, { helps: string[]; hinders: string[] }>();
   for (const j of scJunctions) {
     const existing = scByEntry.get(j.demandEntryId) || { helps: [], hinders: [] };
@@ -85,7 +88,6 @@ export async function GET(
     scByEntry.set(j.demandEntryId, existing);
   }
 
-  const thJunctions = entryIds.length > 0 ? await getThinkingsForEntries(entryIds) : [];
   const thByEntry = new Map<string, string[]>();
   for (const j of thJunctions) {
     const label = thTypeMap.get(j.thinkingId);
@@ -97,11 +99,11 @@ export async function GET(
   }
 
   // Build linked value demand verbatim lookup
-  const linkedEntryIds = entries.filter(e => e.linkedValueDemandEntryId).map(e => e.linkedValueDemandEntryId!);
+  const linkedEntryIds = new Set(entries.filter(e => e.linkedValueDemandEntryId).map(e => e.linkedValueDemandEntryId!));
   const linkedVerbatimMap = new Map<string, string>();
-  if (linkedEntryIds.length > 0) {
+  if (linkedEntryIds.size > 0) {
     for (const entry of entries) {
-      if (linkedEntryIds.includes(entry.id)) {
+      if (linkedEntryIds.has(entry.id)) {
         linkedVerbatimMap.set(entry.id, entry.verbatim);
       }
     }

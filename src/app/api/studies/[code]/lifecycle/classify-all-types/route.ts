@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { demandTypes, workTypes } from '@/lib/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { getStudyByCode, getLifecycleStages, getLifecycleStageByCode, setDemandTypeLifecycle, setWorkTypeLifecycle } from '@/lib/queries';
+import { getStudyByCode, getLifecycleStages, setDemandTypeLifecycle, setWorkTypeLifecycle } from '@/lib/queries';
 import { classifyTypeStage } from '@/lib/ai/classify-lifecycle';
 
 export const runtime = 'nodejs';
@@ -21,6 +21,7 @@ export async function POST(
     return NextResponse.json({ error: 'No lifecycle stages defined for this study' }, { status: 400 });
   }
   const stageCodes = stages.map((s) => s.code);
+  const stageIdByCode = new Map(stages.map((s) => [s.code, s.id]));
 
   const body = await request.json().catch(() => ({}));
   const force = body?.force === true;
@@ -38,11 +39,7 @@ export async function POST(
   for (const t of demandTypeList) {
     try {
       const result = await classifyTypeStage(t.label, stageCodes);
-      let stageId: string | null = null;
-      if (result.stageCode) {
-        const s = await getLifecycleStageByCode(study.id, result.stageCode);
-        stageId = s?.id ?? null;
-      }
+      const stageId: string | null = result.stageCode ? stageIdByCode.get(result.stageCode) ?? null : null;
       await setDemandTypeLifecycle(t.id, stageId, { aiSuggestion: stageId });
       classified += 1;
     } catch {
@@ -52,11 +49,7 @@ export async function POST(
   for (const t of workTypeList) {
     try {
       const result = await classifyTypeStage(t.label, stageCodes);
-      let stageId: string | null = null;
-      if (result.stageCode) {
-        const s = await getLifecycleStageByCode(study.id, result.stageCode);
-        stageId = s?.id ?? null;
-      }
+      const stageId: string | null = result.stageCode ? stageIdByCode.get(result.stageCode) ?? null : null;
       await setWorkTypeLifecycle(t.id, stageId, { aiSuggestion: stageId });
       classified += 1;
     } catch {

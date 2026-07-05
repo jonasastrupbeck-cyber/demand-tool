@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateEntry, deleteEntry, getEntries, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry, getBlockSystemConditions, getCase } from '@/lib/queries';
+import { getStudyByCode, updateEntry, deleteEntry, getEntryInStudy, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry, getBlockSystemConditions, getCase } from '@/lib/queries';
 
 export async function GET(
   _request: Request,
@@ -12,8 +12,7 @@ export async function GET(
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   }
 
-  const entries = await getEntries(study.id);
-  const entry = entries.find((e) => e.id === entryId);
+  const entry = await getEntryInStudy(study.id, entryId);
   if (!entry) {
     return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }

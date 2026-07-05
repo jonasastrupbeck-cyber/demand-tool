@@ -17,8 +17,10 @@ export async function GET(
   const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
   const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
 
-  const entries = await getEntries(study.id, from, to);
-  const todayCount = await getEntryCountToday(study.id);
+  const [entries, todayCount] = await Promise.all([
+    getEntries(study.id, from, to),
+    getEntryCountToday(study.id),
+  ]);
 
   return NextResponse.json({ entries, todayCount });
 }
