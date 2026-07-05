@@ -1339,7 +1339,14 @@ export async function updateValueStep(id: string, data: { label?: string; sortOr
 
 export async function deleteValueStep(id: string) {
   // work_description_blocks.value_step_id is ON DELETE SET NULL — blocks unset.
+  const [row] = await db.select({ studyId: valueSteps.studyId }).from(valueSteps).where(eq(valueSteps.id, id));
   await db.delete(valueSteps).where(eq(valueSteps.id, id));
+  if (!row) return;
+  // Renumber the remaining steps 0..n-1 so sortOrder stays gap-free — otherwise
+  // a later add (sortOrder = count) can collide with a surviving row and the
+  // reorder arrows go dead / order becomes non-deterministic.
+  const rest = await db.select({ id: valueSteps.id }).from(valueSteps).where(eq(valueSteps.studyId, row.studyId)).orderBy(asc(valueSteps.sortOrder));
+  await Promise.all(rest.map((r, i) => db.update(valueSteps).set({ sortOrder: i }).where(eq(valueSteps.id, r.id))));
 }
 
 // Phase 4B (2026-04-16) — synthesis helper support.
@@ -2034,7 +2041,12 @@ export async function getSubquestionById(id: string) {
 
 export async function deleteSubquestion(id: string) {
   // options + case answers cascade at the DB level (consultant taxonomy fix).
+  const [row] = await db.select({ milestoneId: subquestions.milestoneId }).from(subquestions).where(eq(subquestions.id, id));
   await db.delete(subquestions).where(eq(subquestions.id, id));
+  if (!row) return;
+  // Keep the milestone's subquestion sortOrders gap-free (see deleteValueStep).
+  const rest = await db.select({ id: subquestions.id }).from(subquestions).where(eq(subquestions.milestoneId, row.milestoneId)).orderBy(asc(subquestions.sortOrder));
+  await Promise.all(rest.map((r, i) => db.update(subquestions).set({ sortOrder: i }).where(eq(subquestions.id, r.id))));
 }
 
 export async function addSubquestionOption(subquestionId: string, data: { label: string; polarity?: OptionPolarity | null }) {
@@ -2069,7 +2081,12 @@ export async function updateSubquestionOption(id: string, data: { label?: string
 }
 
 export async function deleteSubquestionOption(id: string) {
+  const [row] = await db.select({ subquestionId: subquestionOptions.subquestionId }).from(subquestionOptions).where(eq(subquestionOptions.id, id));
   await db.delete(subquestionOptions).where(eq(subquestionOptions.id, id));
+  if (!row) return;
+  // Keep option sortOrders gap-free (see deleteValueStep).
+  const rest = await db.select({ id: subquestionOptions.id }).from(subquestionOptions).where(eq(subquestionOptions.subquestionId, row.subquestionId)).orderBy(asc(subquestionOptions.sortOrder));
+  await Promise.all(rest.map((r, i) => db.update(subquestionOptions).set({ sortOrder: i }).where(eq(subquestionOptions.id, r.id))));
 }
 
 // ── Conditional visibility (0050) ────────────────────────────────────────────

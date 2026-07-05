@@ -480,12 +480,20 @@ export default function SettingsPage() {
     const a = ms?.subquestions.find((s) => s.id === sqId);
     const b = ms?.subquestions.find((s) => s.id === otherId);
     if (!a || !b) return;
-    const aSort = a.sortOrder, bSort = b.sortOrder;
-    patchMsSubqs(msId, (subs) => subs.map((s) => s.id === sqId ? { ...s, sortOrder: bSort } : s.id === otherId ? { ...s, sortOrder: aSort } : s));
+    // Swap the two siblings in the milestone's full flat order and renumber all
+    // 0..n-1, persisting every row. Swapping only the two sortOrder values was a
+    // no-op when they had collided (via a past delete-then-add), leaving the
+    // arrows dead; a full renumber also heals any pre-existing gaps/duplicates.
+    const flat = [...(ms?.subquestions ?? [])].sort((x, y) => x.sortOrder - y.sortOrder).map((s) => s.id);
+    const ia = flat.indexOf(sqId), ib = flat.indexOf(otherId);
+    if (ia < 0 || ib < 0) return;
+    [flat[ia], flat[ib]] = [flat[ib], flat[ia]];
+    const sortById = new Map(flat.map((id, i) => [id, i]));
+    patchMsSubqs(msId, (subs) => subs.map((s) => (sortById.has(s.id) ? { ...s, sortOrder: sortById.get(s.id)! } : s)));
     const patch = (id: string, sortOrder: number) => fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder }),
     });
-    Promise.all([patch(sqId, bSort), patch(otherId, aSort)])
+    Promise.all(flat.map((id, i) => patch(id, i)))
       .then((rs) => { if (rs.some((r) => !r.ok)) loadStudy(); })
       .catch(() => loadStudy());
   }
@@ -684,21 +692,23 @@ export default function SettingsPage() {
   }
 
   function moveMilestone(id: string, dir: -1 | 1) {
-    setStudy((s) => {
-      if (!s) return s;
-      const ordered = [...s.milestones].sort((a, b) => a.sortOrder - b.sortOrder);
-      const i = ordered.findIndex((m) => m.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= ordered.length) return s;
-      [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
-      const renumbered = ordered.map((m, k) => ({ ...m, sortOrder: k }));
-      mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderedIds: renumbered.map((m) => m.id) }),
-      }));
-      return { ...s, milestones: renumbered };
-    });
+    // Compute the new order OUTSIDE the state updater — firing the network
+    // request inside setStudy makes the updater impure, so React StrictMode
+    // (dev) double-invokes it and sends the reorder twice.
+    const current = study?.milestones;
+    if (!current) return;
+    const ordered = [...current].sort((a, b) => a.sortOrder - b.sortOrder);
+    const i = ordered.findIndex((m) => m.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ordered.length) return;
+    [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    const renumbered = ordered.map((m, k) => ({ ...m, sortOrder: k }));
+    setStudy((s) => (s ? { ...s, milestones: renumbered } : s));
+    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/milestones/reorder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderedIds: renumbered.map((m) => m.id) }),
+    }));
   }
 
   function addWorkTypeHandler(e: React.FormEvent) {
@@ -835,10 +845,11 @@ export default function SettingsPage() {
     [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
     const renumbered = ordered.map((v, k) => ({ ...v, sortOrder: k }));
     setStudy((s) => (s ? { ...s, valueSteps: renumbered } : s));
-    const a = renumbered.find((v) => v.id === ordered[j].id)!; // the two that swapped
-    const b = renumbered.find((v) => v.id === ordered[i].id)!;
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${a.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: a.sortOrder }) }));
-    mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: b.sortOrder }) }));
+    // Persist EVERY row's new sortOrder (not just the two swapped) so the saved
+    // order can't diverge from what's shown when the list had gaps from deletes.
+    for (const v of renumbered) {
+      mutate(() => fetch(`/api/studies/${encodeURIComponent(code)}/value-steps/${v.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sortOrder: v.sortOrder }) }));
+    }
   }
 
   // Phase 4B — synthesis helper actions.
