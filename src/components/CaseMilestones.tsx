@@ -16,7 +16,7 @@
  * (no reseed effect → no clobber of in-progress typing).
  */
 
-import { useState, type ReactElement } from 'react';
+import { useState, useMemo, type ReactElement } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
@@ -116,7 +116,16 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   // milestones (a parent choice can gate a child on another milestone). Hidden
   // subquestions are neither rendered nor sent on save (the server also clears
   // any stale hidden answer).
-  const allSubqsFlat = milestones.flatMap((m) => m.subquestions);
+  // allSubqsFlat + its id→subquestion index depend only on `milestones`, so
+  // memoize them (they were rebuilt on every keystroke via the drafts-driven
+  // re-render below). The id index also replaces an O(n²) `.find` inside the
+  // visibility filter.
+  const { allSubqsFlat, subqById } = useMemo(() => {
+    const allSubqsFlat = milestones.flatMap((m) => m.subquestions);
+    const subqById = new Map<string, Subquestion>();
+    for (const s of allSubqsFlat) subqById.set(s.id, s);
+    return { allSubqsFlat, subqById };
+  }, [milestones]);
   const choiceBySubqId = new Map(allSubqsFlat.map((s) => [s.id, (drafts[s.id] ?? EMPTY_DRAFT).choice || null]));
   const conditionVisible = visibleSubquestionIds(allSubqsFlat.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
   // Per-subquestion demand-type exclusions (0054): a subquestion whose exclusion
@@ -124,7 +133,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   // fold it into the same visibility set the render and save paths use.
   const isExcluded = (s: Subquestion) => (s.demandTypeExclusions ?? []).some((id) => caseDemandTypeIds.includes(id));
   const visibleIds = new Set([...conditionVisible].filter((id) => {
-    const s = allSubqsFlat.find((x) => x.id === id);
+    const s = subqById.get(id);
     return s ? !isExcluded(s) : true;
   }));
 
@@ -133,10 +142,8 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   const parseInt10 = (s: string) => { const n = parseInt(s, 10); return Number.isInteger(n) ? n : null; };
 
   // Calculated subquestions derive their value from sibling drafts (see
-  // src/lib/formula.ts). Resolve refs case-wide; a `seen` set prevents a cyclic
-  // calculated→calculated reference from looping.
-  const subqById = new Map<string, Subquestion>();
-  for (const m of milestones) for (const sq of m.subquestions) subqById.set(sq.id, sq);
+  // src/lib/formula.ts). Resolve refs case-wide (subqById above); a `seen` set
+  // prevents a cyclic calculated→calculated reference from looping.
   const computeCalc = (sq: Subquestion, seen: Set<string> = new Set()): number | null => {
     if (!sq.formula || seen.has(sq.id)) return null;
     const next = new Set(seen); next.add(sq.id);
