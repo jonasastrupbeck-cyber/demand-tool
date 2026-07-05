@@ -2732,31 +2732,6 @@ export async function deleteEntry(entryId: string) {
   await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
 }
 
-export async function getEntriesForReclassification(studyId: string, layer: number) {
-  const conditions = [
-    eq(demandEntries.studyId, studyId),
-    eq(demandEntries.entryType, 'demand'),
-  ];
-
-  if (layer === 2) {
-    conditions.push(eq(demandEntries.classification, 'unknown'));
-  } else if (layer === 3) {
-    conditions.push(isNull(demandEntries.handlingTypeId));
-  } else if (layer === 4) {
-    conditions.push(eq(demandEntries.classification, 'failure'));
-    conditions.push(isNull(demandEntries.linkedValueDemandEntryId));
-    conditions.push(isNull(demandEntries.originalValueDemandTypeId));
-  }
-
-  return db.select().from(demandEntries)
-    .where(and(...conditions))
-    .orderBy(asc(demandEntries.createdAt));
-}
-
-export async function getReclassificationCount(studyId: string, layer: number): Promise<number> {
-  const entries = await getEntriesForReclassification(studyId, layer);
-  return entries.length;
-}
 
 export async function getWhatMattersForEntries(entryIds: string[]) {
   if (entryIds.length === 0) return [];

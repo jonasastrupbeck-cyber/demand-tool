@@ -116,9 +116,9 @@ async function seedBankStudy(): Promise<string> {
   console.log('   All types configured');
 
   // 7. Activate layers 2 → 5
-  for (const layer of [2, 3, 4, 5]) {
-    await api(`/api/studies/${code}/activate-layer`, 'PUT', { targetLayer: layer });
-  }
+  // The legacy /activate-layer endpoint was replaced by boolean toggles; set the
+  // equivalent flags (layer 5 = having what-matters types, seeded elsewhere).
+  await api(`/api/studies/${code}`, 'PUT', { classificationEnabled: true, handlingEnabled: true, valueLinkingEnabled: true });
   console.log('   Layers activated to 5');
 
   // 8. Build and import XLSX
@@ -218,9 +218,9 @@ async function seedHousingStudy(): Promise<string> {
   console.log('   All types configured (including work types)');
 
   // 5. Activate layers 2 → 5
-  for (const layer of [2, 3, 4, 5]) {
-    await api(`/api/studies/${code}/activate-layer`, 'PUT', { targetLayer: layer });
-  }
+  // The legacy /activate-layer endpoint was replaced by boolean toggles; set the
+  // equivalent flags (layer 5 = having what-matters types, seeded elsewhere).
+  await api(`/api/studies/${code}`, 'PUT', { classificationEnabled: true, handlingEnabled: true, valueLinkingEnabled: true });
   console.log('   Layers activated to 5');
 
   // 6. Build and import XLSX
