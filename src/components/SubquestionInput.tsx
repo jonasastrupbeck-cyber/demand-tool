@@ -67,9 +67,9 @@ export const EMPTY_DRAFT: Draft = { num: '', date: '', years: '', months: '', ch
 // heavy solid -600. RESTING below stays a lighter wash; the selected pill is a
 // step darker (bg -100, border -400) so it still reads as chosen.
 const POLARITY_ACTIVE: Record<'positive' | 'negative' | 'none', string> = {
-  positive: 'bg-green-100 text-green-800 border-green-400',
-  negative: 'bg-red-100 text-red-800 border-red-400',
-  none: 'bg-sky-100 text-sky-800 border-sky-400',
+  positive: 'bg-green-200 text-green-900 border-green-500',
+  negative: 'bg-red-200 text-red-900 border-red-500',
+  none: 'bg-sky-200 text-sky-900 border-sky-500',
 };
 const POLARITY_RESTING: Record<'positive' | 'negative' | 'none', string> = {
   positive: 'border-green-300 text-green-800 bg-green-50 hover:bg-green-100',

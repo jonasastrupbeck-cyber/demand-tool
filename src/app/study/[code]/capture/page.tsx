@@ -1583,6 +1583,7 @@ export default function CapturePage() {
                                 onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i !== idx ? b
                                   : v === 'failure_demand' ? { ...b, tag: 'failure_demand', workStepTypeId: null, freeText: true }
                                   : { ...b, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null }))}
+                                dense
                                 options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                               />
                               <button
@@ -1637,6 +1638,7 @@ export default function CapturePage() {
                               ariaLabel={t('capture.workBlocksLabel')}
                               value={block.tag}
                               onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' | 'failure_demand', systemConditionIds: v === 'value' ? [] : b.systemConditionIds, demandTypeId: v === 'failure_demand' ? b.demandTypeId : null } : b))}
+                              dense
                               options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                             />
                             <button
@@ -1772,7 +1774,7 @@ export default function CapturePage() {
             button so it settles under the LAST FILLED block (not the empty add
             placeholder) once that block scrolls into view. */}
         {flowWorkPath && (
-          <div className="sticky right-0 ml-auto lg:mr-[18.5rem] z-[1] mt-3 w-fit max-w-full flex flex-col gap-2 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+          <div className="sticky right-0 ml-auto lg:mr-[18.5rem] z-[1] mt-1 w-fit max-w-full flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
             {/* One date for the whole work entry — defaults today; change it to
                 backdate a retrospectively-captured touch before saving. */}
             <label className="flex items-center justify-end gap-1.5">

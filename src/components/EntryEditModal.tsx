@@ -713,6 +713,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     onChange={(v) => setWorkBlocks((prev) => prev.map((p, i) => i !== idx ? p
                                       : v === 'failure_demand' ? { ...p, tag: 'failure_demand', workStepTypeId: null, freeText: true }
                                       : { ...p, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null }))}
+                                    dense
                                     options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                                   />
                                   <button
@@ -766,6 +767,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     const tag: 'value' | 'sequence' | 'failure' | 'failure_demand' = v === 'value' ? 'value' : v === 'sequence' ? 'sequence' : v === 'failure_demand' ? 'failure_demand' : 'failure';
                                     setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionIds: tag === 'value' ? [] : p.systemConditionIds, demandTypeId: tag === 'failure_demand' ? p.demandTypeId : null } : p)));
                                   }}
+                                  dense
                                   options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                                 />
                                 <button
