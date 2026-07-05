@@ -14,7 +14,7 @@
  * saved entry; `refreshSignal` bumps after each save so the timeline refetches.
  */
 
-import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
@@ -106,6 +106,83 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   sequence: 'bg-amber-400',
   unknown: 'bg-gray-300',
 };
+
+const STEP_TAG_CLASS: Record<string, string> = {
+  value: 'border-green-200 bg-green-50 text-green-800',
+  sequence: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  failure: 'border-red-200 bg-red-50 text-red-800',
+  // failure_demand (the demand hitting you) — rose, distinct from failure work.
+  failure_demand: 'border-rose-300 bg-rose-50 text-rose-800',
+};
+
+// A saved touch rendered IN FULL for the freeze rail (was the inline
+// `renderTouchFull`). Extracted + memoized (CAP-16): the composer's state lives
+// in the capture page and the composer is CasePanel's `children`, so every
+// keystroke re-rendered CasePanel and re-parsed every touch's verbatim. As a
+// React.memo with stable props (entry unchanged, taxonomies + onOpenEntry stable
+// via useCallback), typing no longer re-renders the saved cards. Read-only;
+// clicking opens the edit window.
+const TouchCardFull = memo(function TouchCardFull({ entry: e, handlingTypes, systemConditions, onOpenEntry }: {
+  entry: CaseEntry;
+  handlingTypes: { id: string; label: string }[];
+  systemConditions: { id: string; label: string }[];
+  onOpenEntry?: (id: string) => void;
+}) {
+  const { t, tl } = useLocale();
+  const steps = e.verbatim.split(/\n\n(?=\[(?:value|sequence|failure|failure_demand)\])/)
+    .map((line) => {
+      const m = line.match(/^\[(value|sequence|failure|failure_demand)\]\s*([\s\S]*)$/);
+      return m ? { tag: m[1], text: m[2] } : { tag: 'value', text: line };
+    })
+    .filter((s) => s.text.trim().length > 0);
+  const cor = e.handlingTypeId ? (handlingTypes.find((h) => h.id === e.handlingTypeId) ? tl(handlingTypes.find((h) => h.id === e.handlingTypeId)!.label) : null) : null;
+  const scs = (e.systemConditionIds || '').split(',').filter(Boolean)
+    .map((id) => { const x = systemConditions.find((s) => s.id === id); return x ? tl(x.label) : null; })
+    .filter((l): l is string => !!l);
+  const sepHeader = (label: string) => (
+    <div className="flex items-center gap-1.5">
+      <div className="flex-1 h-px bg-gray-200" />
+      <span className="text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap">{label}</span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenEntry?.(e.id)}
+      className="w-full h-full text-left rounded-xl border border-gray-200 bg-white p-2 hover:border-gray-400 transition-colors flex flex-col gap-1.5"
+    >
+      {scs.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {sepHeader(t('capture.touchSecConditions'))}
+          <div className="flex flex-wrap gap-1">
+            {scs.map((label, i) => (
+              <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] leading-snug break-words">{label}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-1 flex-1">
+        {sepHeader(t('capture.touchSecSteps'))}
+        <div className="space-y-1">
+          {steps.map((s, i) => (
+            <div key={i} className={`px-1.5 py-1 rounded-md border text-[11px] leading-snug whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
+              {s.text}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        {sepHeader(t('capture.touchSecCor'))}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
+          <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
+          {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
+        </div>
+      </div>
+    </button>
+  );
+});
 
 export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, children }: Props) {
   const { t, tl } = useLocale();
@@ -690,84 +767,6 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     </button>
   );
 
-  // C5/R6 (2026-06-17): a saved touch rendered IN FULL for the freeze rail —
-  // the work steps exactly as captured (parsed from the stored `[tag] text`
-  // verbatim, colour-coded value/sequence/failure, wrapped not truncated), plus
-  // the COR and the customer-felt flag. Read-only; clicking opens the edit window.
-  // Touches pile up left→right so the whole flow is visible end-to-end.
-  const STEP_TAG_CLASS: Record<string, string> = {
-    value: 'border-green-200 bg-green-50 text-green-800',
-    sequence: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    failure: 'border-red-200 bg-red-50 text-red-800',
-    // failure_demand (the demand hitting you) — rose, distinct from failure work.
-    failure_demand: 'border-rose-300 bg-rose-50 text-rose-800',
-  };
-  const renderTouchFull = (e: CaseEntry) => {
-    // Split only at a `\n\n` that starts a new `[tag]` block (the server joins
-    // blocks that way). A plain blank line typed INSIDE a block's text must stay
-    // with that block — otherwise it fragmented into a fake, green ('value') step.
-    const steps = e.verbatim.split(/\n\n(?=\[(?:value|sequence|failure|failure_demand)\])/)
-      .map((line) => {
-        const m = line.match(/^\[(value|sequence|failure|failure_demand)\]\s*([\s\S]*)$/);
-        return m ? { tag: m[1], text: m[2] } : { tag: 'value', text: line };
-      })
-      .filter((s) => s.text.trim().length > 0);
-    const cor = handlingLabel(e.handlingTypeId);
-    const scs = scLabels(e.systemConditionIds);
-    // Small section header — a centered label flanked by thin lines, matching the
-    // composer's flow separator (capture.strand.flow), so the card reads in clear
-    // sections (2026-06-18).
-    const sepHeader = (label: string) => (
-      <div className="flex items-center gap-1.5">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap">{label}</span>
-        <div className="flex-1 h-px bg-gray-200" />
-      </div>
-    );
-    return (
-      // h-full so the card stretches to the row's height (= the composer), giving
-      // an even overview. Sections: Conditions (if any) → Steps (grows) → CoR.
-      <button
-        key={e.id}
-        type="button"
-        onClick={() => onOpenEntry?.(e.id)}
-        className="w-full h-full text-left rounded-xl border border-gray-200 bg-white p-2 hover:border-gray-400 transition-colors flex flex-col gap-1.5"
-      >
-        {/* 1. System condition(s) driving this touch — only when present. */}
-        {scs.length > 0 && (
-          <div className="flex flex-col gap-1">
-            {sepHeader(t('capture.touchSecConditions'))}
-            <div className="flex flex-wrap gap-1">
-              {scs.map((label, i) => (
-                <span key={i} className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] leading-snug break-words">{label}</span>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* 2. What happened — colour-coded steps. flex-1 absorbs slack so the CoR
-            section pins to the bottom on a stretched card. */}
-        <div className="flex flex-col gap-1 flex-1">
-          {sepHeader(t('capture.touchSecSteps'))}
-          <div className="space-y-1">
-            {steps.map((s, i) => (
-              <div key={i} className={`px-1.5 py-1 rounded-md border text-[11px] leading-snug whitespace-pre-wrap break-words ${STEP_TAG_CLASS[s.tag] ?? STEP_TAG_CLASS.value}`}>
-                {s.text}
-              </div>
-            ))}
-          </div>
-        </div>
-        {/* 3. CoR + authoring (date, collector) at the bottom. */}
-        <div className="flex flex-col gap-1">
-          {sepHeader(t('capture.touchSecCor'))}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
-            <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
-            {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
-          </div>
-        </div>
-      </button>
-    );
-  };
 
   // Collapsed: only the latest touch + a "Show N earlier" control. Expanded:
   // earlier touches (oldest→latest) revealed above the latest, which stays
@@ -1003,7 +1002,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                   onDragOver={canDrag ? (ev) => ev.preventDefault() : undefined}
                   onDrop={canDrag ? (ev) => { ev.preventDefault(); handleTouchDrop(e.id); } : undefined}
                 >
-                  {renderTouchFull(e)}
+                  <TouchCardFull entry={e} handlingTypes={handlingTypes} systemConditions={systemConditions} onOpenEntry={onOpenEntry} />
                 </div>
               );
             })}

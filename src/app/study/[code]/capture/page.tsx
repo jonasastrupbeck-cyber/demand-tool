@@ -160,6 +160,9 @@ export default function CapturePage() {
   const [pendingCounts, setPendingCounts] = useState({ needsClassification: 0, needsHandling: 0, needsValueLink: 0 });
   const [filter, setFilter] = useState<'all' | 'needsClassification' | 'needsHandling' | 'needsValueLink'>('all');
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  // Stable so the memoized flow-rail touch cards (CAP-16) aren't re-rendered by
+  // a new closure on every composer keystroke.
+  const openEntry = useCallback((id: string) => setEditingEntryId(id), []);
   const [listLimit, setListLimit] = useState(50);
   const [showTogglesModal, setShowTogglesModal] = useState(false);
   const [entriesSheetOpen, setEntriesSheetOpen] = useState(false);
@@ -1001,7 +1004,7 @@ export default function CapturePage() {
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
         milestones={study.milestones || []}
-        onOpenEntry={(id) => setEditingEntryId(id)}
+        onOpenEntry={openEntry}
       >
 
       {/* Demand / Work tabs — shown when work tracking is on, OR when the user has
