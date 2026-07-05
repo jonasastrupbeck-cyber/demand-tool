@@ -1711,9 +1711,13 @@ export async function reorderCaseEntries(
   orderedIds: string[],
   moved?: { id: string; date: string },
 ) {
-  for (let i = 0; i < orderedIds.length; i++) {
-    await db.update(demandEntries).set({ sortOrder: i })
-      .where(and(eq(demandEntries.id, orderedIds[i]), eq(demandEntries.caseId, caseId)));
+  // One UPDATE with a CASE instead of one round-trip per row. The WHERE limits
+  // to the listed ids (scoped to the case), so the ELSE branch is never hit.
+  if (orderedIds.length > 0) {
+    const whens = orderedIds.map((id, i) => sql`when ${id} then ${i}`);
+    await db.update(demandEntries)
+      .set({ sortOrder: sql`case ${demandEntries.id} ${sql.join(whens, sql` `)} else ${demandEntries.sortOrder} end` })
+      .where(and(inArray(demandEntries.id, orderedIds), eq(demandEntries.caseId, caseId)));
   }
   if (moved) {
     await db.update(workDescriptionBlocks)
@@ -2333,10 +2337,11 @@ export async function updateMilestone(id: string, data: { label?: string; sortOr
 // One POST reorders the whole list — set sortOrder = position. Avoids the
 // per-row PATCH races a drag-reorder would otherwise create.
 export async function reorderMilestones(studyId: string, orderedIds: string[]) {
-  for (let i = 0; i < orderedIds.length; i++) {
-    await db.update(milestones).set({ sortOrder: i })
-      .where(and(eq(milestones.id, orderedIds[i]), eq(milestones.studyId, studyId)));
-  }
+  if (orderedIds.length === 0) return;
+  const whens = orderedIds.map((id, i) => sql`when ${id} then ${i}`);
+  await db.update(milestones)
+    .set({ sortOrder: sql`case ${milestones.id} ${sql.join(whens, sql` `)} else ${milestones.sortOrder} end` })
+    .where(and(inArray(milestones.id, orderedIds), eq(milestones.studyId, studyId)));
 }
 
 export async function deleteMilestone(id: string) {
