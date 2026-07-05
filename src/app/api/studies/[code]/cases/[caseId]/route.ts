@@ -174,10 +174,15 @@ export async function PATCH(
   // milestone and the auto-close/reopen. (Adding a type can reopen a case;
   // removing one can complete/close it.)
   if (data.demandTypeIds !== undefined) {
-    const visible = await getCaseVisibleSubquestionIds(caseId, study.id);
-    const applicable = await getApplicableMilestoneIds(caseId, study.id);
-    const allMs = await getMilestones(study.id);
-    for (const m of allMs) await recomputeCaseMilestone(caseId, m.id, visible, applicable);
+    // Independent reads — fetch concurrently. Each milestone's recompute writes an
+    // independent row and reads only the shared precomputed sets, so run them
+    // concurrently too (mirrors the answers route). Closure runs after all complete.
+    const [visible, applicable, allMs] = await Promise.all([
+      getCaseVisibleSubquestionIds(caseId, study.id),
+      getApplicableMilestoneIds(caseId, study.id),
+      getMilestones(study.id),
+    ]);
+    await Promise.all(allMs.map((m) => recomputeCaseMilestone(caseId, m.id, visible, applicable)));
     await recomputeCaseClosure(caseId, study.id);
   }
   const [updated, wmRows, lifeProblemIds, demandTypeIds] = await Promise.all([

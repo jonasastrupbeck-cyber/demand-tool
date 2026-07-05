@@ -556,18 +556,47 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   let capabilityByDemandType: Array<{ demandTypeLabel: string; valueBlocks: number; failureBlocks: number; pctValue: number }> = [];
 
   if (workStepTypesEnabled) {
-    // 1) Top Work Steps (overall frequency, split by tag)
-    const freqRows = await db.select({
-      label: workStepTypes.label,
-      tag: workStepTypes.tag,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(workDescriptionBlocks)
-      .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
-      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-      .where(and(...baseConditions))
-      .groupBy(workStepTypes.label, workStepTypes.tag)
-      .orderBy(desc(sql`count(*)`));
+    // The three selects below are mutually independent — fetch concurrently to
+    // avoid stacking Neon round-trips. Post-processing is unchanged.
+    const [freqRows, capRows, stepByWorkType] = await Promise.all([
+      // 1) Top Work Steps (overall frequency, split by tag)
+      db.select({
+        label: workStepTypes.label,
+        tag: workStepTypes.tag,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(workDescriptionBlocks)
+        .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .where(and(...baseConditions))
+        .groupBy(workStepTypes.label, workStepTypes.tag)
+        .orderBy(desc(sql`count(*)`)),
+      // 4) Capability by work type (block-level value vs failure tags)
+      db.select({
+        label: workTypes.label,
+        tag: workDescriptionBlocks.tag,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(workDescriptionBlocks)
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+        .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
+        .groupBy(workTypes.label, workDescriptionBlocks.tag),
+      // Work Step × Work Type cross-tab
+      db.select({
+        workTypeLabel: workTypes.label,
+        workStepLabel: workStepTypes.label,
+        workStepTag: workStepTypes.tag,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(workDescriptionBlocks)
+        .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
+        .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
+        .groupBy(workTypes.label, workStepTypes.label, workStepTypes.tag)
+        .orderBy(desc(sql`count(*)`)),
+    ]);
     workStepFrequency = freqRows.map(r => ({ label: r.label, tag: (r.tag === 'value' ? 'value' : 'failure') as 'value' | 'failure', count: r.count }));
 
     // 2) Work Step × Demand Type cross-tab. Join blocks → work entry → demand entry
@@ -591,17 +620,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     //    linkage issue. Instead, we report capability per WORK TYPE (which IS
     //    on work entries). Keep the interface named capabilityByDemandType for
     //    now but populate it via work types as the axis — simpler and truthful
-    //    to what we actually have.
-    const capRows = await db.select({
-      label: workTypes.label,
-      tag: workDescriptionBlocks.tag,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(workDescriptionBlocks)
-      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
-      .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
-      .groupBy(workTypes.label, workDescriptionBlocks.tag);
+    //    to what we actually have. (Query fetched in the Promise.all above.)
     const capMap = new Map<string, { value: number; failure: number }>();
     for (const r of capRows) {
       const entry = capMap.get(r.label) ?? { value: 0, failure: 0 };
@@ -616,20 +635,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     }).sort((a, b) => b.pctValue - a.pctValue);
 
     // Work Step × Work Type cross-tab (replaces the blocked demand/life-problem
-    // ones; at least this one has real joinable data).
-    const stepByWorkType = await db.select({
-      workTypeLabel: workTypes.label,
-      workStepLabel: workStepTypes.label,
-      workStepTag: workStepTypes.tag,
-      count: sql<number>`count(*)::int`,
-    })
-      .from(workDescriptionBlocks)
-      .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
-      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-      .innerJoin(workTypes, eq(demandEntries.workTypeId, workTypes.id))
-      .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')))
-      .groupBy(workTypes.label, workStepTypes.label, workStepTypes.tag)
-      .orderBy(desc(sql`count(*)`));
+    // ones; at least this one has real joinable data). Fetched above.
     // Re-purpose the demand-type-named slot to carry this (the rendering shell
     // is the same shape — label on X axis, workStep stacks; we can rename the
     // key + UI later when genuine demand-type linkage on work entries exists).
