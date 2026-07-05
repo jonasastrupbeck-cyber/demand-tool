@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
+import { parseDateParam } from '@/lib/local-date';
 import { getCapabilityData } from '@/lib/dashboard-aggregations';
 
 // Capability / lead-time chart data: time between two chosen events across the
@@ -18,8 +19,8 @@ export async function GET(
   if (!fromEvent || !toEvent) {
     return NextResponse.json({ error: 'fromEvent and toEvent are required' }, { status: 400 });
   }
-  const dateFrom = sp.get('dateFrom') ? new Date(sp.get('dateFrom')!) : undefined;
-  const dateTo = sp.get('dateTo') ? new Date(sp.get('dateTo')!) : undefined;
+  const dateFrom = parseDateParam(sp.get('dateFrom'));
+  const dateTo = parseDateParam(sp.get('dateTo'));
   const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
   const metricParam = sp.get('metric');
   const metric = metricParam === 'touches' ? 'touches' : metricParam === 'variance' ? 'variance' : 'leadTime';

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
+import { parseDateParam } from '@/lib/local-date';
 import { getAskDeliveryData } from '@/lib/dashboard-aggregations';
 
 // Delivery on what matters (2026-07-02, slice 4): per linked capture field,
@@ -19,8 +20,8 @@ export async function GET(
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
-  const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
+  const from = parseDateParam(searchParams.get('from'));
+  const to = parseDateParam(searchParams.get('to'));
   const lifeProblemId = searchParams.get('p2bs') || undefined;
 
   const rows = await getAskDeliveryData(study.id, from, to, lifeProblemId);

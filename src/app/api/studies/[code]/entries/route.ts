@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions, getCase, validateStudyRefs, collectEntryRefs, getEntryInStudy } from '@/lib/queries';
+import { parseDateParam } from '@/lib/local-date';
 
 export async function GET(
   request: NextRequest,
@@ -14,8 +15,8 @@ export async function GET(
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
-  const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
+  const from = parseDateParam(searchParams.get('from'));
+  const to = parseDateParam(searchParams.get('to'));
 
   const [entries, todayCount] = await Promise.all([
     getEntries(study.id, from, to),

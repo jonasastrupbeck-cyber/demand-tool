@@ -19,3 +19,12 @@ export function localDay(d: Date = new Date()): string {
 export function localDayOf(v?: string | null): string {
   return v ? localDay(new Date(v)) : '';
 }
+
+// Parse a `from`/`to` query-string date. An unparseable value returns undefined
+// (the filter is simply ignored) instead of an Invalid Date that would throw a
+// 500 when Drizzle binds it.
+export function parseDateParam(raw: string | null | undefined): Date | undefined {
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? undefined : d;
+}

@@ -75,6 +75,12 @@ export async function PATCH(
     data.status = body.status;
   }
   if (body.openedAt !== undefined) {
+    // Reject null/empty explicitly (new Date(null) = 1970 epoch passes isNaN and
+    // would poison lead-time charts). openedAt cannot be cleared — a case always
+    // has an open date.
+    if (body.openedAt === null || body.openedAt === '') {
+      return NextResponse.json({ error: 'openedAt is not a valid date' }, { status: 400 });
+    }
     const parsed = new Date(body.openedAt);
     if (isNaN(parsed.getTime())) {
       return NextResponse.json({ error: 'openedAt is not a valid date' }, { status: 400 });

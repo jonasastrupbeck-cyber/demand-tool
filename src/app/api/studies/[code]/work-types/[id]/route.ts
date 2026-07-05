@@ -17,15 +17,15 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  if (typeof body.label === 'string' && body.label.trim()) {
-    await updateWorkType(id, { label: body.label.trim() });
+  // Validate the whole body BEFORE writing anything — otherwise an invalid
+  // category returned 400 after the label rename had already committed.
+  if (body.category !== undefined && body.category !== 'value' && body.category !== 'failure' && body.category !== 'sequence') {
+    return NextResponse.json({ error: 'category must be value | failure | sequence' }, { status: 400 });
   }
-  if (body.category !== undefined) {
-    if (body.category !== 'value' && body.category !== 'failure' && body.category !== 'sequence') {
-      return NextResponse.json({ error: 'category must be value | failure | sequence' }, { status: 400 });
-    }
-    await updateWorkType(id, { category: body.category });
-  }
+  const fields: { label?: string; category?: 'value' | 'failure' | 'sequence' } = {};
+  if (typeof body.label === 'string' && body.label.trim()) fields.label = body.label.trim();
+  if (body.category !== undefined) fields.category = body.category;
+  if (Object.keys(fields).length > 0) await updateWorkType(id, fields);
   if (body.lifecycleStageId !== undefined) {
     await db.update(workTypes).set({ lifecycleStageId: body.lifecycleStageId }).where(eq(workTypes.id, id));
   }

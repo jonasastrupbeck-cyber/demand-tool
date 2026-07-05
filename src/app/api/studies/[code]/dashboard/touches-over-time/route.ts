@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
+import { parseDateParam } from '@/lib/local-date';
 import { getTouchSeries } from '@/lib/dashboard-aggregations';
 
 // "Touches over time": per-day touch counts by classification, bucketed on the
@@ -15,8 +16,8 @@ export async function GET(
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
   const sp = request.nextUrl.searchParams;
-  const from = sp.get('from') ? new Date(sp.get('from')!) : undefined;
-  const to = sp.get('to') ? new Date(sp.get('to')!) : undefined;
+  const from = parseDateParam(sp.get('from'));
+  const to = parseDateParam(sp.get('to'));
   const lifeProblemId = sp.get('p2bs') || undefined;
   const caseId = sp.get('caseId') || undefined;
 

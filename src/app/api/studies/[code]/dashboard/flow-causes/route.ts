@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
+import { parseDateParam } from '@/lib/local-date';
 import { getFailureCausesForFlow } from '@/lib/dashboard-aggregations';
 
 export async function GET(
@@ -22,8 +23,8 @@ export async function GET(
     return NextResponse.json({ error: 'source and target query params required' }, { status: 400 });
   }
 
-  const from = searchParams.get('from') ? new Date(searchParams.get('from')!) : undefined;
-  const to = searchParams.get('to') ? new Date(searchParams.get('to')!) : undefined;
+  const from = parseDateParam(searchParams.get('from'));
+  const to = parseDateParam(searchParams.get('to'));
 
   const causes = await getFailureCausesForFlow(study.id, source, target, from, to);
   return NextResponse.json({ causes });

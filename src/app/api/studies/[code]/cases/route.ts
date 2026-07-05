@@ -38,6 +38,11 @@ export async function POST(
 
   let openedAt: Date | undefined;
   if (body.openedAt !== undefined) {
+    // Reject null/empty explicitly — new Date(null) is the 1970 epoch and would
+    // pass the isNaN check, silently corrupting the case's open date.
+    if (body.openedAt === null || body.openedAt === '') {
+      return NextResponse.json({ error: 'openedAt is not a valid date' }, { status: 400 });
+    }
     const parsed = new Date(body.openedAt);
     if (isNaN(parsed.getTime())) {
       return NextResponse.json({ error: 'openedAt is not a valid date' }, { status: 400 });
