@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCases, findOrCreateCase } from '@/lib/queries';
+import { getStudyByCode, getCases, findOrCreateCase, validateStudyRefs } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -45,8 +45,14 @@ export async function POST(
     openedAt = parsed;
   }
 
+  const demandTypeId = typeof body.demandTypeId === 'string' ? body.demandTypeId : null;
+  if (demandTypeId) {
+    const refError = await validateStudyRefs(study.id, { demandTypes: [demandTypeId] });
+    if (refError) return NextResponse.json({ error: refError }, { status: 400 });
+  }
+
   const caseRow = await findOrCreateCase(study.id, caseRef, {
-    demandTypeId: typeof body.demandTypeId === 'string' ? body.demandTypeId : null,
+    demandTypeId,
     openedAt,
     collectorName: typeof body.collectorName === 'string' ? body.collectorName.trim() || null : null,
   });

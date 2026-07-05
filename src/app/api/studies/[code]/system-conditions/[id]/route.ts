@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, deleteSystemCondition, updateSystemCondition, getSystemConditions, mergeSystemConditions } from '@/lib/queries';
+import { getStudyByCode, rowBelongsToStudy, deleteSystemCondition, updateSystemCondition, getSystemConditions, mergeSystemConditions } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -8,6 +8,10 @@ export async function PATCH(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('systemConditions', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   const body = await request.json();
   const updates: { label?: string; operationalDefinition?: string | null } = {};
@@ -36,6 +40,10 @@ export async function DELETE(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('systemConditions', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   await deleteSystemCondition(id);
   return new Response(null, { status: 204 });

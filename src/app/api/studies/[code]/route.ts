@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getValueSteps, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions, getMilestoneDemandTypeExclusions } from '@/lib/queries';
+import { getStudyByCode, updateStudy, getHandlingTypes, getDemandTypes, getContactMethods, getPointsOfTransaction, getWorkSources, getWhatMattersTypes, getWorkTypes, getWorkStepTypes, getValueSteps, getSystemConditions, getThinkings, seedDefaultWorkTypes, getLifecycleStages, seedDefaultLifecycleStages, getLifeProblems, FLOW_PRESET_TOGGLES, seedDefaultSubquestions, getMilestones, getSubquestions, getMilestoneDemandTypeExclusions, validateStudyRefs } from '@/lib/queries';
 
 export async function GET(
   request: Request,
@@ -82,7 +82,14 @@ export async function PUT(
   if (body.name !== undefined) updates.name = body.name;
   if (body.description !== undefined) updates.description = body.description;
   if (body.purpose !== undefined) updates.purpose = body.purpose;
-  if (body.oneStopHandlingType !== undefined) updates.oneStopHandlingType = body.oneStopHandlingType;
+  if (body.oneStopHandlingType !== undefined) {
+    // A handling-type id must belong to this study (else a foreign id or FK-500).
+    if (typeof body.oneStopHandlingType === 'string' && body.oneStopHandlingType) {
+      const refError = await validateStudyRefs(study.id, { handlingTypes: [body.oneStopHandlingType] });
+      if (refError) return NextResponse.json({ error: refError }, { status: 400 });
+    }
+    updates.oneStopHandlingType = body.oneStopHandlingType;
+  }
   if (body.workTrackingEnabled !== undefined) updates.workTrackingEnabled = body.workTrackingEnabled;
   if (body.systemConditionsEnabled !== undefined) updates.systemConditionsEnabled = body.systemConditionsEnabled;
   if (body.demandTypesEnabled !== undefined) updates.demandTypesEnabled = body.demandTypesEnabled;

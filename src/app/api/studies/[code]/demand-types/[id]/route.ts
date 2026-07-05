@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { demandTypes } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { getStudyByCode, deleteDemandType, updateDemandType } from '@/lib/queries';
+import { getStudyByCode, rowBelongsToStudy, deleteDemandType, updateDemandType } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -11,6 +11,10 @@ export async function PATCH(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('demandTypes', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   const body = await request.json();
   const updates: { label?: string; operationalDefinition?: string | null } = {};
@@ -36,6 +40,10 @@ export async function DELETE(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('demandTypes', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   await deleteDemandType(id);
   return new Response(null, { status: 204 });

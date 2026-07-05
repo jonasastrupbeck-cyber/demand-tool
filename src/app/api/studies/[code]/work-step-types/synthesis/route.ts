@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getOrphanWorkBlocks, promoteWorkStepFromCluster } from '@/lib/queries';
+import { getStudyByCode, getOrphanWorkBlocks, promoteWorkStepFromCluster, filterBlockIdsInStudy } from '@/lib/queries';
 import { clusterBlocks } from '@/lib/cluster-work-blocks';
 
 // Phase 4B (2026-04-16) — Synthesis endpoint.
@@ -46,6 +46,12 @@ export async function POST(
   }
   if (!Array.isArray(body.blockIds) || !body.blockIds.every((id: unknown) => typeof id === 'string')) {
     return NextResponse.json({ error: 'blockIds must be an array of strings' }, { status: 400 });
+  }
+  // Ownership: every block id must belong to this study, else this would
+  // reassign another study's work blocks (ids are exposed to clients).
+  const ownedBlockIds = await filterBlockIdsInStudy(study.id, body.blockIds);
+  if (ownedBlockIds.length !== body.blockIds.length) {
+    return NextResponse.json({ error: 'One or more blocks do not belong to this study' }, { status: 400 });
   }
 
   const id = await promoteWorkStepFromCluster(study.id, {

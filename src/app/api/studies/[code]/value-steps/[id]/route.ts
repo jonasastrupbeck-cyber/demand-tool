@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateValueStep, deleteValueStep } from '@/lib/queries';
+import { getStudyByCode, rowBelongsToStudy, updateValueStep, deleteValueStep } from '@/lib/queries';
 
 export async function PATCH(
   request: Request,
@@ -8,6 +8,10 @@ export async function PATCH(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('valueSteps', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
 
   const body = await request.json();
   const updates: { label?: string; sortOrder?: number } = {};
@@ -24,6 +28,10 @@ export async function DELETE(
   const { code, id } = await params;
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  if (!(await rowBelongsToStudy('valueSteps', id, study.id))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   // ON DELETE SET NULL means referencing blocks revert to unset automatically.
   await deleteValueStep(id);
   return new Response(null, { status: 204 });

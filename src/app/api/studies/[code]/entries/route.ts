@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions, getCase } from '@/lib/queries';
+import { getStudyByCode, createEntry, getEntries, getEntryCountToday, getPendingCounts, getFailureCauseSuggestions, getCase, validateStudyRefs, collectEntryRefs, getEntryInStudy } from '@/lib/queries';
 
 export async function GET(
   request: NextRequest,
@@ -64,6 +64,16 @@ export async function POST(
       return NextResponse.json({ error: 'Case not found in this study' }, { status: 400 });
     }
     validatedCaseId = caseRow.id;
+  }
+
+  // Reject cross-study references before writing (foreign ids would corrupt this
+  // study's aggregations or FK-500 mid-write).
+  const refError = await validateStudyRefs(study.id, collectEntryRefs(body));
+  if (refError) return NextResponse.json({ error: refError }, { status: 400 });
+  if (typeof body.linkedValueDemandEntryId === 'string' && body.linkedValueDemandEntryId) {
+    if (!(await getEntryInStudy(study.id, body.linkedValueDemandEntryId))) {
+      return NextResponse.json({ error: 'Linked value-demand entry not found in this study' }, { status: 400 });
+    }
   }
 
   const id = await createEntry(study.id, {

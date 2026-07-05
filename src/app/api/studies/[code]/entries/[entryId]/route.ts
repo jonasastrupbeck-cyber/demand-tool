@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, updateEntry, deleteEntry, getEntryInStudy, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry, getBlockSystemConditions, getCase } from '@/lib/queries';
+import { getStudyByCode, updateEntry, deleteEntry, getEntryInStudy, getWhatMattersForEntry, getSystemConditionsForEntry, getThinkingsForEntry, getThinkingScAttachmentsForEntry, getWorkBlocksForEntry, getBlockSystemConditions, getCase, validateStudyRefs, collectEntryRefs } from '@/lib/queries';
 
 export async function GET(
   _request: Request,
@@ -74,6 +74,11 @@ export async function PATCH(
 
   if (!study) {
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+  }
+
+  // Ownership: the entry must belong to this study (ids are exposed in payloads).
+  if (!(await getEntryInStudy(study.id, entryId))) {
+    return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
   const body = await request.json();
@@ -172,6 +177,15 @@ export async function PATCH(
     }
   }
 
+  // Reject cross-study references before writing.
+  const refError = await validateStudyRefs(study.id, collectEntryRefs(body));
+  if (refError) return NextResponse.json({ error: refError }, { status: 400 });
+  if (typeof body.linkedValueDemandEntryId === 'string' && body.linkedValueDemandEntryId) {
+    if (!(await getEntryInStudy(study.id, body.linkedValueDemandEntryId))) {
+      return NextResponse.json({ error: 'Linked value-demand entry not found in this study' }, { status: 400 });
+    }
+  }
+
   await updateEntry(entryId, updates);
 
   return NextResponse.json({ success: true });
@@ -186,6 +200,11 @@ export async function DELETE(
 
   if (!study) {
     return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+  }
+
+  // Ownership: only delete an entry that belongs to this study.
+  if (!(await getEntryInStudy(study.id, entryId))) {
+    return NextResponse.json({ error: 'Entry not found' }, { status: 404 });
   }
 
   await deleteEntry(entryId);

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -165,6 +165,15 @@ export async function PATCH(
       },
     };
   }
+
+  // Reject cross-study references (foreign demand types / life problems /
+  // what-matters ids would mis-scope milestones and dashboards).
+  const refError = await validateStudyRefs(study.id, {
+    demandTypes: [data.demandTypeId, ...(data.demandTypeIds ?? [])],
+    lifeProblems: [data.lifeProblemId, ...(data.lifeProblemIds ?? [])],
+    whatMattersTypes: [...(data.whatMattersTypeIds ?? []), wmDate?.whatMattersTypeId, wmValue?.whatMattersTypeId],
+  });
+  if (refError) return NextResponse.json({ error: refError }, { status: 400 });
 
   await updateCase(caseId, data);
   if (wmDate) await setCaseWhatMattersDate(caseId, wmDate.whatMattersTypeId, wmDate.date);

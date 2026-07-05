@@ -7,6 +7,83 @@ import { kindsCompatible, compatibleKinds } from './subquestion-kinds';
 import type { Locale } from './i18n';
 import { STANDARD_LIFECYCLE_STAGES } from './ai/classify-lifecycle';
 
+// Ownership guard for the taxonomy [id] routes. Rows are addressed by id, and
+// ids are exposed in study payloads/exports, so a bare `WHERE id = ?` mutation
+// lets any study-code holder touch another study's rows. Each [id] route calls
+// this before mutating/deleting so a foreign id returns 404 instead.
+const OWNED_TABLES = {
+  contactMethods, demandTypes, handlingTypes, lifeProblems, lifecycleStages,
+  pointsOfTransaction, systemConditions, thinkings, valueSteps, whatMattersTypes,
+  workSources, workStepTypes, workTypes,
+} as const;
+export async function rowBelongsToStudy(table: keyof typeof OWNED_TABLES, id: string, studyId: string): Promise<boolean> {
+  const t = OWNED_TABLES[table];
+  const rows = await db.select({ id: t.id }).from(t).where(and(eq(t.id, id), eq(t.studyId, studyId))).limit(1);
+  return rows.length > 0;
+}
+
+// Validate that referenced taxonomy ids in a write body all belong to this
+// study. Prevents cross-study reference injection (a foreign id would render as
+// a blank label, drop out of study-scoped aggregations, or FK-500 mid-write).
+// One batched query per present entity type; returns an error string or null.
+export async function validateStudyRefs(
+  studyId: string,
+  refs: Partial<Record<keyof typeof OWNED_TABLES, (string | null | undefined)[]>>,
+): Promise<string | null> {
+  const checks: Promise<string | null>[] = [];
+  for (const key of Object.keys(refs) as (keyof typeof OWNED_TABLES)[]) {
+    const ids = [...new Set((refs[key] ?? []).filter((x): x is string => typeof x === 'string' && x.length > 0))];
+    if (ids.length === 0) continue;
+    const t = OWNED_TABLES[key];
+    checks.push(
+      db.select({ id: t.id }).from(t).where(and(inArray(t.id, ids), eq(t.studyId, studyId)))
+        .then((rows) => (rows.length === ids.length ? null : `Invalid ${key} reference for this study`)),
+    );
+  }
+  const results = await Promise.all(checks);
+  return results.find((r) => r !== null) ?? null;
+}
+
+// Collect every taxonomy id referenced by an entry write body (top-level + per
+// work block) into the shape validateStudyRefs expects. Shared by POST + PATCH.
+export function collectEntryRefs(body: Record<string, unknown>): Partial<Record<keyof typeof OWNED_TABLES, (string | null | undefined)[]>> {
+  const blocks = Array.isArray(body.workBlocks) ? (body.workBlocks as Array<Record<string, unknown>>) : [];
+  const scs = Array.isArray(body.systemConditions) ? (body.systemConditions as Array<Record<string, unknown>>) : [];
+  const ths = Array.isArray(body.thinkings) ? (body.thinkings as Array<Record<string, unknown>>) : [];
+  const blockScIds = blocks.flatMap((b) => [
+    b.systemConditionId as string | undefined,
+    ...(Array.isArray(b.systemConditionIds) ? (b.systemConditionIds as string[]) : []),
+  ]);
+  const thScIds = ths.flatMap((t) => (Array.isArray(t.scAttachments)
+    ? (t.scAttachments as Array<Record<string, unknown>>).map((a) => a.systemConditionId as string | undefined)
+    : []));
+  return {
+    demandTypes: [body.demandTypeId as string, body.originalValueDemandTypeId as string, ...blocks.map((b) => b.demandTypeId as string | undefined)],
+    handlingTypes: [body.handlingTypeId as string],
+    contactMethods: [body.contactMethodId as string],
+    pointsOfTransaction: [body.pointOfTransactionId as string],
+    workSources: [body.workSourceId as string],
+    workTypes: [body.workTypeId as string],
+    lifeProblems: [body.lifeProblemId as string],
+    whatMattersTypes: [body.whatMattersTypeId as string, ...(Array.isArray(body.whatMattersTypeIds) ? (body.whatMattersTypeIds as string[]) : [])],
+    systemConditions: [...scs.map((s) => s.id as string | undefined), ...blockScIds, ...thScIds],
+    thinkings: ths.map((t) => t.id as string | undefined),
+    workStepTypes: blocks.map((b) => b.workStepTypeId as string | undefined),
+    valueSteps: blocks.map((b) => b.valueStepId as string | undefined),
+  };
+}
+
+// Which of the given work-block ids belong to this study (block → entry → study).
+// Used to stop the work-step promote endpoint reassigning another study's blocks.
+export async function filterBlockIdsInStudy(studyId: string, blockIds: string[]): Promise<string[]> {
+  if (blockIds.length === 0) return [];
+  const rows = await db.select({ id: workDescriptionBlocks.id })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(inArray(workDescriptionBlocks.id, blockIds), eq(demandEntries.studyId, studyId)));
+  return rows.map((r) => r.id);
+}
+
 const DEFAULT_HANDLING_TYPES: Record<Locale, string[]> = {
   en: [
     'One Stop',
