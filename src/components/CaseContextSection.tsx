@@ -330,7 +330,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
                 onClick={() => toggleWhatMatters(wm.id)}
                 className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
                   on
-                    ? 'bg-green-100 text-green-800 border-green-400'
+                    ? 'bg-green-200 text-green-900 border-green-500'
                     : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
                 }`}
               >

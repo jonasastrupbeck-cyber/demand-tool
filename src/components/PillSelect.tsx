@@ -24,7 +24,7 @@ export interface PillSelectOption {
   operationalDefinition?: string | null;
 }
 
-export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'sequence' | 'failure' | 'add' | 'thinking' | 'milestone';
+export type PillSelectVariant = 'default' | 'value' | 'valueLight' | 'sequence' | 'failure' | 'failureSoft' | 'add' | 'thinking' | 'milestone';
 
 interface Props {
   value: string; // option id, or '' for "not selected"
@@ -99,6 +99,12 @@ function pillClasses(variant: PillSelectVariant, hasSelection: boolean): string 
   if (variant === 'failure') {
     // Dark solid red + white text — the failure-side twin of the 'value' variant.
     return 'bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700';
+  }
+  if (variant === 'failureSoft') {
+    // Soft red — the popped-red twin of the decision-box negative / work Failure
+    // pill (red-200/900/500). Reads clearly on the red-50 failure-demand card
+    // without the heavy solid red. Used for the failure-demand TYPE picker.
+    return 'bg-red-200 text-red-900 border-red-500 hover:bg-red-300';
   }
   // Default variant — same style regardless of selection state so neighbouring
   // pills (PoT, Contact method, Work source) read as one consistent row.

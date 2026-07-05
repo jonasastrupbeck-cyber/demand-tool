@@ -1705,21 +1705,23 @@ export default function CapturePage() {
                           (mirrors the transactional demand-type picker, category='failure').
                           Below the description too. Gated by the study opt-in. */}
                       {flowWorkPath && study.flowFailureDemandTypesEnabled && block.tag === 'failure_demand' && (
-                        <div className="p-2 rounded-md border bg-red-50 border-red-200">
-                          <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
-                          <div className="flex gap-2 items-center">
+                        <div className="p-1.5 rounded-md border bg-red-50 border-red-200">
+                          <p className="text-[10px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
+                          <div className="flex gap-1.5 items-center">
                             <PillSelect
                               ariaLabel={t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}
                               placeholder={t('capture.selectType')}
                               value={block.demandTypeId ?? ''}
                               onChange={(id) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, demandTypeId: id || null } : b))}
                               options={study.demandTypes.filter((dt) => dt.category === 'failure').map((dt) => ({ id: dt.id, label: tl(dt.label), operationalDefinition: dt.operationalDefinition }))}
-                              variant="failure"
+                              variant="failureSoft"
+                              compact
+                              compactMenu
                             />
                             <button
                               type="button"
                               onClick={() => { setDemandTypeAddTargetBlockIdx(idx); setAddingType('demand'); setNewTypeLabel(''); }}
-                              className="px-2 py-1 rounded-full text-xs font-medium border border-dashed border-red-300 text-red-700 hover:bg-red-50"
+                              className="px-2 py-0.5 rounded-full text-[11px] font-medium border border-dashed border-red-300 text-red-700 hover:bg-red-50"
                             >
                               + {t('capture.addNew')}
                             </button>

@@ -837,16 +837,18 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                               Mirrors the entry-level demand-type picker (category='failure').
                               Gated by the study opt-in. */}
                           {flowWorkPath && study.flowFailureDemandTypesEnabled && b.tag === 'failure_demand' && (
-                            <div className="mt-1 p-2 rounded-md border bg-red-50 border-red-200">
-                              <p className="text-[11px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
-                              <div className="flex gap-2 items-center">
+                            <div className="mt-1 p-1.5 rounded-md border bg-red-50 border-red-200">
+                              <p className="text-[10px] font-medium text-gray-700 mb-1">{t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}</p>
+                              <div className="flex gap-1.5 items-center">
                                 <PillSelect
                                   ariaLabel={t('capture.demandTypeLabel', { classification: t('capture.failure').toLowerCase() })}
                                   placeholder={t('capture.selectType')}
                                   value={b.demandTypeId ?? ''}
                                   onChange={(id) => setWorkBlocks((prev) => prev.map((p, i) => i === idx ? { ...p, demandTypeId: id || null } : p))}
                                   options={study.demandTypes.filter((dt) => dt.category === 'failure').map((dt) => ({ id: dt.id, label: tl(dt.label) }))}
-                                  variant="failure"
+                                  variant="failureSoft"
+                                  compact
+                                  compactMenu
                                 />
                                 <InlineTypeAdder
                                   code={code}
