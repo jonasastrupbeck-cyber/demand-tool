@@ -374,6 +374,11 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     return () => ro.disconnect();
   }, [measureRail, activeCaseId, caseRow?.id, entries.length]);
 
+  // "Open existing account" switcher open-state (2026-07-01) — declared before
+  // the loadCaseList effect below, which fetches when the switcher opens.
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
+
   // Flow chooser: load the customer (case) list so the chooser can show recent
   // open customers and enforce new-vs-existing. Reuses the existing list route.
   const loadCaseList = useCallback(async () => {
@@ -384,16 +389,19 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   }, [code]);
 
   useEffect(() => {
-    // Load the recent-customers list for BOTH the cold-start chooser AND the
-    // "Open existing account" switcher shown while a case is open (2026-07-01).
+    // Load the recent-customers list only when it's actually shown — the
+    // cold-start chooser (no active case) or when the "Open existing account"
+    // switcher opens (CAP-18). It was refetched on every refreshSignal (every
+    // saved touch), a study-wide query whose result was invisible while a case
+    // was open and the popover closed. Fetching on open keeps it fresh when seen.
     if (!enabled || systemType !== 'flow') return;
+    if (activeCaseId && !switcherOpen) return;
     loadCaseList();
-  }, [enabled, systemType, activeCaseId, refreshSignal, loadCaseList]);
+  }, [enabled, systemType, activeCaseId, switcherOpen, loadCaseList]);
 
   // "Open existing account" switcher (2026-07-01): a popover above the board to
   // jump to a recent customer or open a new ref without the full-screen chooser.
-  const [switcherOpen, setSwitcherOpen] = useState(false);
-  const switcherRef = useRef<HTMLDivElement>(null);
+  // (State declared above so the case-list effect can depend on it.)
   useEffect(() => {
     if (!switcherOpen) return;
     const onDown = (e: PointerEvent) => { if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) setSwitcherOpen(false); };
