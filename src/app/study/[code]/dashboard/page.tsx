@@ -628,7 +628,7 @@ export default function DashboardPage() {
         {isFlow && ((lifeProblemsEnabled && lifeProblems.length > 0) || whatMattersTypes.some((w) => w.timing)) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-start">
         {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
-          <div className="rounded-lg border border-gray-200 bg-white p-2">
+          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('capture.caseTableP2bs')}</p>
             <PillToggle
               ariaLabel={t('capture.caseTableP2bs')}
@@ -643,7 +643,7 @@ export default function DashboardPage() {
             that selected a timed factor. "As soon as possible" + case-open →
             completion lead time = the ASAP measure. */}
         {isFlow && whatMattersTypes.some((w) => w.timing) && (
-          <div className="rounded-lg border border-gray-200 bg-white p-2">
+          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.scopeWhatMatters')}</p>
             <PillToggle
               ariaLabel={t('dashboard.scopeWhatMatters')}
