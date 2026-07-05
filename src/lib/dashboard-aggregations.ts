@@ -3,7 +3,7 @@ import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTran
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { DashboardData, CapabilityData, TouchSeriesPoint } from '@/types';
+import type { DashboardData, CapabilityData, TouchSeriesPoint, BudgetCapabilityField, BudgetCapabilityPoint } from '@/types';
 import type { SQL } from 'drizzle-orm';
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<DashboardData> {
@@ -1326,4 +1326,121 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
     });
   }
   return rows;
+}
+
+// --- Budget capability (2026-07-05) -----------------------------------------
+// Signed budget variance per case, in answeredAt order, per amount-kind linked
+// field. Same scoping as getAskDeliveryData (P2BS on the case's primary life
+// problem, from/to on the milestone's reachedAt). Only cases where BOTH the
+// budget cap and the delivered amount exist — notCaptured stays the Ask
+// delivery card's business. XmR stats are computed client-side because the
+// unit toggle (% of budget vs amount) changes the value series.
+const AMOUNT_KINDS = ['amount', 'number', 'currency'] as const;
+
+export async function getBudgetCapability(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<BudgetCapabilityField[]> {
+  const fields = await db
+    .select({
+      id: subquestions.id,
+      label: subquestions.label,
+      kind: subquestions.kind,
+      milestoneId: subquestions.milestoneId,
+      linkedWhatMattersTypeId: subquestions.linkedWhatMattersTypeId,
+      currencyCode: subquestions.currencyCode,
+      sortOrder: subquestions.sortOrder,
+      decisionLabel: milestones.label,
+      decisionSort: milestones.sortOrder,
+    })
+    .from(subquestions)
+    .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+    .where(and(
+      eq(milestones.studyId, studyId),
+      isNotNull(subquestions.linkedWhatMattersTypeId),
+      inArray(subquestions.kind, [...AMOUNT_KINDS]),
+    ));
+  if (fields.length === 0) return [];
+
+  const caseWhere = lifeProblemId
+    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
+    : eq(cases.studyId, studyId);
+  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef }).from(cases).where(caseWhere);
+  if (caseRows.length === 0) return [];
+  const caseIds = caseRows.map((c) => c.id);
+  const caseRefById = new Map(caseRows.map((c) => [c.id, c.caseRef]));
+
+  const msIds = [...new Set(fields.map((f) => f.milestoneId))];
+  const wmTypeIds = [...new Set(fields.map((f) => f.linkedWhatMattersTypeId!))];
+
+  const msConds = [inArray(caseMilestones.caseId, caseIds), inArray(caseMilestones.milestoneId, msIds)];
+  if (from) msConds.push(gte(caseMilestones.reachedAt, from));
+  if (to) msConds.push(lte(caseMilestones.reachedAt, to));
+  const msRows = await db.select({ caseId: caseMilestones.caseId, milestoneId: caseMilestones.milestoneId })
+    .from(caseMilestones).where(and(...msConds));
+  const completedCasesByMs = new Map<string, string[]>();
+  for (const m of msRows) {
+    const list = completedCasesByMs.get(m.milestoneId) ?? [];
+    list.push(m.caseId);
+    completedCasesByMs.set(m.milestoneId, list);
+  }
+
+  const valueRows = await db.select().from(caseSubquestionAnswers)
+    .where(and(inArray(caseSubquestionAnswers.caseId, caseIds), inArray(caseSubquestionAnswers.subquestionId, fields.map((f) => f.id))));
+  const valuesByCaseField = new Map(valueRows.map((v) => [`${v.caseId}:${v.subquestionId}`, v]));
+  const askRows = await db.select().from(caseWhatMatters)
+    .where(and(inArray(caseWhatMatters.caseId, caseIds), inArray(caseWhatMatters.whatMattersTypeId, wmTypeIds)));
+  const asksByCaseType = new Map(askRows.map((a) => [`${a.caseId}:${a.whatMattersTypeId}`, a]));
+
+  const wmTypes = await db.select({ id: whatMattersTypes.id, label: whatMattersTypes.label })
+    .from(whatMattersTypes).where(eq(whatMattersTypes.studyId, studyId));
+  const wmLabelById = new Map(wmTypes.map((w) => [w.id, w.label]));
+
+  const out: BudgetCapabilityField[] = [];
+  for (const f of fields.sort((a, b) => a.decisionSort - b.decisionSort || a.sortOrder - b.sortOrder)) {
+    const points: BudgetCapabilityPoint[] = [];
+    for (const caseId of completedCasesByMs.get(f.milestoneId) ?? []) {
+      const ask = asksByCaseType.get(`${caseId}:${f.linkedWhatMattersTypeId}`);
+      if (!ask) continue;
+      const v = valuesByCaseField.get(`${caseId}:${f.id}`);
+      if (!v || v.valueNumber == null) continue; // no delivered amount — Ask delivery surfaces the miss
+      const verdict = askVerdict(f.kind, {
+        targetDate: ask.targetDate,
+        amountSpecific: ask.amountSpecific,
+        amountMin: ask.amountMin,
+        amountMax: ask.amountMax,
+        termYears: ask.termYears,
+        termMonths: ask.termMonths,
+      }, { valueNumber: v.valueNumber, valueDate: null, valueYears: null, valueMonths: null });
+      if (!verdict.comparable || verdict.diffAmount == null) continue;
+      const cap = ask.amountSpecific ?? ask.amountMax!; // non-null when diffAmount != null (ask-verdict.ts)
+      points.push({
+        caseId,
+        caseRef: caseRefById.get(caseId) ?? '',
+        answeredAt: v.answeredAt.toISOString(),
+        cap,
+        delivered: v.valueNumber,
+        diffAmount: verdict.diffAmount,
+        diffPct: cap > 0 ? Math.round((verdict.diffAmount / cap) * 1000) / 10 : null,
+      });
+    }
+    if (points.length === 0) continue; // self-hiding: comparable cases only
+    points.sort((a, b) => a.answeredAt.localeCompare(b.answeredAt) || a.caseRef.localeCompare(b.caseRef));
+    const overCount = points.filter((p) => p.diffAmount > 0).length;
+    out.push({
+      fieldId: f.id,
+      fieldLabel: f.label,
+      decisionLabel: f.decisionLabel,
+      whatMattersTypeId: f.linkedWhatMattersTypeId!,
+      whatMattersLabel: wmLabelById.get(f.linkedWhatMattersTypeId!) ?? '',
+      kind: f.kind as BudgetCapabilityField['kind'],
+      currencyCode: f.currencyCode,
+      points,
+      summary: {
+        n: points.length,
+        underCount: points.filter((p) => p.diffAmount < 0).length,
+        metExactCount: points.filter((p) => p.diffAmount === 0).length,
+        overCount,
+        withinCount: points.length - overCount,
+      },
+    });
+  }
+  return out;
 }

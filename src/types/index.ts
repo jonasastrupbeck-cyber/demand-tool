@@ -135,6 +135,31 @@ export interface CapabilityData {
   nWantedByDate: number;
 }
 
+// Budget capability (2026-07-05): per amount-kind linked field, the signed
+// budget variance per case in answeredAt order. XmR stats are computed
+// client-side per active unit (% vs amount) — the toggle changes the series.
+export interface BudgetCapabilityPoint {
+  caseId: string;
+  caseRef: string;
+  answeredAt: string; // ISO — time-order key
+  cap: number;        // the customer's budget (amountSpecific ?? amountMax)
+  delivered: number;  // the solution amount (valueNumber)
+  diffAmount: number; // delivered − cap; ≤0 = within budget
+  diffPct: number | null; // diffAmount/cap*100, 1 decimal; null when cap ≤ 0
+}
+
+export interface BudgetCapabilityField {
+  fieldId: string;
+  fieldLabel: string;
+  decisionLabel: string;
+  whatMattersTypeId: string;
+  whatMattersLabel: string;
+  kind: 'amount' | 'number' | 'currency';
+  currencyCode: string | null; // author-set for kind='currency'; null = locale default
+  points: BudgetCapabilityPoint[]; // time-ordered by answeredAt
+  summary: { n: number; underCount: number; metExactCount: number; overCount: number; withinCount: number };
+}
+
 // One day's touch counts for the "Touches over time" chart. Bucketed by the
 // touch's EFFECTIVE date (min block_date, else created_at). total includes the
 // rare 'unknown'; the chart draws Total + value/failure/sequence.

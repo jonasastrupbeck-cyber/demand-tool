@@ -5,10 +5,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, LineChart, Line, Legend, LabelList, Sankey,
+  ResponsiveContainer, LineChart, Line, Legend, LabelList, Sankey, ReferenceLine,
 } from 'recharts';
 import type { NodeProps, LinkProps } from 'recharts/types/chart/Sankey';
-import type { DashboardData } from '@/types';
+import type { DashboardData, BudgetCapabilityField } from '@/types';
+import { formatCurrency, currencyForSubquestion } from '@/lib/format-currency';
+import SegmentedToggle from '@/components/SegmentedToggle';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
@@ -69,7 +71,11 @@ export default function DashboardPage() {
   const [flowCausesLoading, setFlowCausesLoading] = useState(false);
   // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
   // mattered, per linked capture field. Fetched when the Analytics tab opens.
-  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null; overCount: number; avgAmountOver: number | null }> | null>(null);
+  const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'number' | 'currency' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null; overCount: number; avgAmountOver: number | null }> | null>(null);
+  // Budget capability (2026-07-05): signed budget variance per case, XmR-style.
+  const [budgetCapability, setBudgetCapability] = useState<BudgetCapabilityField[] | null>(null);
+  const [budgetFieldId, setBudgetFieldId] = useState<string>('');
+  const [budgetUnit, setBudgetUnit] = useState<'pct' | 'amount'>('pct');
   const [showEntries, setShowEntries] = useState(false);
   const [entries, setEntries] = useState<Array<{ id: string; verbatim: string; classification: string; createdAt: string; demandTypeId: string | null; entryType: string; collectorName: string | null }>>([]);
   const [entriesLoading, setEntriesLoading] = useState(false);
@@ -231,6 +237,25 @@ export default function DashboardPage() {
       .then(d => setAskDelivery(d.rows))
       .catch(() => setAskDelivery([]));
   }, [dashboardView, code, getDateRangeParams, lifeProblemFilter]);
+
+  // Budget capability (2026-07-05): fetch only when Ask delivery reports an
+  // amount-kind field, so studies without budget asks never pay the request.
+  // Same params as the ask-delivery fetch.
+  const hasAmountAsk = !!askDelivery?.some((r) => r.kind === 'amount' || r.kind === 'number' || r.kind === 'currency');
+  useEffect(() => {
+    // No clearing setState here (lint: set-state-in-effect) — the card render
+    // is ALSO gated on hasAmountAsk, so stale data can never show.
+    if (dashboardView !== 'analytics' || !hasAmountAsk) return;
+    const qp = new URLSearchParams();
+    const range = getDateRangeParams();
+    if (range.from) qp.set('from', range.from);
+    if (range.to) qp.set('to', range.to);
+    if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/budget-capability?${qp}`)
+      .then(r => r.ok ? r.json() : { fields: [] })
+      .then(d => setBudgetCapability(d.fields))
+      .catch(() => setBudgetCapability([]));
+  }, [dashboardView, hasAmountAsk, code, getDateRangeParams, lifeProblemFilter]);
 
   // Capability: event options (fixed + milestones + decision points) for the
   // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
@@ -1929,6 +1954,131 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+
+              {/* Budget capability (2026-07-05): XmR-style chart of signed
+                  budget variance per case in answeredAt order. Zero line = the
+                  customer's budget; within budget green, over red. Y defaults
+                  to % of budget (comparable across budget sizes), toggle to
+                  amount. Self-gates on ≥1 amount-kind field with ≥1 comparable
+                  case; XmR stats derived inline for the active unit. */}
+              {hasAmountAsk && budgetCapability && budgetCapability.length > 0 && (() => {
+                // Default field = most comparable cases; selector only for >1.
+                const sortedFields = [...budgetCapability].sort((a, b) => b.summary.n - a.summary.n);
+                const field = budgetCapability.find((f) => f.fieldId === budgetFieldId) ?? sortedFields[0];
+                const currency = currencyForSubquestion(field.currencyCode, locale);
+                const isCurrency = field.kind === 'currency';
+                // % mode drops points whose cap can't scale (cap ≤ 0 → diffPct null).
+                const pts = budgetUnit === 'pct' ? field.points.filter((p) => p.diffPct !== null) : field.points;
+                const pctExcluded = budgetUnit === 'pct' ? field.points.length - pts.length : 0;
+                const values = pts.map((p) => (budgetUnit === 'pct' ? p.diffPct! : p.diffAmount));
+                // XmR (same 2.66×mR math as getCapabilityData); signed metric —
+                // LNPL may legitimately go negative (under budget).
+                const mean = values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
+                let unpl: number | null = null, lnpl: number | null = null;
+                if (values.length >= 2 && mean !== null) {
+                  let mrSum = 0;
+                  for (let i = 1; i < values.length; i++) mrSum += Math.abs(values[i] - values[i - 1]);
+                  const mrBar = mrSum / (values.length - 1);
+                  unpl = mean + 2.66 * mrBar;
+                  lnpl = mean - 2.66 * mrBar;
+                }
+                const chartData = pts.map((p) => ({ ...p, y: budgetUnit === 'pct' ? p.diffPct! : p.diffAmount }));
+                const fmtAmount = (v: number) => isCurrency
+                  ? formatCurrency(v, currency, locale)
+                  : new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(v);
+                const fmtY = (v: number) => budgetUnit === 'pct' ? `${Math.round(v * 10) / 10}%` : fmtAmount(v);
+                const { n, underCount, metExactCount, overCount, withinCount } = field.summary;
+                const under = field.points.filter((p) => p.diffAmount < 0);
+                const over = field.points.filter((p) => p.diffAmount > 0);
+                const avgUnder = under.length ? Math.round(under.reduce((s, p) => s + Math.abs(p.diffAmount), 0) / under.length) : null;
+                const avgOver = over.length ? Math.round(over.reduce((s, p) => s + p.diffAmount, 0) / over.length) : null;
+                return (
+                  <div className="rounded-xl bg-white border border-gray-200 p-5">
+                    <h3 className="font-bold text-gray-900 mb-1">{t('dashboard.budgetCapabilityTitle')}</h3>
+                    <p className="text-xs text-gray-500 mb-3">{t('dashboard.budgetCapabilityHint')}</p>
+                    <div className="flex flex-wrap items-center gap-3 mb-3">
+                      {budgetCapability.length > 1 && (
+                        <SegmentedToggle
+                          options={sortedFields.map((f) => ({ value: f.fieldId, label: tl(f.whatMattersLabel) }))}
+                          value={field.fieldId}
+                          onChange={setBudgetFieldId}
+                          ariaLabel={t('dashboard.budgetCapabilityTitle')}
+                        />
+                      )}
+                      <SegmentedToggle
+                        options={[
+                          { value: 'pct', label: t('dashboard.budgetUnitPct') },
+                          { value: 'amount', label: t('dashboard.budgetUnitAmount') },
+                        ]}
+                        value={budgetUnit}
+                        onChange={(v) => setBudgetUnit(v as 'pct' | 'amount')}
+                        ariaLabel={t('dashboard.budgetUnitPct')}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-3">
+                      <span className={`text-2xl font-bold ${withinCount === n ? 'text-green-700' : 'text-gray-900'}`}>
+                        {t('dashboard.budgetWithinHeadline', { x: String(withinCount), y: String(n) })}
+                      </span>
+                      <span className="text-[11px] text-green-700">{t('capture.evalUnderBudget')}: {underCount}</span>
+                      <span className="text-[11px] text-gray-600">{t('capture.evalMet')}: {metExactCount}</span>
+                      <span className="text-[11px] text-red-600">{t('capture.evalOverBudget')}: {overCount}</span>
+                      {avgUnder !== null && <span className="text-[11px] text-green-700">{t('dashboard.askAvgUnderBudget')}: {fmtAmount(avgUnder)}</span>}
+                      {avgOver !== null && <span className="text-[11px] text-red-600">{t('dashboard.askAvgOverBudget')}: {fmtAmount(avgOver)}</span>}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mb-1">{tl(field.whatMattersLabel)} · {tl(field.fieldLabel)} · {tl(field.decisionLabel)}</p>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={chartData} margin={{ top: 10, right: 60, bottom: 4, left: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                        <XAxis dataKey="caseRef" tick={{ fontSize: 10, fill: THEME.textSecondary }} />
+                        <YAxis tick={tickStyle} tickFormatter={(v: number) => fmtY(v)} width={budgetUnit === 'pct' ? 50 : 80} />
+                        <Tooltip {...tooltipStyle} content={(p: { active?: boolean; payload?: readonly { payload?: typeof chartData[number] }[] }) => {
+                          const pt = p.active && p.payload && p.payload.length ? p.payload[0].payload : null;
+                          if (!pt) return null;
+                          return (
+                            <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                              <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.answeredAt).toLocaleDateString()}</div>
+                              <div>{t('dashboard.budgetZeroLine')}: {fmtAmount(pt.cap)}</div>
+                              <div>{tl(field.fieldLabel)}: {fmtAmount(pt.delivered)}</div>
+                              <div className={pt.diffAmount > 0 ? 'text-red-600' : 'text-green-700'}>
+                                {pt.diffAmount > 0 ? '+' : ''}{fmtAmount(pt.diffAmount)}{pt.diffPct !== null ? ` (${pt.diffAmount > 0 ? '+' : ''}${pt.diffPct}%)` : ''}
+                              </div>
+                            </div>
+                          );
+                        }} />
+                        {/* Zero line = the budget: thick, dark, always shown.
+                            extendDomain keeps the reference lines on-axis —
+                            XmR limits usually sit OUTSIDE the data range and
+                            recharts clips them off otherwise. */}
+                        <ReferenceLine y={0} stroke="#1f2937" strokeWidth={2} ifOverflow="extendDomain" label={{ value: t('dashboard.budgetZeroLine'), position: 'right', fill: '#1f2937', fontSize: 10 }} />
+                        {mean !== null && <ReferenceLine y={mean} stroke={THEME.textSecondary} strokeDasharray="5 4" ifOverflow="extendDomain" label={{ value: t('dashboard.processAvg'), position: 'right', fill: THEME.textSecondary, fontSize: 10 }} />}
+                        {unpl !== null && <ReferenceLine y={unpl} stroke={COLORS.failure} strokeDasharray="5 4" ifOverflow="extendDomain" label={{ value: t('dashboard.upperLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                        {lnpl !== null && <ReferenceLine y={lnpl} stroke={COLORS.failure} strokeDasharray="5 4" ifOverflow="extendDomain" label={{ value: t('dashboard.lowerLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                        <Line
+                          type="monotone"
+                          dataKey="y"
+                          stroke={COLORS.neutral[0]}
+                          strokeWidth={2}
+                          isAnimationActive={false}
+                          activeDot={{ r: 5 }}
+                          dot={(props: { cx?: number; cy?: number; payload?: typeof chartData[number] }) => {
+                            const { cx, cy, payload } = props;
+                            if (cx === undefined || cy === undefined || !payload) return <g key={`b-${cx}`} />;
+                            const overBudget = payload.diffAmount > 0;
+                            return (
+                              <g key={`b-${payload.caseId}`}>
+                                <circle cx={cx} cy={cy} r={4} fill={overBudget ? COLORS.failure : COLORS.value} stroke="#fff" strokeWidth={1} />
+                              </g>
+                            );
+                          }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                    {pctExcluded > 0 && (
+                      <p className="mt-1 text-center text-xs text-gray-400">{pctExcluded} {t('dashboard.budgetPctExcluded')}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )
         )}

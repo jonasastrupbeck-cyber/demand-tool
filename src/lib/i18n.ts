@@ -1095,6 +1095,57 @@ const translations = {
     sv: 'Ej registrerat',
     de: 'Nicht erfasst',
   },
+  // Budget capability card (2026-07-05). 'Capability' follows the canonical
+  // Kapabilitet (DA/SV); DE composes with the file's existing Kapabilität.
+  // Budget language is not Vanguard canon — plain words.
+  'dashboard.budgetCapabilityTitle': {
+    en: 'Budget capability',
+    da: 'Budgetkapabilitet',
+    sv: 'Budgetkapabilitet',
+    de: 'Budget-Kapabilität',
+  },
+  'dashboard.budgetCapabilityHint': {
+    en: 'Each point is one customer: how far the solution landed under or over what they could afford. The zero line is their budget.',
+    da: 'Hvert punkt er én kunde: hvor langt løsningen landede under eller over, hvad de havde råd til. Nullinjen er deres budget.',
+    sv: 'Varje punkt är en kund: hur långt lösningen hamnade under eller över vad de hade råd med. Nollinjen är deras budget.',
+    de: 'Jeder Punkt ist ein Kunde: wie weit die Lösung unter oder über dem lag, was er sich leisten konnte. Die Nulllinie ist sein Budget.',
+  },
+  'dashboard.budgetWithinHeadline': {
+    en: '{x} of {y} within budget',
+    da: '{x} af {y} inden for budget',
+    sv: '{x} av {y} inom budget',
+    de: '{x} von {y} im Budget',
+  },
+  'dashboard.budgetUnitPct': {
+    en: '% of budget',
+    da: '% af budget',
+    sv: '% av budget',
+    de: '% des Budgets',
+  },
+  'dashboard.budgetUnitAmount': {
+    en: 'Amount',
+    da: 'Beløb',
+    sv: 'Belopp',
+    de: 'Betrag',
+  },
+  'dashboard.budgetZeroLine': {
+    en: 'Budget',
+    da: 'Budget',
+    sv: 'Budget',
+    de: 'Budget',
+  },
+  'dashboard.askAvgUnderBudget': {
+    en: 'Avg under budget',
+    da: 'Gns. under budget',
+    sv: 'Snitt under budget',
+    de: 'Ø unter Budget',
+  },
+  'dashboard.budgetPctExcluded': {
+    en: 'excluded — budget can’t be shown as %',
+    da: 'udeladt — budget kan ikke vises som %',
+    sv: 'utelämnade — budget kan inte visas som %',
+    de: 'ausgeschlossen — Budget kann nicht als % angezeigt werden',
+  },
   'capture.askValueMissing': {
     en: 'value not captured',
     da: 'værdi ikke registreret',
