@@ -1452,6 +1452,25 @@ const translations = {
     sv: 'Exportera PPTX',
     de: 'PPTX exportieren',
   },
+  // Consolidated flow export dropdown + the boxed control-group labels (2026-07-05).
+  'dashboard.exportMenu': {
+    en: 'Export',
+    da: 'Eksporter',
+    sv: 'Exportera',
+    de: 'Exportieren',
+  },
+  'dashboard.viewLabel': {
+    en: 'View',
+    da: 'Visning',
+    sv: 'Vy',
+    de: 'Ansicht',
+  },
+  'dashboard.periodLabel': {
+    en: 'Period',
+    da: 'Periode',
+    sv: 'Period',
+    de: 'Zeitraum',
+  },
   'dashboard.totalEntries': {
     en: 'Total Entries',
     da: 'Antal registreringer',

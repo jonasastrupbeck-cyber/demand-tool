@@ -82,6 +82,8 @@ export default function DashboardPage() {
   const [entryFilter, setEntryFilter] = useState('');
   const [demandTypeMap, setDemandTypeMap] = useState<Map<string, string>>(new Map());
   const [notesGroupBy, setNotesGroupBy] = useState<'date' | 'type'>('date');
+  // Flow export dropdown (2026-07-05): one sky "Export" pill → the two actions.
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [fullStudy, setFullStudy] = useState<EntryEditModalStudy | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   // Capability / lead-time (2026-06-18): event-pair pickers + XmR chart data.
@@ -515,55 +517,92 @@ export default function DashboardPage() {
             Synthesise view tabs sit to the LEFT of the date range on this same
             row; the contextual help line drops just beneath the row. */}
         <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start gap-2">
             {isFlow && (flowAnalyticsAvailable || synthesisAvailable) && (
-              <PillToggle
-                ariaLabel={t('dashboard.capabilityTab')}
-                value={dashboardView}
-                onChange={(v) => setDashboardView(v as DashboardView)}
-                options={(['capability', ...(flowAnalyticsAvailable ? ['analytics'] : []), ...(synthesisAvailable ? ['synthesis'] : [])] as DashboardView[]).map((view) => ({
-                  value: view,
-                  label: view === 'synthesis' ? t('dashboard.synthesisTab') : view === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab'),
-                }))}
-              />
-            )}
-            <PillToggle
-              ariaLabel={dateRangeLabels['all']}
-              value={dateRange}
-              onChange={(v) => setDateRange(v as DateRange)}
-              options={(['all', 'today', '7d', '30d', 'custom'] as DateRange[]).map((range) => ({ value: range, label: dateRangeLabels[range] }))}
-            />
-            {dateRange === 'custom' && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={e => setCustomFrom(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white text-gray-700"
-                />
-                <span className="text-gray-400 text-sm">–</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={e => setCustomTo(e.target.value)}
-                  className="px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white text-gray-700"
+              <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.viewLabel')}</p>
+                <PillToggle
+                  ariaLabel={t('dashboard.viewLabel')}
+                  value={dashboardView}
+                  onChange={(v) => setDashboardView(v as DashboardView)}
+                  options={(['capability', ...(flowAnalyticsAvailable ? ['analytics'] : []), ...(synthesisAvailable ? ['synthesis'] : [])] as DashboardView[]).map((view) => ({
+                    value: view,
+                    label: view === 'synthesis' ? t('dashboard.synthesisTab') : view === 'analytics' ? t('dashboard.analyticsTab') : t('dashboard.capabilityTab'),
+                  }))}
                 />
               </div>
             )}
+            <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.periodLabel')}</p>
+              <PillToggle
+                ariaLabel={t('dashboard.periodLabel')}
+                value={dateRange}
+                onChange={(v) => setDateRange(v as DateRange)}
+                options={(['all', 'today', '7d', '30d', 'custom'] as DateRange[]).map((range) => ({ value: range, label: dateRangeLabels[range] }))}
+              />
+              {dateRange === 'custom' && (
+                <div className="flex items-center gap-1.5 mt-1.5">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={e => setCustomFrom(e.target.value)}
+                    className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white text-gray-700"
+                  />
+                  <span className="text-gray-400 text-xs">–</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={e => setCustomTo(e.target.value)}
+                    className="px-2 py-1 text-xs border border-gray-300 rounded-md bg-white text-gray-700"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex gap-2">
             {isFlow ? (
               /* R11: flow exports — branded PowerPoint of the charts + a full-study
-                 spreadsheet. (Per-chart PNG lives on each chart card.) */
-              <>
-                <button onClick={handleDownloadAllData} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
-                  {t('dashboard.downloadAllData')}
+                 spreadsheet, consolidated into one sky "Export" dropdown (2026-07-05).
+                 (Per-chart PNG lives on each chart card.) */
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setExportMenuOpen((o) => !o)}
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenuOpen}
+                  className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100"
+                >
+                  {t('dashboard.exportMenu')}
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ transform: exportMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}>
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
-                <button onClick={handleExportCapabilityPptx} disabled={capPptxExporting} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed">
-                  {capPptxExporting ? '...' : t('dashboard.exportPptx')}
-                </button>
-              </>
+                {exportMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} aria-hidden="true" />
+                    <div role="menu" className="absolute right-0 mt-1 z-50 min-w-[168px] rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { setExportMenuOpen(false); handleDownloadAllData(); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        {t('dashboard.downloadAllData')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={capPptxExporting}
+                        onClick={() => { setExportMenuOpen(false); handleExportCapabilityPptx(); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {capPptxExporting ? '...' : t('dashboard.exportPptx')}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 <button onClick={handleDownloadTemplate} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
