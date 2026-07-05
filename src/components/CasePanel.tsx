@@ -172,10 +172,18 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const onRailScroll = () => syncScroll(workScrollRef.current, workScrollTopRef.current);
   const onTopScroll = () => syncScroll(workScrollTopRef.current, workScrollRef.current);
 
+  // Always holds the latest active case id, so an in-flight loadCase can bail if
+  // the collector switched customers before its response arrived (otherwise an
+  // older response could overwrite the newer case's board — and patchCase would
+  // then write to the wrong caseRow.id).
+  const activeCaseIdRef = useRef(activeCaseId);
+  useEffect(() => { activeCaseIdRef.current = activeCaseId; }, [activeCaseId]);
+
   const loadCase = useCallback(async (caseId: string) => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`);
     if (!res.ok) return;
     const data = await res.json();
+    if (activeCaseIdRef.current !== caseId) return; // a newer switch won
     setCaseRow(data);
     setEntries(data.entries || []);
     setWmIds(Array.isArray(data.whatMattersTypeIds) ? data.whatMattersTypeIds : []);
@@ -350,8 +358,11 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
 
   async function patchCase(body: Record<string, unknown>) {
     if (!caseRow) return;
+    const caseId = caseRow.id;
     // Optimistic local update; refetch on failure to re-sync. The what-matters
-    // set lives in its own state (junction-backed), the rest on caseRow.
+    // set lives in its own state (junction-backed), the rest on caseRow. All
+    // optimistic writes use functional updaters so two patchCase calls before a
+    // re-render don't clobber each other from a stale closure.
     const { whatMattersTypeIds: nextWmIds, whatMattersDate, whatMattersValue, ...rowFields } = body as { whatMattersTypeIds?: string[]; whatMattersDate?: { whatMattersTypeId: string; date: string | null }; whatMattersValue?: { whatMattersTypeId: string } & WmValue } & Record<string, unknown>;
     if (nextWmIds !== undefined) setWmIds(nextWmIds);
     if (whatMattersValue) {
@@ -359,7 +370,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       // like a date, a set value also selects the pill.
       const { whatMattersTypeId, ...value } = whatMattersValue;
       setWmValues((prev) => ({ ...prev, [whatMattersTypeId]: value }));
-      if (!wmIds.includes(whatMattersTypeId)) setWmIds([...wmIds, whatMattersTypeId]);
+      setWmIds((prev) => (prev.includes(whatMattersTypeId) ? prev : [...prev, whatMattersTypeId]));
     }
     if (whatMattersDate) {
       // Optimistically reflect the set/cleared target date (junction-backed).
@@ -376,17 +387,23 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         return { ...prev, [whatMattersDate.whatMattersTypeId]: { ...cur, targetDate: whatMattersDate.date } };
       });
       // A date can also select the type; keep the pill in sync.
-      if (whatMattersDate.date && !wmIds.includes(whatMattersDate.whatMattersTypeId)) {
-        setWmIds([...wmIds, whatMattersDate.whatMattersTypeId]);
+      if (whatMattersDate.date) {
+        setWmIds((prev) => (prev.includes(whatMattersDate.whatMattersTypeId) ? prev : [...prev, whatMattersDate.whatMattersTypeId]));
       }
     }
-    if (Object.keys(rowFields).length > 0) setCaseRow({ ...caseRow, ...rowFields } as CaseRow);
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseRow.id)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) await loadCase(caseRow.id);
+    if (Object.keys(rowFields).length > 0) setCaseRow((prev) => (prev ? { ...prev, ...rowFields } as CaseRow : prev));
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) await loadCase(caseId);
+    } catch {
+      // Network failure — re-sync from the server so the UI doesn't keep a
+      // change that never persisted.
+      await loadCase(caseId);
+    }
   }
 
   // "Capture first, stitch when the number arrives" (slice B3): attach the
@@ -686,7 +703,10 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     failure_demand: 'border-rose-300 bg-rose-50 text-rose-800',
   };
   const renderTouchFull = (e: CaseEntry) => {
-    const steps = e.verbatim.split('\n\n')
+    // Split only at a `\n\n` that starts a new `[tag]` block (the server joins
+    // blocks that way). A plain blank line typed INSIDE a block's text must stay
+    // with that block — otherwise it fragmented into a fake, green ('value') step.
+    const steps = e.verbatim.split(/\n\n(?=\[(?:value|sequence|failure|failure_demand)\])/)
       .map((line) => {
         const m = line.match(/^\[(value|sequence|failure|failure_demand)\]\s*([\s\S]*)$/);
         return m ? { tag: m[1], text: m[2] } : { tag: 'value', text: line };

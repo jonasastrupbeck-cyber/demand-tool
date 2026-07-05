@@ -19,6 +19,12 @@ import { localDay } from '@/lib/local-date';
 // <input type="date">. Must be local, not UTC — see local-date.ts.
 const todayIso = () => localDay();
 
+// Stable client-side key for a work block so React reconciles by identity, not
+// array index — the "insert step before" feature shifts indices, and index keys
+// made the caret/textarea-resize stick to the wrong block. Not sent to the server.
+let _blockKeySeq = 0;
+const nextBlockKey = () => `wb${++_blockKeySeq}`;
+
 interface HandlingType {
   id: string;
   label: string;
@@ -225,7 +231,7 @@ export default function CapturePage() {
   // block's tag is sequence/failure in the flow-mode work path. Null otherwise.
   // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
   // set only when the block's tag is 'failure' (flow work path). Null otherwise.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ _key: string; tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
   // One date for the WHOLE work entry (2026-07-02): flow work used to carry a
   // per-block "Step date"; now a single date near Save applies to every block.
   // Defaults today; set a past day to backdate a retrospectively-captured touch.
@@ -253,6 +259,9 @@ export default function CapturePage() {
   const [examples, setExamples] = useState<Array<{ verbatim: string }>>([]);
   const [examplesLoading, setExamplesLoading] = useState(false);
   const examplesCache = useRef<Record<string, Array<{ verbatim: string }>>>({});
+  // Latest-selected example type, so a slow response for a previously-selected
+  // type can't populate the examples under a different type.
+  const examplesTypeIdRef = useRef<string | null>(null);
 
   const loadStudy = useCallback(async () => {
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}`);
@@ -302,7 +311,14 @@ export default function CapturePage() {
     /* eslint-disable react-hooks/set-state-in-effect */
     setCaseRefreshTick((n) => n + 1);
     setLastEntry(null);
+    // Also refresh the entries list + pending counts so the undone (deleted)
+    // entry doesn't linger in the review sheet / counts (clicking Edit on a
+    // deleted entry would 404). loadTodayCount/loadPendingCounts are stable
+    // useCallbacks declared below — call them here, not in deps (TDZ).
+    loadTodayCount();
+    loadPendingCounts();
     /* eslint-enable react-hooks/set-state-in-effect */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [undoSignal]);
 
   // When the Work-tab classification row is hidden (workClassificationEnabled
@@ -329,7 +345,7 @@ export default function CapturePage() {
       // flow study has loaded.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEntryType('work');
-      setWorkBlocks((blocks) => blocks.length ? blocks : [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }]);
+      setWorkBlocks((blocks) => blocks.length ? blocks : [{ _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }]);
     }
   }, [loading, study, entryType]);
 
@@ -385,15 +401,21 @@ export default function CapturePage() {
 
   // Debounced search
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!searchOpen || searchQuery.length < 2) { setSearchResults([]); return; }
+    /* eslint-disable react-hooks/set-state-in-effect */
+    // Reset the loading flag on the early-return too — else deleting back below
+    // 2 chars left the spinner stuck on.
+    if (!searchOpen || searchQuery.length < 2) { setSearchResults([]); setSearchLoading(false); return; }
     setSearchLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    let cancelled = false;
     const timer = setTimeout(async () => {
       const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/search?q=${encodeURIComponent(searchQuery)}`);
+      // Ignore a response for a superseded query (out-of-order).
+      if (cancelled) return;
       if (res.ok) setSearchResults(await res.json());
-      setSearchLoading(false);
+      if (!cancelled) setSearchLoading(false);
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [searchQuery, searchOpen, code]);
 
   function resetForm() {
@@ -415,7 +437,7 @@ export default function CapturePage() {
     setWorkTypeFreeText('');
     // After a flow-work save, keep one empty block ready for the next entry
     // (entryType stays sticky); otherwise clear.
-    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }] : []);
+    setWorkBlocks(study?.systemType === 'flow' && entryType === 'work' ? [{ _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }] : []);
     // Next entry defaults back to today (the previous entry may have backdated it).
     setWorkEntryDate(todayIso());
     setError('');
@@ -518,11 +540,14 @@ export default function CapturePage() {
   );
 
   async function toggleExamples(typeId: string) {
-    if (examplesTypeId === typeId) { setExamplesTypeId(null); return; }
+    if (examplesTypeId === typeId) { setExamplesTypeId(null); examplesTypeIdRef.current = null; return; }
     setExamplesTypeId(typeId);
+    examplesTypeIdRef.current = typeId;
     if (examplesCache.current[typeId]) { setExamples(examplesCache.current[typeId]); return; }
     setExamplesLoading(true);
     const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/search?typeId=${typeId}&limit=5`);
+    // Ignore a response if the user has since selected a different type.
+    if (examplesTypeIdRef.current !== typeId) { setExamplesLoading(false); return; }
     if (res.ok) {
       const data = await res.json();
       const items = data.map((d: { verbatim: string }) => ({ verbatim: d.verbatim }));
@@ -989,7 +1014,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); }}
+                onClick={() => { setEntryType('demand'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); setSystemConditions([]); setThinkings([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -1009,7 +1034,7 @@ export default function CapturePage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); }}
+                onClick={() => { setEntryType('work'); setClassification(''); setDemandTypeId(''); setWorkTypeId(''); setWorkTypeFreeText(''); setWorkBlocks([]); setSystemConditions([]); setThinkings([]); }}
                 className={`w-full py-2.5 rounded-md font-medium text-sm transition-all ${
                   !isDemand
                     ? 'bg-white text-gray-900 shadow-sm'
@@ -1041,9 +1066,16 @@ export default function CapturePage() {
           <button
             type="button"
             onClick={async () => {
-              await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${lastEntry.id}`, { method: 'DELETE' });
+              try {
+                await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${lastEntry.id}`, { method: 'DELETE' });
+              } catch { /* leave the card so the collector can retry */ return; }
               setLastEntry(null);
               setLastTouch(null); // keep the nav Undo button in sync
+              // Refresh the timeline + lists so the deleted entry disappears
+              // everywhere (the nav-Undo path does this; the card path did not).
+              setCaseRefreshTick((n) => n + 1);
+              loadTodayCount();
+              loadPendingCounts();
             }}
             className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
           >
@@ -1559,13 +1591,13 @@ export default function CapturePage() {
                   ) : null;
 
                   return (
-                    <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                    <div key={block._key} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? (freezeLayout ? 'w-full lg:flex-none lg:w-72' : 'w-full') : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                       {/* Insert a step BEFORE this one (flow only) — for backfilling a
                           missed step between existing ones. Append button stays at the end. */}
                       {flowWorkPath && (
                         <button
                           type="button"
-                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
+                          onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
                           className="self-center -mt-1 text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                           aria-label={t('capture.insertWorkBlock')}
                           title={t('capture.insertWorkBlock')}
@@ -1608,7 +1640,9 @@ export default function CapturePage() {
                                 value={block.tag}
                                 onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i !== idx ? b
                                   : v === 'failure_demand' ? { ...b, tag: 'failure_demand', workStepTypeId: null, freeText: true }
-                                  : { ...b, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null }))}
+                                  // Clear system conditions when re-tagging to 'value' — the per-block
+                                  // SC box is hidden for value blocks, so kept SC ids would save invisibly.
+                                  : { ...b, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null, systemConditionIds: v === 'value' ? [] : b.systemConditionIds }))}
                                 dense
                                 options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                               />
@@ -1766,7 +1800,7 @@ export default function CapturePage() {
                 })}
                 <button
                   type="button"
-                  onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
+                  onClick={() => setWorkBlocks((prev) => [...prev, { _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
                   aria-label={t('capture.addWorkBlockButton')}
                   className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center gap-1 text-sm font-medium ${flowWorkPath ? (freezeLayout ? 'w-full py-2 lg:flex-none lg:w-72 lg:py-0 lg:min-h-[6rem] lg:self-stretch' : 'w-full py-2') : 'flex-none w-16 text-2xl'}`}
                 >

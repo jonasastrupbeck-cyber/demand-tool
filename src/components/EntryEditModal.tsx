@@ -16,13 +16,18 @@ import { localDay, localDayOf } from '@/lib/local-date';
 const todayIso = () => localDay();
 const isoDay = (v?: string | null) => localDayOf(v);
 
+// Stable client-side key for a work block (reconcile by identity, not array
+// index — insert-before shifts indices). Not sent to the server.
+let _blockKeySeq = 0;
+const nextBlockKey = () => `wb${++_blockKeySeq}`;
+
 interface HandlingType { id: string; label: string; operationalDefinition?: string | null }
 interface DemandType { id: string; category: 'value' | 'failure'; label: string }
 interface ContactMethod { id: string; label: string }
 interface PointOfTransaction { id: string; label: string }
 interface WhatMattersType { id: string; label: string; enabled?: boolean }
 interface LifeProblem { id: string; label: string }
-interface WorkType { id: string; label: string }
+interface WorkType { id: string; label: string; category?: 'value' | 'failure' | 'sequence' }
 interface SystemCondition { id: string; label: string; operationalDefinition?: string | null }
 interface Thinking { id: string; label: string }
 
@@ -120,7 +125,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }[]>([]);
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
-  const [workBlocks, setWorkBlocks] = useState<{ tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
+  const [workBlocks, setWorkBlocks] = useState<{ _key: string; tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
   // One date for the whole work entry (2026-07-02) — mirrors the capture composer.
   // Initialised from the entry on load; on save it's written to every block.
   const [entryDate, setEntryDate] = useState(todayIso());
@@ -176,6 +181,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         // UI-only — derive it from whether the block has text but no step reference.
         setWorkBlocks(Array.isArray(data.workBlocks)
           ? data.workBlocks.map((b: { tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId?: string | null; systemConditionId?: string | null; systemConditionIds?: string[]; demandTypeId?: string | null; valueStepId?: string | null }) => ({
+              _key: nextBlockKey(),
               tag: b.tag,
               text: b.text,
               workStepTypeId: b.workStepTypeId ?? null,
@@ -387,7 +393,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         <button
                           key={c}
                           type="button"
-                          onClick={() => setEntry({ ...entry, classification: c, demandTypeId: null })}
+                          onClick={() => setEntry({ ...entry, classification: c, demandTypeId: null, workTypeId: null, failureCause: null, originalValueDemandTypeId: null })}
                           className={`py-2 rounded-lg font-semibold text-sm transition-all ${entry.classification === c ? t1.active : t1.idle}`}
                         >
                           {label(c)}
@@ -436,9 +442,14 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     className={inputCls}
                   >
                     <option value="">{t('capture.selectWorkType')}</option>
-                    {study.workTypes.map((wt) => (
-                      <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
-                    ))}
+                    {study.workTypes
+                      // Filter by the entry's classification, like the capture form
+                      // (a value entry shouldn't be assignable a failure work type).
+                      // 'unknown' / missing category → show all (safe fallback).
+                      .filter((wt) => entry.classification === 'unknown' || wt.category == null || wt.category === entry.classification)
+                      .map((wt) => (
+                        <option key={wt.id} value={wt.id}>{tl(wt.label)}</option>
+                      ))}
                   </select>
                   <InlineTypeAdder
                     code={code}
@@ -694,11 +705,11 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                         </div>
                       ) : null;
                       return (
-                        <div key={idx} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
+                        <div key={b._key} className={`p-2 rounded-lg border border-gray-200 bg-gray-50 flex flex-col gap-2 ${flowWorkPath ? 'w-full' : `flex-none ${hasStep ? 'w-28' : 'min-w-[12rem] max-w-[18rem]'}`}`}>
                           {flowWorkPath && (
                             <button
                               type="button"
-                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
+                              onClick={() => setWorkBlocks((prev) => [...prev.slice(0, idx), { _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }, ...prev.slice(idx)])}
                               className="self-center -mt-1 text-[11px] font-medium text-gray-400 hover:text-brand transition-colors"
                               aria-label={t('capture.insertWorkBlock')}
                               title={t('capture.insertWorkBlock')}
@@ -729,7 +740,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     value={b.tag}
                                     onChange={(v) => setWorkBlocks((prev) => prev.map((p, i) => i !== idx ? p
                                       : v === 'failure_demand' ? { ...p, tag: 'failure_demand', workStepTypeId: null, freeText: true }
-                                      : { ...p, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null }))}
+                                      // Clear SCs when re-tagging to 'value' (the SC box is hidden for value blocks).
+                                      : { ...p, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null, systemConditionIds: v === 'value' ? [] : p.systemConditionIds }))}
                                     dense
                                     options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
                                   />
@@ -889,7 +901,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     })}
                     <button
                       type="button"
-                      onClick={() => setWorkBlocks((prev) => [...prev, { tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
+                      onClick={() => setWorkBlocks((prev) => [...prev, { _key: nextBlockKey(), tag: 'value', text: '', workStepTypeId: null, freeText: false, systemConditionIds: [], demandTypeId: null, valueStepId: null }])}
                       aria-label={t('capture.addWorkBlockButton')}
                       className={`rounded-lg border-2 border-dashed border-gray-300 text-gray-400 hover:border-brand hover:text-brand flex items-center justify-center ${flowWorkPath ? 'w-full py-2 text-sm font-medium' : 'flex-none w-16 text-2xl'}`}
                     >
