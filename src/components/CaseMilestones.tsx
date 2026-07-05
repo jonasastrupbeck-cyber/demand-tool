@@ -186,25 +186,35 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
     setSavingId(m.id);
     const on = completedOn[m.id] ?? todayISO();
     const answersPayload = m.subquestions.filter((sq) => visibleIds.has(sq.id)).map((sq) => toAnswer(sq, drafts[sq.id] ?? EMPTY_DRAFT, on));
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/answers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: answersPayload, recordedByCollector: collectorName || undefined }),
-    });
-    if (res.ok) await onChanged();
-    setSavingId(null);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}/answers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: answersPayload, recordedByCollector: collectorName || undefined }),
+      });
+      if (res.ok) await onChanged();
+    } catch {
+      // Network failure — leave drafts intact so the collector can retry.
+    } finally {
+      setSavingId(null);
+    }
   }
 
   async function closeCase() {
     if (closing) return;
     setClosing(true);
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'closed' }),
-    });
-    if (res.ok) { setClosePrompt(false); await onChanged(); }
-    setClosing(false);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed' }),
+      });
+      if (res.ok) { setClosePrompt(false); await onChanged(); }
+    } catch {
+      // Network failure — keep the prompt so the collector can retry.
+    } finally {
+      setClosing(false);
+    }
   }
 
   // --- Ask evaluation (linked subquestion: asked vs delivered) -----------

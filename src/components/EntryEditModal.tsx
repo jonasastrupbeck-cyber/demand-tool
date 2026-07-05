@@ -95,6 +95,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
@@ -201,8 +202,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   }, [code, entryId]);
 
   async function handleSave() {
-    if (!entry) return;
+    if (!entry || saving) return;
     setSaving(true);
+    setSaveError('');
     const body: Record<string, unknown> = {
       classification: entry.classification,
       demandTypeId: entry.demandTypeId || null,
@@ -224,14 +226,20 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
         .filter((b) => b.text.trim().length > 0)
         .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId, date: entryDate }));
     }
-    await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    onSaved?.();
-    onClose();
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) { setSaveError(t('capture.saveFailed')); return; }
+      onSaved?.();
+      onClose();
+    } catch {
+      setSaveError(t('capture.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   // Delete this touch (mistake). Two-click confirm (no window.confirm). Reuses
@@ -239,10 +247,17 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   async function handleDelete() {
     if (!entry || saving) return;
     setSaving(true);
-    await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, { method: 'DELETE' });
-    setSaving(false);
-    onSaved?.();
-    onClose();
+    setSaveError('');
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, { method: 'DELETE' });
+      if (!res.ok) { setSaveError(t('capture.saveFailed')); return; }
+      onSaved?.();
+      onClose();
+    } catch {
+      setSaveError(t('capture.saveFailed'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputCls = 'w-full px-4 py-3 rounded-lg text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-brand focus:border-brand outline-none';
@@ -1161,6 +1176,9 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
               />
             </label>
+          )}
+          {saveError && (
+            <p className="text-sm text-red-600 mb-2 text-center">{saveError}</p>
           )}
           <div className="flex gap-3">
           {confirmingDelete ? (

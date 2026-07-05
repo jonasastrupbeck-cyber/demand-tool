@@ -394,16 +394,21 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   async function attachLastEntry() {
     if (!caseRow || !unattachedLastEntryId || attaching) return;
     setAttaching(true);
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${encodeURIComponent(unattachedLastEntryId)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ caseId: caseRow.id }),
-    });
-    if (res.ok) {
-      onAttachedLast?.(caseRow.id);
-      await loadCase(caseRow.id);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${encodeURIComponent(unattachedLastEntryId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseId: caseRow.id }),
+      });
+      if (res.ok) {
+        onAttachedLast?.(caseRow.id);
+        await loadCase(caseRow.id);
+      }
+    } catch {
+      // Network failure — leave the chip so the collector can retry.
+    } finally {
+      setAttaching(false);
     }
-    setAttaching(false);
   }
 
   const handlingLabel = (id: string | null) => {

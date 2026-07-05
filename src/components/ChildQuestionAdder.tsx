@@ -59,28 +59,32 @@ export default function ChildQuestionAdder({ code, milestoneId, parentSubquestio
     if (!clean || busy) return;
     setBusy(true);
     const base = `/api/studies/${encodeURIComponent(code)}`;
-    const res = await fetch(`${base}/milestones/${milestoneId}/subquestions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: clean, kind: kind === 'yesno' ? 'choice' : kind }),
-    });
-    if (res.ok) {
-      const sq = await res.json();
-      if (kind === 'yesno') {
-        for (const optLabel of [t('capture.dpYes'), t('capture.dpNo')]) {
-          await fetch(`${base}/subquestions/${sq.id}/options`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ label: optLabel }),
-          });
-        }
-      }
-      await fetch(`${base}/subquestions/${sq.id}/conditions`, {
+    try {
+      const res = await fetch(`${base}/milestones/${milestoneId}/subquestions`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ parentSubquestionId, triggerValue }),
+        body: JSON.stringify({ label: clean, kind: kind === 'yesno' ? 'choice' : kind }),
       });
-      await onRefresh();
+      if (res.ok) {
+        const sq = await res.json();
+        if (kind === 'yesno') {
+          for (const optLabel of [t('capture.dpYes'), t('capture.dpNo')]) {
+            await fetch(`${base}/subquestions/${sq.id}/options`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ label: optLabel }),
+            });
+          }
+        }
+        await fetch(`${base}/subquestions/${sq.id}/conditions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ parentSubquestionId, triggerValue }),
+        });
+        await onRefresh();
+        reset();
+      }
+    } finally {
+      // Always clear busy — a rejected fetch must not freeze the adder.
+      setBusy(false);
     }
-    setBusy(false);
-    reset();
   };
 
   if (!open) {

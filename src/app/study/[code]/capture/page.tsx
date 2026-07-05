@@ -439,14 +439,17 @@ export default function CapturePage() {
     extraBody: Record<string, string>,
     onCreated: (id: string) => void
   ) {
-    if (!newTypeLabel.trim()) return;
+    if (!newTypeLabel.trim() || addingTypeLoading) return;
     setAddingTypeLoading(true);
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/${apiPath}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: newTypeLabel.trim(), ...extraBody }),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/${apiPath}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ label: newTypeLabel.trim(), ...extraBody }),
+      });
+      // On failure, keep the typed label + adder open so the collector can retry,
+      // and surface the error rather than silently swallowing their input.
+      if (!res.ok) { setError(t('capture.saveFailed')); return; }
       const row = await res.json();
       // Optimistic append to local study state — no refresh round-trip needed
       // since the POST response is the full new row.
@@ -462,10 +465,13 @@ export default function CapturePage() {
         await refreshStudy();
       }
       onCreated(row.id);
+      setNewTypeLabel('');
+      setAddingType(null);
+    } catch {
+      setError(t('capture.saveFailed'));
+    } finally {
+      setAddingTypeLoading(false);
     }
-    setNewTypeLabel('');
-    setAddingType(null);
-    setAddingTypeLoading(false);
   }
 
   function renderAddTypeInput(
@@ -557,6 +563,9 @@ export default function CapturePage() {
         : 'value';
     }
     if (!resolvedClassification) return;
+    // In-flight guard: the form also submits on Enter from date/text inputs, so
+    // the disabled Save button alone doesn't stop a double-post during a slow save.
+    if (submitting) return;
 
     setSubmitting(true);
     setError('');
@@ -619,11 +628,20 @@ export default function CapturePage() {
       body.thinkings = thinkings;
     }
 
-    const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      // Network failure (flaky field-test wifi): surface it and re-enable Save
+      // instead of leaving the button stuck disabled with the text stranded.
+      setError(t('capture.saveFailed'));
+      setSubmitting(false);
+      return;
+    }
 
     setSubmitting(false);
 

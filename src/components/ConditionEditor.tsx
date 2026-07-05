@@ -42,24 +42,29 @@ export default function ConditionEditor({ code, sqId, conditions, parents, onRef
   const add = async () => {
     if (!parentId || !triggerValue || busy) return;
     setBusy(true);
-    await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}/conditions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parentSubquestionId: parentId, triggerValue }),
-    });
-    setParentId(''); setTriggerValue('');
-    await onRefresh();
-    setBusy(false);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}/conditions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parentSubquestionId: parentId, triggerValue }),
+      });
+      if (res.ok) { setParentId(''); setTriggerValue(''); await onRefresh(); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async (id: string) => {
     if (busy) return;
     setBusy(true);
-    await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}/conditions`, {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    await onRefresh();
-    setBusy(false);
+    try {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/subquestions/${sqId}/conditions`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      await onRefresh();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const selectCls = 'px-1.5 py-1 rounded text-xs text-gray-900 bg-white border border-gray-300 focus:ring-2 focus:ring-brand outline-none';

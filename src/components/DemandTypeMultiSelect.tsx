@@ -54,12 +54,16 @@ export default function DemandTypeMultiSelect({ endpoint, label, variant, select
     setBusy(true);
     const next = new Set(set);
     if (next.has(dtId)) next.delete(dtId); else next.add(dtId);
-    await fetch(endpoint, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ demandTypeIds: [...next] }),
-    });
-    await onRefresh();
-    setBusy(false);
+    try {
+      await fetch(endpoint, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ demandTypeIds: [...next] }),
+      });
+      await onRefresh();
+    } finally {
+      // Always clear busy — a rejected fetch must not freeze the control.
+      setBusy(false);
+    }
   };
 
   if (demandTypes.length === 0) return null;
