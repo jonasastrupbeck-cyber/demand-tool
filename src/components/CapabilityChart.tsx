@@ -10,6 +10,7 @@ import PillSelect, { type PillSelectOption } from '@/components/PillSelect';
 import PillToggle from '@/components/PillToggle';
 import InfoPopover from '@/components/InfoPopover';
 import { exportNodeToPng } from '@/lib/chart-image';
+import { useCollapsibleCards } from '@/components/collapsible-cards-context';
 
 // R11 (2026-06-18): one capability (XmR) chart, self-contained so the flow
 // dashboard can stack several to compare measures in parallel. Each instance
@@ -68,6 +69,10 @@ export default function CapabilityChart({
   const [notesOpen, setNotesOpen] = useState(false);
   const [capExporting, setCapExporting] = useState(false);
   const capExportRef = useRef<HTMLDivElement>(null);
+  // Flow dashboards render cards collapsible. Collapse clips the body (CSS) so
+  // the chart stays mounted + captureable by the PPTX export even while closed.
+  const collapsible = useCollapsibleCards();
+  const [open, setOpen] = useState(true);
 
   // Default the pickers once options are known: first contact → first milestone
   // (or first decision, or case closed).
@@ -148,9 +153,21 @@ export default function CapabilityChart({
               {t('dashboard.removeChart')}
             </button>
           )}
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              aria-expanded={open}
+              aria-label={open ? 'Collapse' : 'Expand'}
+              className="shrink-0 text-gray-400 hover:text-gray-600 text-xs leading-none px-1 py-0.5 transition-colors"
+            >
+              {open ? '▲' : '▼'}
+            </button>
+          )}
         </div>
       </div>
 
+      <div className={collapsible && !open ? 'max-h-0 overflow-hidden' : ''}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-xs font-medium text-gray-500">{t('dashboard.eventFrom')}</span>
         <PillSelect value={capFrom} onChange={pickFrom} options={eventOptions} placeholder={t('dashboard.eventFrom')} ariaLabel={t('dashboard.eventFrom')} />
@@ -379,6 +396,7 @@ export default function CapabilityChart({
         </>
         );
       })()}
+      </div>
     </div>
   );
 }

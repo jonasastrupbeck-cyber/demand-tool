@@ -20,6 +20,7 @@ import CapabilityChart from '@/components/CapabilityChart';
 import TouchSeriesChart from '@/components/TouchSeriesChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
+import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
 
 const THEME = {
   text: '#1f2937',
@@ -352,30 +353,36 @@ export default function DashboardPage() {
     setChartIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
-  // R11: branded PowerPoint of every rendered capability chart. Each chart's
-  // export region carries data-capability-export + data-cap-title; capture each
-  // to a PNG and drop one per slide.
+  // R11: branded PowerPoint of the charts in the CURRENTLY SHOWN flow view
+  // (Capability or Analytics) — not just capability. Every dashboard card's
+  // export region carries data-chart-export + data-chart-title (CapabilityChart
+  // also has the legacy data-capability-export/data-cap-title); only the active
+  // view is mounted, so a document-wide query returns exactly what's on screen.
+  // Collapsed cards stay in the DOM (CSS-clipped) so they're included too.
   const handleExportCapabilityPptx = useCallback(async () => {
     if (capPptxExporting) return;
     setCapPptxExporting(true);
     try {
-      const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-capability-export]'));
+      const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-chart-export], [data-capability-export]'));
       const slides: { title: string; dataUrl: string }[] = [];
       for (const node of nodes) {
         const dataUrl = await nodeToPngDataUrl(node);
-        slides.push({ title: node.getAttribute('data-cap-title') || studyName || code, dataUrl });
+        slides.push({ title: node.getAttribute('data-chart-title') || node.getAttribute('data-cap-title') || studyName || code, dataUrl });
       }
       if (slides.length) {
         const rangeLabel = dateRange === 'custom' && (customFrom || customTo)
           ? [customFrom, customTo].filter(Boolean).join(' – ')
           : dateRangeLabels[dateRange];
-        await exportCapabilityChartsToPptx(slides, studyName || code, rangeLabel, `capability-${code}.pptx`);
+        const subtitle = dashboardView === 'analytics' ? t('dashboard.analyticsTab')
+          : dashboardView === 'synthesis' ? t('dashboard.synthesisTab')
+          : t('dashboard.capabilityTab');
+        await exportCapabilityChartsToPptx(slides, studyName || code, rangeLabel, `${dashboardView}-${code}.pptx`, subtitle);
       }
     } catch (err) {
-      console.error('Capability PPTX export error:', err);
+      console.error('Dashboard PPTX export error:', err);
     }
     setCapPptxExporting(false);
-  }, [capPptxExporting, studyName, code, dateRange, customFrom, customTo, dateRangeLabels]);
+  }, [capPptxExporting, studyName, code, dateRange, customFrom, customTo, dateRangeLabels, dashboardView, t]);
 
   // R11: download every input made to the study as a multi-sheet spreadsheet.
   const handleDownloadAllData = useCallback(() => {
@@ -1594,6 +1601,7 @@ export default function DashboardPage() {
         {/* ── CAPABILITY / LEAD-TIME VIEW (R11: stacked, independent charts) ── */}
         {dashboardView === 'capability' && (() => {
           return (
+          <CollapsibleCardsContext.Provider value={true}>
           <div className="space-y-4">
             {/* Touches over time — per-day counts, scoped + count/%. Needs only
                 cases + work entries (not milestones), so it shows for every flow study. */}
@@ -1621,6 +1629,7 @@ export default function DashboardPage() {
               + {t('dashboard.addChart')}
             </button>
           </div>
+          </CollapsibleCardsContext.Provider>
           );
         })()}
 
@@ -1683,6 +1692,7 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-500">{t('dashboard.noEntriesHint')}</p>
             </div>
           ) : (
+            <CollapsibleCardsContext.Provider value={true}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card compact label={t('dashboard.workEntries')} value={data.workCount} />
@@ -1852,9 +1862,8 @@ export default function DashboardPage() {
                   compares steps, this one explains each step. Self-gates like
                   the chart; plain CSS bars, no recharts. */}
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
-                <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200">
-                  <h3 className="text-sm font-semibold mb-1 text-gray-700">{t('dashboard.valueStepOverviewTitle')}</h3>
-                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.valueStepOverviewHint')}</p>
+                <ChartCard title={t('dashboard.valueStepOverviewTitle')}>
+                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.valueStepOverviewHint')}</p>
                   <div className="space-y-3">
                     {data.workByValueStep.map((step) => {
                       const total = step.value + step.sequence + step.failure + step.failureDemand;
@@ -1911,7 +1920,7 @@ export default function DashboardPage() {
                       );
                     })}
                   </div>
-                </div>
+                </ChartCard>
               )}
 
               {data.workOverTime.length > 1 && (
@@ -1938,9 +1947,8 @@ export default function DashboardPage() {
                   having evaluated cases; scoped by the P2BS filter + date range
                   (decidedAt) like everything else on this tab. */}
               {askDelivery && askDelivery.length > 0 && (
-                <div className="rounded-xl bg-white border border-gray-200 p-5">
-                  <h3 className="font-bold text-gray-900 mb-1">{t('dashboard.askDeliveryTitle')}</h3>
-                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
+                <ChartCard title={t('dashboard.askDeliveryTitle')}>
+                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.askDeliveryHint')}</p>
                   <div className="space-y-2">
                     {askDelivery.map((r) => {
                       // pct over EVALUATED cases only; a row can exist purely on
@@ -1976,7 +1984,7 @@ export default function DashboardPage() {
                       );
                     })}
                   </div>
-                </div>
+                </ChartCard>
               )}
 
               {/* Budget capability (2026-07-05): XmR-style chart of signed
@@ -2017,9 +2025,8 @@ export default function DashboardPage() {
                 const avgUnder = under.length ? Math.round(under.reduce((s, p) => s + Math.abs(p.diffAmount), 0) / under.length) : null;
                 const avgOver = over.length ? Math.round(over.reduce((s, p) => s + p.diffAmount, 0) / over.length) : null;
                 return (
-                  <div className="rounded-xl bg-white border border-gray-200 p-5">
-                    <h3 className="font-bold text-gray-900 mb-1">{t('dashboard.budgetCapabilityTitle')}</h3>
-                    <p className="text-xs text-gray-500 mb-3">{t('dashboard.budgetCapabilityHint')}</p>
+                  <ChartCard title={t('dashboard.budgetCapabilityTitle')}>
+                    <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.budgetCapabilityHint')}</p>
                     <div className="flex flex-wrap items-center gap-3 mb-3">
                       {budgetCapability.length > 1 && (
                         <PillToggle
@@ -2100,10 +2107,11 @@ export default function DashboardPage() {
                     {pctExcluded > 0 && (
                       <p className="mt-1 text-center text-xs text-gray-400">{pctExcluded} {t('dashboard.budgetPctExcluded')}</p>
                     )}
-                  </div>
+                  </ChartCard>
                 );
               })()}
             </div>
+            </CollapsibleCardsContext.Provider>
           )
         )}
 
@@ -2366,11 +2374,36 @@ function extractThemes(notes: string[]): Array<{ term: string; count: number }> 
   return results.slice(0, 20);
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+// ChartCard — the standard dashboard panel. On flow dashboards it's `collapsible`
+// (a chevron toggles the body); collapse uses a `max-h-0 overflow-hidden` CLIP on
+// an ancestor so the chart stays mounted at full size and remains captureable by
+// the PPTX export even while visually collapsed. The inner `data-chart-export`
+// node is what the export handler screenshots (title from `data-chart-title`).
+function ChartCard({ title, children, collapsible = false, defaultOpen = true }: { title: string; children: React.ReactNode; collapsible?: boolean; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const ctxCollapsible = useCollapsibleCards();
+  const isCollapsible = collapsible || ctxCollapsible;
   return (
-    <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200 overflow-hidden">
-      <h3 className="text-sm font-semibold mb-3 text-gray-700">{title}</h3>
-      {children}
+    <div className="rounded-xl shadow-sm bg-white border border-gray-200 overflow-hidden">
+      <div className="flex items-center gap-2 px-5 pt-5 pb-3">
+        <h3 className="flex-1 text-sm font-semibold text-gray-700">{title}</h3>
+        {isCollapsible && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? 'Collapse' : 'Expand'}
+            className="shrink-0 text-gray-400 hover:text-gray-600 text-xs leading-none px-1 py-0.5 transition-colors"
+          >
+            {open ? '▲' : '▼'}
+          </button>
+        )}
+      </div>
+      <div className={isCollapsible && !open ? 'max-h-0 overflow-hidden' : ''}>
+        <div data-chart-export data-chart-title={title} className="px-5 pb-5">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

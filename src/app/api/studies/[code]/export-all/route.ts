@@ -10,7 +10,7 @@ import {
 } from '@/lib/queries';
 import { db } from '@/lib/db';
 import { formatCalcResult } from '@/lib/formula';
-import { caseSubquestionAnswers, caseMilestones, capabilityAnnotations } from '@/lib/schema';
+import { caseSubquestionAnswers, caseMilestones, capabilityAnnotations, caseWhatMatters } from '@/lib/schema';
 import { inArray } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
@@ -80,11 +80,13 @@ export async function GET(
     const arr = scLabelsByBlock.get(r.workBlockId);
     if (arr) arr.push(label); else scLabelsByBlock.set(r.workBlockId, [label]);
   }
-  const [answers, milestones, annotations] = await Promise.all([
+  const [answers, milestones, annotations, caseWm] = await Promise.all([
     caseIds.length ? db.select().from(caseSubquestionAnswers).where(inArray(caseSubquestionAnswers.caseId, caseIds)) : Promise.resolve([]),
     caseIds.length ? db.select().from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)) : Promise.resolve([]),
     caseIds.length ? db.select().from(capabilityAnnotations).where(inArray(capabilityAnnotations.caseId, caseIds)) : Promise.resolve([]),
+    caseIds.length ? db.select().from(caseWhatMatters).where(inArray(caseWhatMatters.caseId, caseIds)) : Promise.resolve([]),
   ]);
+  const wmTypeById = new Map(wmTypes.map((w) => [w.id, w]));
 
   const wmByEntry = new Map<string, string[]>();
   for (const j of wmJ) { const a = wmByEntry.get(j.demandEntryId) || []; const l = wmMap.get(j.whatMattersTypeId); if (l) a.push(l); wmByEntry.set(j.demandEntryId, a); }
@@ -137,9 +139,15 @@ export async function GET(
   const blocksData = wbJ.map((b) => ({
     'Case Ref': (() => { const cid = caseByEntry.get(b.demandEntryId); return cid ? caseRefById.get(cid) || '' : ''; })(),
     'Touch Date': (() => { const d = dateByEntry.get(b.demandEntryId); return d ? new Date(d).toLocaleString() : ''; })(),
+    // Block's own date (migration 0031) — set when a step was backdated; blank
+    // means it inherits the touch date above.
+    'Block Date': b.blockDate ? new Date(b.blockDate).toLocaleString() : '',
     'Tag': b.tag,
     'Text': b.text,
     'Work Step Type': b.workStepTypeId ? wsMap.get(b.workStepTypeId) || '' : '',
+    // Failure-demand type (migration 0033) — the kind of failure demand hitting
+    // at this step; only on 'failure_demand'/'failure' blocks.
+    'Failure Demand Type': b.demandTypeId ? dMap.get(b.demandTypeId) || '' : '',
     'Value Step': b.valueStepId ? vsMap.get(b.valueStepId) || '' : '',
     'Block System Conditions': (scLabelsByBlock.get(b.id) ?? (b.systemConditionId ? [scMap.get(b.systemConditionId) || ''] : [])).filter(Boolean).join('; '),
     'Order': b.sortOrder,
@@ -197,6 +205,27 @@ export async function GET(
     'Note': a.note || '',
   }));
 
+  // ── Sheet: Case What Matters — the per-case structured "what matters" values
+  // (target date + budget amount / term). These back the what-matters-dates and
+  // budget-capability dashboards but the Cases sheet only lists the labels. ──
+  const caseWmData = caseWm.map((r) => {
+    const type = wmTypeById.get(r.whatMattersTypeId);
+    const amount = r.amountSpecific != null
+      ? String(r.amountSpecific)
+      : (r.amountMin != null || r.amountMax != null)
+        ? `${r.amountMin ?? ''}–${r.amountMax ?? ''}`
+        : '';
+    const term = (r.termYears != null || r.termMonths != null) ? `${r.termYears ?? 0}y ${r.termMonths ?? 0}m` : '';
+    return {
+      'Case Ref': caseRefById.get(r.caseId) || '',
+      'What Matters': wmMap.get(r.whatMattersTypeId) || '',
+      'Timing': type?.timing || '',
+      'Target Date': r.targetDate ? new Date(r.targetDate).toLocaleDateString() : '',
+      'Amount': amount,
+      'Term': term,
+    };
+  });
+
   const wb = XLSX.utils.book_new();
   const add = (rows: Record<string, unknown>[], name: string) => {
     // json_to_sheet needs at least a header; for empty sheets seed one blank row's keys.
@@ -205,6 +234,7 @@ export async function GET(
   };
   add(casesData, 'Cases');
   add(touchesData, 'Touches');
+  add(caseWmData, 'Case What Matters');
   add(blocksData, 'Work Blocks');
   add(answersData, 'Answers');
   add(milestonesData, 'Milestones');

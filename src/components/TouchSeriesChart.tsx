@@ -7,6 +7,7 @@ import {
 import type { TouchSeriesPoint } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import PillToggle from '@/components/PillToggle';
+import { useCollapsibleCards } from '@/components/collapsible-cards-context';
 
 // "Touches over time" — per-day touch counts, scoped (all / life problem / case),
 // switchable between count and % of touches per day. A touch = a work entry;
@@ -35,6 +36,8 @@ export default function TouchSeriesChart({
   const [mode, setMode] = useState<'count' | 'pct'>('count');
   const [series, setSeries] = useState<TouchSeriesPoint[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const collapsible = useCollapsibleCards();
+  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -64,8 +67,22 @@ export default function TouchSeriesChart({
 
   return (
     <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200 overflow-hidden">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">{t('dashboard.touchesOverTime')}</h3>
+      <div className="flex items-center gap-2 mb-3">
+        <h3 className="flex-1 text-sm font-semibold text-gray-700">{t('dashboard.touchesOverTime')}</h3>
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-label={open ? 'Collapse' : 'Expand'}
+            className="shrink-0 text-gray-400 hover:text-gray-600 text-xs leading-none px-1 py-0.5 transition-colors"
+          >
+            {open ? '▲' : '▼'}
+          </button>
+        )}
+      </div>
 
+      <div className={collapsible && !open ? 'max-h-0 overflow-hidden' : ''}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <select
           value={scope}
@@ -106,6 +123,7 @@ export default function TouchSeriesChart({
       ) : !series || series.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilityNoData')}</p>
       ) : (
+        <div data-chart-export data-chart-title={t('dashboard.touchesOverTime')} className="bg-white">
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
@@ -131,7 +149,9 @@ export default function TouchSeriesChart({
             )}
           </LineChart>
         </ResponsiveContainer>
+        </div>
       )}
+      </div>
     </div>
   );
 }
