@@ -393,6 +393,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   let workTypesByClassification: Array<{ label: string; valueCount: number; failureCount: number; sequenceCount: number }> = [];
   let workOverTime: Array<{ date: string; valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }> = [];
 
+  const workDone = (async () => {
   if (workTrackingEnabled) {
     // Work section — all three queries are independent. Parallelise.
     const [workClassCounts, wtCountsRaw, workTypeByClass, workOT] = await Promise.all([
@@ -476,12 +477,14 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
       ...counts,
     }));
   }
+  })();
 
   // ── LIFECYCLE AGGREGATIONS ──
   // Effective stage = entry.lifecycleStageId ?? type.lifecycleStageId
   const lifecycleByStageAndDemandType: Array<{ stageLabel: string; stageSortOrder: number; demandTypeLabel: string; demandTypeCategory: 'value' | 'failure'; count: number }> = [];
   let lifecycleFailureByStage: Array<{ stageLabel: string; stageSortOrder: number; count: number }> = [];
 
+  const lifecycleDone = (async () => {
   if (lifecycleEnabled) {
     // Demand lifecycle grouped by stage + demand type (with category)
     const effectiveStage = sql<string>`COALESCE(${demandEntries.lifecycleStageId}, ${demandTypes.lifecycleStageId})`;
@@ -546,6 +549,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
       .map(([stageLabel, v]) => ({ stageLabel, stageSortOrder: v.stageSortOrder, count: v.count }))
       .sort((a, b) => a.stageSortOrder - b.stageSortOrder);
   }
+  })();
 
   // ── PHASE 4C: WORK STEP AGGREGATIONS ──
   // Only populated when workStepTypesEnabled; otherwise empty arrays so the
@@ -555,6 +559,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   const workStepByLifeProblem: Array<{ lifeProblemLabel: string; workStepLabel: string; workStepTag: 'value' | 'failure'; count: number }> = [];
   let capabilityByDemandType: Array<{ demandTypeLabel: string; valueBlocks: number; failureBlocks: number; pctValue: number }> = [];
 
+  const workStepDone = (async () => {
   if (workStepTypesEnabled) {
     // The three selects below are mutually independent — fetch concurrently to
     // avoid stacking Neon round-trips. Post-processing is unchanged.
@@ -646,12 +651,14 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
       count: r.count,
     }));
   }
+  })();
 
   // ── FLOW FAILURE-DEMAND TYPES (migration 0033, slice 2) ──
   // Type + frequency of failure demand captured inline in flow, counted from
   // failure_demand work blocks. P2BS-scoped via baseConditions (the flow life
   // problem lives on the case). Only when the per-study feature is on.
   let flowFailureDemandTypeCounts: Array<{ label: string; count: number }> = [];
+  const failureDemandDone = (async () => {
   if (flowFailureDemandTypesEnabled) {
     const rows = await db.select({
       label: demandTypes.label,
@@ -665,21 +672,25 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
       .orderBy(desc(sql`count(*)`));
     flowFailureDemandTypeCounts = rows.map(r => ({ label: r.label, count: r.count }));
   }
+  })();
 
   // ── CAPABILITY OF RESPONSE (CoR) DISTRIBUTION ──
   // Share of each CoR type across flow touches. Flow touches are work entries
   // carrying handlingTypeId; the existing handlingTypeCounts is demand-only, so
   // count here over work entries. P2BS + date scoped via workConditions.
-  const corRows = await db.select({
-    label: handlingTypes.label,
-    count: sql<number>`count(*)::int`,
-  })
-    .from(demandEntries)
-    .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
-    .where(and(...workConditions))
-    .groupBy(handlingTypes.label)
-    .orderBy(desc(sql`count(*)`));
-  const corTypeCounts = corRows.map(r => ({ label: r.label, count: r.count }));
+  let corTypeCounts: Array<{ label: string; count: number }> = [];
+  const corDone = (async () => {
+    const corRows = await db.select({
+      label: handlingTypes.label,
+      count: sql<number>`count(*)::int`,
+    })
+      .from(demandEntries)
+      .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
+      .where(and(...workConditions))
+      .groupBy(handlingTypes.label)
+      .orderBy(desc(sql`count(*)`));
+    corTypeCounts = corRows.map(r => ({ label: r.label, count: r.count }));
+  })();
 
   // ── WORK BY VALUE STEP (migration 0047) ──
   // Where does failure/sequence (and value) work land across the customer value
@@ -687,6 +698,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   // via baseConditions; ordered by the value step's own order. Feature-gated.
   let workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }> = [];
   let valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }> = [];
+  const valueStepDone = (async () => {
   if (valueStepsEnabled) {
     const [rows, scRows] = await Promise.all([
       db.select({
@@ -735,6 +747,13 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     }
     workByValueStep = [...byStep.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   }
+  })();
+
+  // Perf: the six sections above (work / lifecycle / work-step / failure-demand /
+  // CoR / value-step) are mutually independent and were kicked off concurrently
+  // as IIFEs — await them all here so the whole group costs ~one section's waves
+  // (the slowest) instead of the sum. Each assigns to the outer vars above.
+  await Promise.all([workDone, lifecycleDone, workStepDone, failureDemandDone, corDone, valueStepDone]);
 
   return {
     totalEntries,
