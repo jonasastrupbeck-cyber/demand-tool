@@ -91,7 +91,7 @@ export type StudyTemplateSnapshotV1 = {
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; sortOrder: number; timing: 'by_date' | 'asap' | null; anchorEvent: string | null; enabled: boolean; valueKind: 'amount' | 'date_or_duration' | null }[];
   milestones: { id: string; label: string; sortOrder: number }[];
   subquestions: { id: string; milestoneId: string; label: string; kind: SubquestionKind; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number }[];
-  subquestionOptions: { id: string; subquestionId: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[];
+  subquestionOptions: { id: string; subquestionId: string; label: string; polarity: 'positive' | 'negative' | 'concern' | null; sortOrder: number }[];
   subquestionConditions: { subquestionId: string; parentSubquestionId: string; triggerValue: string }[];
   // Dormant include-model (kept for backward-compat with older templates).
   milestoneDemandTypeConditions: { milestoneId: string; demandTypeId: string }[];

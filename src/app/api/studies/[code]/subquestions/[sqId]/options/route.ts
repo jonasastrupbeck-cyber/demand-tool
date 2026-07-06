@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStudyByCode, getSubquestions, addSubquestionOption, type OptionPolarity } from '@/lib/queries';
 
-const POLARITIES: OptionPolarity[] = ['positive', 'negative'];
+const POLARITIES: OptionPolarity[] = ['positive', 'negative', 'concern'];
 
 // POST — add an option to a choice subquestion. polarity is optional; 'negative'
 // prompts the collector to close the case at capture (never auto-closes).

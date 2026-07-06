@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStudyByCode, getSubquestions, updateSubquestionOption, deleteSubquestionOption, type OptionPolarity } from '@/lib/queries';
 
-const POLARITIES: OptionPolarity[] = ['positive', 'negative'];
+const POLARITIES: OptionPolarity[] = ['positive', 'negative', 'concern'];
 
 // Does this option belong to a subquestion of this study?
 async function ownsOption(studyId: string, optId: string) {

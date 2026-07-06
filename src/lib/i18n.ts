@@ -4070,6 +4070,12 @@ const translations = {
     sv: 'Neutral',
     de: 'Neutral',
   },
+  'settings.optionNegative': {
+    en: 'Negative',
+    da: 'Negativ',
+    sv: 'Negativ',
+    de: 'Negativ',
+  },
   'settings.optionSuggestClose': {
     en: 'Suggest closing case',
     da: 'Foreslå at lukke sagen',

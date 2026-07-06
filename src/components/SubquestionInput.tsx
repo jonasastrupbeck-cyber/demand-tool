@@ -7,15 +7,19 @@
  * amount / number → number input; date → date input; duration → years+months;
  * text → free text (a named box, e.g. "Solicitor firm"); choice → a row of
  * pills built from the subquestion's options, coloured by polarity (positive =
- * green, negative = red, none = sky). Selecting a negative-polarity option calls
- * onNegativePick so the caller can offer to close the case.
+ * green, concern = amber, negative = red, none = sky). Selecting a NEGATIVE
+ * option calls onNegativePick so the caller can offer to close the case; a
+ * 'concern' option is negative-but-informational and never prompts.
  */
 
 import { useLocale } from '@/lib/locale-context';
 import { formatCurrency, currencyForSubquestion, parseAmountLoose } from '@/lib/format-currency';
 
 export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
-export type OptionPolarity = 'positive' | 'negative' | null;
+// 'concern' (2026-07-06) = a NEGATIVE outcome that is purely informational — it
+// colours the pill amber but never offers to close the case. 'negative' remains
+// the "suggest closing" outcome (fires onNegativePick). null = neutral.
+export type OptionPolarity = 'positive' | 'negative' | 'concern' | null;
 
 export interface SubquestionOption {
   id: string;
@@ -66,13 +70,15 @@ export const EMPTY_DRAFT: Draft = { num: '', date: '', years: '', months: '', ch
 // Selected outcome = the softer customer-context tone (2026-07-05), not the
 // heavy solid -600. RESTING below stays a lighter wash; the selected pill is a
 // step darker (bg -100, border -400) so it still reads as chosen.
-const POLARITY_ACTIVE: Record<'positive' | 'negative' | 'none', string> = {
+const POLARITY_ACTIVE: Record<'positive' | 'negative' | 'concern' | 'none', string> = {
   positive: 'bg-green-200 text-green-900 border-green-500',
+  concern: 'bg-amber-200 text-amber-900 border-amber-500',
   negative: 'bg-red-200 text-red-900 border-red-500',
   none: 'bg-sky-200 text-sky-900 border-sky-500',
 };
-const POLARITY_RESTING: Record<'positive' | 'negative' | 'none', string> = {
+const POLARITY_RESTING: Record<'positive' | 'negative' | 'concern' | 'none', string> = {
   positive: 'border-green-300 text-green-800 bg-green-50 hover:bg-green-100',
+  concern: 'border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100',
   negative: 'border-red-300 text-red-800 bg-red-50 hover:bg-red-100',
   none: 'border-sky-300 text-sky-800 bg-sky-50 hover:bg-sky-100',
 };

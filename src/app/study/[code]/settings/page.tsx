@@ -114,7 +114,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeExclusions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeExclusions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | 'concern' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -129,7 +129,7 @@ interface StudyData {
 // drop onto a milestone. Labels are English starters (renameable per study);
 // options carry polarity only where an outcome is implied. Add on demand — none
 // are auto-seeded.
-type Preset = { key: string; label: string; options: { label: string; polarity?: 'positive' | 'negative' }[] };
+type Preset = { key: string; label: string; options: { label: string; polarity?: 'positive' | 'negative' | 'concern' }[] };
 const PRESET_SUBQUESTIONS: Preset[] = [
   { key: 'avm', label: 'AVM or Standard', options: [{ label: 'AVM' }, { label: 'Standard' }] },
   { key: 'confidence', label: 'Confidence grade', options: ['A', 'B', 'C', 'D', 'E', 'U'].map((l) => ({ label: l })) },
@@ -583,7 +583,7 @@ export default function SettingsPage() {
     await loadStudy();
   }
 
-  function patchOption(msId: string, sqId: string, optId: string, patch: { label?: string; polarity?: 'positive' | 'negative' | null }) {
+  function patchOption(msId: string, sqId: string, optId: string, patch: { label?: string; polarity?: 'positive' | 'negative' | 'concern' | null }) {
     const clean: typeof patch = {};
     if (typeof patch.label === 'string' && patch.label.trim()) clean.label = patch.label.trim();
     if (patch.polarity !== undefined) clean.polarity = patch.polarity;
@@ -1684,10 +1684,11 @@ export default function SettingsPage() {
                             compact
                             ariaLabel={t('settings.optionPolarity')}
                             value={o.polarity ?? 'none'}
-                            onChange={(v) => patchOption(msId, sq.id, o.id, { polarity: v === 'none' ? null : (v as 'positive' | 'negative') })}
+                            onChange={(v) => patchOption(msId, sq.id, o.id, { polarity: v === 'none' ? null : (v as 'positive' | 'negative' | 'concern') })}
                             options={[
                               { value: 'positive', label: t('settings.optionOnTrack'), activeColor: 'green' },
                               { value: 'none', label: t('settings.optionNeutral'), activeColor: 'blue' },
+                              { value: 'concern', label: t('settings.optionNegative'), activeColor: 'amber' },
                               { value: 'negative', label: t('settings.optionSuggestClose'), activeColor: 'red' },
                             ]}
                           />

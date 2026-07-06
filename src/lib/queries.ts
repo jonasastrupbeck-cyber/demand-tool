@@ -1917,7 +1917,9 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
 // the required ones completes the milestone (recomputeCaseMilestone).
 
 export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
-export type OptionPolarity = 'positive' | 'negative';
+// 'concern' = negative-but-informational (amber, no close prompt); 'negative' =
+// suggests closing the case. Keep in sync with SubquestionInput.OptionPolarity.
+export type OptionPolarity = 'positive' | 'negative' | 'concern';
 
 // Field-type edit compatibility lives in a client-safe module (see 0054); re-export
 // so server callers can import it from here alongside the rest of the data layer.

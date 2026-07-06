@@ -416,13 +416,14 @@ export const subquestions = pgTable('subquestions', {
   migratedFromFieldId: text('migrated_from_field_id'),
 });
 
-// Options for a choice subquestion. polarity null = a plain choice; 'negative'
-// prompts the collector to close the case (never auto-closes).
+// Options for a choice subquestion. polarity null = neutral; 'positive' = on
+// track; 'concern' = a negative outcome that's informational only (amber, 2026-07-06);
+// 'negative' = suggests closing the case (prompts the collector, never auto-closes).
 export const subquestionOptions = pgTable('subquestion_options', {
   id: text('id').primaryKey(),
   subquestionId: text('subquestion_id').notNull().references(() => subquestions.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
-  polarity: text('polarity').$type<'positive' | 'negative'>(),
+  polarity: text('polarity').$type<'positive' | 'negative' | 'concern'>(),
   sortOrder: integer('sort_order').notNull().default(0),
 });
 
