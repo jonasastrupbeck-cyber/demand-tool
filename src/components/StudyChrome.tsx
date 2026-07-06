@@ -69,15 +69,15 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
             empty band on top), tabs absolutely centred on the line, and the controls
             bottom-right — all at ~the same height above the line. */}
         <div className="px-6">
-          <div className="relative flex items-end -mb-px">
-            <Link href="/" className="flex items-center pt-2 pb-3 hover:opacity-80 transition-opacity">
+          <div className="relative flex flex-wrap items-end justify-between gap-x-4 gap-y-2 -mb-px">
+            <Link href="/" className="flex items-center pt-2 pb-3 hover:opacity-80 transition-opacity shrink-0">
               {isFlow ? (
-                <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={218} height={93} className="h-[93px] w-auto" priority />
+                <Image src="/vgskip-v2.png" alt="Skipton Building Society · Powered by Vanguard Method" width={218} height={93} className="h-16 sm:h-20 lg:h-[93px] w-auto" priority />
               ) : (
                 <Image src="/vanguard-logo.png" alt="Vanguard" width={44} height={48} className="h-11 w-auto" priority />
               )}
             </Link>
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-0 flex items-end gap-2">
+            <div className="order-last w-full flex items-end justify-center gap-2 lg:order-none lg:w-auto lg:absolute lg:left-1/2 lg:-translate-x-1/2 lg:bottom-0">
               {workflowTabs.map((tab) => {
                 const isActive = pathname.startsWith(tab.href);
                 return (
@@ -95,7 +95,7 @@ export default function StudyChrome({ code, isFlow, children }: { code: string; 
                 );
               })}
             </div>
-            <div className="absolute right-0 bottom-0 flex items-center gap-3 pb-1">
+            <div className="flex items-center gap-3 pb-1 shrink-0">
               <UndoButton code={code} />
               <select
                 value={locale}
