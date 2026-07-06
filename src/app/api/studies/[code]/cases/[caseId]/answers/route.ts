@@ -95,5 +95,13 @@ export async function POST(
     // Completing the final milestone auto-closes the case (un-completing reopens).
     await recomputeCaseClosure(caseId, study.id, applicable);
   }
-  return NextResponse.json(await getCaseSubquestionAnswers(caseId), { status: 201 });
+  // Return everything the client needs to update in place — the saved answers,
+  // the recomputed milestone completions, and the (possibly auto-closed) status
+  // — so the capture UI never has to refetch the whole case (one parallel read).
+  const [answers, milestones, updatedCase] = await Promise.all([
+    getCaseSubquestionAnswers(caseId),
+    getCaseMilestones(caseId),
+    getCase(caseId),
+  ]);
+  return NextResponse.json({ answers, milestones, status: updatedCase?.status ?? caseRow.status }, { status: 201 });
 }

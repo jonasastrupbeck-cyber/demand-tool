@@ -1054,6 +1054,12 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                     collectorName={collectorName}
                     compact
                     onChanged={() => loadCase(caseRow.id)}
+                    onSaved={(r) => {
+                      // Patch state in place instead of a full-case refetch (perf).
+                      setSubquestionAnswers(r.answers);
+                      setCaseMilestones(r.milestones);
+                      if (r.status) setCaseRow((prev) => (prev ? { ...prev, status: r.status } as CaseRow : prev));
+                    }}
                   />
                 </div>
               </div>

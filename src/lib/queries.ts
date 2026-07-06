@@ -1493,25 +1493,30 @@ export async function createEntry(studyId: string, data: {
     customerFelt: data.customerFelt ?? null,
   });
 
-  // Insert what matters junction records
+  // Junctions are independent of each other (thinkings uses the in-memory `scs`,
+  // not a DB read), so run them concurrently. Under the Neon HTTP driver each
+  // awaited statement is its own round-trip, so this collapses the sequential
+  // junction writes into a single wave.
+  const scs = data.systemConditions || [];
+  const scVisible = !!data.classification && data.classification !== 'unknown';
+  const ths = data.thinkings || [];
+  const jobs: Promise<unknown>[] = [];
+
+  // Insert what matters junction records (batched multi-row insert).
   const whatMattersIds = data.whatMattersTypeIds || (data.whatMattersTypeId ? [data.whatMattersTypeId] : []);
   if (isDemand && whatMattersIds.length > 0) {
-    // Batched: one multi-row insert instead of one round-trip per row (neon-http).
-    await db.insert(demandEntryWhatMatters).values(
+    jobs.push(db.insert(demandEntryWhatMatters).values(
       whatMattersIds.map((wmtId) => ({ id: generateId(), demandEntryId: id, whatMattersTypeId: wmtId })),
-    );
+    ));
   }
 
   // Insert system condition junction records.
   // Per Ali feedback 2026-04-16: failure work can be hidden inside ANY outcome,
   // so SC is accepted on every classified entry (mirrors the UI gate in
   // capture/page.tsx and EntryEditModal.tsx). Only rejected when classification
-  // is unset or 'unknown'.
-  // Each entry carries a "dimension" (helps | hinders) — Phase 2 / Item 3.
-  const scs = data.systemConditions || [];
-  const scVisible = !!data.classification && data.classification !== 'unknown';
+  // is unset or 'unknown'. Each entry carries a "dimension" (helps | hinders).
   if (scVisible && scs.length > 0) {
-    await db.insert(demandEntrySystemConditions).values(
+    jobs.push(db.insert(demandEntrySystemConditions).values(
       scs.map((sc) => {
         // Attachment defaults: if the caller didn't specify any, assume attaches
         // to Demand — matches the old implicit semantics so existing callers
@@ -1529,14 +1534,13 @@ export async function createEntry(studyId: string, data: {
           attachesToWork:        !!sc.attachesToWork,
         };
       }),
-    );
+    ));
   }
 
   // Insert thinking junction records (mirrors system conditions visibility).
   // Each entry carries a per-pair "logic" (free-text reasoning), a per-thinking
   // helps/hinders dimension (migration 0012), and zero or more SC attachments
   // (migration 0011 — dimension later removed in 0012).
-  const ths = data.thinkings || [];
   if (scVisible && ths.length > 0) {
     const scIdsOnEntry = new Set(scs.map((s) => s.id));
     const thRows = ths.map((th) => ({
@@ -1552,8 +1556,10 @@ export async function createEntry(studyId: string, data: {
         .filter((att) => scIdsOnEntry.has(att.systemConditionId))
         .map((att) => ({ id: generateId(), demandEntryId: id, thinkingId: th.id, systemConditionId: att.systemConditionId })),
     );
-    await db.insert(demandEntryThinkings).values(thRows);
-    if (thScRows.length > 0) await db.insert(demandEntryThinkingScs).values(thScRows);
+    jobs.push((async () => {
+      await db.insert(demandEntryThinkings).values(thRows);
+      if (thScRows.length > 0) await db.insert(demandEntryThinkingScs).values(thScRows);
+    })());
   }
 
   // Insert work-description blocks (Work tab only, Phase 2 / Item 4).
@@ -1581,10 +1587,14 @@ export async function createEntry(studyId: string, data: {
         blockScRows.push({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
       }
     }
-    await db.insert(workDescriptionBlocks).values(blockRows);
-    if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
+    // blockScRows FK-reference the block rows, so insert blocks first.
+    jobs.push((async () => {
+      await db.insert(workDescriptionBlocks).values(blockRows);
+      if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
+    })());
   }
 
+  await Promise.all(jobs);
   return id;
 }
 
@@ -2167,36 +2177,51 @@ export async function setCaseSubquestionAnswers(
     .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, ids)));
   const existingBySq = new Map(existing.map((e) => [e.subquestionId, e]));
   const touched = new Set<string>();
+  // Perf: batch the writes. Under the Neon HTTP driver each awaited statement is
+  // its own round-trip, so a per-answer loop was N sequential round-trips. Split
+  // into ONE delete (the cleared subquestions) + ONE multi-row upsert (the filled
+  // ones); they hit disjoint rows so they can run concurrently.
+  const toDelete: string[] = [];
+  const toUpsert: (typeof caseSubquestionAnswers.$inferInsert)[] = [];
   for (const a of answers) {
     const kind = kindById.get(a.subquestionId);
     if (!kind) continue; // unknown subquestion — ignore
     const ms = msById.get(a.subquestionId);
     if (ms) touched.add(ms);
-    const filled = answerIsFilled(kind, a);
-    if (!filled) {
-      await db.delete(caseSubquestionAnswers)
-        .where(and(eq(caseSubquestionAnswers.caseId, caseId), eq(caseSubquestionAnswers.subquestionId, a.subquestionId)));
-      continue;
-    }
+    if (!answerIsFilled(kind, a)) { toDelete.push(a.subquestionId); continue; }
     // Freeze at first fill: keep an existing answer's date; a new answer takes
     // the caller-supplied date (backdated capture) or now.
     const answeredAt = existingBySq.get(a.subquestionId)?.answeredAt ?? a.answeredAt ?? new Date();
-    await db.insert(caseSubquestionAnswers)
-      .values({
-        id: generateId(), caseId, subquestionId: a.subquestionId,
-        valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
-        valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
-        answeredAt, recordedByCollector: a.recordedByCollector ?? null,
-      })
-      .onConflictDoUpdate({
-        target: [caseSubquestionAnswers.caseId, caseSubquestionAnswers.subquestionId],
-        set: {
-          valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
-          valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
-          answeredAt, recordedByCollector: a.recordedByCollector ?? null,
-        },
-      });
+    toUpsert.push({
+      id: generateId(), caseId, subquestionId: a.subquestionId,
+      valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
+      valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
+      answeredAt, recordedByCollector: a.recordedByCollector ?? null,
+    });
   }
+  await Promise.all([
+    toDelete.length
+      ? db.delete(caseSubquestionAnswers)
+          .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, toDelete)))
+      : Promise.resolve(),
+    toUpsert.length
+      ? db.insert(caseSubquestionAnswers).values(toUpsert).onConflictDoUpdate({
+          target: [caseSubquestionAnswers.caseId, caseSubquestionAnswers.subquestionId],
+          // `excluded.*` = the row proposed for insertion (the answeredAt in it is
+          // already frozen above), so an update copies the incoming values.
+          set: {
+            valueNumber: sql`excluded.value_number`,
+            valueDate: sql`excluded.value_date`,
+            valueYears: sql`excluded.value_years`,
+            valueMonths: sql`excluded.value_months`,
+            valueChoice: sql`excluded.value_choice`,
+            valueText: sql`excluded.value_text`,
+            answeredAt: sql`excluded.answered_at`,
+            recordedByCollector: sql`excluded.recorded_by_collector`,
+          },
+        })
+      : Promise.resolve(),
+  ]);
   return [...touched];
 }
 
@@ -2619,45 +2644,90 @@ export async function updateEntry(entryId: string, data: {
     updateFields.verbatim = concatWorkBlocks(workBlocks);
   }
 
+  // Row update + the junctions that don't depend on each other run concurrently
+  // (Neon HTTP = one round-trip per await; parallel collapses them into ~1 wave).
+  // `thinkings` is handled AFTER this group because it reads the entry's now-
+  // current system conditions. Within each junction, delete precedes insert.
+  const jobs: Promise<unknown>[] = [];
+
   if (Object.keys(updateFields).length > 0) {
-    await db.update(demandEntries).set(updateFields).where(eq(demandEntries.id, entryId));
+    jobs.push(db.update(demandEntries).set(updateFields).where(eq(demandEntries.id, entryId)));
   }
 
   // Update what matters junction records if provided
   if (whatMattersTypeIds !== undefined) {
-    await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
-    if (whatMattersTypeIds.length > 0) {
-      await db.insert(demandEntryWhatMatters).values(
-        whatMattersTypeIds.map((wmtId) => ({ id: generateId(), demandEntryId: entryId, whatMattersTypeId: wmtId })),
-      );
-    }
+    jobs.push((async () => {
+      await db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.demandEntryId, entryId));
+      if (whatMattersTypeIds.length > 0) {
+        await db.insert(demandEntryWhatMatters).values(
+          whatMattersTypeIds.map((wmtId) => ({ id: generateId(), demandEntryId: entryId, whatMattersTypeId: wmtId })),
+        );
+      }
+    })());
   }
 
   // Update system condition junction records if provided. Carries per-pair dimension + 5 field attachments.
   if (systemConditions !== undefined) {
-    await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
-    if (systemConditions.length > 0) {
-      await db.insert(demandEntrySystemConditions).values(
-        systemConditions.map((sc) => {
-          const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
-          return {
-            id: generateId(),
-            demandEntryId: entryId,
-            systemConditionId: sc.id,
-            dimension: sc.dimension || 'hinders',
-            attachesToLifeProblem: !!sc.attachesToLifeProblem,
-            attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
-            attachesToWhatMatters: !!sc.attachesToWhatMatters,
-            attachesToCor:         !!sc.attachesToCor,
-            attachesToWork:        !!sc.attachesToWork,
-          };
-        }),
-      );
-    }
+    jobs.push((async () => {
+      await db.delete(demandEntrySystemConditions).where(eq(demandEntrySystemConditions.demandEntryId, entryId));
+      if (systemConditions.length > 0) {
+        await db.insert(demandEntrySystemConditions).values(
+          systemConditions.map((sc) => {
+            const anyAttachment = sc.attachesToLifeProblem || sc.attachesToDemand || sc.attachesToWhatMatters || sc.attachesToCor || sc.attachesToWork;
+            return {
+              id: generateId(),
+              demandEntryId: entryId,
+              systemConditionId: sc.id,
+              dimension: sc.dimension || 'hinders',
+              attachesToLifeProblem: !!sc.attachesToLifeProblem,
+              attachesToDemand:      anyAttachment ? !!sc.attachesToDemand : true,
+              attachesToWhatMatters: !!sc.attachesToWhatMatters,
+              attachesToCor:         !!sc.attachesToCor,
+              attachesToWork:        !!sc.attachesToWork,
+            };
+          }),
+        );
+      }
+    })());
   }
+
+  // Replace work-description blocks when provided (Work tab only, Phase 2 / Item 4).
+  if (workBlocks !== undefined) {
+    jobs.push((async () => {
+      await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
+      const blockRows: (typeof workDescriptionBlocks.$inferInsert)[] = [];
+      const blockScRows: (typeof workBlockSystemConditions.$inferInsert)[] = [];
+      let order = 0;
+      for (const block of workBlocks) {
+        const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
+        const blockId = generateId();
+        blockRows.push({
+          id: blockId,
+          demandEntryId: entryId,
+          tag: block.tag,
+          text: block.text,
+          sortOrder: order++,
+          workStepTypeId: block.workStepTypeId ?? null,
+          systemConditionId: scIds[0] ?? null,
+          blockDate: block.date ? new Date(block.date) : null,
+          // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
+          demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
+          valueStepId: block.valueStepId ?? null,
+        });
+        for (const scId of scIds) {
+          blockScRows.push({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
+        }
+      }
+      if (blockRows.length > 0) await db.insert(workDescriptionBlocks).values(blockRows);
+      if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
+    })());
+  }
+
+  await Promise.all(jobs);
 
   // Update thinking junction records if provided. Carries per-pair logic, a
   // per-thinking dimension (migration 0012), and SC attachments (migration 0011).
+  // Runs AFTER the group above because it reads the entry's now-current SCs.
   if (thinkings !== undefined) {
     // Clear attachments first - the junction has no cascade on this side, so
     // we need to clean explicitly before re-inserting.
@@ -2681,36 +2751,6 @@ export async function updateEntry(entryId: string, data: {
     );
     if (thRows.length > 0) await db.insert(demandEntryThinkings).values(thRows);
     if (thScRows.length > 0) await db.insert(demandEntryThinkingScs).values(thScRows);
-  }
-
-  // Replace work-description blocks when provided (Work tab only, Phase 2 / Item 4).
-  if (workBlocks !== undefined) {
-    await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
-    const blockRows: (typeof workDescriptionBlocks.$inferInsert)[] = [];
-    const blockScRows: (typeof workBlockSystemConditions.$inferInsert)[] = [];
-    let order = 0;
-    for (const block of workBlocks) {
-      const scIds = [...new Set(block.systemConditionIds ?? (block.systemConditionId ? [block.systemConditionId] : []))];
-      const blockId = generateId();
-      blockRows.push({
-        id: blockId,
-        demandEntryId: entryId,
-        tag: block.tag,
-        text: block.text,
-        sortOrder: order++,
-        workStepTypeId: block.workStepTypeId ?? null,
-        systemConditionId: scIds[0] ?? null,
-        blockDate: block.date ? new Date(block.date) : null,
-        // Per-block failure-demand type (0033): only 'failure demand' steps carry one.
-        demandTypeId: block.tag === 'failure_demand' ? (block.demandTypeId ?? null) : null,
-        valueStepId: block.valueStepId ?? null,
-      });
-      for (const scId of scIds) {
-        blockScRows.push({ id: generateId(), workBlockId: blockId, systemConditionId: scId });
-      }
-    }
-    if (blockRows.length > 0) await db.insert(workDescriptionBlocks).values(blockRows);
-    if (blockScRows.length > 0) await db.insert(workBlockSystemConditions).values(blockScRows);
   }
 }
 

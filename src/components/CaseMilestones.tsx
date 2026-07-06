@@ -78,6 +78,9 @@ interface Props {
   whatMattersTypes?: LinkedWhatMattersType[];
   collectorName: string;
   onChanged: () => Promise<void> | void;
+  // Perf: called with the answers POST response so the parent updates state in
+  // place (no full-case refetch). Falls back to onChanged if absent.
+  onSaved?: (result: { answers: CaseSubquestionAnswer[]; milestones: CaseMilestone[]; status?: string }) => void;
   compact?: boolean;
 }
 
@@ -92,7 +95,7 @@ const draftFromAnswer = (a?: CaseSubquestionAnswer): Draft => ({
 
 const todayISO = () => localDay();
 
-export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, caseDemandTypeIds = [], whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, compact = false }: Props) {
+export default function CaseMilestones({ code, caseId, milestones, answers, caseMilestones, caseDemandTypeIds = [], whatMattersValues = {}, whatMattersTypes = [], collectorName, onChanged, onSaved, compact = false }: Props) {
   const { t, tl, locale } = useLocale();
 
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
@@ -192,7 +195,16 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: answersPayload, recordedByCollector: collectorName || undefined }),
       });
-      if (res.ok) await onChanged();
+      if (res.ok) {
+        // Update in place from the response — no full-case refetch (perf).
+        if (onSaved) {
+          const result = await res.json().catch(() => null);
+          if (result && Array.isArray(result.answers) && Array.isArray(result.milestones)) onSaved(result);
+          else await onChanged();
+        } else {
+          await onChanged();
+        }
+      }
     } catch {
       // Network failure — leave drafts intact so the collector can retry.
     } finally {

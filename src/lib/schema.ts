@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, timestamp, unique, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, timestamp, unique, doublePrecision, index } from 'drizzle-orm/pg-core';
 
 export const studies = pgTable('studies', {
   id: text('id').primaryKey(),
@@ -485,6 +485,9 @@ export const subquestionConditions = pgTable('subquestion_conditions', {
   triggerValue: text('trigger_value').notNull(),
 }, (t) => ({
   uniqCond: unique('subquestion_conditions_unique').on(t.subquestionId, t.parentSubquestionId, t.triggerValue),
+  // Perf index 0058: visibility logic filters children by parent (the unique
+  // above leads with subquestion_id, so it doesn't serve this lookup).
+  parentIdx: index('idx_sqc_parent').on(t.parentSubquestionId),
 }));
 
 // One row per (case, subquestion). The value lives in the column matching the
@@ -563,13 +566,21 @@ export const demandEntries = pgTable('demand_entries', {
   // NULL = never reordered → the timeline falls back to created_at order. Set for
   // every entry in a case once the user drags to reorder its touches.
   sortOrder: integer('sort_order'),
-});
+}, (t) => ({
+  // Perf indexes 0058: the two hottest read filters — a case's timeline and every
+  // study-wide dashboard aggregation. Neither column had any index before.
+  caseIdx: index('idx_demand_entries_case_id').on(t.caseId),
+  studyIdx: index('idx_demand_entries_study_id').on(t.studyId),
+}));
 
 export const demandEntryWhatMatters = pgTable('demand_entry_what_matters', {
   id: text('id').primaryKey(),
   demandEntryId: text('demand_entry_id').notNull().references(() => demandEntries.id, { onDelete: 'cascade' }),
   whatMattersTypeId: text('what_matters_type_id').notNull().references(() => whatMattersTypes.id),
-});
+}, (t) => ({
+  // Perf index 0058: junction read/deleted by entry on every entry edit.
+  entryIdx: index('idx_dewm_entry').on(t.demandEntryId),
+}));
 
 export const systemConditions = pgTable('system_conditions', {
   id: text('id').primaryKey(),
@@ -687,7 +698,10 @@ export const workDescriptionBlocks = pgTable('work_description_blocks', {
   // Value step (migration 0047, 2026-07-03): ONE value step this work relates to.
   // NULL when unset / value_steps disabled. SET NULL mirrors workStepTypeId.
   valueStepId: text('value_step_id').references(() => valueSteps.id, { onDelete: 'set null' }),
-});
+}, (t) => ({
+  // Perf index 0058: blocks are read/deleted by entry on every edit.
+  entryIdx: index('idx_wdb_entry').on(t.demandEntryId),
+}));
 
 // Block ↔ system-condition junction (migration 0032): a flow work block can be
 // driven by several system conditions. Mirrors demand_entry_system_conditions.
