@@ -23,7 +23,15 @@ export async function POST(
   { params }: { params: Promise<{ code: string; caseId: string }> }
 ) {
   const { code, caseId } = await params;
-  const [study, caseRow] = await Promise.all([getStudyByCode(code), getCase(caseId)]);
+  // Perf: read the case's demand types + current answers up front, alongside
+  // study/case — all four need only the code/caseId, so one round-trip. These are
+  // then threaded through every step below so the save never re-reads them.
+  const [study, caseRow, caseDT, preAnswers] = await Promise.all([
+    getStudyByCode(code),
+    getCase(caseId),
+    getCaseDemandTypeIds(caseId),
+    getCaseSubquestionAnswers(caseId),
+  ]);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
   if (!caseRow || caseRow.studyId !== study.id) {
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
@@ -67,33 +75,42 @@ export async function POST(
     });
   }
 
-  const touched = await setCaseSubquestionAnswers(caseId, parsed);
+  // Write the answers (pass the already-loaded subqs + current answers so the
+  // upsert skips its own two reads).
+  const touched = await setCaseSubquestionAnswers(caseId, parsed, subqs, preAnswers);
   // Conditional visibility (0050): drop answers to now-hidden subquestions, then
   // recompute EVERY milestone — a changed choice can hide/reveal children on
-  // other milestones, not just the directly-touched ones. Perf: `subqs` is reused
-  // (already loaded above) and the case demand-type / exclude / optional /
-  // applicable sets are computed ONCE and threaded into the recompute loop, so a
-  // save no longer re-queries them per milestone.
-  await clearHiddenCaseAnswers(caseId, study.id, subqs);
+  // other milestones, not just the directly-touched ones.
   if (touched.length > 0) {
-    // Independent reads — fetch concurrently to avoid stacking Neon latency.
-    const [caseDT, visible, allMs, existingCms] = await Promise.all([
-      getCaseDemandTypeIds(caseId),
-      getCaseVisibleSubquestionIds(caseId, study.id, subqs),
+    // Read the post-write answers ONCE + the milestone metadata, concurrently.
+    // Everything below reads from these in memory — no per-milestone re-reads.
+    const [answersNow, allMs, existingCms, applicable] = await Promise.all([
+      getCaseSubquestionAnswers(caseId),
       getMilestones(study.id),
       getCaseMilestones(caseId),
+      getApplicableMilestoneIds(caseId, study.id, caseDT),
     ]);
+    const visible = await getCaseVisibleSubquestionIds(caseId, study.id, subqs, answersNow);
     // Excluded / not-mandatory subquestion ids derived in memory from subqs
     // (each nests its demand-type sets) intersected with the case's demand types.
     const excluded = new Set(subqs.filter((s) => s.demandTypeExclusions.some((id) => caseDT.includes(id))).map((s) => s.id));
     const optional = new Set(subqs.filter((s) => s.demandTypeOptional.some((id) => caseDT.includes(id))).map((s) => s.id));
-    const applicable = await getApplicableMilestoneIds(caseId, study.id, caseDT);
     const existingByMs = new Map(existingCms.map((r) => [r.milestoneId, r]));
-    // Each milestone's recompute writes an independent row and reads only the
-    // shared (immutable) precomputed sets — run them concurrently.
-    await Promise.all(allMs.map((m) => recomputeCaseMilestone(caseId, m.id, visible, applicable, excluded, optional, subqs, study.id, existingByMs)));
+    // Clearing hidden answers and recomputing each milestone are independent
+    // writes — recompute only reads visible-required answers (never the hidden
+    // ones being cleared), so run the whole group concurrently.
+    await Promise.all([
+      clearHiddenCaseAnswers(caseId, study.id, subqs, visible, answersNow),
+      ...allMs.map((m) => recomputeCaseMilestone(caseId, m.id, visible, applicable, excluded, optional, subqs, study.id, existingByMs, answersNow)),
+    ]);
     // Completing the final milestone auto-closes the case (un-completing reopens).
-    await recomputeCaseClosure(caseId, study.id, applicable);
+    await recomputeCaseClosure(caseId, study.id, applicable, allMs, caseRow);
+  } else {
+    // No write happened (empty payload) → answers unchanged and no completion can
+    // change; still sweep any now-hidden answer for parity with the old always-run
+    // clear, using the already-loaded data (a no-op unless one was left stale).
+    const visible = await getCaseVisibleSubquestionIds(caseId, study.id, subqs, preAnswers);
+    await clearHiddenCaseAnswers(caseId, study.id, subqs, visible, preAnswers);
   }
   // Return everything the client needs to update in place — the saved answers,
   // the recomputed milestone completions, and the (possibly auto-closed) status

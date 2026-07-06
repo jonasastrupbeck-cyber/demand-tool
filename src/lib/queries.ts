@@ -2128,9 +2128,9 @@ export async function getSubquestionConditionsForSubquestion(subquestionId: stri
 // Visible subquestion ids for a case: the study's subquestions (with their
 // conditions) resolved against the case's current choice answers, via the shared
 // pure rule. A subquestion with no conditions is always visible (back-compat).
-export async function getCaseVisibleSubquestionIds(caseId: string, studyId: string, preSubqs?: SubquestionList): Promise<Set<string>> {
+export async function getCaseVisibleSubquestionIds(caseId: string, studyId: string, preSubqs?: SubquestionList, preAnswers?: { subquestionId: string; valueChoice: string | null }[]): Promise<Set<string>> {
   const subqs = preSubqs ?? await getSubquestions(studyId);
-  const answers = await db.select({ subquestionId: caseSubquestionAnswers.subquestionId, valueChoice: caseSubquestionAnswers.valueChoice })
+  const answers = preAnswers ?? await db.select({ subquestionId: caseSubquestionAnswers.subquestionId, valueChoice: caseSubquestionAnswers.valueChoice })
     .from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
   const choiceBySubqId = new Map(answers.map((a) => [a.subquestionId, a.valueChoice]));
   return visibleSubquestionIds(subqs.map((s) => ({ id: s.id, conditions: s.conditions })), choiceBySubqId);
@@ -2140,17 +2140,22 @@ export async function getCaseVisibleSubquestionIds(caseId: string, studyId: stri
 // parent), so a stale answer never lingers nor counts toward completion. Returns
 // the milestoneIds whose answers were cleared. Accepts precomputed subqs/visible
 // (from a caller that already loaded them) to avoid re-querying.
-export async function clearHiddenCaseAnswers(caseId: string, studyId: string, preSubqs?: SubquestionList, preVisible?: Set<string>): Promise<string[]> {
+export async function clearHiddenCaseAnswers(caseId: string, studyId: string, preSubqs?: SubquestionList, preVisible?: Set<string>, preAnswers?: { id: string; subquestionId: string }[]): Promise<string[]> {
   const subqs = preSubqs ?? await getSubquestions(studyId);
   const visible = preVisible ?? await getCaseVisibleSubquestionIds(caseId, studyId, subqs);
-  const answers = await db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
+  const answers = preAnswers ?? await db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
   const msBySubq = new Map(subqs.map((s) => [s.id, s.milestoneId]));
   const clearedMs = new Set<string>();
+  const toDelete: string[] = [];
   for (const a of answers) {
     if (visible.has(a.subquestionId)) continue;
-    await db.delete(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.id, a.id));
+    toDelete.push(a.id);
     const ms = msBySubq.get(a.subquestionId);
     if (ms) clearedMs.add(ms);
+  }
+  // Batch the deletes into one statement (was one round-trip per hidden answer).
+  if (toDelete.length > 0) {
+    await db.delete(caseSubquestionAnswers).where(inArray(caseSubquestionAnswers.id, toDelete));
   }
   return [...clearedMs];
 }
@@ -2166,15 +2171,24 @@ export async function getCaseSubquestionAnswers(caseId: string) {
 export async function setCaseSubquestionAnswers(
   caseId: string,
   answers: ({ subquestionId: string } & AnswerShape & { recordedByCollector?: string | null; answeredAt?: Date | null })[],
+  // Perf: callers that already loaded the study's subquestions and the case's
+  // current answers can pass them in to skip two reads (Neon HTTP round-trips).
+  preSubqs?: { id: string; milestoneId: string; kind: string }[],
+  preExisting?: (typeof caseSubquestionAnswers.$inferSelect)[],
 ): Promise<string[]> {
   if (answers.length === 0) return [];
   const ids = answers.map((a) => a.subquestionId);
-  const sqRows = await db.select({ id: subquestions.id, milestoneId: subquestions.milestoneId, kind: subquestions.kind })
-    .from(subquestions).where(inArray(subquestions.id, ids));
+  const idSet = new Set(ids);
+  const sqRows = preSubqs
+    ? preSubqs.filter((s) => idSet.has(s.id))
+    : await db.select({ id: subquestions.id, milestoneId: subquestions.milestoneId, kind: subquestions.kind })
+        .from(subquestions).where(inArray(subquestions.id, ids));
   const kindById = new Map(sqRows.map((s) => [s.id, s.kind as SubquestionKind]));
   const msById = new Map(sqRows.map((s) => [s.id, s.milestoneId]));
-  const existing = await db.select().from(caseSubquestionAnswers)
-    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, ids)));
+  const existing = preExisting
+    ? preExisting.filter((e) => idSet.has(e.subquestionId))
+    : await db.select().from(caseSubquestionAnswers)
+        .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, ids)));
   const existingBySq = new Map(existing.map((e) => [e.subquestionId, e]));
   const touched = new Set<string>();
   // Perf: batch the writes. Under the Neon HTTP driver each awaited statement is
@@ -2242,6 +2256,9 @@ export async function recomputeCaseMilestone(
   preSubqs?: SubquestionList,
   studyIdIn?: string,
   existingByMs?: Map<string, { id: string; derived: boolean | null }>,
+  // Perf: the full set of the case's current answers, so we don't re-read them
+  // once per milestone during a save (Neon HTTP = one round-trip per read).
+  preAnswers?: (typeof caseSubquestionAnswers.$inferSelect)[],
 ): Promise<boolean> {
   const reqRows = preSubqs
     ? preSubqs.filter((s) => s.milestoneId === milestoneId && s.required).map((s) => ({ id: s.id, kind: s.kind }))
@@ -2289,8 +2306,11 @@ export async function recomputeCaseMilestone(
     return false;
   }
 
-  const answers = await db.select().from(caseSubquestionAnswers)
-    .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, visibleReq.map((r) => r.id))));
+  const visibleReqIds = new Set(visibleReq.map((r) => r.id));
+  const answers = preAnswers
+    ? preAnswers.filter((a) => visibleReqIds.has(a.subquestionId))
+    : await db.select().from(caseSubquestionAnswers)
+        .where(and(eq(caseSubquestionAnswers.caseId, caseId), inArray(caseSubquestionAnswers.subquestionId, [...visibleReqIds])));
   const answerBySq = new Map(answers.map((a) => [a.subquestionId, a]));
 
   let allAnswered = true;
@@ -2317,24 +2337,30 @@ export async function recomputeCaseMilestone(
 // Implicit closure (0043): completing the FINAL milestone (highest sort_order in
 // the study) auto-closes the case; un-completing it reopens — but ONLY if the
 // case was auto-closed (closedReason='final_milestone'), never a manual close.
-export async function recomputeCaseClosure(caseId: string, studyId: string, applicableIn?: Set<string>): Promise<void> {
+export async function recomputeCaseClosure(caseId: string, studyId: string, applicableIn?: Set<string>, preMs?: { id: string; sortOrder: number }[], preCase?: { status: string; closedReason: string | null }): Promise<void> {
   // Dynamic milestones (0051): the "final" milestone is the highest-sortOrder one
   // that APPLIES to this case, not the global last — so a case whose last
   // milestones are scoped out (e.g. additional borrowing) closes on its own last
   // relevant milestone instead of hanging on an irrelevant one.
   const applicable = applicableIn ?? await getApplicableMilestoneIds(caseId, studyId);
-  const ms = (await db.select({ id: milestones.id, sortOrder: milestones.sortOrder })
-    .from(milestones).where(eq(milestones.studyId, studyId))
-    .orderBy(desc(milestones.sortOrder)))
+  const msSource = preMs ?? await db.select({ id: milestones.id, sortOrder: milestones.sortOrder })
+    .from(milestones).where(eq(milestones.studyId, studyId));
+  const ms = [...msSource]
+    .sort((a, b) => b.sortOrder - a.sortOrder)
     .filter((m) => applicable.has(m.id));
   const final = ms[0];
   if (!final) return; // no applicable milestones → nothing drives closure
 
-  const caseRow = (await db.select().from(cases).where(eq(cases.id, caseId)))[0];
+  // The case's pre-save status/closedReason is still current here (only THIS
+  // function changes them), so a caller can pass it to skip the re-read. The
+  // final milestone's completion must be read fresh (recompute just wrote it);
+  // run whatever reads remain concurrently.
+  const [caseRow, finalDone] = await Promise.all([
+    preCase ? Promise.resolve(preCase) : db.select().from(cases).where(eq(cases.id, caseId)).then((r) => r[0]),
+    db.select().from(caseMilestones)
+      .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, final.id))).then((r) => r[0]),
+  ]);
   if (!caseRow) return;
-
-  const finalDone = (await db.select().from(caseMilestones)
-    .where(and(eq(caseMilestones.caseId, caseId), eq(caseMilestones.milestoneId, final.id))))[0];
 
   if (finalDone && caseRow.status === 'open') {
     await updateCase(caseId, { status: 'closed', closedAt: finalDone.reachedAt, closedReason: 'final_milestone' });
@@ -2471,9 +2497,12 @@ export async function getCaseOptionalSubquestionIds(caseId: string, studyId: str
 // unless its exclusion set intersects the case's demand types. No rows = applies
 // to all. Optional precomputed `caseDemandTypeIds` avoids a re-query in the save loop.
 export async function getApplicableMilestoneIds(caseId: string, studyId: string, caseDemandTypeIds?: string[]): Promise<Set<string>> {
-  const ms = await getMilestones(studyId);
-  const excls = await getMilestoneDemandTypeExclusions(studyId);
-  const caseDT = new Set(caseDemandTypeIds ?? await getCaseDemandTypeIds(caseId));
+  const [ms, excls, caseDTArr] = await Promise.all([
+    getMilestones(studyId),
+    getMilestoneDemandTypeExclusions(studyId),
+    caseDemandTypeIds ? Promise.resolve(caseDemandTypeIds) : getCaseDemandTypeIds(caseId),
+  ]);
+  const caseDT = new Set(caseDTArr);
   const byMs = new Map<string, string[]>();
   for (const c of excls) { const l = byMs.get(c.milestoneId) ?? []; l.push(c.demandTypeId); byMs.set(c.milestoneId, l); }
   const applies = new Set<string>();
