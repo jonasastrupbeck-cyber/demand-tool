@@ -364,10 +364,13 @@ export default function DashboardPage() {
     setCapPptxExporting(true);
     try {
       const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-chart-export], [data-capability-export]'));
-      const slides: { title: string; dataUrl: string }[] = [];
+      const slides: { title: string; dataUrl: string; wPx: number; hPx: number }[] = [];
       for (const node of nodes) {
+        // Capture the on-screen pixel size so the slide can keep the chart's
+        // exact aspect ratio (rect is full-size even when the card is collapsed).
+        const rect = node.getBoundingClientRect();
         const dataUrl = await nodeToPngDataUrl(node);
-        slides.push({ title: node.getAttribute('data-chart-title') || node.getAttribute('data-cap-title') || studyName || code, dataUrl });
+        slides.push({ title: node.getAttribute('data-chart-title') || node.getAttribute('data-cap-title') || studyName || code, dataUrl, wPx: rect.width, hPx: rect.height });
       }
       if (slides.length) {
         const rangeLabel = dateRange === 'custom' && (customFrom || customTo)
@@ -1839,7 +1842,7 @@ export default function DashboardPage() {
                   P2BS-scoped. Self-gates on the feature + having data. */}
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
                 <ChartCard title={t('dashboard.workByValueStepTitle')}>
-                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.workByValueStepHint')}</p>
+                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.workByValueStepHint')}</p>
                   <ResponsiveContainer width="100%" height={Math.max(220, data.workByValueStep.length * 44 + 48)}>
                     <BarChart data={data.workByValueStep.map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
@@ -1863,7 +1866,7 @@ export default function DashboardPage() {
                   the chart; plain CSS bars, no recharts. */}
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
                 <ChartCard title={t('dashboard.valueStepOverviewTitle')}>
-                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.valueStepOverviewHint')}</p>
+                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.valueStepOverviewHint')}</p>
                   <div className="space-y-3">
                     {data.workByValueStep.map((step) => {
                       const total = step.value + step.sequence + step.failure + step.failureDemand;
@@ -1948,7 +1951,7 @@ export default function DashboardPage() {
                   (decidedAt) like everything else on this tab. */}
               {askDelivery && askDelivery.length > 0 && (
                 <ChartCard title={t('dashboard.askDeliveryTitle')}>
-                  <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.askDeliveryHint')}</p>
+                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
                   <div className="space-y-2">
                     {askDelivery.map((r) => {
                       // pct over EVALUATED cases only; a row can exist purely on
@@ -2026,7 +2029,7 @@ export default function DashboardPage() {
                 const avgOver = over.length ? Math.round(over.reduce((s, p) => s + p.diffAmount, 0) / over.length) : null;
                 return (
                   <ChartCard title={t('dashboard.budgetCapabilityTitle')}>
-                    <p className="text-xs text-gray-500 mb-3 -mt-2">{t('dashboard.budgetCapabilityHint')}</p>
+                    <p className="text-xs text-gray-500 mb-3">{t('dashboard.budgetCapabilityHint')}</p>
                     <div className="flex flex-wrap items-center gap-3 mb-3">
                       {budgetCapability.length > 1 && (
                         <PillToggle
@@ -2400,7 +2403,10 @@ function ChartCard({ title, children, collapsible = false, defaultOpen = true }:
         )}
       </div>
       <div className={isCollapsible && !open ? 'max-h-0 overflow-hidden' : ''}>
-        <div data-chart-export data-chart-title={title} className="px-5 pb-5">
+        {/* pt-1 so captured PNGs (export region = this node, title lives in the
+            header above and is added to the slide separately) never crop content
+            flush against the top edge. */}
+        <div data-chart-export data-chart-title={title} className="px-5 pt-1 pb-5">
           {children}
         </div>
       </div>

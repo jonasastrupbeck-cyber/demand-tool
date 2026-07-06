@@ -15,7 +15,7 @@ const GREY = '6b7280';
 const LOGO_RATIO = 1550 / 658;
 
 export async function exportCapabilityChartsToPptx(
-  slides: { title: string; dataUrl: string }[],
+  slides: { title: string; dataUrl: string; wPx: number; hPx: number }[],
   studyName: string,
   dateRangeLabel: string,
   fileName: string,
@@ -43,12 +43,21 @@ export async function exportCapabilityChartsToPptx(
   }
 
   // ── One slide per chart ──
+  // Preserve each chart's on-screen aspect ratio EXACTLY (pptxgenjs `sizing:
+  // contain` can't read intrinsic dimensions from a dataURL, so it stretches).
+  // We fit the captured pixel ratio into the body band ourselves and centre it —
+  // matching the dashboard proportions matters more than filling the slide.
+  const BODY_Y = 1.0, BODY_W = 12.5, BODY_H = 5.5, SLIDE_W = 13.33;
   for (const s of slides) {
     const slide = pptx.addSlide();
     slide.background = { color: 'FFFFFF' };
     slide.addText(s.title, { x: 0.4, y: 0.3, w: 12.5, h: 0.6, fontSize: 14, bold: true, color: '1f2937' });
-    // Contain the chart image within the body area, preserving aspect ratio.
-    slide.addImage({ data: s.dataUrl, x: 0.4, y: 1.0, w: 12.5, h: 5.5, sizing: { type: 'contain', w: 12.5, h: 5.5 } });
+    const ar = s.hPx > 0 ? s.wPx / s.hPx : BODY_W / BODY_H;
+    let w = BODY_W, h = BODY_W / ar;
+    if (h > BODY_H) { h = BODY_H; w = BODY_H * ar; }
+    const x = (SLIDE_W - w) / 2;            // centre horizontally in the slide
+    const y = BODY_Y + (BODY_H - h) / 2;    // centre vertically in the body band
+    slide.addImage({ data: s.dataUrl, x, y, w, h });
     addLogoFooter(slide);
   }
 
