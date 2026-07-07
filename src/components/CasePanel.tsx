@@ -14,7 +14,7 @@
  * saved entry; `refreshSignal` bumps after each save so the timeline refetches.
  */
 
-import { memo, useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
@@ -248,6 +248,65 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   };
   const onRailScroll = () => syncScroll(workScrollRef.current, workScrollTopRef.current);
   const onTopScroll = () => syncScroll(workScrollTopRef.current, workScrollRef.current);
+
+  // Resizable customer-context (green) box (2026-07-07). On a laptop the right
+  // cluster (decision box + COR) is tight. Besides the responsive auto-compact
+  // widths, let the collector drag the LEFT dashed divider to narrow/widen the
+  // green box; the freed width flows to the work rail + right cluster. The width
+  // is md+ only (inline style isn't responsive) and persists per study.
+  // greenWidth === null → use the responsive Tailwind classes (auto-compact).
+  const asideRef = useRef<HTMLElement>(null);
+  const [isMdUp, setIsMdUp] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsMdUp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  const GREEN_MIN = 192, GREEN_MAX = 384;
+  const [greenWidth, setGreenWidth] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`panelWidths:${code}`);
+      if (raw) {
+        const v = JSON.parse(raw);
+        if (typeof v?.greenWidth === 'number' && v.greenWidth >= GREEN_MIN && v.greenWidth <= GREEN_MAX) {
+          setGreenWidth(v.greenWidth);
+        }
+      }
+    } catch {}
+  }, [code]);
+  const greenDrag = useRef<{ x: number; w: number } | null>(null);
+  const onGreenResizeMove = useCallback((e: PointerEvent) => {
+    const d = greenDrag.current;
+    if (!d) return;
+    const next = Math.min(GREEN_MAX, Math.max(GREEN_MIN, d.w + (e.clientX - d.x)));
+    setGreenWidth(next);
+  }, []);
+  const onGreenResizeEnd = useCallback(() => {
+    greenDrag.current = null;
+    document.removeEventListener('pointermove', onGreenResizeMove);
+    measureRail();
+    // Read the settled width via the functional updater (avoids a stale closure).
+    setGreenWidth((w) => {
+      try { localStorage.setItem(`panelWidths:${code}`, JSON.stringify({ greenWidth: w })); } catch {}
+      return w;
+    });
+  }, [onGreenResizeMove, measureRail, code]);
+  const onGreenResizeStart = (e: ReactPointerEvent) => {
+    if (!isMdUp) return;
+    e.preventDefault();
+    const startW = greenWidth ?? asideRef.current?.getBoundingClientRect().width ?? 208;
+    greenDrag.current = { x: e.clientX, w: startW };
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    document.addEventListener('pointermove', onGreenResizeMove);
+    document.addEventListener('pointerup', onGreenResizeEnd, { once: true });
+  };
+  const resetGreenWidth = () => {
+    setGreenWidth(null);
+    try { localStorage.removeItem(`panelWidths:${code}`); } catch {}
+  };
 
   // Always holds the latest active case id, so an in-flight loadCase can bail if
   // the collector switched customers before its response arrived (otherwise an
@@ -955,8 +1014,13 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           Below lg it stacks vertically — capture-first order: context → composer →
           touches → decisions. R2: lg:items-start; R5: dashed zone boundaries. */}
       <div className="flex flex-col gap-3 md:flex-row md:gap-0 md:items-stretch min-h-[24rem]">
-        {/* PINNED LEFT — the customer. Always visible. */}
-        <aside className="order-1 w-full md:w-64 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
+        {/* PINNED LEFT — the customer. Always visible. Auto-compact on laptops
+            (md:w-52 → 2xl:w-64); a saved/dragged width (md+ only) overrides via
+            inline style so the collector can reclaim room for the right cluster. */}
+        <aside
+          ref={asideRef}
+          style={isMdUp && greenWidth != null ? { width: greenWidth, flex: '0 0 auto' } : undefined}
+          className="order-1 w-full md:w-52 2xl:w-64 shrink-0 rounded-xl border-2 border-green-600 bg-green-100/50 p-3">
           {studyName && <p className="text-center text-xs font-semibold text-gray-500 truncate mb-2">{studyName}</p>}
           {/* Open-new / close / set-aside moved to the customer action bar above. */}
           {headerRow}
@@ -978,15 +1042,23 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           {attachLastChip}
         </aside>
 
-        {/* ┊ LEFT dashed line — full board height (matches the right one). */}
-        <div aria-hidden className="hidden md:flex shrink-0 self-stretch items-stretch mx-3 md:order-2">
-          <div className="border-l-4 border-dashed border-gray-500 h-full" />
+        {/* ┊ LEFT dashed line — full board height (matches the right one). Doubles
+            as a drag handle to resize the green box (md+); double-click resets. */}
+        <div
+          aria-hidden
+          onPointerDown={onGreenResizeStart}
+          onDoubleClick={resetGreenWidth}
+          className="hidden md:flex shrink-0 self-stretch items-stretch mx-1 md:order-2 group cursor-col-resize touch-none select-none"
+        >
+          <div className="w-4 flex justify-center items-stretch">
+            <div className="border-l-4 border-dashed border-gray-500 group-hover:border-gray-700 transition-colors h-full" />
+          </div>
         </div>
 
         {/* GROUP A — [ captured touches → composer ]. Own horizontal scroll with a
             min-width = the Work Entry box, so the composer is ALWAYS fully visible;
             scroll left within this group for the captured touches. */}
-        <div className="order-2 md:order-3 flex-1 md:min-w-[42rem] min-w-0 flex flex-col">
+        <div className="order-2 md:order-3 flex-1 md:min-w-[34rem] 2xl:min-w-[42rem] min-w-0 flex flex-col">
         {/* Top mirror scrollbar — desktop only, shown only on horizontal overflow. */}
         <div
           ref={workScrollTopRef}
@@ -1015,7 +1087,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               );
             })}
             {children && (
-              <div ref={composerColRef} className="order-1 md:order-2 w-full md:w-fit md:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
+              <div ref={composerColRef} className="order-1 md:order-2 w-full md:w-fit md:min-w-[32rem] 2xl:min-w-[37rem] shrink-0 rounded-xl border-2 border-brand bg-white p-3 shadow-sm">
                 <p className="text-[10px] uppercase tracking-widest text-brand font-medium mb-1 px-1 text-center">{t('capture.caseComposerHeading')}</p>
                 {children}
               </div>
@@ -1036,7 +1108,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
               which lets the dashed line stretch to the SAME height as the left one. */}
           <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch min-w-0 md:overflow-x-auto">
             {decisionPointsEnabled && (
-              <div className="w-full md:w-64 shrink-0">
+              <div className="w-full md:w-56 2xl:w-64 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">
                   <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                     {t('capture.caseDecisionsHeading')}
@@ -1068,7 +1140,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             <div aria-hidden className="hidden md:flex shrink-0 self-stretch items-stretch mx-3">
               <div className="border-l-4 border-dashed border-gray-500 h-full" />
             </div>
-            <aside className="w-full md:w-72 shrink-0">
+            <aside className="w-full md:w-64 2xl:w-72 shrink-0">
               <p className="text-[10px] uppercase tracking-widest text-sky-700/70 font-medium mb-1 px-1 text-center">
                 {t('capture.handlingLabel')}
               </p>
