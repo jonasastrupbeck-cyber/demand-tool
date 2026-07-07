@@ -53,8 +53,8 @@ export async function GET(
 
   // Resolve a capability event token to a readable label.
   const eventLabel = (token: string): string => {
-    if (token === 'caseOpen') return 'Case opened';
-    if (token === 'firstContact') return 'First contact';
+    // caseOpen is the unified end-to-end start; firstContact is a legacy alias.
+    if (token === 'caseOpen' || token === 'firstContact') return 'First contact (case opened)';
     if (token === 'caseClose') return 'Case closed';
     if (token.startsWith('milestone:')) return msMap.get(token.slice('milestone:'.length)) || token;
     return token;

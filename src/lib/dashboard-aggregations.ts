@@ -869,9 +869,11 @@ export async function getFailureCausesForFlow(
 
 // Capability / lead-time (2026-06-18): the time between any two chosen events
 // across a study's cases, as an XmR individuals (capability) chart. Events:
-//   'caseOpen' | 'firstContact' | 'caseClose' | 'decision:<typeId>' | 'milestone:<id>'
+//   'caseOpen' | 'caseClose' | 'decision:<typeId>' | 'milestone:<id>'
 //   | 'whatMattersTarget:<typeId>'  (the customer's wanted date, 2026-07-01)
 //   | 'whatMattersAsap:<typeId>'    (ASAP anchor milestone reached, 2026-07-01)
+// ('firstContact' is a legacy alias kept only in the resolver — it now resolves
+//  identically to 'caseOpen', 2026-07-07: the two starts were unified.)
 // All timestamps already captured — read-only analytics, no schema change.
 // Reads are kept FLAT and assembled in JS (Drizzle correlated-subquery gotcha).
 type EventToken = string;
@@ -879,7 +881,7 @@ type EventToken = string;
 function eventTimestamp(
   token: EventToken,
   ctx: {
-    openedAt: Date; closedAt: Date | null; firstContactAt: Date | null;
+    openedAt: Date; closedAt: Date | null; earliestTouchAt: Date | null;
     milestones: Map<string, Date>;
     whatMattersTargets: Map<string, Date>;
     // Types this case selected + the study's typeId→anchor-token map, so the ASAP
@@ -887,8 +889,14 @@ function eventTimestamp(
     whatMattersSelected: Set<string>; asapAnchors: Map<string, string>;
   },
 ): Date | null {
-  if (token === 'caseOpen') return ctx.openedAt;
-  if (token === 'firstContact') return ctx.firstContactAt;
+  // The end-to-end start. 'caseOpen' is the real start (cases.openedAt), floored
+  // to the earliest effective touch when that is earlier — so a retrospective
+  // case whose openedAt was left at the data-entry day never starts "today".
+  // 'firstContact' is a legacy alias resolving identically (unified 2026-07-07).
+  if (token === 'caseOpen' || token === 'firstContact') {
+    const t = ctx.earliestTouchAt;
+    return t && t.getTime() < ctx.openedAt.getTime() ? t : ctx.openedAt;
+  }
   if (token === 'caseClose') return ctx.closedAt;
   if (token.startsWith('milestone:')) return ctx.milestones.get(token.slice('milestone:'.length)) ?? null;
   if (token.startsWith('whatMattersTarget:')) return ctx.whatMattersTargets.get(token.slice('whatMattersTarget:'.length)) ?? null;
@@ -995,13 +1003,14 @@ export async function getCapabilityData(
   const annoByCase = new Map<string, { excluded: boolean; note: string | null }>();
   for (const a of annoRows) annoByCase.set(a.caseId, { excluded: a.excluded, note: a.note });
 
-  // Flat reads, one per event source. first contact = earliest EFFECTIVE touch
-  // date per case. Effective date = COALESCE(block_date, entry.created_at): when
-  // a case is entered retrospectively the work-block dates are backdated to when
-  // the touch really happened, while entry.created_at is the data-entry day. Using
-  // created_at alone made first contact land "today", after backdated milestones/
-  // decisions → negative window → the case was silently dropped. Mirrors the
-  // over-time charts' COALESCE(blockDate, createdAt) bucketing (migration 0031).
+  // Flat reads, one per event source. earliestTouch = earliest EFFECTIVE touch
+  // date per case, used to FLOOR the case-open start (see eventTimestamp). Effective
+  // date = COALESCE(block_date, entry.created_at): when a case is entered
+  // retrospectively the work-block dates are backdated to when the touch really
+  // happened, while entry.created_at is the data-entry day. Flooring the start to
+  // this stops a retrospective case (openedAt left at "today") from starting after
+  // its own backdated milestones/decisions → negative window → silently dropped.
+  // Mirrors the over-time charts' COALESCE(blockDate, createdAt) bucketing (0031).
   const [fcRows, msRows] = await Promise.all([
     db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))` })
       .from(demandEntries)
@@ -1046,7 +1055,7 @@ export async function getCapabilityData(
     const ctx = {
       openedAt: new Date(c.openedAt as unknown as string),
       closedAt: c.closedAt ? new Date(c.closedAt as unknown as string) : null,
-      firstContactAt: fcMap.get(c.id) ?? null,
+      earliestTouchAt: fcMap.get(c.id) ?? null,
       milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
       whatMattersTargets: wmTargetByCase.get(c.id) ?? new Map<string, Date>(),
       whatMattersSelected: wmSelectedByCase.get(c.id) ?? new Set<string>(),

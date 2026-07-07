@@ -515,8 +515,9 @@ export const caseSubquestionAnswers = pgTable('case_subquestion_answers', {
 // EXCLUDED from the control-limit calc (with a reason) or carry a NOTE. Scoped
 // to the MEASURE — the (fromEvent, toEvent) pair — so excluding an outlier on
 // one chart doesn't affect another. fromEvent/toEvent are the same string tokens
-// the capability API uses (caseOpen | firstContact | caseClose | decision:<id> |
-// milestone:<id>). Cascades on case delete.
+// the capability API uses (caseOpen | caseClose | decision:<id> | milestone:<id>;
+// legacy rows may carry 'firstContact', now an alias of caseOpen). Cascades on
+// case delete.
 export const capabilityAnnotations = pgTable('capability_annotations', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),

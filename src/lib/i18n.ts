@@ -1848,16 +1848,10 @@ const translations = {
     de: 'Bis',
   },
   'dashboard.evCaseOpened': {
-    en: 'Case opened',
-    da: 'Sag åbnet',
-    sv: 'Ärende öppnat',
-    de: 'Fall eröffnet',
-  },
-  'dashboard.evFirstContact': {
-    en: 'First contact',
-    da: 'Første kontakt',
-    sv: 'Första kontakt',
-    de: 'Erster Kontakt',
+    en: 'First contact (case opened)',
+    da: 'Første kontakt (sag åbnet)',
+    sv: 'Första kontakt (ärende öppnat)',
+    de: 'Erster Kontakt (Fall eröffnet)',
   },
   'dashboard.evCaseClosed': {
     en: 'Case closed',

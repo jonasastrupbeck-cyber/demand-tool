@@ -297,7 +297,7 @@ export default function DashboardPage() {
   }, [dashboardView, hasAmountAsk, code, getDateRangeParams, lifeProblemFilter]);
 
   // Capability: event options (fixed + milestones + decision points) for the
-  // two pickers. Token ids match the backend (caseOpen/firstContact/caseClose,
+  // two pickers. Token ids match the backend (caseOpen/caseClose,
   // milestone:<id>).
   const capabilityAvailable = caseTrackingEnabled && milestones.length > 0;
   // R7: flow studies get a capability-only dashboard (demand widgets stripped).
@@ -328,7 +328,6 @@ export default function DashboardPage() {
       .map((x) => ({ id: `whatMattersAsap:${x.w.id}`, label: `⏱ ${tl(x.w.label)} → ${anchorLabel(x.tok!)}` }));
     return [
       { id: 'caseOpen', label: t('dashboard.evCaseOpened') },
-      { id: 'firstContact', label: t('dashboard.evFirstContact') },
       ...ms,
       ...wm,
       ...wmAsap,

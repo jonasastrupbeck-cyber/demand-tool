@@ -74,14 +74,14 @@ export default function CapabilityChart({
   const collapsible = useCollapsibleCards();
   const [open, setOpen] = useState(true);
 
-  // Default the pickers once options are known: first contact → first milestone
+  // Default the pickers once options are known: case opened → first milestone
   // (or first decision, or case closed).
   useEffect(() => {
     if (capFrom || capTo || eventOptions.length === 0) return;
     const firstMs = eventOptions.find((o) => o.id.startsWith('milestone:'));
     const firstDp = eventOptions.find((o) => o.id.startsWith('decision:'));
     /* eslint-disable react-hooks/set-state-in-effect */
-    setCapFrom('firstContact');
+    setCapFrom('caseOpen');
     setCapTo(firstMs?.id || firstDp?.id || 'caseClose');
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [eventOptions, capFrom, capTo]);
