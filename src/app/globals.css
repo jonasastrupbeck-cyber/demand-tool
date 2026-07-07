@@ -42,9 +42,10 @@ html, body {
   }
 }
 
-/* Top mirror scrollbar for the flow touch rail (2026-07-01). Its content is only
-   1px tall, so macOS overlay scrollbars would stay hidden — force a persistent
-   thin bar (WebKit needs -webkit-appearance: none to override the overlay). */
+/* Synced top mirror scrollbar. Originally the flow touch rail (2026-07-01); now
+   shared by all capture-page horizontal strips via <TopScrollbar> (2026-07-07).
+   Its content is only 1px tall, so macOS overlay scrollbars would stay hidden —
+   force a persistent thin bar (WebKit needs -webkit-appearance: none). */
 .rail-topscroll {
   scrollbar-width: thin;
   scrollbar-color: rgba(100, 116, 139, 0.4) transparent;

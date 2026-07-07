@@ -10,6 +10,7 @@ import { WORK_TAG_PILLS } from '@/lib/work-tag-pills';
 import InfoPopover from './InfoPopover';
 import PillSelect from './PillSelect';
 import { localDay, localDayOf } from '@/lib/local-date';
+import { useSyncedTopScrollbar, TopScrollbar } from '@/components/TopScrollbar';
 
 // Per-block date (slice 2): LOCAL-day YYYY-MM-DD helpers for <input type="date">
 // (must match the local-day display; see local-date.ts).
@@ -126,6 +127,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [whatMattersNoteOpen, setWhatMattersNoteOpen] = useState(false);
   // Phase 4 (2026-04-16) — workStepTypeId + freeText flag; see capture/page.tsx for shape rationale.
   const [workBlocks, setWorkBlocks] = useState<{ _key: string; tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
+  // Synced top scrollbar for the (non-flow) work-block strip in the modal.
+  const wbBar = useSyncedTopScrollbar([workBlocks.length]);
   // One date for the whole work entry (2026-07-02) — mirrors the capture composer.
   // Initialised from the entry on load; on save it's written to every block.
   const [entryDate, setEntryDate] = useState(todayIso());
@@ -668,7 +671,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 </div>
                 {/* Flow mode stacks blocks vertically (full-width) so the
                     per-block SC picker can expand below without clipping. */}
-                <div className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
+                <TopScrollbar bar={wbBar} className="-mx-1 px-1" />
+                <div ref={wbBar.mainRef} onScroll={wbBar.onMainScroll} className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
                   <div className={flowWorkPath ? 'space-y-2' : 'flex gap-2 items-stretch min-w-min'}>
                     {workBlocks.map((b, idx) => {
                       // Phase 4 — same three-mode decision as in capture/page.tsx.

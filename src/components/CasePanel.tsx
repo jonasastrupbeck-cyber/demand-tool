@@ -19,6 +19,7 @@ import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
+import { useSyncedTopScrollbar, TopScrollbar } from '@/components/TopScrollbar';
 import CaseMilestones, { type MilestoneWithSubqs, type CaseMilestone, type CaseSubquestionAnswer } from '@/components/CaseMilestones';
 import { localDay, localDayOf } from '@/lib/local-date';
 
@@ -248,6 +249,10 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   };
   const onRailScroll = () => syncScroll(workScrollRef.current, workScrollTopRef.current);
   const onTopScroll = () => syncScroll(workScrollTopRef.current, workScrollRef.current);
+
+  // Group B (decision box ┊ COR) gets its own synced top scrollbar, same as the
+  // work rail. Re-measures when the case/touches change (COR list length etc.).
+  const gbBar = useSyncedTopScrollbar([activeCaseId, caseRow?.id, entries.length]);
 
   // Resizable customer-context (green) box (2026-07-07). On a laptop the right
   // cluster (decision box + COR) is tight. Besides the responsive auto-compact
@@ -1104,9 +1109,11 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
             GROUP A (the work rail, the sole remaining flex-1). Below 1600px it
             keeps flex-1 + internal scroll (no regression, no page h-scroll). */}
         <div className="order-3 md:order-4 flex-1 min-w-0 min-[1600px]:flex-none md:ml-3 flex flex-col">
+          {/* Synced top scrollbar for the decision ┊ COR row (shown only on overflow). */}
+          <TopScrollbar bar={gbBar} />
           {/* inner row is flex-1 so it fills Group B's (board-stretched) height,
               which lets the dashed line stretch to the SAME height as the left one. */}
-          <div className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch min-w-0 md:overflow-x-auto">
+          <div ref={gbBar.mainRef} onScroll={gbBar.onMainScroll} className="flex flex-col gap-3 md:flex-1 md:flex-row md:gap-0 md:items-stretch min-w-0 md:overflow-x-auto">
             {decisionPointsEnabled && (
               <div className="w-full md:w-56 2xl:w-64 shrink-0">
                 <div className="rounded-xl bg-sky-50/70 border-2 border-sky-300 p-2">

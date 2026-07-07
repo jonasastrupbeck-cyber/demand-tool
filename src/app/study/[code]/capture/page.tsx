@@ -13,6 +13,7 @@ import { WORK_TAG_PILLS } from '@/lib/work-tag-pills';
 import InfoPopover from '@/components/InfoPopover';
 import PillSelect from '@/components/PillSelect';
 import CasePanel from '@/components/CasePanel';
+import { useSyncedTopScrollbar, TopScrollbar } from '@/components/TopScrollbar';
 import { localDay } from '@/lib/local-date';
 
 // Per-block date default (slice 2): today (LOCAL day) as YYYY-MM-DD for the
@@ -235,6 +236,10 @@ export default function CapturePage() {
   // `demandTypeId` (migration 0033, 2026-06-26): per-block failure-demand type,
   // set only when the block's tag is 'failure' (flow work path). Null otherwise.
   const [workBlocks, setWorkBlocks] = useState<{ _key: string; tag: 'value' | 'sequence' | 'failure' | 'failure_demand'; text: string; workStepTypeId: string | null; freeText: boolean; systemConditionIds: string[]; demandTypeId: string | null; valueStepId: string | null }[]>([]);
+  // Synced top scrollbar for the (non-flow) work-block strip. Called before any
+  // early return; the computed-overflow check + ResizeObserver handle the flow
+  // vs non-flow className flip, so workBlocks.length is enough as a dep.
+  const wbBar = useSyncedTopScrollbar([workBlocks.length]);
   // One date for the WHOLE work entry (2026-07-02): flow work used to carry a
   // per-block "Step date"; now a single date near Save applies to every block.
   // Defaults today; set a past day to backdate a retrospectively-captured touch.
@@ -1541,7 +1546,8 @@ export default function CapturePage() {
                 and its per-block system-condition picker/dropdown — can expand
                 downward without the overflow-x-auto strip clipping it. Non-flow
                 studies keep the horizontal scrolling strip. */}
-            <div className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
+            <TopScrollbar bar={wbBar} className="-mx-1 px-1" />
+            <div ref={wbBar.mainRef} onScroll={wbBar.onMainScroll} className={flowWorkPath ? '' : 'overflow-x-auto -mx-1 px-1 pb-2'}>
               {/* R3 (2026-06-17): freeze flow lays work blocks left→right (the
                   outer rail provides the single horizontal scroll); stacked flow
                   keeps the vertical full-width stack. */}
