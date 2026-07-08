@@ -11,6 +11,7 @@ import type { NodeProps, LinkProps } from 'recharts/types/chart/Sankey';
 import type { DashboardData, BudgetCapabilityField } from '@/types';
 import { formatCurrency, currencyForSubquestion } from '@/lib/format-currency';
 import PillToggle from '@/components/PillToggle';
+import PillMultiSelect from '@/components/PillMultiSelect';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
@@ -102,8 +103,10 @@ export default function DashboardPage() {
   const [synthTax, setSynthTax] = useState<'sc' | 'wt' | 'wst'>('sc');
   // Flow analytics (0029): gates the demand-style "Analytics" tab on flow dashboards.
   const [flowAnalyticsEnabled, setFlowAnalyticsEnabled] = useState(false);
-  // P2BS data-scope filter (null = all data) + collapsed coverage box.
-  const [lifeProblemFilter, setLifeProblemFilter] = useState<string | null>(null);
+  // Value-demand data-scope filter (empty = all data), multi-select. Replaces the
+  // former P2BS (life-problem) filter on the flow dashboard. + collapsed coverage box.
+  const [valueDemandFilter, setValueDemandFilter] = useState<string[]>([]);
+  const [valueDemandTypes, setValueDemandTypes] = useState<{ id: string; label: string }[]>([]);
   const [showCoverage, setShowCoverage] = useState(false);
   const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
@@ -181,7 +184,7 @@ export default function DashboardPage() {
     const queryParams: string[] = [];
     if (range.from) queryParams.push(`from=${range.from}`);
     if (range.to) queryParams.push(`to=${range.to}`);
-    if (lifeProblemFilter) queryParams.push(`p2bs=${encodeURIComponent(lifeProblemFilter)}`);
+    if (valueDemandFilter.length) queryParams.push(`valueDemands=${encodeURIComponent(valueDemandFilter.join(','))}`);
     if (queryParams.length) url += '?' + queryParams.join('&');
 
     try {
@@ -191,7 +194,7 @@ export default function DashboardPage() {
     } finally {
       if (dashReqRef.current === reqId) setLoading(false);
     }
-  }, [code, getDateRangeParams, lifeProblemFilter]);
+  }, [code, getDateRangeParams, valueDemandFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -216,6 +219,9 @@ export default function DashboardPage() {
         setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
         setLifeProblemsEnabled(s.lifeProblemsEnabled ?? false);
         setLifeProblems(Array.isArray(s.lifeProblems) ? s.lifeProblems : []);
+        setValueDemandTypes((Array.isArray(s.demandTypes) ? s.demandTypes : [])
+          .filter((d: { category?: string }) => d.category === 'value')
+          .map((d: { id: string; label: string }) => ({ id: d.id, label: d.label })));
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         setWhatMattersTypes(Array.isArray(s.whatMattersTypes) ? s.whatMattersTypes : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -266,14 +272,14 @@ export default function DashboardPage() {
     const range = getDateRangeParams();
     if (range.from) qp.set('from', range.from);
     if (range.to) qp.set('to', range.to);
-    if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    if (valueDemandFilter.length) qp.set('valueDemands', valueDemandFilter.join(','));
     let cancelled = false;
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/ask-delivery?${qp}`)
       .then(r => r.ok ? r.json() : { rows: [] })
       .then(d => { if (!cancelled) setAskDelivery(d.rows); })
       .catch(() => { if (!cancelled) setAskDelivery([]); });
     return () => { cancelled = true; };
-  }, [dashboardView, code, getDateRangeParams, lifeProblemFilter]);
+  }, [dashboardView, code, getDateRangeParams, valueDemandFilter]);
 
   // Budget capability (2026-07-05): fetch only when Ask delivery reports an
   // amount-kind field, so studies without budget asks never pay the request.
@@ -287,14 +293,14 @@ export default function DashboardPage() {
     const range = getDateRangeParams();
     if (range.from) qp.set('from', range.from);
     if (range.to) qp.set('to', range.to);
-    if (lifeProblemFilter) qp.set('p2bs', lifeProblemFilter);
+    if (valueDemandFilter.length) qp.set('valueDemands', valueDemandFilter.join(','));
     let cancelled = false;
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/budget-capability?${qp}`)
       .then(r => r.ok ? r.json() : { fields: [] })
       .then(d => { if (!cancelled) setBudgetCapability(d.fields); })
       .catch(() => { if (!cancelled) setBudgetCapability([]); });
     return () => { cancelled = true; };
-  }, [dashboardView, hasAmountAsk, code, getDateRangeParams, lifeProblemFilter]);
+  }, [dashboardView, hasAmountAsk, code, getDateRangeParams, valueDemandFilter]);
 
   // Capability: event options (fixed + milestones + decision points) for the
   // two pickers. Token ids match the backend (caseOpen/caseClose,
@@ -711,16 +717,17 @@ export default function DashboardPage() {
         {/* Flow scope selectors, side by side (2026-07-02): Problems-to-be-solved
             (life problem) on the left, What matters (timed factor) to its right;
             they wrap under each other on narrow screens. */}
-        {isFlow && ((lifeProblemsEnabled && lifeProblems.length > 0) || whatMattersTypes.some((w) => w.timing)) && (
+        {isFlow && (valueDemandTypes.length > 0 || whatMattersTypes.some((w) => w.timing)) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-start">
-        {isFlow && lifeProblemsEnabled && lifeProblems.length > 0 && (
+        {isFlow && valueDemandTypes.length > 0 && (
           <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('capture.caseTableP2bs')}</p>
-            <PillToggle
-              ariaLabel={t('capture.caseTableP2bs')}
-              value={lifeProblemFilter ?? ''}
-              onChange={(v) => setLifeProblemFilter(v || null)}
-              options={[{ value: '', label: t('dashboard.scopeAll') }, ...lifeProblems.map((lp) => ({ value: lp.id, label: tl(lp.label) }))]}
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.valueDemand')}</p>
+            <PillMultiSelect
+              ariaLabel={t('dashboard.valueDemand')}
+              value={valueDemandFilter}
+              onChange={setValueDemandFilter}
+              allLabel={t('dashboard.scopeAll')}
+              options={valueDemandTypes.map((d) => ({ value: d.id, label: tl(d.label) }))}
             />
           </div>
         )}
@@ -1622,7 +1629,7 @@ export default function DashboardPage() {
                 studyName={studyName}
                 dateFrom={capRange.from}
                 dateTo={capRange.to}
-                lifeProblemId={lifeProblemFilter}
+                valueDemands={valueDemandFilter}
                 whatMattersScopeTypeId={whatMattersScope}
                 onRemove={chartIds.length > 1 ? () => removeChart(id) : undefined}
               />
@@ -1678,7 +1685,7 @@ export default function DashboardPage() {
                   options={taxes.map((x) => ({ value: x.key, label: x.label }))}
                 />
               )}
-              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} lifeProblemId={lifeProblemFilter} />
+              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} valueDemands={valueDemandFilter} />
             </div>
           );
         })()}

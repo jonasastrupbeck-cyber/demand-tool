@@ -12,6 +12,6 @@ export async function GET(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
-  const p2bs = new URL(request.url).searchParams.get('p2bs') || undefined;
-  return NextResponse.json(await getTaxonomyOverTime(study.id, tax, p2bs));
+  const valueDemands = new URL(request.url).searchParams.get('valueDemands')?.split(',').filter(Boolean);
+  return NextResponse.json(await getTaxonomyOverTime(study.id, tax, valueDemands));
 }

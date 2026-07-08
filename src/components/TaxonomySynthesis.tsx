@@ -32,11 +32,11 @@ type MergeRow = {
   sources: { id: string; label: string }[];
 };
 
-export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true, lifeProblemId }: {
+export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true, valueDemands }: {
   apiBase: string;
   labels: SynthesisLabels;
   hasOverTime?: boolean;
-  lifeProblemId?: string | null;
+  valueDemands?: string[];
 }) {
   const { tl } = useLocale();
   const [freqs, setFreqs] = useState<Freq[]>([]);
@@ -53,9 +53,9 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
 
   const load = useCallback(async () => {
     setLoading(true);
-    // P2BS scope applies to the distribution reads (frequencies + over-time) only;
-    // the merge log stays study-wide (a category is shared across all P2BS).
-    const q = lifeProblemId ? `?p2bs=${encodeURIComponent(lifeProblemId)}` : '';
+    // Value-demand scope applies to the distribution reads (frequencies + over-time)
+    // only; the merge log stays study-wide (a category is shared across all demands).
+    const q = valueDemands && valueDemands.length ? `?valueDemands=${encodeURIComponent(valueDemands.join(','))}` : '';
     try {
       const [fRes, mRes, oRes] = await Promise.all([
         fetch(`${apiBase}/frequencies${q}`).then((r) => (r.ok ? r.json() : [])),
@@ -68,7 +68,7 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
     } finally {
       setLoading(false);
     }
-  }, [apiBase, hasOverTime, lifeProblemId]);
+  }, [apiBase, hasOverTime, valueDemands]);
 
   useEffect(() => { load(); }, [load]);
 

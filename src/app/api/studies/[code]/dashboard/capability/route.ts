@@ -24,9 +24,9 @@ export async function GET(
   const sort = sp.get('sort') === 'closed' ? 'closed' : 'start';
   const metricParam = sp.get('metric');
   const metric = metricParam === 'touches' ? 'touches' : metricParam === 'variance' ? 'variance' : 'leadTime';
-  const p2bs = sp.get('p2bs') || undefined;
+  const valueDemands = sp.get('valueDemands')?.split(',').filter(Boolean);
   const wmScope = sp.get('wmScope') || undefined;
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, p2bs, wmScope);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, valueDemands, wmScope);
   return NextResponse.json(data);
 }

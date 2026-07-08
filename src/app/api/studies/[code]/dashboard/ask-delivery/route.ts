@@ -22,8 +22,8 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const from = parseDateParam(searchParams.get('from'));
   const to = parseDateParam(searchParams.get('to'));
-  const lifeProblemId = searchParams.get('p2bs') || undefined;
+  const valueDemands = searchParams.get('valueDemands')?.split(',').filter(Boolean);
 
-  const rows = await getAskDeliveryData(study.id, from, to, lifeProblemId);
+  const rows = await getAskDeliveryData(study.id, from, to, valueDemands);
   return NextResponse.json({ rows });
 }

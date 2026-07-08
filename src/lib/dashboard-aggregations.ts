@@ -1,27 +1,46 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData, TouchSeriesPoint, BudgetCapabilityField, BudgetCapabilityPoint } from '@/types';
 import type { SQL } from 'drizzle-orm';
 
-export async function getDashboardData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<DashboardData> {
+// Value-demand scope (2026-07-08): the flow dashboard filters by VALUE DEMAND
+// (a demand_types row, category='value') instead of life problem. A case's value
+// demand(s) live on cases.demandTypeId (primary) + the caseDemandTypes junction
+// (a case may have several), so resolve the matching case ids and scope entries /
+// the case set by them. Multi-select: match cases whose value-demand set intersects
+// ANY selected id. Empty selection = no filter ("All"). Selected-but-no-match must
+// show ZERO (guarded with sql`false` at the call sites), never "all".
+export async function valueDemandCaseIds(studyId: string, ids: string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const rows = await db.selectDistinct({ id: cases.id })
+    .from(cases)
+    .leftJoin(caseDemandTypes, eq(caseDemandTypes.caseId, cases.id))
+    .where(and(eq(cases.studyId, studyId), or(inArray(cases.demandTypeId, ids), inArray(caseDemandTypes.demandTypeId, ids))));
+  return rows.map((r) => r.id);
+}
+
+// Case-set scope predicate for value-demand-filtered case queries. Absent filter →
+// study only; selected-but-no-match → sql`false` (zero cases).
+async function valueDemandCaseWhere(studyId: string, valueDemands?: string[]): Promise<SQL> {
+  if (!valueDemands || !valueDemands.length) return eq(cases.studyId, studyId);
+  const caseIds = await valueDemandCaseIds(studyId, valueDemands);
+  return caseIds.length ? and(eq(cases.studyId, studyId), inArray(cases.id, caseIds))! : sql`false`;
+}
+
+export async function getDashboardData(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<DashboardData> {
   const baseConditions = [eq(demandEntries.studyId, studyId)];
   if (from) baseConditions.push(gte(demandEntries.createdAt, from));
   if (to) baseConditions.push(lte(demandEntries.createdAt, to));
 
-  // P2BS (life problem) scope. In flow the life problem lives on the case
-  // (entries carry caseId but NULL lifeProblemId), so match entries whose case
-  // has it OR (transactional) whose own lifeProblemId matches. Cascades into
-  // demandWhere + workWhere below, so every aggregation is scoped.
-  if (lifeProblemId) {
-    const caseRows = await db.select({ id: cases.id })
-      .from(cases).where(and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId)));
-    const caseIds = caseRows.map((c) => c.id);
-    baseConditions.push(caseIds.length
-      ? or(eq(demandEntries.lifeProblemId, lifeProblemId), inArray(demandEntries.caseId, caseIds))!
-      : eq(demandEntries.lifeProblemId, lifeProblemId));
+  // Value-demand scope (flow: value demand lives on the case; entries carry
+  // caseId). Cascades into demandWhere + workWhere below, so every aggregation is
+  // scoped. Selected-but-no-match → sql`false` (show zero, never "all").
+  if (valueDemands && valueDemands.length) {
+    const caseIds = await valueDemandCaseIds(studyId, valueDemands);
+    baseConditions.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
   }
 
   // Demand-only conditions (filter out work entries from all existing queries)
@@ -919,7 +938,7 @@ export async function getCapabilityData(
   dateTo?: Date,
   sort: 'start' | 'closed' = 'start',
   metric: 'leadTime' | 'touches' | 'variance' = 'leadTime',
-  lifeProblemId?: string,
+  valueDemands?: string[],
   // Optional what-matters scope: restrict to cases that selected this type.
   // Gives the "ASAP" measure its meaning (scope to the asap type, then read
   // case-open → completion lead time).
@@ -928,10 +947,8 @@ export async function getCapabilityData(
   const unit = metric === 'touches' ? 'touches' : 'days';
   const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
 
-  // P2BS scope: capability is case-level, so filter the case set directly.
-  const caseWhere = lifeProblemId
-    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
-    : eq(cases.studyId, studyId);
+  // Value-demand scope: capability is case-level, so filter the case set directly.
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
   let caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
     .from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
@@ -1243,7 +1260,7 @@ export interface AskDeliveryRow {
   avgAmountOver: number | null; // amount kind only: mean amount over among overCount
 }
 
-export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<AskDeliveryRow[]> {
+export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<AskDeliveryRow[]> {
   // Linked subquestions only — an unlinked one has no ask to evaluate against.
   const fields = await db
     .select({
@@ -1261,10 +1278,8 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
     .where(and(eq(milestones.studyId, studyId), isNotNull(subquestions.linkedWhatMattersTypeId)));
   if (fields.length === 0) return [];
 
-  // P2BS scope: filter the case set by its primary life problem.
-  const caseWhere = lifeProblemId
-    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
-    : eq(cases.studyId, studyId);
+  // Value-demand scope: filter the case set by its value demand(s).
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
   const caseRows = await db.select({ id: cases.id }).from(cases).where(caseWhere);
   if (caseRows.length === 0) return [];
   const caseIds = caseRows.map((c) => c.id);
@@ -1377,7 +1392,7 @@ export async function getAskDeliveryData(studyId: string, from?: Date, to?: Date
 // unit toggle (% of budget vs amount) changes the value series.
 const AMOUNT_KINDS = ['amount', 'number', 'currency'] as const;
 
-export async function getBudgetCapability(studyId: string, from?: Date, to?: Date, lifeProblemId?: string): Promise<BudgetCapabilityField[]> {
+export async function getBudgetCapability(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<BudgetCapabilityField[]> {
   const fields = await db
     .select({
       id: subquestions.id,
@@ -1399,9 +1414,7 @@ export async function getBudgetCapability(studyId: string, from?: Date, to?: Dat
     ));
   if (fields.length === 0) return [];
 
-  const caseWhere = lifeProblemId
-    ? and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId))
-    : eq(cases.studyId, studyId);
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef }).from(cases).where(caseWhere);
   if (caseRows.length === 0) return [];
   const caseIds = caseRows.map((c) => c.id);

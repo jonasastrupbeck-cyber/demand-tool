@@ -884,24 +884,25 @@ export async function getSystemConditionMerges(studyId: string) {
 // Per-condition reference counts across entry attachments + flow work blocks —
 // feeds the synthesis histogram. Live (non-archived) conditions only; conditions
 // with zero references are still returned so unused labels can be cleaned up too.
-// P2BS (life problem) scope filter for entry-based reads. In flow the life problem
-// lives on the CASE (entries carry caseId but NULL lifeProblemId), so match entries
-// whose case has it OR (transactional) whose own lifeProblemId matches. Returns
-// undefined when no filter — drizzle and()/or() ignore undefined args.
-async function lifeProblemEntryFilter(studyId: string, lifeProblemId?: string) {
-  if (!lifeProblemId) return undefined;
-  const caseRows = await db.select({ id: cases.id })
-    .from(cases).where(and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId)));
-  const caseIds = caseRows.map((c) => c.id);
-  return caseIds.length
-    ? or(eq(demandEntries.lifeProblemId, lifeProblemId), inArray(demandEntries.caseId, caseIds))
-    : eq(demandEntries.lifeProblemId, lifeProblemId);
+// Value-demand scope filter for entry-based reads (2026-07-08). In flow the value
+// demand lives on the CASE (cases.demandTypeId + caseDemandTypes junction; entries
+// carry caseId), so match entries whose case is in the selected value-demand set.
+// Multi-select. Returns undefined when no filter (drizzle and()/or() ignore
+// undefined); selected-but-no-match → sql`false` (show zero, never "all").
+async function valueDemandEntryFilter(studyId: string, valueDemands?: string[]) {
+  if (!valueDemands || !valueDemands.length) return undefined;
+  const rows = await db.selectDistinct({ id: cases.id })
+    .from(cases)
+    .leftJoin(caseDemandTypes, eq(caseDemandTypes.caseId, cases.id))
+    .where(and(eq(cases.studyId, studyId), or(inArray(cases.demandTypeId, valueDemands), inArray(caseDemandTypes.demandTypeId, valueDemands))));
+  const caseIds = rows.map((r) => r.id);
+  return caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`;
 }
 
-export async function getSystemConditionFrequencies(studyId: string, lifeProblemId?: string) {
+export async function getSystemConditionFrequencies(studyId: string, valueDemands?: string[]) {
   const conds = await getSystemConditions(studyId);
   if (conds.length === 0) return [] as { id: string; label: string; count: number }[];
-  const lpf = await lifeProblemEntryFilter(studyId, lifeProblemId);
+  const vdf = await valueDemandEntryFilter(studyId, valueDemands);
 
   const junctionCounts = await db.select({
     scId: demandEntrySystemConditions.systemConditionId,
@@ -909,7 +910,7 @@ export async function getSystemConditionFrequencies(studyId: string, lifeProblem
   })
     .from(demandEntrySystemConditions)
     .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .where(and(eq(demandEntries.studyId, studyId), vdf))
     .groupBy(demandEntrySystemConditions.systemConditionId);
 
   const blockCounts = await db.select({
@@ -919,7 +920,7 @@ export async function getSystemConditionFrequencies(studyId: string, lifeProblem
     .from(workBlockSystemConditions)
     .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .where(and(eq(demandEntries.studyId, studyId), vdf))
     .groupBy(workBlockSystemConditions.systemConditionId);
 
   const tally = new Map<string, number>();
@@ -935,8 +936,8 @@ export async function getSystemConditionFrequencies(studyId: string, lifeProblem
 // Counts entry attachments + flow work blocks, both bucketed by the entry's
 // created day (blocks inherit their entry's date, mirroring demandOverTime).
 // Live (non-archived) conditions only; flat rows, the client pivots for the chart.
-export async function getSystemConditionOverTime(studyId: string, lifeProblemId?: string) {
-  const lpf = await lifeProblemEntryFilter(studyId, lifeProblemId);
+export async function getSystemConditionOverTime(studyId: string, valueDemands?: string[]) {
+  const vdf = await valueDemandEntryFilter(studyId, valueDemands);
   const junction = await db.select({
     date: sql<string>`${demandEntries.createdAt}::date`,
     scId: demandEntrySystemConditions.systemConditionId,
@@ -944,7 +945,7 @@ export async function getSystemConditionOverTime(studyId: string, lifeProblemId?
   })
     .from(demandEntrySystemConditions)
     .innerJoin(demandEntries, eq(demandEntrySystemConditions.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .where(and(eq(demandEntries.studyId, studyId), vdf))
     .groupBy(sql`${demandEntries.createdAt}::date`, demandEntrySystemConditions.systemConditionId);
 
   const blocks = await db.select({
@@ -955,7 +956,7 @@ export async function getSystemConditionOverTime(studyId: string, lifeProblemId?
     .from(workBlockSystemConditions)
     .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), lpf))
+    .where(and(eq(demandEntries.studyId, studyId), vdf))
     .groupBy(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`, workBlockSystemConditions.systemConditionId);
 
   const live = await getSystemConditions(studyId);
@@ -1035,23 +1036,23 @@ export async function getTaxonomyTypes(studyId: string, tax: SingleFkTaxonomy, o
     .from(tt).where(and(...conds)).orderBy(asc(tt.sortOrder));
 }
 
-export async function getTaxonomyFrequencies(studyId: string, tax: SingleFkTaxonomy, lifeProblemId?: string) {
+export async function getTaxonomyFrequencies(studyId: string, tax: SingleFkTaxonomy, valueDemands?: string[]) {
   const cfg = taxConfig(tax);
   const live = await getTaxonomyTypes(studyId, tax);
   if (live.length === 0) return [] as { id: string; label: string; count: number }[];
-  const lpf = await lifeProblemEntryFilter(studyId, lifeProblemId);
-  const counts = await cfg.countByType().where(and(cfg.countWhere(studyId), lpf)).groupBy(cfg.countGroup);
+  const vdf = await valueDemandEntryFilter(studyId, valueDemands);
+  const counts = await cfg.countByType().where(and(cfg.countWhere(studyId), vdf)).groupBy(cfg.countGroup);
   const tally = new Map<string, number>();
   for (const c of counts) if (c.typeId) tally.set(c.typeId, c.count);
   return live.map((t) => ({ id: t.id, label: t.label, count: tally.get(t.id) ?? 0 }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-export async function getTaxonomyOverTime(studyId: string, tax: SingleFkTaxonomy, lifeProblemId?: string) {
+export async function getTaxonomyOverTime(studyId: string, tax: SingleFkTaxonomy, valueDemands?: string[]) {
   const cfg = taxConfig(tax);
   const liveIds = new Set((await getTaxonomyTypes(studyId, tax)).map((t) => t.id));
-  const lpf = await lifeProblemEntryFilter(studyId, lifeProblemId);
-  const rows = await cfg.timeRows().where(and(cfg.countWhere(studyId), lpf)).groupBy(...cfg.timeGroup);
+  const vdf = await valueDemandEntryFilter(studyId, valueDemands);
+  const rows = await cfg.timeRows().where(and(cfg.countWhere(studyId), vdf)).groupBy(...cfg.timeGroup);
   return rows.filter((r) => r.typeId && liveIds.has(r.typeId))
     .map((r) => ({ date: r.date, id: r.typeId as string, count: r.count }))
     .sort((a, b) => a.date.localeCompare(b.date));
