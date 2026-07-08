@@ -19,6 +19,7 @@ import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEdit
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
 import TouchSeriesChart from '@/components/TouchSeriesChart';
+import TouchesPerCaseChart from '@/components/TouchesPerCaseChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
@@ -1612,6 +1613,13 @@ export default function DashboardPage() {
           return (
           <CollapsibleCardsContext.Provider value={true}>
           <div className="space-y-4">
+            {/* Touches per case (XmR) — one point per case = its total touch count. */}
+            <TouchesPerCaseChart
+              code={code}
+              dateFrom={capRange.from}
+              dateTo={capRange.to}
+              valueDemands={valueDemandFilter}
+            />
             {/* Touches over time — per-day counts, scoped + count/%. Needs only
                 cases + work entries (not milestones), so it shows for every flow study. */}
             <TouchSeriesChart

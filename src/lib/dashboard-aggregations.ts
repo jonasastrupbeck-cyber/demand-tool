@@ -930,6 +930,28 @@ function eventTimestamp(
   return null;
 }
 
+// XmR (individuals) statistics for a TIME-ORDERED value series. mrBar = mean of
+// |consecutive differences|; limits = mean ± 2.66·mrBar. floorZero clamps the
+// lower limit at 0 for measures that can't go negative (lead time / touches /
+// steps); leave false for signed measures (variance). n<2 → null limits. Shared
+// by getCapabilityData + getTouchesPerCaseCapability + getStepsPerCaseCapability.
+function xmrLimits(values: number[], { floorZero }: { floorZero: boolean }): { mean: number | null; median: number | null; unpl: number | null; lnpl: number | null } {
+  const n = values.length;
+  const mean = n ? values.reduce((s, v) => s + v, 0) / n : null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = n ? (n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2) : null;
+  let unpl: number | null = null;
+  let lnpl: number | null = null;
+  if (n >= 2 && mean !== null) {
+    let mrSum = 0;
+    for (let i = 1; i < values.length; i++) mrSum += Math.abs(values[i] - values[i - 1]);
+    const mrBar = mrSum / (values.length - 1);
+    unpl = mean + 2.66 * mrBar;
+    lnpl = floorZero ? Math.max(0, mean - 2.66 * mrBar) : mean - 2.66 * mrBar;
+  }
+  return { mean, median, unpl, lnpl };
+}
+
 export async function getCapabilityData(
   studyId: string,
   fromEvent: EventToken,
@@ -1135,21 +1157,9 @@ export async function getCapabilityData(
   const included = raw.filter((r) => !r.excluded);
   const values = included.map((r) => r.leadTime);
   const n = values.length;
-  const mean = n ? values.reduce((s, v) => s + v, 0) / n : null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const median = n ? (n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2) : null;
-
-  let unpl: number | null = null;
-  let lnpl: number | null = null;
-  if (n >= 2 && mean !== null) {
-    let mrSum = 0;
-    for (let i = 1; i < values.length; i++) mrSum += Math.abs(values[i] - values[i - 1]);
-    const mrBar = mrSum / (values.length - 1);
-    unpl = mean + 2.66 * mrBar;
-    // Lead time / touches can't be negative (floor at 0); variance is signed,
-    // so its lower limit may legitimately be negative (delivered early).
-    lnpl = metric === 'variance' ? mean - 2.66 * mrBar : Math.max(0, mean - 2.66 * mrBar);
-  }
+  // Lead time / touches can't be negative (floor at 0); variance is signed, so its
+  // lower limit may legitimately be negative (delivered early).
+  const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: metric !== 'variance' });
 
   const round1 = (x: number) => Math.round(x * 10) / 10;
   const points = raw.map((r) => ({
@@ -1181,6 +1191,80 @@ export async function getCapabilityData(
 // EFFECTIVE date min(coalesce(block_date, created_at)) so backdated retrospective
 // touches land on their real day — matches getCapabilityData / over-time charts,
 // NOT raw created_at. Scope: case > life problem (P2BS, via the case) > all.
+// Touches-per-case XmR (2026-07-08): one point per case = that case's total touch
+// count (a touch = one work entry with ≥1 block). Ordered by the case-open date
+// (min(openedAt, earliest touch) — the "First contact (case opened)" start).
+// Scoped by value demand; the date range filters touches by effective date.
+export async function getTouchesPerCaseCapability(
+  studyId: string,
+  opts: { valueDemands?: string[]; from?: Date; to?: Date } = {},
+): Promise<CapabilityData> {
+  const { valueDemands, from, to } = opts;
+  const empty: CapabilityData = { unit: 'touches', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
+  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
+  if (caseRows.length === 0) return empty;
+
+  // One row per work entry (≥1 block) with its effective date.
+  const entryRows = await db.select({
+    caseId: demandEntries.caseId,
+    eff: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))`,
+  })
+    .from(demandEntries)
+    .innerJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), isNotNull(demandEntries.caseId)))
+    .groupBy(demandEntries.caseId, demandEntries.id);
+
+  const byCase = new Map<string, Date[]>();
+  for (const r of entryRows) {
+    if (!r.caseId || !r.eff) continue;
+    let arr = byCase.get(r.caseId);
+    if (!arr) { arr = []; byCase.set(r.caseId, arr); }
+    arr.push(new Date(r.eff));
+  }
+
+  const fromMs = from ? from.getTime() : null;
+  const toMs = to ? to.getTime() : null;
+  type Row = { caseId: string; caseRef: string; touches: number; startKey: number };
+  const rows: Row[] = [];
+  for (const c of caseRows) {
+    const effs = byCase.get(c.id) ?? [];
+    const inRange = effs.filter((d) => {
+      const ms = d.getTime();
+      if (fromMs !== null && ms < fromMs) return false;
+      if (toMs !== null && ms > toMs) return false;
+      return true;
+    });
+    if (inRange.length === 0) continue; // drop cases with no touch in range
+    const openedMs = new Date(c.openedAt as unknown as string).getTime();
+    const earliest = effs.length ? Math.min(...effs.map((d) => d.getTime())) : openedMs;
+    rows.push({ caseId: c.id, caseRef: c.caseRef, touches: inRange.length, startKey: Math.min(openedMs, earliest) });
+  }
+  if (rows.length === 0) return empty;
+  rows.sort((a, b) => a.startKey - b.startKey);
+
+  const values = rows.map((r) => r.touches);
+  const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: true });
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+  const points = rows.map((r) => ({
+    caseId: r.caseId,
+    caseRef: r.caseRef,
+    leadTime: r.touches,
+    startedAt: new Date(r.startKey).toISOString(),
+    special: unpl !== null && lnpl !== null && (r.touches > unpl || r.touches < lnpl),
+    excluded: false,
+    note: null as string | null,
+  }));
+  return {
+    unit: 'touches', points,
+    mean: mean !== null ? round1(mean) : null,
+    median: median !== null ? round1(median) : null,
+    unpl: unpl !== null ? round1(unpl) : null,
+    lnpl: lnpl !== null ? round1(lnpl) : null,
+    n: values.length, nExcluded: 0, nWantedByDate: 0,
+  };
+}
+
 export async function getTouchSeries(
   studyId: string,
   opts: { lifeProblemId?: string; caseId?: string; from?: Date; to?: Date } = {},

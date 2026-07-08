@@ -2005,6 +2005,12 @@ const translations = {
     sv: 'Poster per ärende',
     de: 'Einträge pro Fall',
   },
+  'dashboard.touchesPerCaseTitle': {
+    en: 'Touches per case (XmR)',
+    da: 'Registreringer pr. sag (XmR)',
+    sv: 'Poster per ärende (XmR)',
+    de: 'Einträge pro Fall (XmR)',
+  },
   // Touches-over-time chart (per-day series, scoped, count/%).
   'dashboard.touchesOverTime': {
     en: 'Touches over time',
