@@ -15,16 +15,20 @@ type Tag = 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand';
 // a % of the case's total steps. The work-composition companion to touches.
 // Optionally scoped to a single value step (2026-07-08 follow-up).
 export default function StepsPerCaseChart({
-  code, dateFrom, dateTo, valueDemands, valueSteps = [],
+  code, dateFrom, dateTo, valueDemands, valueSteps = [], fixedTag,
 }: {
   code: string;
   dateFrom?: string;
   dateTo?: string;
   valueDemands?: string[];
   valueSteps?: { id: string; label: string }[];
+  /** Lock the chart to one step type (hides the measure selector). Used to show
+   *  the four types as separate charts. */
+  fixedTag?: Tag;
 }) {
   const { t, tl } = useLocale();
-  const [tag, setTag] = useState<Tag>('total');
+  const [tagState, setTag] = useState<Tag>('total');
+  const tag = fixedTag ?? tagState;
   const [mode, setMode] = useState<'count' | 'pct'>('count');
   const [valueStepId, setValueStepId] = useState('');
   const [data, setData] = useState<CapabilityData | null>(null);
@@ -67,14 +71,16 @@ export default function StepsPerCaseChart({
 
   const controls = (
     <>
-      <PillToggle
-        ariaLabel={t('dashboard.metricLabel')}
-        value={tag}
-        onChange={(v) => setTag(v as Tag)}
-        options={(['total', 'value', 'sequence', 'failure', 'failure_demand'] as Tag[]).map((tg) => ({
-          value: tg, label: tagLabel[tg], activeClassName: tagActive[tg],
-        }))}
-      />
+      {!fixedTag && (
+        <PillToggle
+          ariaLabel={t('dashboard.metricLabel')}
+          value={tag}
+          onChange={(v) => setTag(v as Tag)}
+          options={(['total', 'value', 'sequence', 'failure', 'failure_demand'] as Tag[]).map((tg) => ({
+            value: tg, label: tagLabel[tg], activeClassName: tagActive[tg],
+          }))}
+        />
+      )}
       {tag !== 'total' && (
         <PillToggle
           ariaLabel={t('dashboard.countMode')}
@@ -100,17 +106,20 @@ export default function StepsPerCaseChart({
 
   const stepLabel = valueSteps.find((v) => v.id === valueStepId)?.label;
   const subtitle = valueStepId && stepLabel ? `${valueLabel} · ${tl(stepLabel)}` : undefined;
+  // Fixed-tag instances (the four per-type charts) title by their type; the free
+  // chart keeps the generic "Steps per case (XmR)" title.
+  const title = fixedTag ? `${tagLabel[fixedTag]} (XmR)` : t('dashboard.stepsPerCaseTitle');
 
   return (
     <XmRChart
-      title={t('dashboard.stepsPerCaseTitle')}
+      title={title}
       subtitle={subtitle}
       valueLabel={valueLabel}
       data={data}
       loading={loading}
       controls={controls}
       fmtValue={fmtValue}
-      info={<InfoPopover label={t('dashboard.stepsPerCaseTitle')}>{t('dashboard.calcStepsPerCase')}</InfoPopover>}
+      info={<InfoPopover label={title}>{t('dashboard.calcStepsPerCase')}</InfoPopover>}
     />
   );
 }

@@ -1976,6 +1976,17 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
+              {/* The four work-step types as separate per-case XmR charts (value /
+                  sequence / failure work + failure demand). Step-level (block tag),
+                  count or % per case, in case-open order. */}
+              {data.workCount > 0 && (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {(['value', 'sequence', 'failure', 'failure_demand'] as const).map((tg) => (
+                    <StepsPerCaseChart key={tg} code={code} dateFrom={capRange.from} dateTo={capRange.to} valueDemands={valueDemandFilter} fixedTag={tg} />
+                  ))}
+                </div>
+              )}
+
               {/* Ask delivery (2026-07-02, slice 4): per linked capture field,
                   how often the decision delivered what mattered. Self-gates on
                   having evaluated cases; scoped by the P2BS filter + date range
