@@ -248,9 +248,11 @@ export default function CapabilityChart({
                 }} />
                 {/* extendDomain so a limit above the data max (e.g. a wide UNPL with
                     few points) grows the Y axis instead of being discarded/clipped. */}
-                {data.mean != null && <ReferenceLine y={data.mean} ifOverflow="extendDomain" stroke={THEME.textSecondary} strokeDasharray="5 4" label={{ value: t('dashboard.processAvg'), position: 'right', fill: THEME.textSecondary, fontSize: 10 }} />}
-                {data.unpl != null && <ReferenceLine y={data.unpl} ifOverflow="extendDomain" stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.upperLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
-                {data.lnpl != null && <ReferenceLine y={data.lnpl} ifOverflow="extendDomain" stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.lowerLimit'), position: 'right', fill: COLORS.failure, fontSize: 10 }} />}
+                {/* Labels INSIDE the plot (insideRight) so long limit labels aren't
+                    clipped by the container's right edge. */}
+                {data.mean != null && <ReferenceLine y={data.mean} ifOverflow="extendDomain" stroke={THEME.textSecondary} strokeDasharray="5 4" label={{ value: t('dashboard.processAvg'), position: 'insideRight', fill: THEME.textSecondary, fontSize: 10 }} />}
+                {data.unpl != null && <ReferenceLine y={data.unpl} ifOverflow="extendDomain" stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.upperLimit'), position: 'insideBottomRight', fill: COLORS.failure, fontSize: 10 }} />}
+                {data.lnpl != null && <ReferenceLine y={data.lnpl} ifOverflow="extendDomain" stroke={COLORS.failure} strokeDasharray="5 4" label={{ value: t('dashboard.lowerLimit'), position: 'insideTopRight', fill: COLORS.failure, fontSize: 10 }} />}
                 <Line
                   type="monotone"
                   dataKey="includedValue"
