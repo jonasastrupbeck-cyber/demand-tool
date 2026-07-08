@@ -18,8 +18,8 @@ import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
 import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEditModal';
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
-import TouchSeriesChart from '@/components/TouchSeriesChart';
 import TouchesPerCaseChart from '@/components/TouchesPerCaseChart';
+import StepsPerCaseChart from '@/components/StepsPerCaseChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
@@ -1620,14 +1620,14 @@ export default function DashboardPage() {
               dateTo={capRange.to}
               valueDemands={valueDemandFilter}
             />
-            {/* Touches over time — per-day counts, scoped + count/%. Needs only
-                cases + work entries (not milestones), so it shows for every flow study. */}
-            <TouchSeriesChart
+            {/* Steps per case (XmR) — one point per case = its step count for the
+                chosen tag (Total / Value / Sequence / Failure / Failure demand), as
+                count or %. The work-composition companion to touches. */}
+            <StepsPerCaseChart
               code={code}
-              lifeProblems={lifeProblems}
-              cases={cases}
               dateFrom={capRange.from}
               dateTo={capRange.to}
+              valueDemands={valueDemandFilter}
             />
             {chartIds.map((id) => (
               <CapabilityChart

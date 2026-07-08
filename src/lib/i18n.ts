@@ -2011,6 +2011,18 @@ const translations = {
     sv: 'Poster per ärende (XmR)',
     de: 'Einträge pro Fall (XmR)',
   },
+  'dashboard.stepsPerCaseTitle': {
+    en: 'Steps per case (XmR)',
+    da: 'Trin pr. sag (XmR)',
+    sv: 'Steg per ärende (XmR)',
+    de: 'Schritte pro Fall (XmR)',
+  },
+  'dashboard.stepTotal': {
+    en: 'Total steps',
+    da: 'Trin i alt',
+    sv: 'Steg totalt',
+    de: 'Schritte gesamt',
+  },
   // Touches-over-time chart (per-day series, scoped, count/%).
   'dashboard.touchesOverTime': {
     en: 'Touches over time',

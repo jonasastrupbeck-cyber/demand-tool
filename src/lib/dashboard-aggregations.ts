@@ -3,7 +3,7 @@ import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTran
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import type { DashboardData, CapabilityData, TouchSeriesPoint, BudgetCapabilityField, BudgetCapabilityPoint } from '@/types';
+import type { DashboardData, CapabilityData, BudgetCapabilityField, BudgetCapabilityPoint } from '@/types';
 import type { SQL } from 'drizzle-orm';
 
 // Value-demand scope (2026-07-08): the flow dashboard filters by VALUE DEMAND
@@ -1265,57 +1265,85 @@ export async function getTouchesPerCaseCapability(
   };
 }
 
-export async function getTouchSeries(
+// Steps-per-case XmR (2026-07-08): one point per case = its step count for the
+// chosen tag (total / value / sequence / failure / failure_demand), as a count or
+// as a % of that case's total steps. A step = one work_description_blocks row.
+// Ordered by the case-open date; scoped by value demand; range-filtered by the
+// block's effective date. Cases with no steps in range are dropped; a case with
+// steps but zero of the chosen tag is a legitimate 0 point.
+export async function getStepsPerCaseCapability(
   studyId: string,
-  opts: { lifeProblemId?: string; caseId?: string; from?: Date; to?: Date } = {},
-): Promise<TouchSeriesPoint[]> {
-  const { lifeProblemId, caseId, from, to } = opts;
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; tag?: 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand'; mode?: 'count' | 'pct' } = {},
+): Promise<CapabilityData> {
+  const { valueDemands, from, to } = opts;
+  const tag = opts.tag ?? 'total';
+  const mode = opts.mode ?? 'count';
+  const unit: CapabilityData['unit'] = mode === 'pct' ? '%' : 'steps';
+  const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
+  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
+  if (caseRows.length === 0) return empty;
 
-  let scope: SQL | undefined;
-  if (caseId) {
-    scope = eq(demandEntries.caseId, caseId);
-  } else if (lifeProblemId) {
-    // P2BS lives on the case in flow (entries carry caseId, NULL lifeProblemId),
-    // so match entries whose case has it OR whose own lifeProblemId matches.
-    const caseRows = await db.select({ id: cases.id })
-      .from(cases).where(and(eq(cases.studyId, studyId), eq(cases.lifeProblemId, lifeProblemId)));
-    const caseIds = caseRows.map((c) => c.id);
-    scope = caseIds.length
-      ? or(eq(demandEntries.lifeProblemId, lifeProblemId), inArray(demandEntries.caseId, caseIds))
-      : eq(demandEntries.lifeProblemId, lifeProblemId);
+  // One row per work block: its case, tag, and effective date.
+  const blockRows = await db.select({
+    caseId: demandEntries.caseId,
+    tag: workDescriptionBlocks.tag,
+    eff: sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`,
+  })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), isNotNull(demandEntries.caseId)));
+
+  const byCase = new Map<string, { tag: string; ms: number }[]>();
+  for (const r of blockRows) {
+    if (!r.caseId || !r.eff) continue;
+    let arr = byCase.get(r.caseId);
+    if (!arr) { arr = []; byCase.set(r.caseId, arr); }
+    arr.push({ tag: r.tag, ms: new Date(r.eff).getTime() });
   }
 
-  // One row per touch: its classification + effective date.
-  const rows = await db.select({
-    classification: demandEntries.classification,
-    eff: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))`,
-  })
-    .from(demandEntries)
-    .innerJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), scope))
-    .groupBy(demandEntries.id, demandEntries.classification);
-
-  // Bucket by effective DAY; range-filter in JS (eff is an aggregate, not a column).
   const fromMs = from ? from.getTime() : null;
   const toMs = to ? to.getTime() : null;
-  const map = new Map<string, { total: number; valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }>();
-  for (const r of rows) {
-    if (!r.eff) continue;
-    const ms = new Date(r.eff).getTime();
-    if (fromMs !== null && ms < fromMs) continue;
-    if (toMs !== null && ms > toMs) continue;
-    const date = r.eff.slice(0, 10);
-    let e = map.get(date);
-    if (!e) { e = { total: 0, valueCount: 0, failureCount: 0, sequenceCount: 0, unknownCount: 0 }; map.set(date, e); }
-    e.total += 1;
-    if (r.classification === 'value') e.valueCount += 1;
-    else if (r.classification === 'failure') e.failureCount += 1;
-    else if (r.classification === 'sequence') e.sequenceCount += 1;
-    else e.unknownCount += 1;
+  type Row = { caseId: string; caseRef: string; value: number; startKey: number };
+  const rows: Row[] = [];
+  for (const c of caseRows) {
+    const blocks = byCase.get(c.id) ?? [];
+    const inRange = blocks.filter((b) => {
+      if (fromMs !== null && b.ms < fromMs) return false;
+      if (toMs !== null && b.ms > toMs) return false;
+      return true;
+    });
+    const total = inRange.length;
+    if (total === 0) continue; // no steps in range → not on the chart
+    const tagCount = tag === 'total' ? total : inRange.filter((b) => b.tag === tag).length;
+    const value = mode === 'pct' ? Math.round((tagCount / total) * 1000) / 10 : tagCount;
+    const openedMs = new Date(c.openedAt as unknown as string).getTime();
+    const earliest = blocks.length ? Math.min(...blocks.map((b) => b.ms)) : openedMs;
+    rows.push({ caseId: c.id, caseRef: c.caseRef, value, startKey: Math.min(openedMs, earliest) });
   }
-  return [...map.entries()]
-    .map(([date, c]) => ({ date, ...c }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  if (rows.length === 0) return empty;
+  rows.sort((a, b) => a.startKey - b.startKey);
+
+  const values = rows.map((r) => r.value);
+  const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: true });
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+  const points = rows.map((r) => ({
+    caseId: r.caseId,
+    caseRef: r.caseRef,
+    leadTime: r.value,
+    startedAt: new Date(r.startKey).toISOString(),
+    special: unpl !== null && lnpl !== null && (r.value > unpl || r.value < lnpl),
+    excluded: false,
+    note: null as string | null,
+  }));
+  return {
+    unit, points,
+    mean: mean !== null ? round1(mean) : null,
+    median: median !== null ? round1(median) : null,
+    unpl: unpl !== null ? round1(unpl) : null,
+    lnpl: lnpl !== null ? round1(lnpl) : null,
+    n: values.length, nExcluded: 0, nWantedByDate: 0,
+  };
 }
 
 // --- Ask delivery (2026-07-02, slice 4) -------------------------------------
