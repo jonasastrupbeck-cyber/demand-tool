@@ -12,6 +12,7 @@ import type { DashboardData, BudgetCapabilityField } from '@/types';
 import { formatCurrency, currencyForSubquestion } from '@/lib/format-currency';
 import PillToggle from '@/components/PillToggle';
 import PillMultiSelect from '@/components/PillMultiSelect';
+import InfoPopover from '@/components/InfoPopover';
 import { useLocale } from '@/lib/locale-context';
 import { exportDashboardToPptx } from '@/lib/pptx-export';
 import { exportCapabilityChartsToPptx } from '@/lib/pptx-capability-export';
@@ -1792,7 +1793,7 @@ export default function DashboardPage() {
                   date scoped like the rest of the tab. Mirrors the Demand-tab
                   CoR pie for visual parity. */}
               {data.corTypeCounts.length > 0 && (
-                <ChartCard title={t('dashboard.corDistributionTitle')}>
+                <ChartCard title={t('dashboard.corDistributionTitle')} info={<InfoPopover label={t('dashboard.corDistributionTitle')}>{t('dashboard.calcCor')}</InfoPopover>}>
                   <ResponsiveContainer width="100%" height={260}>
                     <PieChart>
                       <Pie
@@ -1838,7 +1839,7 @@ export default function DashboardPage() {
                   type + frequency of failure demand hitting during the flow,
                   P2BS-scoped via the life-problem filter above. */}
               {data.flowFailureDemandTypeCounts.length > 0 && (
-                <ChartCard title={t('dashboard.flowFailureDemand')}>
+                <ChartCard title={t('dashboard.flowFailureDemand')} info={<InfoPopover label={t('dashboard.flowFailureDemand')}>{t('dashboard.calcFlowFailureDemand')}</InfoPopover>}>
                   <ResponsiveContainer width="100%" height={Math.max(200, data.flowFailureDemandTypeCounts.length * 40 + 40)}>
                     <BarChart data={(() => {
                       const total = data.flowFailureDemandTypeCounts.reduce((s, d) => s + d.count, 0);
@@ -1865,7 +1866,7 @@ export default function DashboardPage() {
                   bars per value step, ordered by the value step's own order.
                   P2BS-scoped. Self-gates on the feature + having data. */}
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
-                <ChartCard title={t('dashboard.workByValueStepTitle')}>
+                <ChartCard title={t('dashboard.workByValueStepTitle')} info={<InfoPopover label={t('dashboard.workByValueStepTitle')}>{t('dashboard.calcWorkByValueStep')}</InfoPopover>}>
                   <p className="text-xs text-gray-500 mb-3">{t('dashboard.workByValueStepHint')}</p>
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-medium">{t('dashboard.vsSortBy')}</span>
@@ -1910,7 +1911,7 @@ export default function DashboardPage() {
                   compares steps, this one explains each step. Self-gates like
                   the chart; plain CSS bars, no recharts. */}
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
-                <ChartCard title={t('dashboard.valueStepOverviewTitle')}>
+                <ChartCard title={t('dashboard.valueStepOverviewTitle')} info={<InfoPopover label={t('dashboard.valueStepOverviewTitle')}>{t('dashboard.calcValueStepOverview')}</InfoPopover>}>
                   <p className="text-xs text-gray-500 mb-3">{t('dashboard.valueStepOverviewHint')}</p>
                   <div className="space-y-3">
                     {data.workByValueStep.map((step) => {
@@ -1995,7 +1996,7 @@ export default function DashboardPage() {
                   having evaluated cases; scoped by the P2BS filter + date range
                   (decidedAt) like everything else on this tab. */}
               {askDelivery && askDelivery.length > 0 && (
-                <ChartCard title={t('dashboard.askDeliveryTitle')}>
+                <ChartCard title={t('dashboard.askDeliveryTitle')} info={<InfoPopover label={t('dashboard.askDeliveryTitle')}>{t('dashboard.calcAskDelivery')}</InfoPopover>}>
                   <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
                   <div className="space-y-2">
                     {askDelivery.map((r) => {
@@ -2073,7 +2074,7 @@ export default function DashboardPage() {
                 const avgUnder = under.length ? Math.round(under.reduce((s, p) => s + Math.abs(p.diffAmount), 0) / under.length) : null;
                 const avgOver = over.length ? Math.round(over.reduce((s, p) => s + p.diffAmount, 0) / over.length) : null;
                 return (
-                  <ChartCard title={t('dashboard.budgetCapabilityTitle')}>
+                  <ChartCard title={t('dashboard.budgetCapabilityTitle')} info={<InfoPopover label={t('dashboard.budgetCapabilityTitle')}>{t('dashboard.calcBudget')}</InfoPopover>}>
                     <p className="text-xs text-gray-500 mb-3">{t('dashboard.budgetCapabilityHint')}</p>
                     <div className="flex flex-wrap items-center gap-3 mb-3">
                       {budgetCapability.length > 1 && (
@@ -2427,14 +2428,16 @@ function extractThemes(notes: string[]): Array<{ term: string; count: number }> 
 // an ancestor so the chart stays mounted at full size and remains captureable by
 // the PPTX export even while visually collapsed. The inner `data-chart-export`
 // node is what the export handler screenshots (title from `data-chart-title`).
-function ChartCard({ title, children, collapsible = false, defaultOpen = true }: { title: string; children: React.ReactNode; collapsible?: boolean; defaultOpen?: boolean }) {
+function ChartCard({ title, info, children, collapsible = false, defaultOpen = true }: { title: string; info?: React.ReactNode; children: React.ReactNode; collapsible?: boolean; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const ctxCollapsible = useCollapsibleCards();
   const isCollapsible = collapsible || ctxCollapsible;
   return (
     <div className="rounded-xl shadow-sm bg-white border border-gray-200 overflow-hidden">
       <div className="flex items-center gap-2 px-5 pt-5 pb-3">
-        <h3 className="flex-1 text-sm font-semibold text-gray-700">{title}</h3>
+        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+        {info}
+        <span className="flex-1" />
         {isCollapsible && (
           <button
             type="button"

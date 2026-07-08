@@ -2053,6 +2053,61 @@ const translations = {
     sv: 'Poster fram till slutfört “{step}”',
     de: 'Einträge bis zum Abschluss von „{step}“',
   },
+  // "How it's calculated" explainers (2026-07-08), one per flow-dashboard measure.
+  'dashboard.calcTouchesPerCase': {
+    en: 'One point per case = the number of touches (saved work entries) on that case, plotted in case-open order. Centre line = the mean; limits = mean ± 2.66 × the average moving range (an XmR chart). Choose a value step to count only touches up to that case’s last touch on the step.',
+    da: 'Ét punkt pr. sag = antal registreringer (gemte arbejdsposter) på sagen, vist i rækkefølge efter sagsåbning. Midterlinje = gennemsnit; grænser = gennemsnit ± 2,66 × gennemsnitligt glidende interval (et XmR-kort). Vælg et værditrin for kun at tælle registreringer frem til sagens sidste registrering på trinnet.',
+    sv: 'En punkt per ärende = antal poster (sparade arbetsposter) på ärendet, i ordning efter ärendets öppning. Mittlinje = medelvärde; gränser = medelvärde ± 2,66 × genomsnittligt glidande intervall (ett XmR-diagram). Välj ett värdesteg för att bara räkna poster fram till ärendets sista post på steget.',
+    de: 'Ein Punkt pro Fall = Anzahl der Einträge (gespeicherte Arbeitseinträge) des Falls, in Reihenfolge der Fallöffnung. Mittellinie = Mittelwert; Grenzen = Mittelwert ± 2,66 × durchschnittliche gleitende Spannweite (XmR).',
+  },
+  'dashboard.calcStepsPerCase': {
+    en: 'One point per case = the number of work steps of the chosen type (or that type as a % of the case’s steps), in case-open order, with XmR limits (mean ± 2.66 × the average moving range). A step is one tagged work step; choose a value step to count only steps tagged to it.',
+    da: 'Ét punkt pr. sag = antal arbejdstrin af den valgte type (eller typens andel i % af sagens trin), i rækkefølge efter sagsåbning, med XmR-grænser (gennemsnit ± 2,66 × gennemsnitligt glidende interval). Et trin er ét markeret arbejdstrin; vælg et værditrin for kun at tælle trin markeret dertil.',
+    sv: 'En punkt per ärende = antal arbetssteg av vald typ (eller typens andel i % av ärendets steg), i ordning efter ärendets öppning, med XmR-gränser (medelvärde ± 2,66 × genomsnittligt glidande intervall). Ett steg är ett märkt arbetssteg; välj ett värdesteg för att bara räkna steg märkta dit.',
+    de: 'Ein Punkt pro Fall = Anzahl der Arbeitsschritte des gewählten Typs (oder dessen Anteil in % der Schritte des Falls), in Reihenfolge der Fallöffnung, mit XmR-Grenzen (Mittelwert ± 2,66 × durchschnittliche gleitende Spannweite).',
+  },
+  'dashboard.calcWorkByValueStep': {
+    en: 'Counts each work step by its tag (value, sequence, failure work, failure demand) and groups them by the value step it was tagged to. Sort to rank steps by a waste type, or keep journey order.',
+    da: 'Tæller hvert arbejdstrin efter dets mærkat (værdiskabende, sekvens, ikke-værdiskabende arbejde, ikke-værdiskabende efterspørgsel) og grupperer efter det værditrin, det er markeret til. Sortér for at rangere trin efter en spildtype, eller behold rejsens rækkefølge.',
+    sv: 'Räknar varje arbetssteg efter dess märkning (värdeskapande, sekvens, icke-värdeskapande arbete, icke-värdeskapande efterfrågan) och grupperar efter det värdesteg det märkts till. Sortera för att rangordna steg efter en slöserityp, eller behåll resans ordning.',
+    de: 'Zählt jeden Arbeitsschritt nach seiner Markierung (Wert, Sequenz, Fehlerarbeit, Fehlerbedarf) und gruppiert sie nach dem zugeordneten Wertschritt. Sortieren, um Schritte nach Verschwendungsart zu ordnen, oder Reihenfolge der Reise behalten.',
+  },
+  'dashboard.calcValueStepOverview': {
+    en: 'Per value step: its work-step counts by tag, the non-value share (sequence + failure work + failure demand ÷ all its steps), and the system conditions most often tagged on those steps.',
+    da: 'Pr. værditrin: antal arbejdstrin efter mærkat, den ikke-værdiskabende andel (sekvens + ikke-værdiskabende arbejde + ikke-værdiskabende efterspørgsel ÷ alle trin) og de systemforhold, der oftest er markeret på trinnene.',
+    sv: 'Per värdesteg: antal arbetssteg efter märkning, den icke-värdeskapande andelen (sekvens + icke-värdeskapande arbete + icke-värdeskapande efterfrågan ÷ alla steg) och de systemvillkor som oftast märkts på stegen.',
+    de: 'Pro Wertschritt: Arbeitsschritt-Zahlen nach Markierung, der Nicht-Wert-Anteil (Sequenz + Fehlerarbeit + Fehlerbedarf ÷ alle Schritte) und die am häufigsten markierten Systembedingungen.',
+  },
+  'dashboard.calcFlowFailureDemand': {
+    en: 'Counts work steps tagged as failure demand, grouped by failure-demand type, across the cases in scope (the value-demand filter applies).',
+    da: 'Tæller arbejdstrin markeret som ikke-værdiskabende efterspørgsel, grupperet efter type, på tværs af sagerne i udsnittet (værdiskabende-efterspørgsel-filteret gælder).',
+    sv: 'Räknar arbetssteg märkta som icke-värdeskapande efterfrågan, grupperade efter typ, över ärendena i urvalet (värdeskapande-efterfrågan-filtret gäller).',
+    de: 'Zählt als Fehlerbedarf markierte Arbeitsschritte, gruppiert nach Typ, über die Fälle im Umfang (der Wertbedarf-Filter gilt).',
+  },
+  'dashboard.calcCor': {
+    en: 'The mix of Capability-of-Response outcomes recorded on the cases in scope, as a share of the total.',
+    da: 'Fordelingen af registrerede Capability-of-Response-udfald på sagerne i udsnittet, som andel af totalen.',
+    sv: 'Fördelningen av registrerade Capability-of-Response-utfall på ärendena i urvalet, som andel av totalen.',
+    de: 'Die Verteilung der erfassten Capability-of-Response-Ergebnisse der Fälle im Umfang, als Anteil an der Gesamtzahl.',
+  },
+  'dashboard.calcBudget': {
+    en: 'Per case that has a budget ask and a recorded amount: the signed variance (delivered − budget), shown as % of budget or as an amount, in answer order, with XmR limits.',
+    da: 'Pr. sag med et budgetønske og et registreret beløb: den fortegnede afvigelse (leveret − budget), vist som % af budget eller som beløb, i svarrækkefølge, med XmR-grænser.',
+    sv: 'Per ärende med ett budgetönskemål och ett registrerat belopp: den tecknade avvikelsen (levererat − budget), som % av budget eller som belopp, i svarsordning, med XmR-gränser.',
+    de: 'Pro Fall mit Budgetwunsch und erfasstem Betrag: die vorzeichenbehaftete Abweichung (geliefert − Budget), als % des Budgets oder als Betrag, in Antwortreihenfolge, mit XmR-Grenzen.',
+  },
+  'dashboard.calcAskDelivery': {
+    en: 'For each ask linked to a what-matters factor: of the cases that recorded both the ask and a decision value, how many were met — and, for dates, how many were late and by how many days on average.',
+    da: 'For hvert ønske knyttet til en “det der betyder noget”-faktor: af de sager, der registrerede både ønsket og en beslutningsværdi, hvor mange blev opfyldt — og for datoer, hvor mange var forsinkede og med hvor mange dage i gennemsnit.',
+    sv: 'För varje önskemål kopplat till en “det som betyder något”-faktor: av de ärenden som registrerade både önskemålet och ett beslutsvärde, hur många uppfylldes — och för datum, hur många var sena och med hur många dagar i snitt.',
+    de: 'Für jeden mit einem „Was zählt“-Faktor verknüpften Wunsch: von den Fällen mit Wunsch und Entscheidungswert, wie viele erfüllt wurden — und bei Datumsangaben, wie viele verspätet waren und um wie viele Tage im Schnitt.',
+  },
+  'dashboard.calcEndToEnd': {
+    en: 'Per case: the whole-day time between the two chosen events (or the count of touches, or days early/late vs the customer’s date), in start-date order, with XmR limits (mean ± 2.66 × the average moving range). Excluded points stay visible but don’t move the limits.',
+    da: 'Pr. sag: tiden i hele dage mellem de to valgte hændelser (eller antal registreringer, eller dage før/efter kundens dato), i rækkefølge efter startdato, med XmR-grænser (gennemsnit ± 2,66 × gennemsnitligt glidende interval). Udeladte punkter vises stadig, men flytter ikke grænserne.',
+    sv: 'Per ärende: tiden i hela dagar mellan de två valda händelserna (eller antal poster, eller dagar före/efter kundens datum), i ordning efter startdatum, med XmR-gränser (medelvärde ± 2,66 × genomsnittligt glidande intervall). Uteslutna punkter visas men flyttar inte gränserna.',
+    de: 'Pro Fall: die ganztägige Zeit zwischen den zwei gewählten Ereignissen (oder Anzahl Einträge, oder Tage früher/später als das Kundendatum), in Reihenfolge des Startdatums, mit XmR-Grenzen. Ausgeschlossene Punkte bleiben sichtbar, verschieben die Grenzen aber nicht.',
+  },
   // Touches-over-time chart (per-day series, scoped, count/%).
   'dashboard.touchesOverTime': {
     en: 'Touches over time',

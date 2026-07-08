@@ -132,12 +132,10 @@ export default function CapabilityChart({
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
           {t('dashboard.capabilityLeadTime')}
-          {capMetric === 'leadTime' && (
-            <InfoPopover label={t('dashboard.leadTimeExcludeHelp')}>
-              {t('dashboard.leadTimeExcludeHelp')}
-              {capData && capData.nWantedByDate > 0 ? ` ${t('dashboard.leadTimeExcludedCount', { count: String(capData.nWantedByDate) })}` : ''}
-            </InfoPopover>
-          )}
+          <InfoPopover label={t('dashboard.capabilityLeadTime')}>
+            {t('dashboard.calcEndToEnd')}
+            {capMetric === 'leadTime' ? ` ${t('dashboard.leadTimeExcludeHelp')}${capData && capData.nWantedByDate > 0 ? ` ${t('dashboard.leadTimeExcludedCount', { count: String(capData.nWantedByDate) })}` : ''}` : ''}
+          </InfoPopover>
         </h3>
         <div className="flex items-center gap-2">
           <button

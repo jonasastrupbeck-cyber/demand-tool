@@ -33,7 +33,7 @@ function Card({ label, value, sub, color }: { label: string; value: string | num
 }
 
 export default function XmRChart({
-  title, subtitle, valueLabel, data, loading, controls, fmtValue,
+  title, subtitle, valueLabel, data, loading, controls, fmtValue, info,
 }: {
   title: string;
   subtitle?: string;
@@ -43,6 +43,8 @@ export default function XmRChart({
   controls?: ReactNode;
   /** Format a value for tiles/tooltip. Defaults to the raw number. */
   fmtValue?: (v: number | null) => string;
+  /** Optional info affordance (e.g. an <InfoPopover>) shown beside the title. */
+  info?: ReactNode;
 }) {
   const { t } = useLocale();
   const collapsible = useCollapsibleCards();
@@ -53,7 +55,9 @@ export default function XmRChart({
   return (
     <div className="rounded-xl shadow-sm p-5 bg-white border border-gray-200 overflow-hidden">
       <div className="flex items-center gap-2 mb-3">
-        <h3 className="flex-1 text-sm font-semibold text-gray-700">{title}</h3>
+        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+        {info}
+        <span className="flex-1" />
         {collapsible && (
           <button
             type="button"

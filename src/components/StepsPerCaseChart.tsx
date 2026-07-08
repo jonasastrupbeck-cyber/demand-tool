@@ -6,6 +6,7 @@ import { useLocale } from '@/lib/locale-context';
 import XmRChart from '@/components/XmRChart';
 import PillToggle from '@/components/PillToggle';
 import PillSelect from '@/components/PillSelect';
+import InfoPopover from '@/components/InfoPopover';
 
 type Tag = 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand';
 
@@ -109,6 +110,7 @@ export default function StepsPerCaseChart({
       loading={loading}
       controls={controls}
       fmtValue={fmtValue}
+      info={<InfoPopover label={t('dashboard.stepsPerCaseTitle')}>{t('dashboard.calcStepsPerCase')}</InfoPopover>}
     />
   );
 }

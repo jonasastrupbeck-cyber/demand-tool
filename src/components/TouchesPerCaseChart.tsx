@@ -5,6 +5,7 @@ import type { CapabilityData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import XmRChart from '@/components/XmRChart';
 import PillSelect from '@/components/PillSelect';
+import InfoPopover from '@/components/InfoPopover';
 
 // Touches-per-case XmR (2026-07-08): one point per case = its total touch count
 // (a touch = one saved work entry). Scoped by the dashboard's value-demand filter.
@@ -59,6 +60,7 @@ export default function TouchesPerCaseChart({
       data={data}
       loading={loading}
       controls={controls}
+      info={<InfoPopover label={t('dashboard.touchesPerCaseTitle')}>{t('dashboard.calcTouchesPerCase')}</InfoPopover>}
     />
   );
 }
