@@ -1589,6 +1589,24 @@ const translations = {
     sv: 'Var värdeskapande, sekvens- och icke-värdeskapande arbete hamnar i värderesan.',
     de: 'Wo Wert-, Sequenz- und Fehlerarbeit auf der Wertreise anfallen.',
   },
+  'dashboard.vsSortBy': {
+    en: 'Sort by',
+    da: 'Sortér efter',
+    sv: 'Sortera efter',
+    de: 'Sortieren nach',
+  },
+  'dashboard.vsSortJourney': {
+    en: 'Journey order',
+    da: 'Rejsens rækkefølge',
+    sv: 'Resans ordning',
+    de: 'Reihenfolge der Reise',
+  },
+  'dashboard.vsSortWaste': {
+    en: 'Total waste',
+    da: 'Spild i alt',
+    sv: 'Totalt slöseri',
+    de: 'Verschwendung gesamt',
+  },
   // Per-value-step overview (2026-07-04): causes (system conditions) vs
   // consequences (non-value work + failure demand) for each value step.
   'dashboard.valueStepOverviewTitle': {

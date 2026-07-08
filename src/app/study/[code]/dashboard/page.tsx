@@ -109,6 +109,9 @@ export default function DashboardPage() {
   const [valueDemandFilter, setValueDemandFilter] = useState<string[]>([]);
   const [valueDemandTypes, setValueDemandTypes] = useState<{ id: string; label: string }[]>([]);
   const [valueSteps, setValueSteps] = useState<{ id: string; label: string }[]>([]);
+  // "Work by value step" ordering (Analytics): journey order (default) or ranked
+  // by a waste type, so "which step generates the most X" is answerable at a glance.
+  const [vsSort, setVsSort] = useState<'journey' | 'failureDemand' | 'failure' | 'sequence' | 'waste'>('journey');
   const [showCoverage, setShowCoverage] = useState(false);
   const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
@@ -1864,8 +1867,29 @@ export default function DashboardPage() {
               {data.valueStepsEnabled && data.workByValueStep.length > 0 && (
                 <ChartCard title={t('dashboard.workByValueStepTitle')}>
                   <p className="text-xs text-gray-500 mb-3">{t('dashboard.workByValueStepHint')}</p>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-[10px] uppercase tracking-widest text-gray-500 font-medium">{t('dashboard.vsSortBy')}</span>
+                    <PillToggle
+                      ariaLabel={t('dashboard.vsSortBy')}
+                      value={vsSort}
+                      onChange={(v) => setVsSort(v as typeof vsSort)}
+                      options={[
+                        { value: 'journey', label: t('dashboard.vsSortJourney') },
+                        { value: 'failureDemand', label: t('capture.workBlockTagFailureDemand') },
+                        { value: 'failure', label: t('capture.failure') },
+                        { value: 'sequence', label: t('capture.classificationWorkSequence') },
+                        { value: 'waste', label: t('dashboard.vsSortWaste') },
+                      ]}
+                    />
+                  </div>
                   <ResponsiveContainer width="100%" height={Math.max(220, data.workByValueStep.length * 44 + 48)}>
-                    <BarChart data={data.workByValueStep.map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
+                    <BarChart data={[...data.workByValueStep].sort((a, b) =>
+                      vsSort === 'failureDemand' ? b.failureDemand - a.failureDemand
+                      : vsSort === 'failure' ? b.failure - a.failure
+                      : vsSort === 'sequence' ? b.sequence - a.sequence
+                      : vsSort === 'waste' ? (b.sequence + b.failure + b.failureDemand) - (a.sequence + a.failure + a.failureDemand)
+                      : a.sortOrder - b.sortOrder
+                    ).map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
                       <XAxis type="number" allowDecimals={false} tick={tickStyle} />
                       <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
