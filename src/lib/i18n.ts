@@ -2023,6 +2023,18 @@ const translations = {
     sv: 'Steg totalt',
     de: 'Schritte gesamt',
   },
+  'dashboard.valueStepAll': {
+    en: 'All steps',
+    da: 'Alle trin',
+    sv: 'Alla steg',
+    de: 'Alle Schritte',
+  },
+  'dashboard.touchesUpToStep': {
+    en: 'Touches up to completing “{step}”',
+    da: 'Registreringer frem til afslutning af “{step}”',
+    sv: 'Poster fram till slutfört “{step}”',
+    de: 'Einträge bis zum Abschluss von „{step}“',
+  },
   // Touches-over-time chart (per-day series, scoped, count/%).
   'dashboard.touchesOverTime': {
     en: 'Touches over time',

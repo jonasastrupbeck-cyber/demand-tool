@@ -108,6 +108,7 @@ export default function DashboardPage() {
   // former P2BS (life-problem) filter on the flow dashboard. + collapsed coverage box.
   const [valueDemandFilter, setValueDemandFilter] = useState<string[]>([]);
   const [valueDemandTypes, setValueDemandTypes] = useState<{ id: string; label: string }[]>([]);
+  const [valueSteps, setValueSteps] = useState<{ id: string; label: string }[]>([]);
   const [showCoverage, setShowCoverage] = useState(false);
   const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
@@ -223,6 +224,10 @@ export default function DashboardPage() {
         setValueDemandTypes((Array.isArray(s.demandTypes) ? s.demandTypes : [])
           .filter((d: { category?: string }) => d.category === 'value')
           .map((d: { id: string; label: string }) => ({ id: d.id, label: d.label })));
+        setValueSteps((Array.isArray(s.valueSteps) ? s.valueSteps : [])
+          .slice()
+          .sort((a: { sortOrder: number }, b: { sortOrder: number }) => a.sortOrder - b.sortOrder)
+          .map((v: { id: string; label: string }) => ({ id: v.id, label: v.label })));
         setMilestones(Array.isArray(s.milestones) ? s.milestones : []);
         setWhatMattersTypes(Array.isArray(s.whatMattersTypes) ? s.whatMattersTypes : []);
         // Derive effective layer from the capture toggles so the dashboard
@@ -1619,6 +1624,7 @@ export default function DashboardPage() {
               dateFrom={capRange.from}
               dateTo={capRange.to}
               valueDemands={valueDemandFilter}
+              valueSteps={valueSteps}
             />
             {/* Steps per case (XmR) — one point per case = its step count for the
                 chosen tag (Total / Value / Sequence / Failure / Failure demand), as
@@ -1628,6 +1634,7 @@ export default function DashboardPage() {
               dateFrom={capRange.from}
               dateTo={capRange.to}
               valueDemands={valueDemandFilter}
+              valueSteps={valueSteps}
             />
             {chartIds.map((id) => (
               <CapabilityChart

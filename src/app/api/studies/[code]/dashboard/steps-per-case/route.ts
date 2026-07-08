@@ -22,7 +22,8 @@ export async function GET(
   const tagParam = sp.get('tag');
   const tag = (TAGS as readonly string[]).includes(tagParam ?? '') ? (tagParam as typeof TAGS[number]) : 'total';
   const mode = sp.get('mode') === 'pct' ? 'pct' : 'count';
+  const valueStepId = sp.get('valueStep') || undefined;
 
-  const data = await getStepsPerCaseCapability(study.id, { valueDemands, from, to, tag, mode });
+  const data = await getStepsPerCaseCapability(study.id, { valueDemands, from, to, tag, mode, valueStepId });
   return NextResponse.json(data);
 }

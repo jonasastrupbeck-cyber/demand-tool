@@ -17,7 +17,8 @@ export async function GET(
   const from = parseDateParam(sp.get('from'));
   const to = parseDateParam(sp.get('to'));
   const valueDemands = sp.get('valueDemands')?.split(',').filter(Boolean);
+  const valueStepId = sp.get('valueStep') || undefined;
 
-  const data = await getTouchesPerCaseCapability(study.id, { valueDemands, from, to });
+  const data = await getTouchesPerCaseCapability(study.id, { valueDemands, from, to, valueStepId });
   return NextResponse.json(data);
 }

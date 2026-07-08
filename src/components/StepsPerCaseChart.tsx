@@ -5,23 +5,27 @@ import type { CapabilityData } from '@/types';
 import { useLocale } from '@/lib/locale-context';
 import XmRChart from '@/components/XmRChart';
 import PillToggle from '@/components/PillToggle';
+import PillSelect from '@/components/PillSelect';
 
 type Tag = 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand';
 
 // Steps-per-case XmR (2026-07-08): one point per case = its step count for the
 // chosen tag (Total / Value / Sequence / Failure / Failure demand), as a count or
 // a % of the case's total steps. The work-composition companion to touches.
+// Optionally scoped to a single value step (2026-07-08 follow-up).
 export default function StepsPerCaseChart({
-  code, dateFrom, dateTo, valueDemands,
+  code, dateFrom, dateTo, valueDemands, valueSteps = [],
 }: {
   code: string;
   dateFrom?: string;
   dateTo?: string;
   valueDemands?: string[];
+  valueSteps?: { id: string; label: string }[];
 }) {
-  const { t } = useLocale();
+  const { t, tl } = useLocale();
   const [tag, setTag] = useState<Tag>('total');
   const [mode, setMode] = useState<'count' | 'pct'>('count');
+  const [valueStepId, setValueStepId] = useState('');
   const [data, setData] = useState<CapabilityData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,11 +39,12 @@ export default function StepsPerCaseChart({
     if (dateFrom) qp.set('from', dateFrom);
     if (dateTo) qp.set('to', dateTo);
     if (valueDemands && valueDemands.length) qp.set('valueDemands', valueDemands.join(','));
+    if (valueStepId) qp.set('valueStep', valueStepId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/steps-per-case?${qp}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [code, dateFrom, dateTo, valueDemands, tag, effMode]);
+  }, [code, dateFrom, dateTo, valueDemands, tag, effMode, valueStepId]);
 
   const tagLabel: Record<Tag, string> = {
     total: t('dashboard.stepTotal'),
@@ -80,12 +85,25 @@ export default function StepsPerCaseChart({
           ]}
         />
       )}
+      {valueSteps.length > 0 && (
+        <PillSelect
+          ariaLabel={t('capture.selectValueStep')}
+          placeholder={t('capture.selectValueStep')}
+          value={valueStepId}
+          onChange={setValueStepId}
+          options={[{ id: '', label: t('dashboard.valueStepAll') }, ...valueSteps.map((v) => ({ id: v.id, label: tl(v.label) }))]}
+        />
+      )}
     </>
   );
+
+  const stepLabel = valueSteps.find((v) => v.id === valueStepId)?.label;
+  const subtitle = valueStepId && stepLabel ? `${valueLabel} · ${tl(stepLabel)}` : undefined;
 
   return (
     <XmRChart
       title={t('dashboard.stepsPerCaseTitle')}
+      subtitle={subtitle}
       valueLabel={valueLabel}
       data={data}
       loading={loading}

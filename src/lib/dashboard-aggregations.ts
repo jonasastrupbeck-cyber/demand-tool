@@ -1197,9 +1197,9 @@ export async function getCapabilityData(
 // Scoped by value demand; the date range filters touches by effective date.
 export async function getTouchesPerCaseCapability(
   studyId: string,
-  opts: { valueDemands?: string[]; from?: Date; to?: Date } = {},
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; valueStepId?: string } = {},
 ): Promise<CapabilityData> {
-  const { valueDemands, from, to } = opts;
+  const { valueDemands, from, to, valueStepId } = opts;
   const empty: CapabilityData = { unit: 'touches', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
   const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
@@ -1223,14 +1223,39 @@ export async function getTouchesPerCaseCapability(
     arr.push(new Date(r.eff));
   }
 
+  // Value-step mode: "touches up to completing step X" = touches up to the case's
+  // LAST block tagged that value step (the completion proxy — value steps have no
+  // real completion event). Cases that never touch the step are excluded.
+  const completionByCase = new Map<string, number>();
+  if (valueStepId) {
+    const compRows = await db.select({
+      caseId: demandEntries.caseId,
+      completeAt: sql<string>`max(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))`,
+    })
+      .from(workDescriptionBlocks)
+      .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), isNotNull(demandEntries.caseId), eq(workDescriptionBlocks.valueStepId, valueStepId)))
+      .groupBy(demandEntries.caseId);
+    for (const r of compRows) if (r.caseId && r.completeAt) completionByCase.set(r.caseId, new Date(r.completeAt).getTime());
+  }
+
   const fromMs = from ? from.getTime() : null;
   const toMs = to ? to.getTime() : null;
   type Row = { caseId: string; caseRef: string; touches: number; startKey: number };
   const rows: Row[] = [];
   for (const c of caseRows) {
     const effs = byCase.get(c.id) ?? [];
+    // In value-step mode, only cases that reached the step count, and only touches
+    // up to (and including) that step's completion.
+    let completionMs: number | null = null;
+    if (valueStepId) {
+      const comp = completionByCase.get(c.id);
+      if (comp === undefined) continue; // never touched the step → not on the chart
+      completionMs = comp;
+    }
     const inRange = effs.filter((d) => {
       const ms = d.getTime();
+      if (completionMs !== null && ms > completionMs) return false;
       if (fromMs !== null && ms < fromMs) return false;
       if (toMs !== null && ms > toMs) return false;
       return true;
@@ -1273,9 +1298,9 @@ export async function getTouchesPerCaseCapability(
 // steps but zero of the chosen tag is a legitimate 0 point.
 export async function getStepsPerCaseCapability(
   studyId: string,
-  opts: { valueDemands?: string[]; from?: Date; to?: Date; tag?: 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand'; mode?: 'count' | 'pct' } = {},
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; tag?: 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand'; mode?: 'count' | 'pct'; valueStepId?: string } = {},
 ): Promise<CapabilityData> {
-  const { valueDemands, from, to } = opts;
+  const { valueDemands, from, to, valueStepId } = opts;
   const tag = opts.tag ?? 'total';
   const mode = opts.mode ?? 'count';
   const unit: CapabilityData['unit'] = mode === 'pct' ? '%' : 'steps';
@@ -1284,22 +1309,23 @@ export async function getStepsPerCaseCapability(
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
 
-  // One row per work block: its case, tag, and effective date.
+  // One row per work block: its case, tag, value step, and effective date.
   const blockRows = await db.select({
     caseId: demandEntries.caseId,
     tag: workDescriptionBlocks.tag,
+    valueStepId: workDescriptionBlocks.valueStepId,
     eff: sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`,
   })
     .from(workDescriptionBlocks)
     .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
     .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), isNotNull(demandEntries.caseId)));
 
-  const byCase = new Map<string, { tag: string; ms: number }[]>();
+  const byCase = new Map<string, { tag: string; valueStepId: string | null; ms: number }[]>();
   for (const r of blockRows) {
     if (!r.caseId || !r.eff) continue;
     let arr = byCase.get(r.caseId);
     if (!arr) { arr = []; byCase.set(r.caseId, arr); }
-    arr.push({ tag: r.tag, ms: new Date(r.eff).getTime() });
+    arr.push({ tag: r.tag, valueStepId: r.valueStepId, ms: new Date(r.eff).getTime() });
   }
 
   const fromMs = from ? from.getTime() : null;
@@ -1309,6 +1335,7 @@ export async function getStepsPerCaseCapability(
   for (const c of caseRows) {
     const blocks = byCase.get(c.id) ?? [];
     const inRange = blocks.filter((b) => {
+      if (valueStepId && b.valueStepId !== valueStepId) return false; // scope to the chosen value step
       if (fromMs !== null && b.ms < fromMs) return false;
       if (toMs !== null && b.ms > toMs) return false;
       return true;
