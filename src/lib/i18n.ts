@@ -1895,6 +1895,25 @@ const translations = {
     sv: 'Nedre kontrollgräns (NKG)',
     de: 'Untere Kontrollgrenze',
   },
+  // Short forms for the on-chart reference-line labels (the tiles below spell them out).
+  'dashboard.uclShort': {
+    en: 'UCL',
+    da: 'ØKG',
+    sv: 'ÖKG',
+    de: 'OKG',
+  },
+  'dashboard.lclShort': {
+    en: 'LCL',
+    da: 'NKG',
+    sv: 'NKG',
+    de: 'UKG',
+  },
+  'dashboard.avgShort': {
+    en: 'Av',
+    da: 'Gns.',
+    sv: 'Medel',
+    de: 'Ø',
+  },
   'dashboard.signals': {
     en: 'Special-cause cases',
     da: 'Speciel årsagsvariation',
