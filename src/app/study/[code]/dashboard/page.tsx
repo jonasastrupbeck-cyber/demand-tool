@@ -21,6 +21,7 @@ import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
 import TouchesPerCaseChart from '@/components/TouchesPerCaseChart';
 import StepsPerCaseChart from '@/components/StepsPerCaseChart';
+import CorDistributionChart from '@/components/CorDistributionChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
@@ -1727,7 +1728,7 @@ export default function DashboardPage() {
                 <Card compact label={t('dashboard.valueWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workValueCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workValueCount} ${t('dashboard.entries')}`} color={COLORS.value} />
                 <Card compact label={t('dashboard.failureWorkPct')} value={data.workCount > 0 ? `${Math.round((data.workFailureCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workFailureCount} ${t('dashboard.entries')}`} color={COLORS.failure} />
                 {data.workSequenceCount > 0 && (
-                  <Card compact label={t('capture.classificationWorkSequence')} value={data.workSequenceCount} color={COLORS.sequence} />
+                  <Card compact label={t('capture.classificationWorkSequence')} value={data.workCount > 0 ? `${Math.round((data.workSequenceCount / data.workCount) * 100)}%` : '0%'} sub={`${data.workSequenceCount} ${t('dashboard.entries')}`} color={COLORS.sequence} />
                 )}
                 {data.workUnknownCount > 0 && (
                   <Card compact label={t('dashboard.unknownEntries')} value={data.workUnknownCount} color="#f59e0b" />
@@ -1793,23 +1794,7 @@ export default function DashboardPage() {
                   date scoped like the rest of the tab. Mirrors the Demand-tab
                   CoR pie for visual parity. */}
               {data.corTypeCounts.length > 0 && (
-                <ChartCard title={t('dashboard.corDistributionTitle')} info={<InfoPopover label={t('dashboard.corDistributionTitle')}>{t('dashboard.calcCor')}</InfoPopover>}>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie
-                        data={data.corTypeCounts.map(d => ({ ...d, label: tl(d.label) }))}
-                        cx="50%" cy="50%" outerRadius={80} innerRadius={32}
-                        dataKey="count" nameKey="label"
-                        label={(props) => `${((props.percent || 0) * 100).toFixed(0)}%`}
-                        labelLine={{ strokeWidth: 1 }}
-                      >
-                        {data.corTypeCounts.map((_, i) => (<Cell key={i} fill={COLORS.neutral[i % COLORS.neutral.length]} />))}
-                      </Pie>
-                      <Tooltip {...tooltipStyle} />
-                      <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartCard>
+                <CorDistributionChart code={code} dateFrom={capRange.from} dateTo={capRange.to} valueDemands={valueDemandFilter} />
               )}
 
               {data.workTypeCounts.length > 0 && (

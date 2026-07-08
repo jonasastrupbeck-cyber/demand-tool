@@ -1191,6 +1191,41 @@ export async function getCapabilityData(
 // EFFECTIVE date min(coalesce(block_date, created_at)) so backdated retrospective
 // touches land on their real day — matches getCapabilityData / over-time charts,
 // NOT raw created_at. Scope: case > life problem (P2BS, via the case) > all.
+// COR distribution (2026-07-09): share of each Capability-of-Response type across
+// flow work touches (demand_entries.handlingTypeId), optionally scoped to touches
+// that involve a given work classification. COR is per touch; the classes
+// (value/sequence/failure/failure_demand) are per work block, so a tag filter
+// keeps touches that have ≥1 block whose tag is selected (entry-level membership).
+// Scoped by value demand + date like the dashboard's built-in corTypeCounts.
+export async function getCorDistribution(
+  studyId: string,
+  opts: { from?: Date; to?: Date; valueDemands?: string[]; tags?: string[] } = {},
+): Promise<Array<{ label: string; count: number }>> {
+  const { from, to, valueDemands, tags } = opts;
+  const conds: SQL[] = [eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')];
+  if (from) conds.push(gte(demandEntries.createdAt, from));
+  if (to) conds.push(lte(demandEntries.createdAt, to));
+  if (valueDemands && valueDemands.length) {
+    const caseIds = await valueDemandCaseIds(studyId, valueDemands);
+    conds.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
+  }
+  if (tags && tags.length) {
+    conds.push(inArray(
+      demandEntries.id,
+      db.select({ id: workDescriptionBlocks.demandEntryId })
+        .from(workDescriptionBlocks)
+        .where(inArray(workDescriptionBlocks.tag, tags as ('value' | 'sequence' | 'failure' | 'failure_demand')[])),
+    ));
+  }
+  const rows = await db.select({ label: handlingTypes.label, count: sql<number>`count(*)::int` })
+    .from(demandEntries)
+    .innerJoin(handlingTypes, eq(demandEntries.handlingTypeId, handlingTypes.id))
+    .where(and(...conds))
+    .groupBy(handlingTypes.label)
+    .orderBy(desc(sql`count(*)`));
+  return rows.map((r) => ({ label: r.label, count: r.count }));
+}
+
 // Touches-per-case XmR (2026-07-08): one point per case = that case's total touch
 // count (a touch = one work entry with ≥1 block). Ordered by the case-open date
 // (min(openedAt, earliest touch) — the "First contact (case opened)" start).

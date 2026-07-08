@@ -1895,6 +1895,12 @@ const translations = {
     sv: 'Nedre kontrollgräns (NKG)',
     de: 'Untere Kontrollgrenze',
   },
+  'dashboard.corWorkFilter': {
+    en: 'Work type',
+    da: 'Arbejdstype',
+    sv: 'Arbetstyp',
+    de: 'Arbeitstyp',
+  },
   // Short forms for the on-chart reference-line labels (the tiles below spell them out).
   'dashboard.uclShort': {
     en: 'UCL',
