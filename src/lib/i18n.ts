@@ -2043,12 +2043,6 @@ const translations = {
     sv: 'Ordning',
     de: 'Reihenfolge',
   },
-  'dashboard.sortStart': {
-    en: 'Start date',
-    da: 'Startdato',
-    sv: 'Startdatum',
-    de: 'Startdatum',
-  },
   'dashboard.sortClosed': {
     en: 'Close date',
     da: 'Lukkedato',

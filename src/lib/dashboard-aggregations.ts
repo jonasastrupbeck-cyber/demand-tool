@@ -1049,7 +1049,7 @@ export async function getCapabilityData(
   }
 
   // Per case: resolve both events; keep cases where both exist and to ≥ from.
-  type Raw = { caseId: string; caseRef: string; fromTs: Date; closedAt: Date | null; leadTime: number; excluded: boolean; note: string | null };
+  type Raw = { caseId: string; caseRef: string; fromTs: Date; startTs: Date; closedAt: Date | null; leadTime: number; excluded: boolean; note: string | null };
   const raw: Raw[] = [];
   for (const c of caseRows) {
     const ctx = {
@@ -1090,21 +1090,27 @@ export async function getCapabilityData(
       value = toDay - fromDay;
     }
     const anno = annoByCase.get(c.id);
-    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, closedAt: ctx.closedAt, leadTime: value, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
+    // 'start'-order key = the case-open date (the "First contact (case opened)"
+    // event), independent of the chosen FROM event. openedAt is NOT NULL so this
+    // is always defined.
+    const startTs = eventTimestamp('caseOpen', ctx)!;
+    raw.push({ caseId: c.id, caseRef: c.caseRef, fromTs, startTs, closedAt: ctx.closedAt, leadTime: value, excluded: anno?.excluded ?? false, note: anno?.note ?? null });
   }
   if (raw.length === 0) return empty;
 
   // XmR needs a time order; the chosen order changes the moving ranges → limits.
-  // 'start' = by the FROM event (journey start). 'closed' = by case close date
-  // (still-open cases, closedAt null, sort last; tie-break by start).
+  // 'start' = by the case-open date (the "First contact (case opened)" event =
+  // min(openedAt, earliest touch)), INDEPENDENT of the chosen FROM event.
+  // 'closed' = by case close date (still-open cases, closedAt null, sort last;
+  // tie-break by start).
   if (sort === 'closed') {
     raw.sort((a, b) => {
       const ax = a.closedAt ? a.closedAt.getTime() : Infinity;
       const bx = b.closedAt ? b.closedAt.getTime() : Infinity;
-      return ax !== bx ? ax - bx : a.fromTs.getTime() - b.fromTs.getTime();
+      return ax !== bx ? ax - bx : a.startTs.getTime() - b.startTs.getTime();
     });
   } else {
-    raw.sort((a, b) => a.fromTs.getTime() - b.fromTs.getTime());
+    raw.sort((a, b) => a.startTs.getTime() - b.startTs.getTime());
   }
 
   // Limits + mean/median are computed from INCLUDED points only; excluded points

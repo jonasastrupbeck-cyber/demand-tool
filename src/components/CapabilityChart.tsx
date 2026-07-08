@@ -191,7 +191,7 @@ export default function CapabilityChart({
           value={capSort}
           onChange={(v) => setCapSort(v as 'start' | 'closed')}
           options={[
-            { value: 'start', label: t('dashboard.sortStart') },
+            { value: 'start', label: t('dashboard.evCaseOpened') },
             { value: 'closed', label: t('dashboard.sortClosed') },
           ]}
         />
@@ -222,7 +222,7 @@ export default function CapabilityChart({
         const valueLabel = isTouches ? t('dashboard.touchesPerCase') : isVariance ? t('dashboard.metricVarianceAxis') : t('dashboard.leadTimeDays');
         // Variance is signed: +n = n days late, -n = n days early.
         const fmtValue = (v: number | null) => v == null ? '—' : (isTouches ? `${v}` : `${isVariance && v > 0 ? '+' : ''}${v} ${t('dashboard.daysShort')}`);
-        const subtitle = `${fromLabel} → ${toLabel} · ${valueLabel} · ${t('dashboard.sortLabel')}: ${capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.sortStart')}`;
+        const subtitle = `${fromLabel} → ${toLabel} · ${valueLabel} · ${t('dashboard.sortLabel')}: ${capSort === 'closed' ? t('dashboard.sortClosed') : t('dashboard.evCaseOpened')}`;
         return (
         <>
           {/* Captured region for image / PowerPoint export — title + chart + tiles. */}
