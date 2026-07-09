@@ -1707,12 +1707,6 @@ const translations = {
     sv: 'Hur ofta var och en förekommer',
     de: 'Wie häufig jedes vorkommt',
   },
-  'synthesis.pieTitle': {
-    en: 'Share of each',
-    da: 'Hver enkelts andel',
-    sv: 'Var och ens andel',
-    de: 'Anteil jedes Einzelnen',
-  },
   'synthesis.overTimeTitle': {
     en: 'Over time',
     da: 'Over tid',
@@ -2139,6 +2133,13 @@ const translations = {
     da: 'Blokke i alt',
     sv: 'Block totalt',
     de: 'Blöcke gesamt',
+  },
+  // Parenthetical on the per-tag XmR chart titles, e.g. "Value (work block)".
+  'dashboard.workBlockParen': {
+    en: 'work block',
+    da: 'arbejdsblok',
+    sv: 'arbetsblock',
+    de: 'Arbeitsblock',
   },
   'dashboard.valueStepAll': {
     en: 'All value steps',

@@ -106,9 +106,9 @@ export default function StepsPerCaseChart({
 
   const stepLabel = valueSteps.find((v) => v.id === valueStepId)?.label;
   const subtitle = valueStepId && stepLabel ? `${valueLabel} · ${tl(stepLabel)}` : undefined;
-  // Fixed-tag instances (the four per-type charts) title by their type; the free
-  // chart keeps the generic "Steps per case (XmR)" title.
-  const title = fixedTag ? `${tagLabel[fixedTag]} (XmR)` : t('dashboard.stepsPerCaseTitle');
+  // Fixed-tag instances (the four per-type charts) title by their type, e.g.
+  // "Value (work block)"; the free chart keeps "Blocks of work per case (XmR)".
+  const title = fixedTag ? `${tagLabel[fixedTag]} (${t('dashboard.workBlockParen')})` : t('dashboard.stepsPerCaseTitle');
 
   return (
     <XmRChart

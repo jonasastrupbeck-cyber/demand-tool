@@ -1421,24 +1421,7 @@ export default function DashboardPage() {
                 )}
 
                 {/* Work over time */}
-                {data.workOverTime.length > 1 && (
-                  <ChartCard title={t('dashboard.workOverTime')}>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={data.workOverTime}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
-                        <XAxis dataKey="date" tick={tickStyle} />
-                        <YAxis allowDecimals={false} tick={tickStyle} />
-                        <Tooltip {...tooltipStyle} />
-                        <Legend wrapperStyle={{ color: THEME.textSecondary }} />
-                        <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
-                        {data.workOverTime.some(d => d.sequenceCount > 0) && (
-                          <Line type="monotone" dataKey="sequenceCount" name={t('capture.classificationWorkSequence')} stroke={COLORS.sequence} strokeWidth={2} dot={{ r: 4 }} />
-                        )}
-                        <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </ChartCard>
-                )}
+                {data.workOverTime.length > 1 && <WorkOverTimeCard rows={data.workOverTime} />}
 
                 {/* Phase 4C (2026-04-16) — Work Step analysis. Only visible when
                     workStepTypesEnabled AND real step-tagged data exists. */}
@@ -1740,7 +1723,6 @@ export default function DashboardPage() {
             empty: t(kind === 'sc' ? 'synthesis.empty' : kind === 'wt' ? 'synthesis.wtEmpty' : 'synthesis.wstEmpty'),
             selectHint: t('synthesis.selectHint'),
             distributionTitle: t('synthesis.distributionTitle'),
-            pieTitle: t('synthesis.pieTitle'),
             overTimeTitle: t('synthesis.overTimeTitle'),
             overTimeTopN: t('synthesis.overTimeTopN'),
             mergeInto: t('synthesis.mergeInto'),
@@ -2085,30 +2067,13 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
-              {data.workOverTime.length > 1 && (
-                <ChartCard title={t('dashboard.workOverTime')}>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={data.workOverTime}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
-                      <XAxis dataKey="date" tick={tickStyle} />
-                      <YAxis allowDecimals={false} tick={tickStyle} />
-                      <Tooltip {...tooltipStyle} />
-                      <Legend wrapperStyle={{ color: THEME.textSecondary }} />
-                      <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
-                      {data.workOverTime.some(d => d.sequenceCount > 0) && (
-                        <Line type="monotone" dataKey="sequenceCount" name={t('capture.classificationWorkSequence')} stroke={COLORS.sequence} strokeWidth={2} dot={{ r: 4 }} />
-                      )}
-                      <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartCard>
-              )}
+              {data.workOverTime.length > 1 && <WorkOverTimeCard rows={data.workOverTime} />}
 
-              {/* The four work-step types as separate per-case XmR charts (value /
-                  sequence / failure work + failure demand). Step-level (block tag),
-                  count or % per case, in case-open order. */}
+              {/* The four work-block tags as separate per-case XmR charts (value /
+                  sequence / failure work + failure demand). Block-level (block tag),
+                  count or % per case, in case-open order. One per line (full width). */}
               {data.workCount > 0 && (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {(['value', 'sequence', 'failure', 'failure_demand'] as const).map((tg) => (
                     <StepsPerCaseChart key={tg} code={code} dateFrom={capRange.from} dateTo={capRange.to} valueDemands={valueDemandFilter} fixedTag={tg} />
                   ))}
@@ -2530,6 +2495,49 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Work-over-time line chart with a Count / % toggle (2026-07-09). % is computed
+// client-side per bucket (share of all work that day, incl. unknown — matches the
+// value%/failure% stat tiles). Shared by the flow Analytics + non-flow Work views.
+function WorkOverTimeCard({ rows }: { rows: Array<{ date: string; valueCount: number; failureCount: number; sequenceCount: number; unknownCount: number }> }) {
+  const { t } = useLocale();
+  const [mode, setMode] = useState<'count' | 'pct'>('count');
+  const tickStyle = { fontSize: 11, fill: THEME.textSecondary };
+  const hasSequence = rows.some((d) => d.sequenceCount > 0);
+  const chartRows = mode === 'pct'
+    ? rows.map((d) => {
+        const total = d.valueCount + d.sequenceCount + d.failureCount + d.unknownCount;
+        const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+        return { ...d, valueCount: pct(d.valueCount), sequenceCount: pct(d.sequenceCount), failureCount: pct(d.failureCount) };
+      })
+    : rows;
+  return (
+    <ChartCard title={t('dashboard.workOverTime')}>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <PillToggle
+          ariaLabel={t('dashboard.countMode')}
+          value={mode}
+          onChange={(v) => setMode(v as 'count' | 'pct')}
+          options={[{ value: 'count', label: t('dashboard.countMode') }, { value: 'pct', label: t('dashboard.pctMode') }]}
+        />
+      </div>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={chartRows}>
+          <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+          <XAxis dataKey="date" tick={tickStyle} />
+          <YAxis allowDecimals={false} tick={tickStyle} domain={mode === 'pct' ? [0, 100] : undefined} tickFormatter={mode === 'pct' ? (v) => `${v}%` : undefined} />
+          <Tooltip {...tooltipStyle} formatter={mode === 'pct' ? (v) => `${v}%` : undefined} />
+          <Legend wrapperStyle={{ color: THEME.textSecondary }} />
+          <Line type="monotone" dataKey="valueCount" name={t('capture.value')} stroke={COLORS.value} strokeWidth={2} dot={{ r: 4 }} />
+          {hasSequence && (
+            <Line type="monotone" dataKey="sequenceCount" name={t('capture.classificationWorkSequence')} stroke={COLORS.sequence} strokeWidth={2} dot={{ r: 4 }} />
+          )}
+          <Line type="monotone" dataKey="failureCount" name={t('capture.failure')} stroke={COLORS.failure} strokeWidth={2} dot={{ r: 4 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartCard>
   );
 }
 

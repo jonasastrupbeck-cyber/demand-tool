@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, LineChart, Line, Legend } from 'recharts';
 import { useLocale } from '@/lib/locale-context';
 import InfoPopover from '@/components/InfoPopover';
 
@@ -19,7 +19,7 @@ const OVER_TIME_TOP_N = 8;
 
 export type SynthesisLabels = {
   heading: string; intro: string; selectHint: string; empty: string;
-  distributionTitle: string; pieTitle: string; overTimeTitle: string; overTimeTopN: string;
+  distributionTitle: string; overTimeTitle: string; overTimeTopN: string;
   mergeInto: string; renameOptional: string; mergeButton: string; cancel: string; rename: string;
   recentMerges: string; undo: string; loading: string;
   mergeFailed: string; renameFailed: string; undoFailed: string;
@@ -202,22 +202,6 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
                     <LabelList dataKey="count" position="right" style={{ fill: TEXT_SECONDARY, fontSize: 11 }} />
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {chartData.length > 0 && (
-            <div className="rounded-xl bg-white border border-gray-200 p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">{labels.pieTitle}</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={chartData} cx="50%" cy="50%" outerRadius={80} innerRadius={32} dataKey="count" nameKey="display"
-                    label={(p) => `${((p.percent || 0) * 100).toFixed(0)}%`} labelLine={{ strokeWidth: 1 }}>
-                    {chartData.map((_, i) => (<Cell key={i} fill={PALETTE[i % PALETTE.length]} />))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
-                  <Legend wrapperStyle={{ fontSize: 12, color: TEXT_SECONDARY }} />
-                </PieChart>
               </ResponsiveContainer>
             </div>
           )}
