@@ -675,7 +675,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     { id: 'maintained', label: t('capture.valueCreationCapability.maintained'), operationalDefinition: t('capture.valueCreationCapability.maintainedDef') },
                     { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
                   ]}
-                  variant="value"
+                  variant="add"
                 />
               </div>
             )}
