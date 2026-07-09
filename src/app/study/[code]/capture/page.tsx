@@ -1845,59 +1845,58 @@ export default function CapturePage() {
               setDemandTypeAddTargetBlockIdx(null);
             }, { variant: 'red' })}
 
-            {/* Flow composer: COR + Save sit BELOW the work blocks as a compact
-                bar, CENTRED under the composer box (2026-07-05, Jonas). Rendered
-                INSIDE the flow section (not the space-y-4 parent) so `mt-2` gives
-                a clean 8px gap = the `gap-2` between the block and the "+ Add a
-                step" box. Outer `lg:w-72` matches the first block-card column
-                (left-aligned under it); `justify-center` centres the compact bar
-                under it. (Previously floated sticky-right; dropped for the
-                centred look.) */}
+            {/* Flow composer: COR + Save (+ the value-creation question) sit BELOW
+                the work blocks as a compact bar that FLOATS at the RIGHT of the
+                composer viewport (sticky right-0, right-aligned via ml-auto), so it
+                FOLLOWS the latest block you're filling however far the rail is
+                scrolled — a centred/inline footer scrolls off-screen (Jonas
+                2026-07-09, restored from the centred look). The `lg:mr-[18.5rem]`
+                right margin (one block column `lg:w-72` = 18rem + the `gap-2` =
+                0.5rem) insets the bar past the trailing "+ Add block" button so it
+                settles under the LAST FILLED block. */}
             {flowWorkPath && (
-              <div className="mt-2 lg:w-72 flex justify-center">
-                <div className="w-fit max-w-full flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
-                  {/* One date for the whole work entry — defaults today; change
-                      it to backdate a retrospectively-captured touch before saving. */}
-                  <label className="flex items-center justify-center gap-1.5">
-                    <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
-                    <input
-                      type="date"
-                      value={workEntryDate}
-                      onChange={(e) => setWorkEntryDate(e.target.value)}
-                      className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
-                    />
-                  </label>
-                  <div className="flex items-center gap-3">
-                    {corBlock}
-                    {submitButton}
-                  </div>
-                  {/* Value creation capability (0059): optional per-entry judgement,
-                      shown below COR/Save only when the study opts in. */}
-                  {study.valueCreationCapabilityEnabled && (
-                    <div className="flex flex-col gap-1 border-t border-gray-100 pt-1.5">
-                      <span className="text-[11px] font-medium text-gray-500 text-center max-w-[16rem]">
-                        {t('capture.valueCreationCapabilityLabel')}
-                      </span>
-                      <div className="flex justify-center">
-                        <PillSelect
-                          ariaLabel={t('capture.valueCreationCapabilityLabel')}
-                          placeholder={t('capture.valueCreationCapabilityPlaceholder')}
-                          value={valueCreationCapability}
-                          onChange={setValueCreationCapability}
-                          options={[
-                            { id: 'created', label: t('capture.valueCreationCapability.created'), operationalDefinition: t('capture.valueCreationCapability.createdDef') },
-                            { id: 'maintained', label: t('capture.valueCreationCapability.maintained'), operationalDefinition: t('capture.valueCreationCapability.maintainedDef') },
-                            { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
-                          ]}
-                          variant="add"
-                          compact
-                          compactMenu
-                        />
-                      </div>
-                    </div>
-                  )}
-                  {regretButton}
+              <div className="sticky right-0 ml-auto lg:mr-[18.5rem] z-[1] mt-1 w-fit max-w-full flex flex-col gap-1.5 rounded-xl border border-gray-200 bg-white/95 backdrop-blur-sm px-3 py-2 shadow-sm">
+                {/* One date for the whole work entry — defaults today; change
+                    it to backdate a retrospectively-captured touch before saving. */}
+                <label className="flex items-center justify-end gap-1.5">
+                  <span className="text-[11px] font-medium text-gray-500">{t('capture.workEntryDate')}</span>
+                  <input
+                    type="date"
+                    value={workEntryDate}
+                    onChange={(e) => setWorkEntryDate(e.target.value)}
+                    className="text-xs px-2 py-1 rounded border border-gray-300 bg-white focus:ring-2 focus:ring-brand focus:border-brand outline-none"
+                  />
+                </label>
+                <div className="flex items-center gap-3">
+                  {corBlock}
+                  {submitButton}
                 </div>
+                {/* Value creation capability (0059): optional per-entry judgement,
+                    shown below COR/Save only when the study opts in. */}
+                {study.valueCreationCapabilityEnabled && (
+                  <div className="flex flex-col gap-1 border-t border-gray-100 pt-1.5">
+                    <span className="text-[11px] font-medium text-gray-500 text-center max-w-[16rem]">
+                      {t('capture.valueCreationCapabilityLabel')}
+                    </span>
+                    <div className="flex justify-center">
+                      <PillSelect
+                        ariaLabel={t('capture.valueCreationCapabilityLabel')}
+                        placeholder={t('capture.valueCreationCapabilityPlaceholder')}
+                        value={valueCreationCapability}
+                        onChange={setValueCreationCapability}
+                        options={[
+                          { id: 'created', label: t('capture.valueCreationCapability.created'), operationalDefinition: t('capture.valueCreationCapability.createdDef') },
+                          { id: 'maintained', label: t('capture.valueCreationCapability.maintained'), operationalDefinition: t('capture.valueCreationCapability.maintainedDef') },
+                          { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
+                        ]}
+                        variant="add"
+                        compact
+                        compactMenu
+                      />
+                    </div>
+                  </div>
+                )}
+                {regretButton}
               </div>
             )}
           </div>
