@@ -65,6 +65,15 @@ type P2bsVdLink = {
 };
 type P2bsVdData = { links: P2bsVdLink[]; cases: Record<string, { caseRef: string; whatMatters: string | null }> };
 
+// "Meeting what matters" overview (2026-07-09). Mirrors WhatMattersMeasure in
+// dashboard-aggregations.ts. Discriminated on `kind` so new measure kinds can be
+// added later without touching existing render branches.
+type WhatMattersMeasure =
+  | { kind: 'date'; whatMattersTypeId: string; label: string; n: number; metCount: number;
+      lateCount: number; notYetCount: number; noTargetCount: number; avgDaysLate: number | null; avgDaysEarly: number | null }
+  | { kind: 'speed'; whatMattersTypeId: string; label: string; n: number; notYetCount: number;
+      medianDays: number | null; meanDays: number | null; minDays: number | null; maxDays: number | null };
+
 export default function DashboardPage() {
   const params = useParams();
   const code = params.code as string;
@@ -92,6 +101,9 @@ export default function DashboardPage() {
   // (caseRef + whatMatters per case) eagerly, so a band click is pure state.
   const [p2bsVd, setP2bsVd] = useState<P2bsVdData | null>(null);
   const [selectedP2bsVd, setSelectedP2bsVd] = useState<P2bsVdLink | null>(null);
+  // Meeting what matters (2026-07-09): per timed what-matters type, how well we
+  // delivered on it (met the date / typical time to completion). Analytics tab.
+  const [whatMattersDelivery, setWhatMattersDelivery] = useState<WhatMattersMeasure[] | null>(null);
   // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
   // mattered, per linked capture field. Fetched when the Analytics tab opens.
   const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'number' | 'currency' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null; overCount: number; avgAmountOver: number | null }> | null>(null);
@@ -325,6 +337,23 @@ export default function DashboardPage() {
       .then(r => r.ok ? r.json() : { links: [], cases: {} })
       .then(d => { if (!cancelled) setP2bsVd(d); })
       .catch(() => { if (!cancelled) setP2bsVd({ links: [], cases: {} }); });
+    return () => { cancelled = true; };
+  }, [dashboardView, systemType, code, getDateRangeParams, valueDemandFilter]);
+
+  // Meeting what matters: refetch when the Analytics tab is open. Flow-only
+  // (timed what-matters + case timing). Same scope params as the siblings.
+  useEffect(() => {
+    if (dashboardView !== 'analytics' || systemType !== 'flow') return;
+    const qp = new URLSearchParams();
+    const range = getDateRangeParams();
+    if (range.from) qp.set('from', range.from);
+    if (range.to) qp.set('to', range.to);
+    if (valueDemandFilter.length) qp.set('valueDemands', valueDemandFilter.join(','));
+    let cancelled = false;
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/what-matters-delivery?${qp}`)
+      .then(r => r.ok ? r.json() : { measures: [] })
+      .then(d => { if (!cancelled) setWhatMattersDelivery(d.measures); })
+      .catch(() => { if (!cancelled) setWhatMattersDelivery([]); });
     return () => { cancelled = true; };
   }, [dashboardView, systemType, code, getDateRangeParams, valueDemandFilter]);
 
@@ -764,10 +793,12 @@ export default function DashboardPage() {
         {/* Flow scope selectors, side by side (2026-07-02): Problems-to-be-solved
             (life problem) on the left, What matters (timed factor) to its right;
             they wrap under each other on narrow screens. */}
-        {isFlow && (valueDemandTypes.length > 0 || whatMattersTypes.some((w) => w.timing)) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 items-start">
+        {/* Value-demand data scope — applies to EVERY flow view (touches/blocks,
+            capability, analytics, synthesis), so it stays in the shared header.
+            The what-matters scope only touches the E2E charts, so it lives inside
+            the Capability view instead (relocated 2026-07-09). */}
         {isFlow && valueDemandTypes.length > 0 && (
-          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2 md:max-w-md">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.valueDemand')}</p>
             <PillMultiSelect
               ariaLabel={t('dashboard.valueDemand')}
@@ -777,23 +808,6 @@ export default function DashboardPage() {
               options={valueDemandTypes.map((d) => ({ value: d.id, label: tl(d.label) }))}
             />
           </div>
-        )}
-
-        {/* What-matters scope (flow): restrict every capability chart to cases
-            that selected a timed factor. "As soon as possible" + case-open →
-            completion lead time = the ASAP measure. */}
-        {isFlow && whatMattersTypes.some((w) => w.timing) && (
-          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
-            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.scopeWhatMatters')}</p>
-            <PillToggle
-              ariaLabel={t('dashboard.scopeWhatMatters')}
-              value={whatMattersScope ?? ''}
-              onChange={(v) => setWhatMattersScope(v || null)}
-              options={[{ value: '', label: t('dashboard.scopeAll') }, ...whatMattersTypes.filter((w) => w.timing).map((w) => ({ value: w.id, label: `${w.timing === 'by_date' ? '📅 ' : '⏱ '}${tl(w.label)}` }))]}
-            />
-          </div>
-        )}
-        </div>
         )}
 
         {/* Summary cards */}
@@ -1677,6 +1691,21 @@ export default function DashboardPage() {
               valueDemands={valueDemandFilter}
               valueSteps={valueSteps}
             />
+            {/* What-matters scope — narrows ONLY the end-to-end charts below to
+                cases that chose a timed factor (relocated here 2026-07-09 so it
+                no longer looks like it scopes the whole dashboard). */}
+            {isFlow && whatMattersTypes.some((w) => w.timing) && (
+              <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+                <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-0.5 px-0.5">{t('dashboard.scopeWhatMatters')}</p>
+                <p className="text-[11px] text-gray-500 mb-1.5 px-0.5">{t('dashboard.scopeWhatMattersHelp')}</p>
+                <PillToggle
+                  ariaLabel={t('dashboard.scopeWhatMatters')}
+                  value={whatMattersScope ?? ''}
+                  onChange={(v) => setWhatMattersScope(v || null)}
+                  options={[{ value: '', label: t('dashboard.scopeAll') }, ...whatMattersTypes.filter((w) => w.timing).map((w) => ({ value: w.id, label: `${w.timing === 'by_date' ? '📅 ' : '⏱ '}${tl(w.label)}` }))]}
+                />
+              </div>
+            )}
             {chartIds.map((id) => (
               <CapabilityChart
                 key={id}
@@ -2088,50 +2117,117 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Ask delivery (2026-07-02, slice 4): per linked capture field,
-                  how often the decision delivered what mattered. Self-gates on
-                  having evaluated cases; scoped by the P2BS filter + date range
-                  (decidedAt) like everything else on this tab. */}
-              {askDelivery && askDelivery.length > 0 && (
-                <ChartCard title={t('dashboard.askDeliveryTitle')} info={<InfoPopover label={t('dashboard.askDeliveryTitle')}>{t('dashboard.calcAskDelivery')}</InfoPopover>}>
-                  <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
-                  <div className="space-y-2">
-                    {askDelivery.map((r) => {
-                      // pct over EVALUATED cases only; a row can exist purely on
-                      // notCaptured (ask + decision recorded, value box empty).
-                      const pct = r.n > 0 ? Math.round((r.metCount / r.n) * 100) : null;
-                      const notMet = r.n - r.metCount;
-                      return (
-                        <div key={r.fieldId} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-800 break-words">{tl(r.whatMattersLabel)}</p>
-                            <p className="text-[11px] text-gray-500 break-words">{tl(r.fieldLabel)} · {tl(r.decisionLabel)}</p>
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0 text-sm">
-                            <span className={`font-semibold ${pct !== null && notMet === 0 ? 'text-green-700' : 'text-gray-800'}`}>
-                              {r.metCount}/{r.n} <span className="font-normal text-gray-500">({pct !== null ? `${pct}%` : '—'})</span>
-                            </span>
-                            <span className="text-[11px] text-green-700">✓ {t('capture.evalMet')} {r.metCount}</span>
-                            {notMet > 0 && <span className="text-[11px] text-red-600">✗ {t('capture.evalNotMet')} {notMet}</span>}
-                            {r.notCaptured > 0 && (
-                              <span className="text-[11px] text-gray-500">{t('dashboard.askNotCaptured')}: {r.notCaptured}</span>
-                            )}
-                            {r.kind === 'date' && r.avgDaysLate !== null && (
-                              <span className="text-[11px] text-red-600">{t('dashboard.wmAvgDaysLate')}: {r.avgDaysLate}</span>
-                            )}
-                            {r.kind === 'duration' && r.avgDiffMonths !== null && (
-                              <span className="text-[11px] text-red-600">{t('dashboard.askAvgDeviation')}: {r.avgDiffMonths} {t('capture.unitMonthsShort')}</span>
-                            )}
-                            {r.kind === 'amount' && r.avgAmountOver !== null && (
-                              <span className="text-[11px] text-red-600">{t('dashboard.askAvgOverBudget')}: {new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(r.avgAmountOver)}</span>
-                            )}
-                          </div>
+              {/* Delivery on what matters (consolidated 2026-07-09): ONE card,
+                  several factors. Two lenses that can co-exist per factor:
+                  (a) timing — did the CASE complete by the customer's date / how
+                  fast (from the timed what-matters cohort); (b) captured asks —
+                  did the DECISION VALUE meet the recorded ask. When both are
+                  present a sub-label names the lens so the same factor showing
+                  twice isn't confusing. Scoped by the value-demand filter + date
+                  range like everything on this tab. */}
+              {((whatMattersDelivery && whatMattersDelivery.length > 0) || (askDelivery && askDelivery.length > 0)) && (() => {
+                const timing = whatMattersDelivery ?? [];
+                const asks = askDelivery ?? [];
+                const bothLenses = timing.length > 0 && asks.length > 0;
+                return (
+                  <ChartCard title={t('dashboard.askDeliveryTitle')} info={<InfoPopover label={t('dashboard.askDeliveryTitle')}>{t('dashboard.calcAskDelivery')}</InfoPopover>}>
+                    <p className="text-xs text-gray-500 mb-3">{t('dashboard.askDeliveryHint')}</p>
+
+                    {timing.length > 0 && (
+                      <div className="mb-4">
+                        {bothLenses && <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-2">{t('dashboard.wmByCompletion')}</p>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {timing.map((m) => {
+                            if (m.kind === 'date') {
+                              const pct = m.n > 0 ? Math.round((m.metCount / m.n) * 100) : null;
+                              return (
+                                <div key={m.whatMattersTypeId} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                                  <p className="text-sm font-medium text-gray-800 break-words">📅 {tl(m.label)}</p>
+                                  {m.n > 0 ? (
+                                    <>
+                                      <p className={`text-2xl font-bold mt-1 ${m.lateCount === 0 ? 'text-green-700' : 'text-gray-800'}`}>{pct}%</p>
+                                      <p className="text-[11px] text-gray-500">{t('dashboard.wmMetTheirDate')} · {m.metCount}/{m.n}</p>
+                                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px]">
+                                        {m.lateCount > 0 && <span className="text-red-600">{t('dashboard.wmMissedLate')}: {m.lateCount}{m.avgDaysLate !== null ? ` (${t('dashboard.wmAvgDaysLate')} ${m.avgDaysLate})` : ''}</span>}
+                                        {m.avgDaysEarly !== null && <span className="text-gray-500">{t('dashboard.wmAvgDaysEarly')}: {m.avgDaysEarly}</span>}
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className="text-[11px] text-gray-500 mt-1">{t('dashboard.wmNoneScored')}</p>
+                                  )}
+                                  {(m.notYetCount > 0 || m.noTargetCount > 0) && (
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                      {m.notYetCount > 0 && `${m.notYetCount} ${t('dashboard.wmInProgress')}`}
+                                      {m.notYetCount > 0 && m.noTargetCount > 0 && ' · '}
+                                      {m.noTargetCount > 0 && `${m.noTargetCount} ${t('dashboard.wmNoDate')}`}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={m.whatMattersTypeId} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                                <p className="text-sm font-medium text-gray-800 break-words">⏱ {tl(m.label)}</p>
+                                {m.n > 0 ? (
+                                  <>
+                                    <p className="text-2xl font-bold mt-1 text-gray-800">{m.medianDays} <span className="text-sm font-normal text-gray-500">{t('dashboard.daysShort')}</span></p>
+                                    <p className="text-[11px] text-gray-500">{t('dashboard.wmTypicalTime')} · {m.n} {t('dashboard.entries')}</p>
+                                    <p className="text-[11px] text-gray-400 mt-1">{t('dashboard.wmMeanRange', { mean: String(m.meanDays ?? '—'), min: String(m.minDays ?? '—'), max: String(m.maxDays ?? '—') })}</p>
+                                  </>
+                                ) : (
+                                  <p className="text-[11px] text-gray-500 mt-1">{t('dashboard.wmNoneScored')}</p>
+                                )}
+                                {m.notYetCount > 0 && <p className="text-[11px] text-gray-400 mt-1">{m.notYetCount} {t('dashboard.wmInProgress')}</p>}
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                </ChartCard>
-              )}
+                      </div>
+                    )}
+
+                    {asks.length > 0 && (
+                      <div>
+                        {bothLenses && <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-2">{t('dashboard.wmByCapturedValue')}</p>}
+                        <div className="space-y-2">
+                          {asks.map((r) => {
+                            // pct over EVALUATED cases only; a row can exist purely on
+                            // notCaptured (ask + decision recorded, value box empty).
+                            const pct = r.n > 0 ? Math.round((r.metCount / r.n) * 100) : null;
+                            const notMet = r.n - r.metCount;
+                            return (
+                              <div key={r.fieldId} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium text-gray-800 break-words">{tl(r.whatMattersLabel)}</p>
+                                  <p className="text-[11px] text-gray-500 break-words">{tl(r.fieldLabel)} · {tl(r.decisionLabel)}</p>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0 text-sm">
+                                  <span className={`font-semibold ${pct !== null && notMet === 0 ? 'text-green-700' : 'text-gray-800'}`}>
+                                    {r.metCount}/{r.n} <span className="font-normal text-gray-500">({pct !== null ? `${pct}%` : '—'})</span>
+                                  </span>
+                                  <span className="text-[11px] text-green-700">✓ {t('capture.evalMet')} {r.metCount}</span>
+                                  {notMet > 0 && <span className="text-[11px] text-red-600">✗ {t('capture.evalNotMet')} {notMet}</span>}
+                                  {r.notCaptured > 0 && (
+                                    <span className="text-[11px] text-gray-500">{t('dashboard.askNotCaptured')}: {r.notCaptured}</span>
+                                  )}
+                                  {r.kind === 'date' && r.avgDaysLate !== null && (
+                                    <span className="text-[11px] text-red-600">{t('dashboard.wmAvgDaysLate')}: {r.avgDaysLate}</span>
+                                  )}
+                                  {r.kind === 'duration' && r.avgDiffMonths !== null && (
+                                    <span className="text-[11px] text-red-600">{t('dashboard.askAvgDeviation')}: {r.avgDiffMonths} {t('capture.unitMonthsShort')}</span>
+                                  )}
+                                  {r.kind === 'amount' && r.avgAmountOver !== null && (
+                                    <span className="text-[11px] text-red-600">{t('dashboard.askAvgOverBudget')}: {new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(r.avgAmountOver)}</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </ChartCard>
+                );
+              })()}
 
               {/* Budget capability (2026-07-05): XmR-style chart of signed
                   budget variance per case in answeredAt order. Zero line = the

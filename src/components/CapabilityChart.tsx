@@ -195,6 +195,31 @@ export default function CapabilityChart({
         />
       </div>
 
+      {/* Visible flag (2026-07-09): by_date ("When I want it") customers are
+          hidden from end-to-end time — for them, hitting the date is the measure.
+          Surface the count + a one-click switch to the Early/late measure (which
+          keeps the current completion as the to-event). Shows even when every
+          case was by_date (0 points left). */}
+      {capMetric === 'leadTime' && capData && capData.nWantedByDate > 0 && (() => {
+        const targetOpt = eventOptions.find((o) => o.id.startsWith('whatMattersTarget:'));
+        return (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+            <span className="text-sm text-amber-900">
+              📅 {t('dashboard.leadTimeExcludedBanner', { count: String(capData.nWantedByDate) })}
+            </span>
+            {targetOpt && (
+              <button
+                type="button"
+                onClick={() => pickFrom(targetOpt.id)}
+                className="ml-auto shrink-0 px-2.5 py-1 rounded-md text-xs font-medium bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 transition-colors"
+              >
+                {t('dashboard.leadTimeSeeDateMeasure')}
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {!capFrom || !capTo ? (
         <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilitySelectEvents')}</p>
       ) : capLoading && !capData ? (

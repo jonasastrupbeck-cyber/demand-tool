@@ -1070,10 +1070,24 @@ const translations = {
     de: 'Lieferung auf das, was wichtig ist',
   },
   'dashboard.askDeliveryHint': {
-    en: 'Cases where both the customer’s ask and the decision’s delivered value were captured.',
-    da: 'Sager hvor både kundens ønske og beslutningens leverede værdi er registreret.',
-    sv: 'Ärenden där både kundens önskemål och beslutets levererade värde har registrerats.',
-    de: 'Fälle, in denen sowohl der Kundenwunsch als auch der gelieferte Wert der Entscheidung erfasst wurden.',
+    en: 'How well we delivered on each thing the customer said mattered.',
+    da: 'Hvor godt vi leverede på hver ting, kunden sagde betød noget.',
+    sv: 'Hur väl vi levererade på varje sak kunden sa var viktig.',
+    de: 'Wie gut wir jede Sache erfüllt haben, die dem Kunden wichtig war.',
+  },
+  // Sub-labels distinguishing the two lenses inside the one "Delivery on what
+  // matters" card (only shown when both are present).
+  'dashboard.wmByCompletion': {
+    en: 'By when the case completed',
+    da: 'Efter hvornår sagen blev afsluttet',
+    sv: 'Efter när ärendet slutfördes',
+    de: 'Nach dem Abschlusszeitpunkt des Falls',
+  },
+  'dashboard.wmByCapturedValue': {
+    en: 'By the captured decision value',
+    da: 'Efter den registrerede beslutningsværdi',
+    sv: 'Efter det registrerade beslutsvärdet',
+    de: 'Nach dem erfassten Entscheidungswert',
   },
   'dashboard.askAvgDeviation': {
     en: 'Avg deviation',
@@ -1853,6 +1867,18 @@ const translations = {
     sv: '{count} kund(er) som ville ha det ett bestämt datum visas inte.',
     de: '{count} Kunde(n), die es zu einem festen Datum wollten, werden nicht angezeigt.',
   },
+  'dashboard.leadTimeExcludedBanner': {
+    en: '{count} customer(s) wanted it by a set date, so end-to-end time isn’t their measure — they’re measured on whether we hit their date.',
+    da: '{count} kunde(r) ville have det på en bestemt dato, så E2E-tid er ikke deres mål — de måles på, om vi rammer deres dato.',
+    sv: '{count} kund(er) ville ha det ett bestämt datum, så E2E-tid är inte deras mått — de mäts på om vi träffar deras datum.',
+    de: '{count} Kunde(n) wollten es zu einem festen Datum, daher ist die E2E-Zeit nicht ihr Maß — sie werden daran gemessen, ob wir ihr Datum einhalten.',
+  },
+  'dashboard.leadTimeSeeDateMeasure': {
+    en: 'See how we met their date →',
+    da: 'Se hvordan vi ramte deres dato →',
+    sv: 'Se hur vi träffade deras datum →',
+    de: 'Sehen, wie wir ihr Datum eingehalten haben →',
+  },
   'dashboard.eventFrom': {
     en: 'From',
     da: 'Fra',
@@ -2024,6 +2050,12 @@ const translations = {
     sv: 'Vad är viktigt',
     de: 'Was wichtig ist',
   },
+  'dashboard.scopeWhatMattersHelp': {
+    en: 'Scopes the end-to-end charts below to customers who chose this timing.',
+    da: 'Afgrænser E2E-graferne nedenfor til kunder, der valgte denne timing.',
+    sv: 'Avgränsar E2E-diagrammen nedan till kunder som valde denna timing.',
+    de: 'Grenzt die E2E-Diagramme unten auf Kunden mit dieser Zeitvorgabe ein.',
+  },
   'dashboard.wmMetOnTime': {
     en: 'Met the date',
     da: 'Nåede datoen',
@@ -2041,6 +2073,48 @@ const translations = {
     da: 'Gns. dage forsinket',
     sv: 'Snitt dagar sent',
     de: 'Ø Tage verspätet',
+  },
+  'dashboard.wmMetTheirDate': {
+    en: 'met their date',
+    da: 'ramte deres dato',
+    sv: 'träffade deras datum',
+    de: 'ihr Datum eingehalten',
+  },
+  'dashboard.wmAvgDaysEarly': {
+    en: 'Avg days early',
+    da: 'Gns. dage før',
+    sv: 'Snitt dagar tidigt',
+    de: 'Ø Tage früher',
+  },
+  'dashboard.wmTypicalTime': {
+    en: 'typical time, case open → completion',
+    da: 'typisk tid, sagsåbning → afslutning',
+    sv: 'typisk tid, ärendet öppnas → slutfört',
+    de: 'typische Zeit, Fallöffnung → Abschluss',
+  },
+  'dashboard.wmMeanRange': {
+    en: 'mean {mean} · range {min}–{max}',
+    da: 'gns. {mean} · spænd {min}–{max}',
+    sv: 'snitt {mean} · spann {min}–{max}',
+    de: 'Ø {mean} · Spanne {min}–{max}',
+  },
+  'dashboard.wmInProgress': {
+    en: 'in progress',
+    da: 'i gang',
+    sv: 'pågående',
+    de: 'in Arbeit',
+  },
+  'dashboard.wmNoDate': {
+    en: 'no date set',
+    da: 'ingen dato angivet',
+    sv: 'inget datum satt',
+    de: 'kein Datum gesetzt',
+  },
+  'dashboard.wmNoneScored': {
+    en: 'No completed cases to score yet.',
+    da: 'Ingen afsluttede sager at vurdere endnu.',
+    sv: 'Inga slutförda ärenden att bedöma ännu.',
+    de: 'Noch keine abgeschlossenen Fälle zum Bewerten.',
   },
   'dashboard.touchesPerCase': {
     en: 'Touches per case',
@@ -2122,10 +2196,10 @@ const translations = {
     de: 'Pro Fall mit Budgetwunsch und erfasstem Betrag: die vorzeichenbehaftete Abweichung (geliefert − Budget), als % des Budgets oder als Betrag, in Antwortreihenfolge, mit XmR-Grenzen.',
   },
   'dashboard.calcAskDelivery': {
-    en: 'For each ask linked to a what-matters factor: of the cases that recorded both the ask and a decision value, how many were met — and, for dates, how many were late and by how many days on average.',
-    da: 'For hvert ønske knyttet til en “det der betyder noget”-faktor: af de sager, der registrerede både ønsket og en beslutningsværdi, hvor mange blev opfyldt — og for datoer, hvor mange var forsinkede og med hvor mange dage i gennemsnit.',
-    sv: 'För varje önskemål kopplat till en “det som betyder något”-faktor: av de ärenden som registrerade både önskemålet och ett beslutsvärde, hur många uppfylldes — och för datum, hur många var sena och med hur många dagar i snitt.',
-    de: 'Für jeden mit einem „Was zählt“-Faktor verknüpften Wunsch: von den Fällen mit Wunsch und Entscheidungswert, wie viele erfüllt wurden — und bei Datumsangaben, wie viele verspätet waren und um wie viele Tage im Schnitt.',
+    en: 'How well we delivered on each thing the customer said mattered, through up to two lenses. “By when the case completed”: for a timed factor, the share of cases that finished on or before the wanted date (“When I want it”) or the typical time from case open to completion (“As soon as possible”), measured to the factor’s completion event (or case close). “By the captured decision value”: for an ask linked to a factor, of the cases that recorded both the ask and a decision value, how many were met — and for dates, how many were late and by how many days on average. The value-demand filter and date range apply.',
+    da: 'Hvor godt vi leverede på hver ting, kunden sagde betød noget, gennem op til to perspektiver. “Efter hvornår sagen blev afsluttet”: for en tidsbestemt faktor, andelen af sager, der blev færdige på eller før den ønskede dato (“Hvornår jeg vil have det”), eller den typiske tid fra sagsåbning til afslutning (“Så hurtigt som muligt”), målt til faktorens afslutningshændelse (eller sagslukning). “Efter den registrerede beslutningsværdi”: for et ønske knyttet til en faktor, af de sager der registrerede både ønsket og en beslutningsværdi, hvor mange blev opfyldt — og for datoer, hvor mange var forsinkede og med hvor mange dage i gennemsnit. Værdiskabende-efterspørgsel-filteret og datointervallet gælder.',
+    sv: 'Hur väl vi levererade på varje sak kunden sa var viktig, genom upp till två perspektiv. “Efter när ärendet slutfördes”: för en tidsbestämd faktor, andelen ärenden som blev klara på eller före önskat datum (“När jag vill ha det”), eller den typiska tiden från ärendets öppning till slutförande (“Så snart som möjligt”), mätt till faktorns slutförandehändelse (eller ärendets stängning). “Efter det registrerade beslutsvärdet”: för ett önskemål kopplat till en faktor, av de ärenden som registrerade både önskemålet och ett beslutsvärde, hur många uppfylldes — och för datum, hur många var sena och med hur många dagar i snitt. Värdeskapande-efterfrågan-filtret och datumintervallet gäller.',
+    de: 'Wie gut wir jede Sache erfüllt haben, die dem Kunden wichtig war, durch bis zu zwei Perspektiven. „Nach dem Abschlusszeitpunkt des Falls“: für einen zeitbezogenen Faktor der Anteil der Fälle, die am oder vor dem gewünschten Datum abgeschlossen wurden („Wann ich es möchte“), oder die typische Zeit von Fallöffnung bis Abschluss („So schnell wie möglich“), gemessen bis zum Abschlussereignis des Faktors (oder Fallabschluss). „Nach dem erfassten Entscheidungswert“: für einen mit einem Faktor verknüpften Wunsch, von den Fällen mit Wunsch und Entscheidungswert, wie viele erfüllt wurden — und bei Datumsangaben, wie viele verspätet waren und um wie viele Tage im Schnitt. Der Wertbedarf-Filter und der Datumsbereich gelten.',
   },
   'dashboard.p2bsVdTitle': {
     en: 'Life problems → value demands',

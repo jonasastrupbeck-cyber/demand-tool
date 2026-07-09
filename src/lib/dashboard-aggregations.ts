@@ -1186,6 +1186,155 @@ export async function getCapabilityData(
   };
 }
 
+// "Meeting what matters" overview (2026-07-09): for each TIMED what-matters type
+// (whatMattersTypes.timing set), how well did we deliver on it across the cases
+// that chose it? This is the timing-cohort companion to the ask-delivery card
+// (which is decision-field driven). Completion = the type's configured "measured
+// to" event (anchorEvent / legacy anchorMilestoneId), falling back to case close.
+//
+// EXTENSION POINT: the return is a discriminated union on `kind`. To evaluate a
+// new dimension later (e.g. an amount promise, a satisfaction flag), add a new
+// `kind` branch below AND a matching render block in the dashboard card — no
+// schema change, no change to existing kinds.
+export type WhatMattersMeasure =
+  | { kind: 'date'; whatMattersTypeId: string; label: string; n: number; metCount: number;
+      lateCount: number; notYetCount: number; noTargetCount: number; avgDaysLate: number | null; avgDaysEarly: number | null }
+  | { kind: 'speed'; whatMattersTypeId: string; label: string; n: number; notYetCount: number;
+      medianDays: number | null; meanDays: number | null; minDays: number | null; maxDays: number | null };
+
+export async function getWhatMattersDelivery(
+  studyId: string,
+  opts: { from?: Date; to?: Date; valueDemands?: string[] } = {},
+): Promise<{ measures: WhatMattersMeasure[] }> {
+  const { from, to, valueDemands } = opts;
+
+  const timedTypes = await db.select({ id: whatMattersTypes.id, label: whatMattersTypes.label, timing: whatMattersTypes.timing, anchorEvent: whatMattersTypes.anchorEvent, anchorMilestoneId: whatMattersTypes.anchorMilestoneId, sortOrder: whatMattersTypes.sortOrder })
+    .from(whatMattersTypes)
+    .where(and(eq(whatMattersTypes.studyId, studyId), isNotNull(whatMattersTypes.timing)))
+    .orderBy(whatMattersTypes.sortOrder);
+  if (timedTypes.length === 0) return { measures: [] };
+
+  // Case set (value-demand scoped; date range on case-open, matching getCapabilityData).
+  const caseConds: SQL[] = [await valueDemandCaseWhere(studyId, valueDemands)];
+  if (from) caseConds.push(gte(cases.openedAt, from));
+  if (to) caseConds.push(lte(cases.openedAt, to));
+  const caseRows = await db.select({ id: cases.id, openedAt: cases.openedAt, closedAt: cases.closedAt })
+    .from(cases).where(and(...caseConds));
+  if (caseRows.length === 0) return { measures: [] };
+  const caseIds = caseRows.map((c) => c.id);
+
+  // Per-case context, assembled exactly like getCapabilityData so the event
+  // resolution + day-granularity are identical.
+  const [wmRows, msRows, fcRows] = await Promise.all([
+    db.select({ caseId: caseWhatMatters.caseId, whatMattersTypeId: caseWhatMatters.whatMattersTypeId, targetDate: caseWhatMatters.targetDate })
+      .from(caseWhatMatters).where(inArray(caseWhatMatters.caseId, caseIds)),
+    db.select({ caseId: caseMilestones.caseId, milestoneId: caseMilestones.milestoneId, reachedAt: caseMilestones.reachedAt })
+      .from(caseMilestones).where(inArray(caseMilestones.caseId, caseIds)),
+    db.select({ caseId: demandEntries.caseId, firstAt: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))` })
+      .from(demandEntries)
+      .leftJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.caseId)))
+      .groupBy(demandEntries.caseId),
+  ]);
+
+  const wmTargetByCase = new Map<string, Map<string, Date>>();
+  const wmSelectedByCase = new Map<string, Set<string>>();
+  for (const r of wmRows) {
+    if (!wmSelectedByCase.has(r.caseId)) wmSelectedByCase.set(r.caseId, new Set());
+    wmSelectedByCase.get(r.caseId)!.add(r.whatMattersTypeId);
+    if (r.targetDate) {
+      if (!wmTargetByCase.has(r.caseId)) wmTargetByCase.set(r.caseId, new Map());
+      wmTargetByCase.get(r.caseId)!.set(r.whatMattersTypeId, new Date(r.targetDate as unknown as string));
+    }
+  }
+  const msByCase = new Map<string, Map<string, Date>>();
+  for (const r of msRows) {
+    if (!msByCase.has(r.caseId)) msByCase.set(r.caseId, new Map());
+    msByCase.get(r.caseId)!.set(r.milestoneId, new Date(r.reachedAt as unknown as string));
+  }
+  const fcMap = new Map<string, Date>();
+  for (const r of fcRows) if (r.caseId && r.firstAt) fcMap.set(r.caseId, new Date(r.firstAt));
+
+  // typeId → completion token (its measured-to event), used to resolve when the
+  // journey "completed" for that factor. anchorEvent ?? legacy milestone ?? case close.
+  const completionToken = new Map<string, string>();
+  for (const t of timedTypes) {
+    completionToken.set(t.id, t.anchorEvent ?? (t.anchorMilestoneId ? `milestone:${t.anchorMilestoneId}` : 'caseClose'));
+  }
+  // asapAnchors reuses the same token map so eventTimestamp's whatMattersAsap
+  // resolution (anchor + ASAP-tagged only) stays available if needed.
+  const asapAnchors = new Map<string, string>(completionToken);
+
+  const dayIndex = (d: Date) => Math.floor(d.getTime() / 86_400_000);
+  const median = (xs: number[]) => {
+    if (!xs.length) return null;
+    const s = [...xs].sort((a, b) => a - b);
+    return s.length % 2 ? s[(s.length - 1) / 2] : Math.round(((s[s.length / 2 - 1] + s[s.length / 2]) / 2) * 10) / 10;
+  };
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+
+  const ctxByCase = new Map<string, Parameters<typeof eventTimestamp>[1]>();
+  for (const c of caseRows) {
+    ctxByCase.set(c.id, {
+      openedAt: new Date(c.openedAt as unknown as string),
+      closedAt: c.closedAt ? new Date(c.closedAt as unknown as string) : null,
+      earliestTouchAt: fcMap.get(c.id) ?? null,
+      milestones: msByCase.get(c.id) ?? new Map<string, Date>(),
+      whatMattersTargets: wmTargetByCase.get(c.id) ?? new Map<string, Date>(),
+      whatMattersSelected: wmSelectedByCase.get(c.id) ?? new Set<string>(),
+      asapAnchors,
+    });
+  }
+
+  const measures: WhatMattersMeasure[] = [];
+  for (const t of timedTypes) {
+    const token = completionToken.get(t.id)!;
+    const selected = caseRows.filter((c) => wmSelectedByCase.get(c.id)?.has(t.id));
+    if (t.timing === 'by_date') {
+      let metCount = 0, lateCount = 0, notYetCount = 0, noTargetCount = 0;
+      const lateDays: number[] = [], earlyDays: number[] = [];
+      for (const c of selected) {
+        const ctx = ctxByCase.get(c.id)!;
+        const target = ctx.whatMattersTargets.get(t.id) ?? null;
+        if (!target) { noTargetCount++; continue; }
+        const done = eventTimestamp(token, ctx);
+        if (!done) { notYetCount++; continue; }
+        const diff = dayIndex(done) - dayIndex(target); // + late, − early
+        if (diff <= 0) { metCount++; if (diff < 0) earlyDays.push(-diff); }
+        else { lateCount++; lateDays.push(diff); }
+      }
+      measures.push({
+        kind: 'date', whatMattersTypeId: t.id, label: t.label,
+        n: metCount + lateCount, metCount, lateCount, notYetCount, noTargetCount,
+        avgDaysLate: lateDays.length ? round1(lateDays.reduce((s, v) => s + v, 0) / lateDays.length) : null,
+        avgDaysEarly: earlyDays.length ? round1(earlyDays.reduce((s, v) => s + v, 0) / earlyDays.length) : null,
+      });
+    } else {
+      // 'asap' → time from case open to the measured-to event (completion).
+      let notYetCount = 0;
+      const leads: number[] = [];
+      for (const c of selected) {
+        const ctx = ctxByCase.get(c.id)!;
+        const done = eventTimestamp(token, ctx);
+        const open = eventTimestamp('caseOpen', ctx);
+        if (!done || !open) { notYetCount++; continue; }
+        const lead = dayIndex(done) - dayIndex(open);
+        if (lead < 0) { notYetCount++; continue; } // data anomaly — don't score
+        leads.push(lead);
+      }
+      measures.push({
+        kind: 'speed', whatMattersTypeId: t.id, label: t.label,
+        n: leads.length, notYetCount,
+        medianDays: median(leads),
+        meanDays: leads.length ? round1(leads.reduce((s, v) => s + v, 0) / leads.length) : null,
+        minDays: leads.length ? Math.min(...leads) : null,
+        maxDays: leads.length ? Math.max(...leads) : null,
+      });
+    }
+  }
+  return { measures };
+}
+
 // "Touches over time" (per-day touch counts by classification). A touch = a work
 // entry with ≥1 work block (innerJoin enforces that). Bucketed by the touch's
 // EFFECTIVE date min(coalesce(block_date, created_at)) so backdated retrospective
