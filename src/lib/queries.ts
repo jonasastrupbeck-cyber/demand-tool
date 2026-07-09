@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations, chartAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
@@ -2553,6 +2553,40 @@ export async function upsertCapabilityAnnotation(studyId: string, data: {
     note: data.note ?? null,
   }).onConflictDoUpdate({
     target: [capabilityAnnotations.caseId, capabilityAnnotations.fromEvent, capabilityAnnotations.toEvent],
+    set,
+  });
+}
+
+// --- Generic chart annotations (2026-07-09) — note/exclude per point, keyed by
+// (chartKey, pointKey). Used by the touches/steps/over-time XmR charts. ---
+
+export async function getChartAnnotations(studyId: string, chartKey: string) {
+  return db.select().from(chartAnnotations)
+    .where(and(eq(chartAnnotations.studyId, studyId), eq(chartAnnotations.chartKey, chartKey)));
+}
+
+// Upsert on (studyId, chartKey, pointKey) — only set the fields provided.
+export async function upsertChartAnnotation(studyId: string, data: {
+  chartKey: string;
+  pointKey: string;
+  excluded?: boolean;
+  excludedReason?: string | null;
+  note?: string | null;
+}) {
+  const set: Record<string, unknown> = {};
+  if (data.excluded !== undefined) set.excluded = data.excluded;
+  if (data.excludedReason !== undefined) set.excludedReason = data.excludedReason;
+  if (data.note !== undefined) set.note = data.note;
+  await db.insert(chartAnnotations).values({
+    id: generateId(),
+    studyId,
+    chartKey: data.chartKey,
+    pointKey: data.pointKey,
+    excluded: data.excluded ?? false,
+    excludedReason: data.excludedReason ?? null,
+    note: data.note ?? null,
+  }).onConflictDoUpdate({
+    target: [chartAnnotations.studyId, chartAnnotations.chartKey, chartAnnotations.pointKey],
     set,
   });
 }

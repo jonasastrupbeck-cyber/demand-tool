@@ -24,6 +24,8 @@ export default function TouchesPerCaseChart({
   const [valueStepId, setValueStepId] = useState('');
   const [data, setData] = useState<CapabilityData | null>(null);
   const [loading, setLoading] = useState(false);
+  // Bumped after a saved annotation to refetch (server recomputes exclude-aware limits).
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -37,7 +39,19 @@ export default function TouchesPerCaseChart({
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [code, dateFrom, dateTo, valueDemands, valueStepId]);
+  }, [code, dateFrom, dateTo, valueDemands, valueStepId, tick]);
+
+  // Annotations are keyed to the base measure (filter-independent), matching the
+  // capability chart. count/% + value-step scope share the one chartKey.
+  const annotate = {
+    onSave: async (pointKey: string, patch: { excluded: boolean; excludedReason: string | null; note: string | null }) => {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/chart-annotation`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chartKey: 'touches-per-case', pointKey, ...patch }),
+      });
+      setTick((n) => n + 1);
+    },
+  };
 
   const stepLabel = valueSteps.find((v) => v.id === valueStepId)?.label;
   const subtitle = valueStepId && stepLabel ? t('dashboard.touchesUpToStep', { step: tl(stepLabel) }) : undefined;
@@ -61,6 +75,7 @@ export default function TouchesPerCaseChart({
       loading={loading}
       controls={controls}
       info={<InfoPopover label={t('dashboard.touchesPerCaseTitle')}>{t('dashboard.calcTouchesPerCase')}</InfoPopover>}
+      annotate={annotate}
     />
   );
 }

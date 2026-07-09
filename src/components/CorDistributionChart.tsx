@@ -10,7 +10,7 @@ import PillMultiSelect from '@/components/PillMultiSelect';
 const THEME = { text: '#1f2937', textSecondary: '#6b7280', grid: '#e5e7eb' };
 const NEUTRAL = ['#3b82f6', '#60a5fa', '#93c5fd', '#6b7280', '#9ca3af', '#475569', '#94a3b8', '#64748b'];
 const tooltipStyle = {
-  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: THEME.text },
+  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: THEME.text, fontSize: 11 },
   labelStyle: { color: THEME.text },
   itemStyle: { color: THEME.textSecondary },
 };

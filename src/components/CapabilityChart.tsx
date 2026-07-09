@@ -21,7 +21,7 @@ import { useCollapsibleCards } from '@/components/collapsible-cards-context';
 const THEME = { textSecondary: '#6b7280', grid: '#e5e7eb' };
 const COLORS = { value: '#22c55e', failure: '#ef4444', neutral: '#3b82f6' };
 const tooltipStyle = {
-  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#1f2937' },
+  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#1f2937', fontSize: 11 },
   labelStyle: { color: '#1f2937' },
   itemStyle: { color: THEME.textSecondary },
 };
@@ -264,7 +264,7 @@ export default function CapabilityChart({
                   const pt = p.active && p.payload && p.payload.length ? p.payload[0].payload : null;
                   if (!pt) return null;
                   return (
-                    <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                    <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-[11px] text-gray-700">
                       <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.startedAt).toLocaleDateString()}</div>
                       <div>{valueLabel}: {fmtValue(pt.leadTime)}</div>
                       {pt.excluded && <div className="text-amber-700">{t('dashboard.excludedLegend')}</div>}

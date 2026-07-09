@@ -197,7 +197,7 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                   <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: TEXT_SECONDARY }} />
                   <YAxis type="category" dataKey="display" width={180} interval={0} tick={{ fontSize: 10, fill: TEXT_SECONDARY }} tickFormatter={(v: string) => (v.length > 28 ? v.slice(0, 26) + '…' : v)} />
-                  <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: 11 }} />
                   <Bar dataKey="count" fill={SKY} radius={[0, 4, 4, 0]}>
                     <LabelList dataKey="count" position="right" style={{ fill: TEXT_SECONDARY, fontSize: 11 }} />
                   </Bar>
@@ -215,7 +215,7 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
                   <CartesianGrid strokeDasharray="3 3" stroke={GRID} />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: TEXT_SECONDARY }} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: TEXT_SECONDARY }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: 11 }} />
                   <Legend wrapperStyle={{ fontSize: 12, color: TEXT_SECONDARY }} />
                   {topConds.map((c, i) => (
                     <Line key={c.id} type="monotone" dataKey={c.id} name={c.display} stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls />

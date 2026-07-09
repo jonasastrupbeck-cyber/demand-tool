@@ -33,6 +33,8 @@ export default function StepsPerCaseChart({
   const [valueStepId, setValueStepId] = useState('');
   const [data, setData] = useState<CapabilityData | null>(null);
   const [loading, setLoading] = useState(false);
+  // Bumped after a saved annotation to refetch (server recomputes exclude-aware limits).
+  const [tick, setTick] = useState(0);
 
   // '%' is meaningless for Total (always 100%) — force count when Total is picked.
   const effMode = tag === 'total' ? 'count' : mode;
@@ -49,7 +51,19 @@ export default function StepsPerCaseChart({
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [code, dateFrom, dateTo, valueDemands, tag, effMode, valueStepId]);
+  }, [code, dateFrom, dateTo, valueDemands, tag, effMode, valueStepId, tick]);
+
+  // Annotations keyed per tag (a note/exclude on the failure chart doesn't bleed
+  // into value); count/% + value-step scope share the tag's chartKey.
+  const annotate = {
+    onSave: async (pointKey: string, patch: { excluded: boolean; excludedReason: string | null; note: string | null }) => {
+      await fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/chart-annotation`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chartKey: `steps-per-case:${tag}`, pointKey, ...patch }),
+      });
+      setTick((n) => n + 1);
+    },
+  };
 
   const tagLabel: Record<Tag, string> = {
     total: t('dashboard.stepTotal'),
@@ -120,6 +134,7 @@ export default function StepsPerCaseChart({
       controls={controls}
       fmtValue={fmtValue}
       info={<InfoPopover label={title}>{t('dashboard.calcStepsPerCase')}</InfoPopover>}
+      annotate={annotate}
     />
   );
 }

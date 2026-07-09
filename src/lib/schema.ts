@@ -535,6 +535,25 @@ export const capabilityAnnotations = pgTable('capability_annotations', {
   uniqCapAnno: unique('capability_annotations_unique').on(t.caseId, t.fromEvent, t.toEvent),
 }));
 
+// Generic per-point chart annotations (migration 0060, 2026-07-09) for the
+// touches-per-case, steps-per-case (work-block) and over-time-explorer XmR
+// charts. `chartKey` identifies the measure (e.g. 'touches-per-case',
+// 'steps-per-case:failure', 'over-time:tag:failure:vd:all:vs:all'); `pointKey`
+// is the caseId (case charts) or a date string (over-time). Polymorphic
+// pointKey ⇒ no FK. Distinct from capabilityAnnotations, which stays case-scoped
+// to the lead-time chart's event-pair measures.
+export const chartAnnotations = pgTable('chart_annotations', {
+  id: text('id').primaryKey(),
+  studyId: text('study_id').notNull().references(() => studies.id),
+  chartKey: text('chart_key').notNull(),
+  pointKey: text('point_key').notNull(),
+  excluded: boolean('excluded').notNull().default(false),
+  excludedReason: text('excluded_reason'),
+  note: text('note'),
+}, (t) => ({
+  uniqChartAnno: unique('chart_annotations_unique').on(t.studyId, t.chartKey, t.pointKey),
+}));
+
 export const demandEntries = pgTable('demand_entries', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),

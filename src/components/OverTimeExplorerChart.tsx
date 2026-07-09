@@ -67,6 +67,9 @@ export default function OverTimeExplorerChart({
   const [scOptions, setScOptions] = useState<ScFreq[] | null>(null);
   const [mode, setMode] = useState<'count' | 'pct'>('count');
   const [rows, setRows] = useState<Row[] | null>(null);
+  // Per-day annotations (note / exclude), keyed by date. `tick` refetches after a save.
+  const [annos, setAnnos] = useState<Map<string, { excluded: boolean; note: string | null }>>(new Map());
+  const [annoTick, setAnnoTick] = useState(0);
 
   // SC picker options: the study's system conditions with occurrence counts,
   // sorted largest-first (the ranking IS the picker). Re-ranked when this
@@ -84,7 +87,11 @@ export default function OverTimeExplorerChart({
 
   // The chart data: fetched once the series selection is complete.
   const seriesParam = series === 'sc' ? (scId ? `sc:${scId}` : '') : series ? `tag:${series}` : '';
+  // Annotation measure identity: series + scope, stable across reloads (the point
+  // key is the date). Independent of the count/% mode.
+  const chartKey = seriesParam ? `over-time:${seriesParam}:vd:${[...valueDemands].sort().join('+') || 'all'}:vs:${[...valueStepIds].sort().join('+') || 'all'}` : '';
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!seriesParam) { setRows(null); return; }
     const qp = new URLSearchParams({ series: seriesParam });
     if (dateFrom) qp.set('from', dateFrom);
@@ -98,6 +105,22 @@ export default function OverTimeExplorerChart({
     return () => { cancelled = true; };
   }, [seriesParam, code, dateFrom, dateTo, valueDemands, valueStepIds]);
 
+  // Load this measure's annotations (day → note/exclude). Refetched after a save.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!chartKey) { setAnnos(new Map()); return; }
+    let cancelled = false;
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/chart-annotation?chartKey=${encodeURIComponent(chartKey)}`)
+      .then((r) => (r.ok ? r.json() : { annotations: [] }))
+      .then((d) => {
+        if (cancelled) return;
+        const m = new Map<string, { excluded: boolean; note: string | null }>();
+        for (const a of (d.annotations ?? [])) m.set(a.pointKey, { excluded: a.excluded, note: a.note });
+        setAnnos(m);
+      });
+    return () => { cancelled = true; };
+  }, [code, chartKey, annoTick]);
+
   const seriesOptions = [
     { value: 'value', label: t('capture.value') },
     { value: 'sequence', label: t('capture.classificationWorkSequence') },
@@ -110,29 +133,46 @@ export default function OverTimeExplorerChart({
   const valueLabel = mode === 'pct' ? `${seriesName} %` : seriesName;
   const fmtValue = (v: number | null) => (v == null ? '—' : mode === 'pct' ? `${v}%` : `${v}`);
 
-  // One XmR point per DAY. Limits from the plotted values (count or % within
-  // scope); special-cause = outside the limits, mirroring getCapabilityData.
+  // One XmR point per DAY. Limits from INCLUDED days only (excluded days ride
+  // along greyed but don't move the limits); special-cause = outside the limits,
+  // mirroring getCapabilityData.
   let capData: CapabilityData | null = null;
   if (rows && rows.length > 0) {
     const values = rows.map((r) => (mode === 'pct' ? (r.scopeTotal > 0 ? Math.round((r.count / r.scopeTotal) * 100) : 0) : r.count));
-    const { mean, median, unpl, lnpl } = xmr(values);
+    const includedValues = rows.map((r, i) => ({ v: values[i], excluded: !!annos.get(r.date)?.excluded })).filter((x) => !x.excluded).map((x) => x.v);
+    const { mean, median, unpl, lnpl } = xmr(includedValues);
     capData = {
       unit: mode === 'pct' ? '%' : 'steps',
-      points: rows.map((r, i) => ({
-        caseId: r.date,
-        caseRef: r.date,
-        leadTime: values[i],
-        startedAt: r.date,
-        special: unpl !== null && lnpl !== null && (values[i] > unpl || values[i] < lnpl),
-        excluded: false,
-        note: null,
-      })),
+      points: rows.map((r, i) => {
+        const a = annos.get(r.date);
+        const excluded = !!a?.excluded;
+        return {
+          caseId: r.date,
+          caseRef: r.date,
+          leadTime: values[i],
+          startedAt: r.date,
+          special: !excluded && unpl !== null && lnpl !== null && (values[i] > unpl || values[i] < lnpl),
+          excluded,
+          note: a?.note ?? null,
+        };
+      }),
       mean, median, unpl, lnpl,
-      n: rows.length,
-      nExcluded: 0,
+      n: includedValues.length,
+      nExcluded: rows.length - includedValues.length,
       nWantedByDate: 0,
     };
   }
+
+  const annotate = {
+    onSave: async (pointKey: string, patch: { excluded: boolean; excludedReason: string | null; note: string | null }) => {
+      if (!chartKey) return;
+      await fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/chart-annotation`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chartKey, pointKey, ...patch }),
+      });
+      setAnnoTick((n) => n + 1);
+    },
+  };
 
   const controls = (
     <div className="w-full space-y-3">
@@ -210,6 +250,7 @@ export default function OverTimeExplorerChart({
       nLabel={t('dashboard.otDays')}
       emptyText={!seriesParam ? t('dashboard.otHint') : t('dashboard.otNoData')}
       plainX
+      annotate={chartKey ? annotate : undefined}
     />
   );
 }

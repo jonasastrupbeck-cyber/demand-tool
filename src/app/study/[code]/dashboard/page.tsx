@@ -44,7 +44,9 @@ const COLORS = {
 };
 
 const tooltipStyle = {
-  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: THEME.text },
+  // fontSize 11 matches the charts' own tick/label text (recharts' default ~14px
+  // reads too big next to 10-11px ticks).
+  contentStyle: { backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px', color: THEME.text, fontSize: 11 },
   labelStyle: { color: THEME.text },
   itemStyle: { color: THEME.textSecondary },
 };
@@ -977,7 +979,7 @@ export default function DashboardPage() {
                         return <SankeyLink {...props} onClick={m ? () => setSelectedFlow(m) : undefined} />;
                       }}
                     >
-                      <Tooltip />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
                     </Sankey>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -1053,7 +1055,7 @@ export default function DashboardPage() {
                         return <SankeyLink {...rest} stroke={stroke} />;
                       }}
                     >
-                      <Tooltip />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
                     </Sankey>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -1853,7 +1855,7 @@ export default function DashboardPage() {
                         node={(props: NodeProps) => <SankeyNode {...props} sourceCount={leftNodes.length} fillOverride={nodeFill[props.index]} />}
                         link={(props: LinkProps) => <SankeyLink {...props} stroke="#94a3b8" onClick={() => setSelectedP2bsVd(links[props.index])} />}
                       >
-                        <Tooltip />
+                        <Tooltip contentStyle={{ fontSize: 11 }} />
                       </Sankey>
                     </ResponsiveContainer>
                   </ChartCard>
@@ -2343,7 +2345,7 @@ export default function DashboardPage() {
                           const pt = p.active && p.payload && p.payload.length ? p.payload[0].payload : null;
                           if (!pt) return null;
                           return (
-                            <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
+                            <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-[11px] text-gray-700">
                               <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.answeredAt).toLocaleDateString()}</div>
                               <div>{t('dashboard.budgetZeroLine')}: {fmtAmount(pt.cap)}</div>
                               <div>{tl(field.fieldLabel)}: {fmtAmount(pt.delivered)}</div>

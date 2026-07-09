@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseLifeProblems, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseLifeProblems, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, chartAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -1559,6 +1559,16 @@ export async function getOverTimeSeries(
     .map((r) => ({ date: r.date, count: numerByDate.get(r.date) ?? 0, scopeTotal: r.count }));
 }
 
+// Per-point chart annotations (migration 0060) keyed by pointKey → {excluded, note},
+// for a given measure's chartKey. Shared by the touches/steps XmR aggregations.
+async function getChartAnnotationMap(studyId: string, chartKey: string): Promise<Map<string, { excluded: boolean; note: string | null }>> {
+  const rows = await db.select().from(chartAnnotations)
+    .where(and(eq(chartAnnotations.studyId, studyId), eq(chartAnnotations.chartKey, chartKey)));
+  const m = new Map<string, { excluded: boolean; note: string | null }>();
+  for (const r of rows) m.set(r.pointKey, { excluded: r.excluded, note: r.note });
+  return m;
+}
+
 // Touches-per-case XmR (2026-07-08): one point per case = that case's total touch
 // count (a touch = one work entry with ≥1 block). Ordered by the case-open date
 // (min(openedAt, earliest touch) — the "First contact (case opened)" start).
@@ -1636,25 +1646,34 @@ export async function getTouchesPerCaseCapability(
   if (rows.length === 0) return empty;
   rows.sort((a, b) => a.startKey - b.startKey);
 
-  const values = rows.map((r) => r.touches);
+  // Per-point annotations (note / exclude). Limits are computed from INCLUDED
+  // points only; excluded points ride along on the chart (greyed) but don't move
+  // the limits — mirroring getCapabilityData. Filter-independent chartKey.
+  const annoByCase = await getChartAnnotationMap(studyId, 'touches-per-case');
+  const included = rows.filter((r) => !annoByCase.get(r.caseId)?.excluded);
+  const values = included.map((r) => r.touches);
   const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: true });
   const round1 = (x: number) => Math.round(x * 10) / 10;
-  const points = rows.map((r) => ({
-    caseId: r.caseId,
-    caseRef: r.caseRef,
-    leadTime: r.touches,
-    startedAt: new Date(r.startKey).toISOString(),
-    special: unpl !== null && lnpl !== null && (r.touches > unpl || r.touches < lnpl),
-    excluded: false,
-    note: null as string | null,
-  }));
+  const points = rows.map((r) => {
+    const anno = annoByCase.get(r.caseId);
+    const excluded = !!anno?.excluded;
+    return {
+      caseId: r.caseId,
+      caseRef: r.caseRef,
+      leadTime: r.touches,
+      startedAt: new Date(r.startKey).toISOString(),
+      special: !excluded && unpl !== null && lnpl !== null && (r.touches > unpl || r.touches < lnpl),
+      excluded,
+      note: anno?.note ?? null,
+    };
+  });
   return {
     unit: 'touches', points,
     mean: mean !== null ? round1(mean) : null,
     median: median !== null ? round1(median) : null,
     unpl: unpl !== null ? round1(unpl) : null,
     lnpl: lnpl !== null ? round1(lnpl) : null,
-    n: values.length, nExcluded: 0, nWantedByDate: 0,
+    n: values.length, nExcluded: rows.length - included.length, nWantedByDate: 0,
   };
 }
 
@@ -1719,25 +1738,34 @@ export async function getStepsPerCaseCapability(
   if (rows.length === 0) return empty;
   rows.sort((a, b) => a.startKey - b.startKey);
 
-  const values = rows.map((r) => r.value);
+  // Per-point annotations (note / exclude). Keyed per tag so a note/exclusion on
+  // the failure-block chart doesn't bleed into the value-block chart. count/% mode
+  // share the key (exclude applies to the underlying case). Limits over INCLUDED.
+  const annoByCase = await getChartAnnotationMap(studyId, `steps-per-case:${tag}`);
+  const included = rows.filter((r) => !annoByCase.get(r.caseId)?.excluded);
+  const values = included.map((r) => r.value);
   const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: true });
   const round1 = (x: number) => Math.round(x * 10) / 10;
-  const points = rows.map((r) => ({
-    caseId: r.caseId,
-    caseRef: r.caseRef,
-    leadTime: r.value,
-    startedAt: new Date(r.startKey).toISOString(),
-    special: unpl !== null && lnpl !== null && (r.value > unpl || r.value < lnpl),
-    excluded: false,
-    note: null as string | null,
-  }));
+  const points = rows.map((r) => {
+    const anno = annoByCase.get(r.caseId);
+    const excluded = !!anno?.excluded;
+    return {
+      caseId: r.caseId,
+      caseRef: r.caseRef,
+      leadTime: r.value,
+      startedAt: new Date(r.startKey).toISOString(),
+      special: !excluded && unpl !== null && lnpl !== null && (r.value > unpl || r.value < lnpl),
+      excluded,
+      note: anno?.note ?? null,
+    };
+  });
   return {
     unit, points,
     mean: mean !== null ? round1(mean) : null,
     median: median !== null ? round1(median) : null,
     unpl: unpl !== null ? round1(unpl) : null,
     lnpl: lnpl !== null ? round1(lnpl) : null,
-    n: values.length, nExcluded: 0, nWantedByDate: 0,
+    n: values.length, nExcluded: rows.length - included.length, nWantedByDate: 0,
   };
 }
 
