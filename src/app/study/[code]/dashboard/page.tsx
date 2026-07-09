@@ -790,15 +790,13 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* Flow scope selectors, side by side (2026-07-02): Problems-to-be-solved
-            (life problem) on the left, What matters (timed factor) to its right;
-            they wrap under each other on narrow screens. */}
         {/* Value-demand data scope — applies to EVERY flow view (touches/blocks,
             capability, analytics, synthesis), so it stays in the shared header.
-            The what-matters scope only touches the E2E charts, so it lives inside
-            the Capability view instead (relocated 2026-07-09). */}
+            Full-width now it's the only box here; the what-matters scope only
+            touches the E2E charts, so it lives inside the Capability view
+            instead (relocated 2026-07-09). */}
         {isFlow && valueDemandTypes.length > 0 && (
-          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2 md:max-w-md">
+          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.valueDemand')}</p>
             <PillMultiSelect
               ariaLabel={t('dashboard.valueDemand')}
