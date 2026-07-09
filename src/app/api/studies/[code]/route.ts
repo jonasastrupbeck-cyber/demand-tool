@@ -143,6 +143,8 @@ export async function PUT(
   // Flow per-block failure-demand type picker toggle (migration 0033, 2026-06-26).
   if (body.flowFailureDemandTypesEnabled !== undefined) updates.flowFailureDemandTypesEnabled = body.flowFailureDemandTypesEnabled;
   if (body.valueStepsEnabled !== undefined) updates.valueStepsEnabled = body.valueStepsEnabled;
+  // Flow per-entry value-creation-capability dropdown toggle (migration 0059, 2026-07-09).
+  if (body.valueCreationCapabilityEnabled !== undefined) updates.valueCreationCapabilityEnabled = body.valueCreationCapabilityEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.

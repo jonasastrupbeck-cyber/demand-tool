@@ -60,6 +60,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   const lifecycleEnabled = study[0]?.lifecycleEnabled ?? false;
   const flowFailureDemandTypesEnabled = study[0]?.flowFailureDemandTypesEnabled ?? false;
   const valueStepsEnabled = study[0]?.valueStepsEnabled ?? false;
+  const valueCreationCapabilityEnabled = study[0]?.valueCreationCapabilityEnabled ?? false;
 
   // ── DEMAND AGGREGATIONS ──
   //
@@ -711,6 +712,26 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     corTypeCounts = corRows.map(r => ({ label: r.label, count: r.count }));
   })();
 
+  // ── VALUE CREATION CAPABILITY (migration 0059) ──
+  // Per-work-entry reflective judgement (Value Created / Value Maintained /
+  // Missed Opportunity). Counted over answered flow work entries, P2BS + date
+  // scoped via workConditions. Only when the per-study feature is on.
+  let valueCreationCapabilityCounts: Array<{ key: 'created' | 'maintained' | 'missed'; count: number }> = [];
+  const valueCreationCapabilityDone = (async () => {
+    if (valueCreationCapabilityEnabled) {
+      const rows = await db.select({
+        key: demandEntries.valueCreationCapability,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(demandEntries)
+        .where(and(...workConditions, isNotNull(demandEntries.valueCreationCapability)))
+        .groupBy(demandEntries.valueCreationCapability);
+      valueCreationCapabilityCounts = rows
+        .filter((r): r is { key: 'created' | 'maintained' | 'missed'; count: number } => r.key != null)
+        .map(r => ({ key: r.key, count: r.count }));
+    }
+  })();
+
   // ── WORK BY VALUE STEP (migration 0047) ──
   // Where does failure/sequence (and value) work land across the customer value
   // journey? Count flow work blocks per value step, split by tag. P2BS-scoped
@@ -772,7 +793,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   // CoR / value-step) are mutually independent and were kicked off concurrently
   // as IIFEs — await them all here so the whole group costs ~one section's waves
   // (the slowest) instead of the sum. Each assigns to the outer vars above.
-  await Promise.all([workDone, lifecycleDone, workStepDone, failureDemandDone, corDone, valueStepDone]);
+  await Promise.all([workDone, lifecycleDone, workStepDone, failureDemandDone, corDone, valueStepDone, valueCreationCapabilityDone]);
 
   return {
     totalEntries,
@@ -816,6 +837,8 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     valueStepsEnabled,
     workByValueStep,
     valueStepSystemConditions,
+    valueCreationCapabilityEnabled,
+    valueCreationCapabilityCounts,
   };
 }
 

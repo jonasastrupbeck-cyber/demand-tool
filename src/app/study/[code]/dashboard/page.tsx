@@ -1971,6 +1971,42 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
 
+              {/* Value creation capability (migration 0059): the collector's
+                  reflective judgement per flow work entry, in fixed order
+                  (Value Created / Value Maintained / Missed Opportunity), with
+                  count + % of answered entries. P2BS-scoped. Self-gates on the
+                  feature + having at least one answered entry. */}
+              {data.valueCreationCapabilityEnabled && data.valueCreationCapabilityCounts.length > 0 && (
+                <ChartCard title={t('dashboard.valueCreationCapabilityTitle')} info={<InfoPopover label={t('dashboard.valueCreationCapabilityTitle')}>{t('dashboard.calcValueCreationCapability')}</InfoPopover>}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={(() => {
+                      // Fixed order + colour per option (great → neutral → waste), so all
+                      // three rows always show even at zero. Green / sky / amber.
+                      const byKey = new Map(data.valueCreationCapabilityCounts.map(d => [d.key, d.count]));
+                      const total = data.valueCreationCapabilityCounts.reduce((s, d) => s + d.count, 0);
+                      const order: Array<{ key: 'created' | 'maintained' | 'missed'; label: string; fill: string }> = [
+                        { key: 'created', label: t('capture.valueCreationCapability.created'), fill: '#16a34a' },
+                        { key: 'maintained', label: t('capture.valueCreationCapability.maintained'), fill: '#0ea5e9' },
+                        { key: 'missed', label: t('capture.valueCreationCapability.missed'), fill: '#f59e0b' },
+                      ];
+                      return order.map(o => {
+                        const count = byKey.get(o.key) ?? 0;
+                        return { label: o.label, count, fill: o.fill, pct: total > 0 ? `${Math.round((count / total) * 100)}%` : '0%' };
+                      });
+                    })()} layout="vertical" margin={{ left: 10, right: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
+                      <XAxis type="number" allowDecimals={false} tick={tickStyle} />
+                      <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
+                      <Tooltip {...tooltipStyle} />
+                      <Bar dataKey="count" name={t('dashboard.valueCreationCapabilityTitle')} radius={[0, 4, 4, 0]}>
+                        {['#16a34a', '#0ea5e9', '#f59e0b'].map((fill, i) => <Cell key={i} fill={fill} />)}
+                        <LabelList dataKey="pct" position="right" style={{ fill: THEME.textSecondary, fontSize: 11 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              )}
+
               {/* Work by value step (migration 0047): where value / sequence /
                   failure work lands across the customer value journey. Stacked
                   bars per value step, ordered by the value step's own order.

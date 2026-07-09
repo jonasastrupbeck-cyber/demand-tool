@@ -302,6 +302,56 @@ const translations = {
     sv: 'Reaktionsförmåga',
     de: 'Reaktionsfähigkeit',
   },
+  // Value creation capability (migration 0059, 2026-07-09). EN is Jonas's exact
+  // wording; da/sv/de drafted natively — pending Jonas's approval before prod.
+  'capture.valueCreationCapabilityLabel': {
+    en: 'When applicable, what do we think our value creation capability was?',
+    da: 'Når det er relevant, hvad tror vi vores evne til værdiskabelse var?',
+    sv: 'När det är relevant, vad tror vi att vår värdeskapandekapabilitet var?',
+    de: 'Wenn zutreffend, wie schätzen wir unsere Wertschöpfungsfähigkeit ein?',
+  },
+  'capture.valueCreationCapabilityPlaceholder': {
+    en: 'Select value creation capability…',
+    da: 'Vælg evne til værdiskabelse…',
+    sv: 'Välj värdeskapandekapabilitet…',
+    de: 'Wertschöpfungsfähigkeit wählen…',
+  },
+  'capture.valueCreationCapability.created': {
+    en: 'Value Created',
+    da: 'Værdi skabt',
+    sv: 'Värde skapat',
+    de: 'Wert geschaffen',
+  },
+  'capture.valueCreationCapability.createdDef': {
+    en: 'The system and I went over and above my expectations, really blew the customer away.',
+    da: 'Systemet og jeg overgik kundens forventninger og imponerede kunden stort.',
+    sv: 'Systemet och jag överträffade kundens förväntningar och imponerade stort på kunden.',
+    de: 'Das System und ich haben die Erwartungen des Kunden übertroffen und ihn wirklich begeistert.',
+  },
+  'capture.valueCreationCapability.maintained': {
+    en: 'Value Maintained',
+    da: 'Værdi fastholdt',
+    sv: 'Värde bibehållet',
+    de: 'Wert erhalten',
+  },
+  'capture.valueCreationCapability.maintainedDef': {
+    en: 'The system and I did what the customer needed or expected.',
+    da: 'Systemet og jeg gjorde det, kunden havde brug for eller forventede.',
+    sv: 'Systemet och jag gjorde det som kunden behövde eller förväntade sig.',
+    de: 'Das System und ich haben getan, was der Kunde brauchte oder erwartete.',
+  },
+  'capture.valueCreationCapability.missed': {
+    en: 'Missed Opportunity',
+    da: 'Forpasset mulighed',
+    sv: 'Missad möjlighet',
+    de: 'Verpasste Gelegenheit',
+  },
+  'capture.valueCreationCapability.missedDef': {
+    en: 'The system and I should have been able to do more to help ensure the customer was set up for success to allow value to flow perfectly.',
+    da: 'Systemet og jeg burde have kunnet gøre mere for at sikre, at kunden var sat op til succes, så værdien kunne flyde perfekt.',
+    sv: 'Systemet och jag borde ha kunnat göra mer för att säkerställa att kunden var rustad för framgång så att värdet kunde flöda perfekt.',
+    de: 'Das System und ich hätten mehr tun können, damit der Kunde auf Erfolg ausgerichtet ist und der Wert perfekt fließen kann.',
+  },
   'capture.selectHandling': {
     en: 'Select capability of response...',
     da: 'V\u00e6lg reaktionskapacitet...',
@@ -2184,6 +2234,12 @@ const translations = {
     sv: 'Räknar arbetsblock märkta som icke-värdeskapande efterfrågan, grupperade efter typ, över ärendena i urvalet (värdeskapande-efterfrågan-filtret gäller).',
     de: 'Zählt als Fehlerbedarf markierte Arbeitsblöcke, gruppiert nach Typ, über die Fälle im Umfang (der Wertbedarf-Filter gilt).',
   },
+  'dashboard.calcValueCreationCapability': {
+    en: 'Counts flow work entries by the value-creation-capability judgement recorded on each (Value Created / Value Maintained / Missed Opportunity), as a share of answered entries, across the cases in scope (the value-demand filter applies).',
+    da: 'Tæller flow-arbejdsindtastninger efter den vurdering af evne til værdiskabelse, der er registreret på hver (Værdi skabt / Værdi fastholdt / Forpasset mulighed), som andel af besvarede indtastninger, på tværs af sagerne i udsnittet (værdiskabende-efterspørgsel-filteret gælder).',
+    sv: 'Räknar flödesarbetsposter efter den värdeskapandekapabilitet-bedömning som registrerats på varje (Värde skapat / Värde bibehållet / Missad möjlighet), som andel av besvarade poster, över ärendena i urvalet (värdeskapande-efterfrågan-filtret gäller).',
+    de: 'Zählt Flow-Arbeitseinträge nach der auf jedem erfassten Wertschöpfungsfähigkeits-Bewertung (Wert geschaffen / Wert erhalten / Verpasste Gelegenheit) als Anteil der beantworteten Einträge, über die Fälle im Umfang (der Wertbedarf-Filter gilt).',
+  },
   'dashboard.calcCor': {
     en: 'The mix of Capability-of-Response outcomes recorded on the cases in scope, as a share of the total.',
     da: 'Fordelingen af registrerede Capability-of-Response-udfald på sagerne i udsnittet, som andel af totalen.',
@@ -2952,6 +3008,12 @@ const translations = {
     da: 'Ikke-værdiskabende efterspørgsel (fanget i flow)',
     sv: 'Icke-värdeskapande efterfrågan (fångad i flöde)',
     de: 'Fehlernachfrage (im Flow erfasst)',
+  },
+  'dashboard.valueCreationCapabilityTitle': {
+    en: 'Value creation capability',
+    da: 'Evne til værdiskabelse',
+    sv: 'Värdeskapandekapabilitet',
+    de: 'Wertschöpfungsfähigkeit',
   },
   'dashboard.totalCapacity': {
     en: 'Total Capacity',
@@ -4808,6 +4870,12 @@ const translations = {
     da: 'Type af ikke-værdiskabende efterspørgsel pr. arbejdsblok',
     sv: 'Typ av icke-värdeskapande efterfrågan per arbetsblock',
     de: 'Fehler-Nachfrage-Typ je Arbeitsblock',
+  },
+  'capture.toggles.valueCreationCapability': {
+    en: 'Value creation capability per work entry',
+    da: 'Evne til værdiskabelse pr. arbejdsindtastning',
+    sv: 'Värdeskapandekapabilitet per arbetspost',
+    de: 'Wertschöpfungsfähigkeit je Arbeitseintrag',
   },
   'capture.toggles.lifeProblems': {
     en: 'Capture life problems',

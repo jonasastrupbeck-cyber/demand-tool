@@ -222,6 +222,11 @@ export interface DashboardData {
   // per step (match on stepLabel + stepSortOrder, mirroring workByValueStep's
   // key). Empty unless valueStepsEnabled AND systemConditionsEnabled.
   valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }>;
+  // Value creation capability (migration 0059): per-work-entry reflective
+  // judgement (Value Created / Value Maintained / Missed Opportunity), counted
+  // over answered flow work entries. P2BS + date scoped. Empty unless enabled.
+  valueCreationCapabilityEnabled: boolean;
+  valueCreationCapabilityCounts: Array<{ key: 'created' | 'maintained' | 'missed'; count: number }>;
 }
 
 export interface CreateEntryInput {

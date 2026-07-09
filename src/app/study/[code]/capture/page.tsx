@@ -108,6 +108,8 @@ interface StudyData {
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
   valueStepsEnabled: boolean;
+  // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
+  valueCreationCapabilityEnabled: boolean;
   valueSteps: { id: string; label: string; sortOrder: number }[];
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -184,6 +186,8 @@ export default function CapturePage() {
   const [classification, setClassification] = useState<'value' | 'failure' | 'unknown' | 'sequence' | ''>('');
   const [demandTypeId, setDemandTypeId] = useState('');
   const [handlingTypeId, setHandlingTypeId] = useState('');
+  // Value creation capability (0059): per-work-entry reflective judgement. '' = unanswered.
+  const [valueCreationCapability, setValueCreationCapability] = useState('');
   // C7 (2026-06-17): whether the customer was affected by this touch. Inherited
   // automatically from the chosen COR's customerFacing flag (set per COR in
   // Settings, 2026-06-18) — no longer a per-touch question. null = no COR yet.
@@ -431,6 +435,7 @@ export default function CapturePage() {
     setClassification('');
     setDemandTypeId('');
     setHandlingTypeId('');
+    setValueCreationCapability('');
     setCustomerFelt(null);
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
@@ -629,6 +634,11 @@ export default function CapturePage() {
       // C7 (2026-06-17): the touch-level "did the customer feel it?" flag.
       // Only meaningful once a COR is chosen; null when unset.
       if (handlingTypeId) body.customerFelt = customerFelt;
+    }
+
+    // Value creation capability (0059): flow work entries only, when enabled.
+    if (flowWorkPath && study?.valueCreationCapabilityEnabled) {
+      body.valueCreationCapability = valueCreationCapability || undefined;
     }
 
     if (entryType === 'demand') {
@@ -1861,6 +1871,31 @@ export default function CapturePage() {
                     {corBlock}
                     {submitButton}
                   </div>
+                  {/* Value creation capability (0059): optional per-entry judgement,
+                      shown below COR/Save only when the study opts in. */}
+                  {study.valueCreationCapabilityEnabled && (
+                    <div className="flex flex-col gap-1 border-t border-gray-100 pt-1.5">
+                      <span className="text-[11px] font-medium text-gray-500 text-center max-w-[16rem]">
+                        {t('capture.valueCreationCapabilityLabel')}
+                      </span>
+                      <div className="flex justify-center">
+                        <PillSelect
+                          ariaLabel={t('capture.valueCreationCapabilityLabel')}
+                          placeholder={t('capture.valueCreationCapabilityPlaceholder')}
+                          value={valueCreationCapability}
+                          onChange={setValueCreationCapability}
+                          options={[
+                            { id: 'created', label: t('capture.valueCreationCapability.created'), operationalDefinition: t('capture.valueCreationCapability.createdDef') },
+                            { id: 'maintained', label: t('capture.valueCreationCapability.maintained'), operationalDefinition: t('capture.valueCreationCapability.maintainedDef') },
+                            { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
+                          ]}
+                          variant="value"
+                          compact
+                          compactMenu
+                        />
+                      </div>
+                    </div>
+                  )}
                   {regretButton}
                 </div>
               </div>
@@ -2385,6 +2420,7 @@ export default function CapturePage() {
             systemConditionsEnabled: study.systemConditionsEnabled,
             flowFailureDemandTypesEnabled: study.flowFailureDemandTypesEnabled,
             valueStepsEnabled: study.valueStepsEnabled,
+            valueCreationCapabilityEnabled: study.valueCreationCapabilityEnabled,
             whatMattersEnabled: study.whatMattersEnabled,
             thinkingsEnabled: study.thinkingsEnabled,
             lifeProblemsEnabled: study.lifeProblemsEnabled,

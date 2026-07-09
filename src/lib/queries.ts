@@ -1461,6 +1461,8 @@ export async function createEntry(studyId: string, data: {
   // C7 (2026-06-17): did the customer feel this touch? (customer-facing COR vs
   // internal/partner handoff). Null = not asked.
   customerFelt?: boolean | null;
+  // Value creation capability (0059): per-work-entry reflective judgement.
+  valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -1492,6 +1494,8 @@ export async function createEntry(studyId: string, data: {
     collectorName: data.collectorName || null,
     caseId: data.caseId || null,
     customerFelt: data.customerFelt ?? null,
+    // Work-entry only (0059); demand entries never carry it.
+    valueCreationCapability: !isDemand ? (data.valueCreationCapability ?? null) : null,
   });
 
   // Junctions are independent of each other (thinkings uses the in-memory `scs`,
@@ -2647,6 +2651,8 @@ export async function updateEntry(entryId: string, data: {
   caseId?: string | null;
   // C7 (2026-06-17): did the customer feel this touch?
   customerFelt?: boolean | null;
+  // Value creation capability (0059): per-work-entry reflective judgement.
+  valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
@@ -2666,6 +2672,7 @@ export async function updateEntry(entryId: string, data: {
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
   if (data.caseId !== undefined) updateFields.caseId = data.caseId;
   if (data.customerFelt !== undefined) updateFields.customerFelt = data.customerFelt;
+  if (data.valueCreationCapability !== undefined) updateFields.valueCreationCapability = data.valueCreationCapability;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
   // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
   // An empty array clears verbatim too (else the stale concatenation of the

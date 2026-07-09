@@ -75,6 +75,7 @@ export type StudyTemplateSnapshotV1 = {
     flowAnalyticsEnabled: boolean;
     flowFailureDemandTypesEnabled: boolean;
     valueStepsEnabled: boolean;
+    valueCreationCapabilityEnabled: boolean;
   };
   lifecycleStages: { id: string; code: string; label: string; sortOrder: number }[];
   handlingTypes: { id: string; label: string; operationalDefinition: string | null; customerFacing: boolean; sortOrder: number }[];
@@ -191,6 +192,7 @@ export async function snapshotStudySettings(studyId: string): Promise<StudyTempl
       flowAnalyticsEnabled: study.flowAnalyticsEnabled,
       flowFailureDemandTypesEnabled: study.flowFailureDemandTypesEnabled,
       valueStepsEnabled: study.valueStepsEnabled,
+      valueCreationCapabilityEnabled: study.valueCreationCapabilityEnabled,
     },
     lifecycleStages: stages.map((s) => ({ id: s.id, code: s.code, label: s.label, sortOrder: s.sortOrder })),
     handlingTypes: handling.map((h) => ({ id: h.id, label: h.label, operationalDefinition: h.operationalDefinition, customerFacing: h.customerFacing, sortOrder: h.sortOrder })),
@@ -288,6 +290,7 @@ export async function createStudyFromTemplate(params: {
     flowAnalyticsEnabled: s.flowAnalyticsEnabled,
     flowFailureDemandTypesEnabled: s.flowFailureDemandTypesEnabled,
     valueStepsEnabled: s.valueStepsEnabled,
+    valueCreationCapabilityEnabled: s.valueCreationCapabilityEnabled,
   });
 
   // 2. Settings lists, in FK-safe order, each row a fresh id recorded in a map.

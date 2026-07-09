@@ -53,6 +53,8 @@ export interface EntryEditModalStudy {
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
   valueStepsEnabled: boolean;
+  // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
+  valueCreationCapabilityEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -85,6 +87,8 @@ interface EntryFull {
   collectorName: string | null;
   // Case stitching (Skipton slice 1): read-only display in this modal.
   caseId: string | null;
+  // Value creation capability (0059): per-work-entry reflective judgement.
+  valueCreationCapability: 'created' | 'maintained' | 'missed' | null;
 }
 
 interface Props {
@@ -234,6 +238,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
         .map(({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId }) => ({ tag, text, workStepTypeId, systemConditionIds, demandTypeId, valueStepId, date: entryDate }));
+      // Value creation capability (0059): only meaningful when the study opts in.
+      if (study.valueCreationCapabilityEnabled) {
+        body.valueCreationCapability = entry.valueCreationCapability || null;
+      }
     }
     try {
       const res = await fetch(`/api/studies/${encodeURIComponent(code)}/entries/${entryId}`, {
@@ -648,6 +656,27 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     />
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Value creation capability (0059): flow work entries only, when enabled. */}
+            {study.systemType === 'flow' && entry.entryType === 'work' && study.valueCreationCapabilityEnabled && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[11px] font-medium text-gray-500 text-center max-w-[18rem]">
+                  {t('capture.valueCreationCapabilityLabel')}
+                </span>
+                <PillSelect
+                  ariaLabel={t('capture.valueCreationCapabilityLabel')}
+                  placeholder={t('capture.valueCreationCapabilityPlaceholder')}
+                  value={entry.valueCreationCapability || ''}
+                  onChange={(id) => setEntry({ ...entry, valueCreationCapability: (id || null) as 'created' | 'maintained' | 'missed' | null })}
+                  options={[
+                    { id: 'created', label: t('capture.valueCreationCapability.created'), operationalDefinition: t('capture.valueCreationCapability.createdDef') },
+                    { id: 'maintained', label: t('capture.valueCreationCapability.maintained'), operationalDefinition: t('capture.valueCreationCapability.maintainedDef') },
+                    { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
+                  ]}
+                  variant="value"
+                />
               </div>
             )}
 

@@ -163,6 +163,10 @@ export async function POST(
     // C7 (2026-06-17): did the customer feel this touch? (defaults client-side
     // from the chosen COR's customerFacing; overridable). null = not answered.
     customerFelt: typeof body.customerFelt === 'boolean' ? body.customerFelt : null,
+    // Value creation capability (0059): fixed enum, only kept for work entries.
+    valueCreationCapability: ['created', 'maintained', 'missed'].includes(body.valueCreationCapability)
+      ? body.valueCreationCapability
+      : undefined,
   });
 
   // Fold the three post-save refreshes into this response so the client skips

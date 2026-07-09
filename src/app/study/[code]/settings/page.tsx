@@ -107,6 +107,8 @@ interface StudyData {
   flowAnalyticsEnabled: boolean;
   // Flow per-block failure-demand type picker (migration 0033, 2026-06-26).
   flowFailureDemandTypesEnabled: boolean;
+  // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
+  valueCreationCapabilityEnabled: boolean;
   // The PIN itself is never sent to the browser — only whether one is set.
   hasConsultantPin: boolean;
   handlingTypes: HandlingType[];
@@ -1436,6 +1438,7 @@ export default function SettingsPage() {
               { field: 'synthesisEnabled' as const, label: t('capture.toggles.synthesis'), value: study.synthesisEnabled },
               { field: 'flowAnalyticsEnabled' as const, label: t('capture.toggles.flowAnalytics'), value: study.flowAnalyticsEnabled },
               { field: 'flowFailureDemandTypesEnabled' as const, label: t('capture.toggles.flowFailureDemandTypes'), value: study.flowFailureDemandTypesEnabled },
+              { field: 'valueCreationCapabilityEnabled' as const, label: t('capture.toggles.valueCreationCapability'), value: study.valueCreationCapabilityEnabled },
             ]).map((row) => (
               <button
                 key={row.field}

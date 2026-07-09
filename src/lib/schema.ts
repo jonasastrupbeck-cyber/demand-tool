@@ -93,6 +93,10 @@ export const studies = pgTable('studies', {
   // Value steps (migration 0047, 2026-07-03): opt-in per-block "What value step
   // is this work related to?" picker on flow work blocks. Default false.
   valueStepsEnabled: boolean('value_steps_enabled').notNull().default(false),
+  // Value creation capability (migration 0059, 2026-07-09): opt-in per-work-entry
+  // "what do we think our value creation capability was?" dropdown in the flow
+  // composer (Value Created / Value Maintained / Missed Opportunity). Default false.
+  valueCreationCapabilityEnabled: boolean('value_creation_capability_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -567,6 +571,9 @@ export const demandEntries = pgTable('demand_entries', {
   // NULL = never reordered → the timeline falls back to created_at order. Set for
   // every entry in a case once the user drags to reorder its touches.
   sortOrder: integer('sort_order'),
+  // Value creation capability (migration 0059, 2026-07-09): the collector's
+  // reflective judgement per flow work entry. NULL = not answered / not applicable.
+  valueCreationCapability: text('value_creation_capability').$type<'created' | 'maintained' | 'missed'>(),
 }, (t) => ({
   // Perf indexes 0058: the two hottest read filters — a case's timeline and every
   // study-wide dashboard aggregation. Neither column had any index before.
