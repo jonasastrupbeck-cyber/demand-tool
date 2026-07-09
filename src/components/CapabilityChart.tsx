@@ -225,8 +225,9 @@ export default function CapabilityChart({
         <>
           {/* Captured region for image / PowerPoint export — title + chart + tiles. */}
           <div ref={capExportRef} data-capability-export data-cap-title={`${studyName} — ${subtitle}`} className="bg-white">
+            {/* Study name intentionally not shown in-card (Jonas 2026-07-09) — it
+                still titles the PNG/PPTX export via data-cap-title above. */}
             <div className="mb-2">
-              <p className="text-sm font-semibold text-gray-900">{studyName}</p>
               <p className="text-xs text-gray-500">{subtitle}</p>
             </div>
             <ResponsiveContainer width="100%" height={340}>
