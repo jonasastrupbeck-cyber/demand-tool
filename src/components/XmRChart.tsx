@@ -33,7 +33,7 @@ function Card({ label, value, sub, color }: { label: string; value: string | num
 }
 
 export default function XmRChart({
-  title, subtitle, valueLabel, data, loading, controls, fmtValue, info,
+  title, subtitle, valueLabel, data, loading, controls, fmtValue, info, actions, nLabel, emptyText, plainX,
 }: {
   title: string;
   subtitle?: string;
@@ -45,6 +45,14 @@ export default function XmRChart({
   fmtValue?: (v: number | null) => string;
   /** Optional info affordance (e.g. an <InfoPopover>) shown beside the title. */
   info?: ReactNode;
+  /** Optional header actions (e.g. a Remove button), rendered before the collapse chevron. */
+  actions?: ReactNode;
+  /** Label for the first stat tile. Defaults to "Cases" — override when points aren't cases (e.g. days). */
+  nLabel?: string;
+  /** Copy for the empty state. Defaults to the capability "no data" text. */
+  emptyText?: string;
+  /** Plain x labels: tooltip shows the caseRef as-is (no "#" or date suffix) — for date-keyed points. */
+  plainX?: boolean;
 }) {
   const { t } = useLocale();
   const collapsible = useCollapsibleCards();
@@ -58,6 +66,7 @@ export default function XmRChart({
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
         {info}
         <span className="flex-1" />
+        {actions}
         {collapsible && (
           <button
             type="button"
@@ -77,7 +86,7 @@ export default function XmRChart({
         {loading && !data ? (
           <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.loading')}</p>
         ) : !data || data.points.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400">{t('dashboard.capabilityNoData')}</p>
+          <p className="py-8 text-center text-sm text-gray-400">{emptyText ?? t('dashboard.capabilityNoData')}</p>
         ) : (
           <div data-chart-export data-chart-title={subtitle ? `${title} — ${subtitle}` : title} className="bg-white">
             {subtitle && <p className="text-xs text-gray-500 mb-2">{subtitle}</p>}
@@ -91,7 +100,7 @@ export default function XmRChart({
                   if (!pt) return null;
                   return (
                     <div className="rounded-lg shadow-md bg-white border border-gray-200 px-3 py-2 text-xs text-gray-700">
-                      <div className="font-medium text-gray-900">#{pt.caseRef} · {new Date(pt.startedAt).toLocaleDateString()}</div>
+                      <div className="font-medium text-gray-900">{plainX ? pt.caseRef : `#${pt.caseRef} · ${new Date(pt.startedAt).toLocaleDateString()}`}</div>
                       <div>{valueLabel}: {fmt(pt.leadTime)}</div>
                     </div>
                   );
@@ -128,7 +137,7 @@ export default function XmRChart({
               <p className="mt-2 text-center text-xs text-gray-400">{t('dashboard.capabilityNeedMore')}</p>
             )}
             <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mt-3">
-              <Card label={t('dashboard.capabilityCases')} value={data.n} />
+              <Card label={nLabel ?? t('dashboard.capabilityCases')} value={data.n} />
               <Card label={t('dashboard.processAvg')} value={fmt(data.mean)} color={THEME.textSecondary} />
               <Card label={t('dashboard.capabilityMedian')} value={fmt(data.median)} />
               <Card label={t('dashboard.upperLimit')} value={fmt(data.unpl)} color={COLORS.failure} />
