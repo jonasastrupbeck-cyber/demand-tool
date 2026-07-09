@@ -52,6 +52,19 @@ type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
 type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis' | 'analytics';
 
+// P2BS → value demand band (2026-07-09). Mirrors P2bsVdLink in
+// dashboard-aggregations.ts (kept local — the page only imports types from
+// @/types, never from server modules). null id = "Not set" on that side.
+type P2bsVdLink = {
+  lifeProblemId: string | null;
+  lifeProblemLabel: string | null;
+  demandTypeId: string | null;
+  demandTypeLabel: string | null;
+  caseCount: number;
+  caseIds: string[];
+};
+type P2bsVdData = { links: P2bsVdLink[]; cases: Record<string, { caseRef: string; whatMatters: string | null }> };
+
 export default function DashboardPage() {
   const params = useParams();
   const code = params.code as string;
@@ -74,6 +87,11 @@ export default function DashboardPage() {
   const [selectedFlow, setSelectedFlow] = useState<{ sourceLabel: string; targetLabel: string; sourceName: string; targetName: string; count: number } | null>(null);
   const [flowCauses, setFlowCauses] = useState<Array<{ cause: string; count: number }> | null>(null);
   const [flowCausesLoading, setFlowCausesLoading] = useState(false);
+  // P2BS → value demand Sankey (2026-07-09): what problems the cases' value
+  // demands trace back to. The payload carries the click-through detail
+  // (caseRef + whatMatters per case) eagerly, so a band click is pure state.
+  const [p2bsVd, setP2bsVd] = useState<P2bsVdData | null>(null);
+  const [selectedP2bsVd, setSelectedP2bsVd] = useState<P2bsVdLink | null>(null);
   // Ask delivery (2026-07-02, slice 4): how often decisions delivered what
   // mattered, per linked capture field. Fetched when the Analytics tab opens.
   const [askDelivery, setAskDelivery] = useState<Array<{ fieldId: string; fieldLabel: string; decisionLabel: string; whatMattersTypeId: string; whatMattersLabel: string; kind: 'amount' | 'number' | 'currency' | 'date' | 'duration' | 'choice'; n: number; metCount: number; notCaptured: number; lateCount: number; avgDaysLate: number | null; avgDiffMonths: number | null; overCount: number; avgAmountOver: number | null }> | null>(null);
@@ -291,6 +309,24 @@ export default function DashboardPage() {
       .catch(() => { if (!cancelled) setAskDelivery([]); });
     return () => { cancelled = true; };
   }, [dashboardView, code, getDateRangeParams, valueDemandFilter]);
+
+  // P2BS → value demand Sankey: refetch when the Analytics tab is open and the
+  // date range / value-demand scope changes. Flow-only endpoint (P2BS + value
+  // demands live on cases). `systemType` directly — `isFlow` is declared later.
+  useEffect(() => {
+    if (dashboardView !== 'analytics' || systemType !== 'flow') return;
+    const qp = new URLSearchParams();
+    const range = getDateRangeParams();
+    if (range.from) qp.set('from', range.from);
+    if (range.to) qp.set('to', range.to);
+    if (valueDemandFilter.length) qp.set('valueDemands', valueDemandFilter.join(','));
+    let cancelled = false;
+    fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/p2bs-value-demand?${qp}`)
+      .then(r => r.ok ? r.json() : { links: [], cases: {} })
+      .then(d => { if (!cancelled) setP2bsVd(d); })
+      .catch(() => { if (!cancelled) setP2bsVd({ links: [], cases: {} }); });
+    return () => { cancelled = true; };
+  }, [dashboardView, systemType, code, getDateRangeParams, valueDemandFilter]);
 
   // Budget capability (2026-07-05): fetch only when Ask delivery reports an
   // amount-kind field, so studies without budget asks never pay the request.
@@ -1735,6 +1771,71 @@ export default function DashboardPage() {
                 )}
               </div>
 
+              {/* P2BS → value demand (2026-07-09): what problem is the customer
+                  really trying to solve by placing this value demand on us?
+                  Band width = cases where the pair co-occurs; grey "Not set"
+                  collects cases missing a side. Clicking a band opens the
+                  cases behind it with their what-matters words. */}
+              {p2bsVd && p2bsVd.links.length > 0 && (() => {
+                const links = p2bsVd.links;
+                // Every case unclassified on both sides → data-quality nudge
+                // instead of a one-band grey-to-grey Sankey.
+                if (links.length === 1 && !links[0].lifeProblemId && !links[0].demandTypeId) {
+                  return (
+                    <ChartCard title={t('dashboard.p2bsVdTitle')}>
+                      <p className="text-sm text-gray-500 text-center py-8">{t('dashboard.p2bsVdEmpty')}</p>
+                    </ChartCard>
+                  );
+                }
+                const notSet = t('dashboard.p2bsVdNotSet');
+                // Node order = first appearance in the (sortOrder-sorted) links.
+                const leftNodes: Array<{ id: string | null; label: string | null }> = [];
+                const rightNodes: Array<{ id: string | null; label: string | null }> = [];
+                const seenL = new Set<string>();
+                const seenR = new Set<string>();
+                for (const l of links) {
+                  const lk = l.lifeProblemId ?? '';
+                  if (!seenL.has(lk)) { seenL.add(lk); leftNodes.push({ id: l.lifeProblemId, label: l.lifeProblemLabel }); }
+                  const rk = l.demandTypeId ?? '';
+                  if (!seenR.has(rk)) { seenR.add(rk); rightNodes.push({ id: l.demandTypeId, label: l.demandTypeLabel }); }
+                }
+                const lIdx = new Map(leftNodes.map((n, i) => [n.id ?? '', i]));
+                const rIdx = new Map(rightNodes.map((n, i) => [n.id ?? '', i + leftNodes.length]));
+                const nodes = [
+                  ...leftNodes.map(n => ({ name: n.id ? tl(n.label!) : notSet })),
+                  ...rightNodes.map(n => ({ name: n.id ? tl(n.label!) : notSet })),
+                ];
+                const nodeFill = [
+                  ...leftNodes.map(n => (n.id ? '#6366f1' : '#9ca3af')),
+                  ...rightNodes.map(n => (n.id ? COLORS.value : '#9ca3af')),
+                ];
+                // 1:1 with `links` so the link renderer's index maps back.
+                const sankeyLinks = links.map(l => ({
+                  source: lIdx.get(l.lifeProblemId ?? '')!,
+                  target: rIdx.get(l.demandTypeId ?? '')!,
+                  value: l.caseCount,
+                }));
+                return (
+                  <ChartCard title={t('dashboard.p2bsVdTitle')} info={<InfoPopover label={t('dashboard.p2bsVdTitle')}>{t('dashboard.calcP2bsVd')}</InfoPopover>}>
+                    <p className="text-xs text-gray-600 italic mb-1 -mt-1">{t('dashboard.p2bsVdQuestion')}</p>
+                    <p className="text-xs text-gray-500 mb-2">{t('dashboard.p2bsVdClickHint')}</p>
+                    <ResponsiveContainer width="100%" height={Math.max(300, nodes.length * 35)}>
+                      <Sankey
+                        data={{ nodes, links: sankeyLinks }}
+                        nodePadding={24}
+                        nodeWidth={10}
+                        linkCurvature={0.5}
+                        margin={{ top: 10, right: 160, bottom: 10, left: 160 }}
+                        node={(props: NodeProps) => <SankeyNode {...props} sourceCount={leftNodes.length} fillOverride={nodeFill[props.index]} />}
+                        link={(props: LinkProps) => <SankeyLink {...props} stroke="#94a3b8" onClick={() => setSelectedP2bsVd(links[props.index])} />}
+                      >
+                        <Tooltip />
+                      </Sankey>
+                    </ResponsiveContainer>
+                  </ChartCard>
+                );
+              })()}
+
               <div className="grid md:grid-cols-2 gap-4">
                 <ChartCard title={t('dashboard.workAnalysis')}>
                   <ResponsiveContainer width="100%" height={250}>
@@ -2288,6 +2389,48 @@ export default function DashboardPage() {
               ) : (
                 <p className="text-gray-500 text-sm">{t('dashboard.flowCausesEmpty')}</p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* P2BS ↔ value demand band detail: the cases behind a clicked band and
+          their what-matters words. Data ships with the Sankey payload — no fetch. */}
+      {selectedP2bsVd && p2bsVd && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setSelectedP2bsVd(null)}>
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900">{t('dashboard.p2bsVdDetailTitle')}</h3>
+                <button onClick={() => setSelectedP2bsVd(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="text-indigo-600 font-medium">{selectedP2bsVd.lifeProblemLabel ? tl(selectedP2bsVd.lifeProblemLabel) : t('dashboard.p2bsVdNotSet')}</span>
+                {' → '}
+                <span className="text-green-600 font-medium">{selectedP2bsVd.demandTypeLabel ? tl(selectedP2bsVd.demandTypeLabel) : t('dashboard.p2bsVdNotSet')}</span>
+                <span className="text-gray-400 ml-2">({selectedP2bsVd.caseCount})</span>
+              </p>
+            </div>
+            <div className="p-5">
+              {(() => {
+                const rows = selectedP2bsVd.caseIds
+                  .map(id => ({ id, info: p2bsVd.cases[id] }))
+                  .filter((r): r is { id: string; info: { caseRef: string; whatMatters: string | null } } => !!r.info);
+                const anyNote = rows.some(r => r.info.whatMatters?.trim());
+                return (
+                  <div className="space-y-2">
+                    {!anyNote && <p className="text-gray-500 text-sm">{t('dashboard.p2bsVdDetailEmpty')}</p>}
+                    {rows.map(r => (
+                      <div key={r.id} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2">
+                        <span className="text-sm font-semibold text-gray-700 shrink-0">#{r.info.caseRef}</span>
+                        {r.info.whatMatters?.trim()
+                          ? <span className="text-sm text-gray-800">{r.info.whatMatters}</span>
+                          : <span className="text-sm text-gray-400 italic">—</span>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

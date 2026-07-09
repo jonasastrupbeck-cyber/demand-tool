@@ -1,5 +1,5 @@
 import { db } from './db';
-import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
+import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseLifeProblems, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
 import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
@@ -1224,6 +1224,113 @@ export async function getCorDistribution(
     .groupBy(handlingTypes.label)
     .orderBy(desc(sql`count(*)`));
   return rows.map((r) => ({ label: r.label, count: r.count }));
+}
+
+// P2BS → value demand links (2026-07-09): what problem(s) is the customer really
+// trying to solve by placing this value demand on us? There is no direct FK
+// between life_problems and demand_types — the link is case-mediated: each flow
+// case carries a set of P2BS (cases.lifeProblemId primary + caseLifeProblems
+// junction) and a set of value demands (cases.demandTypeId + caseDemandTypes).
+// Link weight = number of cases where the pair co-occurs; a case with several of
+// either counts once per combination (cross product). A case missing one side
+// lands on a null ("Not set") node for that side. Detail (caseRef + whatMatters)
+// ships eagerly in the same payload so the dashboard's band click-through needs
+// no second request.
+export type P2bsVdLink = {
+  lifeProblemId: string | null;
+  lifeProblemLabel: string | null;
+  demandTypeId: string | null;
+  demandTypeLabel: string | null;
+  caseCount: number;
+  caseIds: string[];
+};
+
+export async function getP2bsValueDemandLinks(
+  studyId: string,
+  opts: { from?: Date; to?: Date; valueDemands?: string[] } = {},
+): Promise<{ links: P2bsVdLink[]; cases: Record<string, { caseRef: string; whatMatters: string | null }> }> {
+  const { from, to, valueDemands } = opts;
+  // Date range on the case-open date: the demand (and its P2BS) arrives when the
+  // case opens — consistent with the capability charts' case scoping.
+  const caseConds: SQL[] = [await valueDemandCaseWhere(studyId, valueDemands)];
+  if (from) caseConds.push(gte(cases.openedAt, from));
+  if (to) caseConds.push(lte(cases.openedAt, to));
+  const caseWhere = and(...caseConds);
+
+  const [caseRows, lpJunction, dtJunction, lpRows, vdRows] = await Promise.all([
+    db.select({ id: cases.id, caseRef: cases.caseRef, lifeProblemId: cases.lifeProblemId, demandTypeId: cases.demandTypeId, whatMatters: cases.whatMatters })
+      .from(cases).where(caseWhere),
+    db.select({ caseId: caseLifeProblems.caseId, lifeProblemId: caseLifeProblems.lifeProblemId })
+      .from(caseLifeProblems).innerJoin(cases, eq(caseLifeProblems.caseId, cases.id)).where(caseWhere),
+    db.select({ caseId: caseDemandTypes.caseId, demandTypeId: caseDemandTypes.demandTypeId })
+      .from(caseDemandTypes).innerJoin(cases, eq(caseDemandTypes.caseId, cases.id)).where(caseWhere),
+    db.select({ id: lifeProblems.id, label: lifeProblems.label, sortOrder: lifeProblems.sortOrder })
+      .from(lifeProblems).where(eq(lifeProblems.studyId, studyId)),
+    db.select({ id: demandTypes.id, label: demandTypes.label, sortOrder: demandTypes.sortOrder })
+      .from(demandTypes).where(and(eq(demandTypes.studyId, studyId), eq(demandTypes.category, 'value'))),
+  ]);
+  if (caseRows.length === 0) return { links: [], cases: {} };
+
+  const lpById = new Map(lpRows.map((r) => [r.id, r]));
+  const vdById = new Map(vdRows.map((r) => [r.id, r]));
+  const selected = valueDemands && valueDemands.length ? new Set(valueDemands) : null;
+  const lpsByCase = new Map<string, string[]>();
+  for (const r of lpJunction) {
+    const arr = lpsByCase.get(r.caseId);
+    if (arr) arr.push(r.lifeProblemId); else lpsByCase.set(r.caseId, [r.lifeProblemId]);
+  }
+  const dtsByCase = new Map<string, string[]>();
+  for (const r of dtJunction) {
+    const arr = dtsByCase.get(r.caseId);
+    if (arr) arr.push(r.demandTypeId); else dtsByCase.set(r.caseId, [r.demandTypeId]);
+  }
+
+  const linkMap = new Map<string, P2bsVdLink>();
+  const caseInfo: Record<string, { caseRef: string; whatMatters: string | null }> = {};
+  for (const c of caseRows) {
+    // Per-case set = union(primary column, junction rows) — legacy cases may
+    // predate the junctions and only carry the primary FK.
+    const lpSet = new Set(lpsByCase.get(c.id) ?? []);
+    if (c.lifeProblemId) lpSet.add(c.lifeProblemId);
+    const lpIds = [...lpSet].filter((id) => lpById.has(id));
+    const dtSet = new Set(dtsByCase.get(c.id) ?? []);
+    if (c.demandTypeId) dtSet.add(c.demandTypeId);
+    // Right side must be value-category (a legacy primary could point at a
+    // failure type) and, when the filter is active, only the selected demands.
+    let dtIds = [...dtSet].filter((id) => vdById.has(id));
+    if (selected) dtIds = dtIds.filter((id) => selected.has(id));
+    const lefts: Array<string | null> = lpIds.length ? lpIds : [null];
+    const rights: Array<string | null> = dtIds.length ? dtIds : [null];
+    for (const p of lefts) {
+      for (const v of rights) {
+        const key = `${p ?? ''}::${v ?? ''}`;
+        let link = linkMap.get(key);
+        if (!link) {
+          link = {
+            lifeProblemId: p, lifeProblemLabel: p ? lpById.get(p)!.label : null,
+            demandTypeId: v, demandTypeLabel: v ? vdById.get(v)!.label : null,
+            caseCount: 0, caseIds: [],
+          };
+          linkMap.set(key, link);
+        }
+        link.caseCount += 1;
+        link.caseIds.push(c.id);
+      }
+    }
+    caseInfo[c.id] = { caseRef: c.caseRef, whatMatters: c.whatMatters };
+  }
+
+  // Stable order: left by P2BS sortOrder, then right by value-demand sortOrder;
+  // "Not set" (null) last on each side. The dashboard derives its node order
+  // from first appearance in this list.
+  const lpOrder = (id: string | null) => (id ? lpById.get(id)!.sortOrder : Number.MAX_SAFE_INTEGER);
+  const vdOrder = (id: string | null) => (id ? vdById.get(id)!.sortOrder : Number.MAX_SAFE_INTEGER);
+  const links = [...linkMap.values()].sort((a, b) =>
+    lpOrder(a.lifeProblemId) - lpOrder(b.lifeProblemId)
+    || (a.lifeProblemLabel ?? '').localeCompare(b.lifeProblemLabel ?? '')
+    || vdOrder(a.demandTypeId) - vdOrder(b.demandTypeId)
+    || (a.demandTypeLabel ?? '').localeCompare(b.demandTypeLabel ?? ''));
+  return { links, cases: caseInfo };
 }
 
 // Touches-per-case XmR (2026-07-08): one point per case = that case's total touch
