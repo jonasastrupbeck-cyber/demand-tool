@@ -2287,6 +2287,67 @@ const translations = {
     sv: '%',
     de: '%',
   },
+  // Over-time explorer (2026-07-09): user-created scoped over-time charts.
+  'dashboard.otCreate': {
+    en: 'Create an over-time chart',
+    da: 'Opret en graf over tid',
+    sv: 'Skapa ett diagram över tid',
+    de: 'Ein Verlaufsdiagramm erstellen',
+  },
+  'dashboard.otTitle': {
+    en: 'Over-time chart',
+    da: 'Graf over tid',
+    sv: 'Diagram över tid',
+    de: 'Verlaufsdiagramm',
+  },
+  'dashboard.calcOtExplorer': {
+    en: 'Plots what you choose per day, within the scope you choose. Pick a value demand (or all data) and value steps, then a work classification or a single system condition — system conditions are listed by how often they occur, largest first. % = that day’s occurrences ÷ ALL work blocks within the chosen scope that day, so a scoped chart never mixes in data from outside its scope. Days use the block date (falling back to the entry date); the dashboard’s period applies, but not its value-demand filter — this chart’s own scope is what counts.',
+    da: 'Viser det, du vælger, pr. dag inden for det udsnit, du vælger. Vælg en værdiskabende efterspørgsel (eller alle data) og værditrin, og derefter en arbejdsklassifikation eller ét systemforhold — systemforhold vises efter, hvor ofte de forekommer, størst først. % = dagens forekomster ÷ ALLE arbejdsblokke i det valgte udsnit den dag, så en afgrænset graf aldrig blander data udefra ind. Dage bruger blokdatoen (ellers registreringsdatoen); dashboardets periode gælder, men ikke dets værdiskabende-efterspørgsel-filter — det er grafens eget udsnit, der tæller.',
+    sv: 'Visar det du väljer, per dag, inom det urval du väljer. Välj en värdeskapande efterfrågan (eller alla data) och värdesteg, och därefter en arbetsklassificering eller ett enskilt systemvillkor — systemvillkor listas efter hur ofta de förekommer, störst först. % = dagens förekomster ÷ ALLA arbetsblock i det valda urvalet den dagen, så ett avgränsat diagram aldrig blandar in data utifrån. Dagar använder blockdatumet (annars registreringsdatumet); dashboardens period gäller, men inte dess värdeskapande-efterfrågan-filter — det är diagrammets eget urval som räknas.',
+    de: 'Zeigt das Gewählte pro Tag, innerhalb des gewählten Umfangs. Wähle eine Wert-Nachfrage (oder alle Daten) und Wertschritte, dann eine Arbeitsklassifikation oder eine einzelne Systembedingung — Systembedingungen sind nach Häufigkeit sortiert, größte zuerst. % = Vorkommen des Tages ÷ ALLE Arbeitsblöcke im gewählten Umfang an dem Tag, sodass ein eingegrenztes Diagramm nie Daten von außerhalb einmischt. Tage nutzen das Blockdatum (sonst das Eintragsdatum); der Zeitraum des Dashboards gilt, nicht aber sein Wertbedarf-Filter — der eigene Umfang des Diagramms zählt.',
+  },
+  'dashboard.otScope': {
+    en: 'Scope',
+    da: 'Udsnit',
+    sv: 'Urval',
+    de: 'Umfang',
+  },
+  'dashboard.otValueSteps': {
+    en: 'Value steps',
+    da: 'Værditrin',
+    sv: 'Värdesteg',
+    de: 'Wertschritte',
+  },
+  'dashboard.otShow': {
+    en: 'Show',
+    da: 'Vis',
+    sv: 'Visa',
+    de: 'Anzeigen',
+  },
+  'dashboard.otSeriesSc': {
+    en: 'System condition',
+    da: 'Systemforhold',
+    sv: 'Systemvillkor',
+    de: 'Systembedingung',
+  },
+  'dashboard.otPickSc': {
+    en: 'Select a system condition…',
+    da: 'Vælg et systemforhold…',
+    sv: 'Välj ett systemvillkor…',
+    de: 'Systembedingung auswählen…',
+  },
+  'dashboard.otHint': {
+    en: 'Choose a scope and what to show, and the chart appears here.',
+    da: 'Vælg et udsnit og hvad der skal vises, så kommer grafen her.',
+    sv: 'Välj ett urval och vad som ska visas, så visas diagrammet här.',
+    de: 'Wähle einen Umfang und was angezeigt werden soll, dann erscheint das Diagramm hier.',
+  },
+  'dashboard.otNoData': {
+    en: 'No work in this scope yet.',
+    da: 'Intet arbejde i dette udsnit endnu.',
+    sv: 'Inget arbete i detta urval ännu.',
+    de: 'Noch keine Arbeit in diesem Umfang.',
+  },
   // R7: capability point ordering + image export.
   'dashboard.sortLabel': {
     en: 'Order',

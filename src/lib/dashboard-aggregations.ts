@@ -1482,6 +1482,60 @@ export async function getP2bsValueDemandLinks(
   return { links, cases: caseInfo };
 }
 
+// Over-time explorer (2026-07-09): one chosen series per day WITHIN a chosen
+// scope. Series = a work-block tag (value/sequence/failure/failure_demand) or a
+// specific system condition. Scope = value demand(s) (case-mediated) and/or value
+// step(s). Each row carries the scope's total block count for that day, so the
+// dashboard's % mode is honest within the selected scope (count ÷ scopeTotal),
+// never % of all data. Block-level, bucketed by the effective date
+// COALESCE(block_date, entry.created_at) like every other block over-time read.
+export type OverTimeSeriesSpec =
+  | { kind: 'tag'; tag: 'value' | 'sequence' | 'failure' | 'failure_demand' }
+  | { kind: 'sc'; systemConditionId: string };
+
+export async function getOverTimeSeries(
+  studyId: string,
+  opts: { from?: Date; to?: Date; valueDemands?: string[]; valueStepIds?: string[]; series: OverTimeSeriesSpec },
+): Promise<Array<{ date: string; count: number; scopeTotal: number }>> {
+  const { from, to, valueDemands, valueStepIds, series } = opts;
+  const effDate = sql<string>`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})::date`;
+
+  const scopeConds: SQL[] = [eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work')];
+  if (valueDemands && valueDemands.length) {
+    const caseIds = await valueDemandCaseIds(studyId, valueDemands);
+    scopeConds.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
+  }
+  if (valueStepIds && valueStepIds.length) scopeConds.push(inArray(workDescriptionBlocks.valueStepId, valueStepIds));
+  if (from) scopeConds.push(gte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, from));
+  if (to) scopeConds.push(lte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, to));
+
+  const denominatorQ = db.select({ date: effDate, count: sql<number>`count(*)::int` })
+    .from(workDescriptionBlocks)
+    .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(...scopeConds))
+    .groupBy(effDate);
+
+  const numeratorQ = series.kind === 'tag'
+    ? db.select({ date: effDate, count: sql<number>`count(*)::int` })
+        .from(workDescriptionBlocks)
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .where(and(...scopeConds, eq(workDescriptionBlocks.tag, series.tag)))
+        .groupBy(effDate)
+    // The (block, SC) junction is unique, so count(*) = blocks carrying the SC.
+    : db.select({ date: effDate, count: sql<number>`count(*)::int` })
+        .from(workBlockSystemConditions)
+        .innerJoin(workDescriptionBlocks, eq(workBlockSystemConditions.workBlockId, workDescriptionBlocks.id))
+        .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+        .where(and(...scopeConds, eq(workBlockSystemConditions.systemConditionId, series.systemConditionId)))
+        .groupBy(effDate);
+
+  const [denomRows, numerRows] = await Promise.all([denominatorQ, numeratorQ]);
+  const numerByDate = new Map(numerRows.map((r) => [r.date, r.count]));
+  return denomRows
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((r) => ({ date: r.date, count: numerByDate.get(r.date) ?? 0, scopeTotal: r.count }));
+}
+
 // Touches-per-case XmR (2026-07-08): one point per case = that case's total touch
 // count (a touch = one work entry with ≥1 block). Ordered by the case-open date
 // (min(openedAt, earliest touch) — the "First contact (case opened)" start).

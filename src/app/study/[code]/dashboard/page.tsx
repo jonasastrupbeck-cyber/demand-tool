@@ -22,6 +22,7 @@ import CapabilityChart from '@/components/CapabilityChart';
 import TouchesPerCaseChart from '@/components/TouchesPerCaseChart';
 import StepsPerCaseChart from '@/components/StepsPerCaseChart';
 import CorDistributionChart from '@/components/CorDistributionChart';
+import OverTimeExplorerChart from '@/components/OverTimeExplorerChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
@@ -432,6 +433,20 @@ export default function DashboardPage() {
   }, []);
   const removeChart = useCallback((id: string) => {
     setChartIds((prev) => prev.filter((x) => x !== id));
+  }, []);
+
+  // Over-time explorer (2026-07-09): user-created over-time charts on the
+  // Analytics tab. Starts EMPTY — the "+ Create an over-time chart" button adds
+  // one; each card owns its scope/series and can be removed.
+  const [otExplorerIds, setOtExplorerIds] = useState<string[]>([]);
+  const addOtExplorer = useCallback(() => {
+    setOtExplorerIds((prev) => {
+      const n = prev.reduce((m, id) => Math.max(m, parseInt(id.replace('ot-', ''), 10) || 0), 0) + 1;
+      return [...prev, `ot-${n}`];
+    });
+  }, []);
+  const removeOtExplorer = useCallback((id: string) => {
+    setOtExplorerIds((prev) => prev.filter((x) => x !== id));
   }, []);
 
   // R11: branded PowerPoint of the charts in the CURRENTLY SHOWN flow view
@@ -2068,6 +2083,27 @@ export default function DashboardPage() {
               )}
 
               {data.workOverTime.length > 1 && <WorkOverTimeCard rows={data.workOverTime} />}
+
+              {/* Over-time explorer (2026-07-09): user-created charts — pick a
+                  scope (value demand → value steps) and ONE series (a work
+                  classification or a system condition, ranked by occurrences in
+                  the picker). Deliberately independent of the global value-demand
+                  filter; the global period applies. One series per card; stack
+                  cards to compare. */}
+              {otExplorerIds.map((id) => (
+                <OverTimeExplorerChart
+                  key={id}
+                  code={code}
+                  dateFrom={capRange.from}
+                  dateTo={capRange.to}
+                  valueDemandOptions={valueDemandTypes}
+                  valueStepOptions={valueSteps}
+                  onRemove={() => removeOtExplorer(id)}
+                />
+              ))}
+              <button onClick={addOtExplorer} className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border border-dashed border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50 transition-colors">
+                + {t('dashboard.otCreate')}
+              </button>
 
               {/* The four work-block tags as separate per-case XmR charts (value /
                   sequence / failure work + failure demand). Block-level (block tag),
