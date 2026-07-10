@@ -1262,6 +1262,15 @@ const translations = {
     sv: 'V\u00e4rdeskapande efterfr\u00e5gan',
     de: 'Wert-Nachfrage',
   },
+  // Native hover tooltip on the Value demand header in the customer context box
+  // (2026-07-10). EN is Jonas's own wording; da/sv/de derived from the canonical
+  // capture.demandClassificationHelp value-demand clause. Drafts pending approval.
+  'capture.valueDemandDef': {
+    en: 'Demand we want that relates to our reason for being.',
+    da: 'Eftersp\u00f8rgsel vi \u00f8nsker, som knytter sig til vores eksistensberettigelse.',
+    sv: 'Efterfr\u00e5gan vi vill ha, som h\u00f6r samman med v\u00e5rt existensber\u00e4ttigande.',
+    de: 'Nachfrage, die wir wollen und die mit unserem Daseinszweck zusammenh\u00e4ngt.',
+  },
   'capture.whatMattersHeader': {
     en: 'What matters',
     da: 'Hvad betyder noget',
@@ -1434,6 +1443,34 @@ const translations = {
     da: 'IVS-efterspørgsel',
     sv: 'IVS-efterfrågan',
     de: 'Fehlernachfrage',
+  },
+  // Native hover tooltips on the four work-block tag pills (2026-07-10). EN wording
+  // is Jonas's own; da/sv/de reuse the clauses of the already vault-sourced
+  // capture.workClassificationHelp / capture.demandClassificationHelp below, so no
+  // new Vanguard copy is invented. Never use fejlarbejde/felarbete/fejlefterspørgsel.
+  'capture.workBlockTagValueDef': {
+    en: 'Work that directly delivers purpose against what matters.',
+    da: 'Arbejde der direkte leverer formålet i forhold til det, der betyder noget.',
+    sv: 'Arbete som direkt levererar syftet mot det som betyder något.',
+    de: 'Arbeit, die den Zweck unmittelbar im Hinblick auf das, was zählt, liefert.',
+  },
+  'capture.workBlockTagSequenceDef': {
+    en: 'Good things to do, done at the wrong time or in the wrong way.',
+    da: 'Gode ting at gøre, gjort på det forkerte tidspunkt eller på den forkerte måde.',
+    sv: 'Bra saker att göra, gjorda vid fel tidpunkt eller på fel sätt.',
+    de: 'Gute Dinge, die zur falschen Zeit oder auf die falsche Weise ausgeführt werden.',
+  },
+  'capture.workBlockTagFailureDef': {
+    en: 'Every work other than value work or sequence work.',
+    da: 'Alt arbejde ud over værdiskabende arbejde og sekvensarbejde.',
+    sv: 'Allt arbete utöver värdeskapande arbete och sekvensarbete.',
+    de: 'Jede Arbeit außer Wertarbeit und Sequenzarbeit.',
+  },
+  'capture.workBlockTagFailureDemandDef': {
+    en: 'Demand caused by a failure to do something or do something right for the customer.',
+    da: 'Efterspørgsel forårsaget af, at noget ikke er gjort, eller ikke er gjort rigtigt for kunden.',
+    sv: 'Efterfrågan orsakad av att något inte har gjorts, eller inte har gjorts rätt för kunden.',
+    de: 'Nachfrage, verursacht durch das Versäumnis, etwas oder etwas richtig für den Kunden zu tun.',
   },
   'capture.workBlockPlaceholder': {
     en: 'Describe this block of work...',

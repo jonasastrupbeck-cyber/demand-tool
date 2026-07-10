@@ -167,10 +167,16 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
 
   // Small category divider, mirroring the saved-touch section headers
   // (CasePanel sepHeader): centred small-caps label flanked by hairlines.
-  const sectionHeader = (label: string) => (
+  // `title` (optional) = the concept's Vanguard definition, shown on hover.
+  const sectionHeader = (label: string, title?: string) => (
     <div className="flex items-center gap-1.5">
       <div className="flex-1 h-px bg-gray-200" />
-      <span className="text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap">{label}</span>
+      <span
+        title={title}
+        className={`text-[10px] tracking-widest text-gray-400 font-medium uppercase whitespace-nowrap${title ? ' cursor-help' : ''}`}
+      >
+        {label}
+      </span>
       <div className="flex-1 h-px bg-gray-200" />
     </div>
   );
@@ -244,7 +250,7 @@ export default function CaseContextSection({ code, contextSituation, lifeProblem
           life problem → value demand). */}
       {valueDemandTypes.length > 0 && (
         <div className="space-y-1">
-          {sectionHeader(t('capture.valueDemandHeader'))}
+          {sectionHeader(t('capture.valueDemandHeader'), t('capture.valueDemandDef'))}
           {renderMultiPicker({
             selectedIds: demandTypeIds,
             allTypes: valueDemandTypes,

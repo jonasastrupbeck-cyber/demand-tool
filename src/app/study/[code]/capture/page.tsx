@@ -1667,7 +1667,7 @@ export default function CapturePage() {
                                   // SC box is hidden for value blocks, so kept SC ids would save invisibly.
                                   : { ...b, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null, systemConditionIds: v === 'value' ? [] : b.systemConditionIds }))}
                                 dense
-                                options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
+                                options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), title: t(p.titleKey), activeClassName: p.activeClassName }))}
                               />
                               <button
                                 type="button"
@@ -1722,7 +1722,7 @@ export default function CapturePage() {
                               value={block.tag}
                               onChange={(v) => setWorkBlocks((prev) => prev.map((b, i) => i === idx ? { ...b, tag: v as 'value' | 'sequence' | 'failure' | 'failure_demand', systemConditionIds: v === 'value' ? [] : b.systemConditionIds, demandTypeId: v === 'failure_demand' ? b.demandTypeId : null } : b))}
                               dense
-                              options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
+                              options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), title: t(p.titleKey), activeClassName: p.activeClassName }))}
                             />
                             <button
                               type="button"

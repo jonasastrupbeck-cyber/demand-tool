@@ -776,7 +776,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                       // Clear SCs when re-tagging to 'value' (the SC box is hidden for value blocks).
                                       : { ...p, tag: v as 'value' | 'sequence' | 'failure', demandTypeId: null, systemConditionIds: v === 'value' ? [] : p.systemConditionIds }))}
                                     dense
-                                    options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
+                                    options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), title: t(p.titleKey), activeClassName: p.activeClassName }))}
                                   />
                                   <button
                                     type="button"
@@ -830,7 +830,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                                     setWorkBlocks((prev) => prev.map((p, i) => (i === idx ? { ...p, tag, systemConditionIds: tag === 'value' ? [] : p.systemConditionIds, demandTypeId: tag === 'failure_demand' ? p.demandTypeId : null } : p)));
                                   }}
                                   dense
-                                  options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), activeClassName: p.activeClassName }))}
+                                  options={WORK_TAG_PILLS.map((p) => ({ value: p.value, label: t(p.labelKey), title: t(p.titleKey), activeClassName: p.activeClassName }))}
                                 />
                                 <button
                                   type="button"
