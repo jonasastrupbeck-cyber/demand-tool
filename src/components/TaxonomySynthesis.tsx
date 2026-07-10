@@ -19,6 +19,8 @@ const OVER_TIME_TOP_N = 8;
 
 export type SynthesisLabels = {
   heading: string; intro: string; selectHint: string; empty: string;
+  // Plain-words explanation of what a merge does to the study (shown in the ⓘ).
+  mergeHelp: string;
   distributionTitle: string; overTimeTitle: string; overTimeTopN: string;
   mergeInto: string; renameOptional: string; mergeButton: string; cancel: string; rename: string;
   recentMerges: string; undo: string; loading: string;
@@ -176,7 +178,7 @@ export default function TaxonomySynthesis({ apiBase, labels, hasOverTime = true,
       <div>
         <div className="flex items-center gap-1.5">
           <h2 className="text-base font-semibold text-gray-900">{labels.heading}</h2>
-          <InfoPopover label={labels.heading}>{labels.intro}</InfoPopover>
+          <InfoPopover label={labels.heading}>{`${labels.intro}\n\n${labels.mergeHelp}`}</InfoPopover>
         </div>
         <p className="text-xs text-gray-400 mt-1">{labels.selectHint}</p>
       </div>

@@ -1748,6 +1748,7 @@ export default function DashboardPage() {
             heading: t(SYNTH_HEADING[kind]),
             intro: t(SYNTH_INTRO[kind]),
             empty: t(SYNTH_EMPTY[kind]),
+            mergeHelp: t('synthesis.mergeConsequences'),
             selectHint: t('synthesis.selectHint'),
             distributionTitle: t('synthesis.distributionTitle'),
             overTimeTitle: t('synthesis.overTimeTitle'),

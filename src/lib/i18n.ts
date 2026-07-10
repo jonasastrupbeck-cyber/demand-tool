@@ -1826,6 +1826,13 @@ const translations = {
     sv: 'Välj de som är samma eller liknande och slå sedan ihop dem.',
     de: 'Wählen Sie die gleichen oder ähnlichen aus und führen Sie sie dann zusammen.',
   },
+  // Plain-words consequences of a merge, appended to the heading ⓘ (2026-07-10).
+  'synthesis.mergeConsequences': {
+    en: 'What merging does: it keeps one name and folds the others into it. Every record already labelled with the folded-in names is moved onto the kept name — nothing is deleted, and their counts combine under it. The folded-in names then disappear from the capture pickers and lists, so everyone uses the one shared name from now on. This affects only this study, and you can undo any merge from the list below.',
+    da: 'Hvad en sammenlægning gør: den beholder ét navn og lægger de andre ind under det. Alle poster, der allerede er mærket med de indlagte navne, flyttes over på det bevarede navn — intet slettes, og deres antal lægges sammen under det. De indlagte navne forsvinder derefter fra opfangnings-vælgerne og listerne, så alle bruger det ene fælles navn fremover. Dette påvirker kun denne undersøgelse, og du kan fortryde enhver sammenlægning fra listen nedenfor.',
+    sv: 'Vad en sammanslagning gör: den behåller ett namn och fogar in de andra under det. Alla poster som redan är märkta med de infogade namnen flyttas till det behållna namnet — inget raderas, och deras antal slås samman under det. De infogade namnen försvinner sedan från fångst-väljarna och listorna, så att alla använder det enda gemensamma namnet framöver. Detta påverkar endast denna studie, och du kan ångra vilken sammanslagning som helst från listan nedan.',
+    de: 'Was das Zusammenführen bewirkt: Ein Name bleibt erhalten, die anderen werden ihm zugeordnet. Jeder bereits mit den zusammengeführten Namen gekennzeichnete Datensatz wird auf den behaltenen Namen übertragen — nichts wird gelöscht, und ihre Anzahl wird darunter zusammengezählt. Die zusammengeführten Namen verschwinden dann aus den Erfassungs-Auswahlen und Listen, sodass fortan alle den einen gemeinsamen Namen verwenden. Dies betrifft nur diese Studie, und Sie können jede Zusammenführung über die Liste unten rückgängig machen.',
+  },
   'synthesis.distributionTitle': {
     en: 'How often each appears',
     da: 'Hvor ofte hver enkelt optræder',
