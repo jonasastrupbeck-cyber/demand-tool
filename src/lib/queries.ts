@@ -1754,6 +1754,10 @@ export async function updateCase(caseId: string, data: {
   // 0043: defaults to 'manual' on an explicit close so recompute won't reopen it.
   closedReason?: 'final_milestone' | 'manual' | null;
   note?: string | null;
+  // Broker/Direct channel (0061).
+  channel?: 'broker' | 'direct' | null;
+  firmName?: string | null;
+  brokerName?: string | null;
   // Flow-mode person context (slice B).
   contextSituation?: string | null;
   lifeProblemId?: string | null;
@@ -1781,6 +1785,9 @@ export async function updateCase(caseId: string, data: {
   if (data.closedAt !== undefined) updateFields.closedAt = data.closedAt;
   if (data.closedReason !== undefined) updateFields.closedReason = data.closedReason;
   if (data.note !== undefined) updateFields.note = data.note;
+  if (data.channel !== undefined) updateFields.channel = data.channel;
+  if (data.firmName !== undefined) updateFields.firmName = data.firmName;
+  if (data.brokerName !== undefined) updateFields.brokerName = data.brokerName;
   if (data.contextSituation !== undefined) updateFields.contextSituation = data.contextSituation;
   if (data.lifeProblemId !== undefined) updateFields.lifeProblemId = data.lifeProblemId;
   if (data.whatMatters !== undefined) updateFields.whatMatters = data.whatMatters;

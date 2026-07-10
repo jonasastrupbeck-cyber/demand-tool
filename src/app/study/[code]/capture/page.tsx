@@ -110,6 +110,8 @@ interface StudyData {
   valueStepsEnabled: boolean;
   // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
   valueCreationCapabilityEnabled: boolean;
+  // Broker/Direct channel capture on cases (migration 0061, 2026-07-10).
+  brokerChannelEnabled: boolean;
   valueSteps: { id: string; label: string; sortOrder: number }[];
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -1018,6 +1020,7 @@ export default function CapturePage() {
         unattachedLastEntryId={lastEntry && !lastEntry.caseId ? lastEntry.id : null}
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
+        brokerChannelEnabled={study.brokerChannelEnabled}
         milestones={study.milestones || []}
         onOpenEntry={openEntry}
       >

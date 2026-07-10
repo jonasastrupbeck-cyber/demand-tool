@@ -17,6 +17,7 @@
 import { memo, useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import PillSelect from '@/components/PillSelect';
+import SegmentedToggle from '@/components/SegmentedToggle';
 import InfoPopover from '@/components/InfoPopover';
 import CaseContextSection, { type WmValue } from '@/components/CaseContextSection';
 import { useSyncedTopScrollbar, TopScrollbar } from '@/components/TopScrollbar';
@@ -38,6 +39,10 @@ interface CaseRow {
   lifeProblemIds?: string[];
   demandTypeIds?: string[];
   whatMatters: string | null;
+  // Broker/Direct channel (0061). channel null = not set; firm/broker only when broker.
+  channel: 'broker' | 'direct' | null;
+  firmName: string | null;
+  brokerName: string | null;
 }
 
 interface CaseEntry {
@@ -87,6 +92,9 @@ interface Props {
   onAttachedLast?: (caseId: string) => void;
   // Decision box gate (Skipton, 2026-06-12). Off hides the milestone panel.
   decisionPointsEnabled: boolean;
+  // Broker/Direct channel capture (migration 0061, 2026-07-10). Off hides the
+  // Broker/Direct toggle + Firm/Broker fields in the flow customer box.
+  brokerChannelEnabled?: boolean;
   // Milestones (2026-06-18): ordered containers. Since 0042 each carries its
   // subquestions (the flattened decision box).
   milestones: MilestoneWithSubqs[];
@@ -185,7 +193,82 @@ const TouchCardFull = memo(function TouchCardFull({ entry: e, handlingTypes, sys
   );
 });
 
-export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, children }: Props) {
+// Broker/Direct channel (migration 0061, 2026-07-10). Sits in the flow customer
+// box below the account number, above the Opened date. Broker → a chevron-
+// collapsible "Broker details" with Firm + Broker inputs (open by default).
+// Rendered with key={caseRow.id} so the local drafts reset on case switch.
+function ChannelSection({ channel, firmName, brokerName, onPatch }: {
+  channel: 'broker' | 'direct' | null;
+  firmName: string | null;
+  brokerName: string | null;
+  onPatch: (body: Record<string, unknown>) => void;
+}) {
+  const { t } = useLocale();
+  const [open, setOpen] = useState(true);
+  const [firmDraft, setFirmDraft] = useState(firmName ?? '');
+  const [brokerDraft, setBrokerDraft] = useState(brokerName ?? '');
+  const inputCls = 'w-full px-2 py-1 rounded-lg text-xs text-gray-900 placeholder-gray-400 bg-white border border-gray-300 focus:ring-2 focus:ring-gray-400 outline-none';
+
+  return (
+    <div className="w-full flex flex-col items-center gap-1.5">
+      <SegmentedToggle
+        ariaLabel={t('capture.channelLabel')}
+        compact
+        value={channel ?? ''}
+        onChange={(v) => {
+          // Direct clears the broker fields so no stale firm/name lingers.
+          if (v === 'broker') onPatch({ channel: 'broker' });
+          else onPatch({ channel: 'direct', firmName: null, brokerName: null });
+        }}
+        options={[
+          { value: 'broker', label: t('capture.channelBroker'), activeColor: 'green' },
+          { value: 'direct', label: t('capture.channelDirect'), activeColor: 'green' },
+        ]}
+      />
+      {channel === 'broker' && (
+        <div className="w-full">
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="flex items-center gap-1 text-[11px] font-medium text-gray-500 hover:text-gray-700"
+          >
+            <span className="text-gray-400">{open ? '▾' : '▸'}</span>
+            {t('capture.brokerDetails')}
+          </button>
+          {open && (
+            <div className="mt-1 flex flex-col gap-1.5">
+              <label className="flex flex-col gap-0.5 text-[11px] text-gray-500">
+                {t('capture.brokerFirm')}
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={firmDraft}
+                  onChange={(e) => setFirmDraft(e.target.value)}
+                  onBlur={() => { const v = firmDraft.trim(); if (v !== (firmName ?? '')) onPatch({ firmName: v || null }); }}
+                  placeholder={t('capture.brokerFirm')}
+                />
+              </label>
+              <label className="flex flex-col gap-0.5 text-[11px] text-gray-500">
+                {t('capture.brokerName')}
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={brokerDraft}
+                  onChange={(e) => setBrokerDraft(e.target.value)}
+                  onBlur={() => { const v = brokerDraft.trim(); if (v !== (brokerName ?? '')) onPatch({ brokerName: v || null }); }}
+                  placeholder={t('capture.brokerName')}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, brokerChannelEnabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -770,6 +853,18 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       }`}>
         {isOpen ? t('capture.caseStatusOpen') : t('capture.caseStatusClosed')}
       </span>
+      {/* Broker/Direct channel (0061), flow-only + opt-in. `w-full` forces the
+          flex-wrap to break so it lands BELOW the account number and ABOVE the
+          Opened date. key resets the field drafts when the case changes. */}
+      {isFlow && brokerChannelEnabled && (
+        <ChannelSection
+          key={caseRow.id}
+          channel={caseRow.channel}
+          firmName={caseRow.firmName}
+          brokerName={caseRow.brokerName}
+          onPatch={patchCase}
+        />
+      )}
       {/* Transactional case: the value demand stays in the header (no life
           problem to anchor it to). Flow mode renders it inside
           CaseContextSection, directly under the life problem. */}

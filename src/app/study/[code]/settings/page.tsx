@@ -109,6 +109,8 @@ interface StudyData {
   flowFailureDemandTypesEnabled: boolean;
   // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
   valueCreationCapabilityEnabled: boolean;
+  // Broker/Direct channel capture on cases (migration 0061, 2026-07-10).
+  brokerChannelEnabled: boolean;
   // The PIN itself is never sent to the browser — only whether one is set.
   hasConsultantPin: boolean;
   handlingTypes: HandlingType[];
@@ -1439,6 +1441,7 @@ export default function SettingsPage() {
               { field: 'flowAnalyticsEnabled' as const, label: t('capture.toggles.flowAnalytics'), value: study.flowAnalyticsEnabled },
               { field: 'flowFailureDemandTypesEnabled' as const, label: t('capture.toggles.flowFailureDemandTypes'), value: study.flowFailureDemandTypesEnabled },
               { field: 'valueCreationCapabilityEnabled' as const, label: t('capture.toggles.valueCreationCapability'), value: study.valueCreationCapabilityEnabled },
+              { field: 'brokerChannelEnabled' as const, label: t('capture.toggles.brokerChannel'), value: study.brokerChannelEnabled },
             ]).map((row) => (
               <button
                 key={row.field}

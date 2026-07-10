@@ -97,6 +97,9 @@ export const studies = pgTable('studies', {
   // "what do we think our value creation capability was?" dropdown in the flow
   // composer (Value Created / Value Maintained / Missed Opportunity). Default false.
   valueCreationCapabilityEnabled: boolean('value_creation_capability_enabled').notNull().default(false),
+  // Broker/Direct channel capture on cases (migration 0061, 2026-07-10): opt-in
+  // Broker/Direct toggle + Firm/Broker fields in the flow customer box. Default false.
+  brokerChannelEnabled: boolean('broker_channel_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -299,6 +302,12 @@ export const cases = pgTable('cases', {
   // only reopens a case it closed itself ('final_milestone'), never a manual one.
   closedReason: text('closed_reason').$type<'final_milestone' | 'manual'>(),
   note: text('note'),
+  // Broker/Direct channel (migration 0061, 2026-07-10): how the customer came in.
+  // When 'broker', firmName + brokerName hold the broker's firm and contact name.
+  // NULL = not set. Opt-in per study via studies.brokerChannelEnabled.
+  channel: text('channel').$type<'broker' | 'direct'>(),
+  firmName: text('firm_name'),
+  brokerName: text('broker_name'),
   createdByCollector: text('created_by_collector'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   // Flow-mode person context (slice B, 2026-06-11). In a flow-based system the

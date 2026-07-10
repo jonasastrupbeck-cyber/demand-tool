@@ -99,6 +99,15 @@ export async function PATCH(
     }
   }
   if (body.note !== undefined) data.note = typeof body.note === 'string' ? body.note : null;
+  // Broker/Direct channel (0061). channel validated like status; firm/broker are free text.
+  if (body.channel !== undefined) {
+    if (body.channel !== null && !['broker', 'direct'].includes(body.channel)) {
+      return NextResponse.json({ error: 'channel must be "broker", "direct" or null' }, { status: 400 });
+    }
+    data.channel = body.channel || null;
+  }
+  if (body.firmName !== undefined) data.firmName = typeof body.firmName === 'string' ? body.firmName : null;
+  if (body.brokerName !== undefined) data.brokerName = typeof body.brokerName === 'string' ? body.brokerName : null;
   // Flow-mode person context (slice B).
   if (body.contextSituation !== undefined) data.contextSituation = typeof body.contextSituation === 'string' ? body.contextSituation : null;
   if (body.lifeProblemId !== undefined) data.lifeProblemId = body.lifeProblemId || null;

@@ -352,6 +352,44 @@ const translations = {
     sv: 'Systemet och jag borde ha kunnat göra mer för att säkerställa att kunden var rustad för framgång så att värdet kunde flöda perfekt.',
     de: 'Das System und ich hätten mehr tun können, damit der Kunde auf Erfolg ausgerichtet ist und der Wert perfekt fließen kann.',
   },
+  // Broker/Direct channel (migration 0061, 2026-07-10). Domain terms (not Vanguard);
+  // da/sv/de drafted — pending Jonas's approval before prod.
+  'capture.channelLabel': {
+    en: 'Channel',
+    da: 'Kanal',
+    sv: 'Kanal',
+    de: 'Kanal',
+  },
+  'capture.channelBroker': {
+    en: 'Broker',
+    da: 'Mægler',
+    sv: 'Mäklare',
+    de: 'Makler',
+  },
+  'capture.channelDirect': {
+    en: 'Direct',
+    da: 'Direkte',
+    sv: 'Direkt',
+    de: 'Direkt',
+  },
+  'capture.brokerDetails': {
+    en: 'Broker details',
+    da: 'Mæglerdetaljer',
+    sv: 'Mäklaruppgifter',
+    de: 'Maklerdetails',
+  },
+  'capture.brokerFirm': {
+    en: 'Firm',
+    da: 'Firma',
+    sv: 'Firma',
+    de: 'Firma',
+  },
+  'capture.brokerName': {
+    en: 'Broker',
+    da: 'Mægler',
+    sv: 'Mäklare',
+    de: 'Makler',
+  },
   'capture.selectHandling': {
     en: 'Select capability of response...',
     da: 'V\u00e6lg reaktionskapacitet...',
@@ -4876,6 +4914,12 @@ const translations = {
     da: 'Evne til værdiskabelse pr. arbejdsindtastning',
     sv: 'Värdeskapandekapabilitet per arbetspost',
     de: 'Wertschöpfungsfähigkeit je Arbeitseintrag',
+  },
+  'capture.toggles.brokerChannel': {
+    en: 'Broker / Direct channel (customer box)',
+    da: 'Mægler/Direkte-kanal (kundeboks)',
+    sv: 'Mäklare/Direkt-kanal (kundruta)',
+    de: 'Makler/Direkt-Kanal (Kundenbox)',
   },
   'capture.toggles.lifeProblems': {
     en: 'Capture life problems',
