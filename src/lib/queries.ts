@@ -1,7 +1,7 @@
 import { db } from './db';
 import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations, chartAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
-import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, inArray } from 'drizzle-orm';
+import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 import { kindsCompatible, compatibleKinds } from './subquestion-kinds';
 import type { Locale } from './i18n';
@@ -1941,7 +1941,7 @@ export async function seedDefaultSubquestions(studyId: string, locale: Locale = 
 // is a typed box under a milestone; choice options can carry polarity; filling
 // the required ones completes the milestone (recomputeCaseMilestone).
 
-export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice';
 // 'concern' = negative-but-informational (amber, no close prompt); 'negative' =
 // suggests closing the case. Keep in sync with SubquestionInput.OptionPolarity.
 export type OptionPolarity = 'positive' | 'negative' | 'concern';
@@ -1957,10 +1957,14 @@ export interface AnswerShape {
   valueMonths: number | null;
   valueChoice: string | null;
   valueText: string | null;
+  // Multi-select (0062): selected option labels for kind='multichoice'.
+  valueChoices: string[] | null;
 }
 
 // True when an answer row actually carries a value for a subquestion of `kind`.
-export function answerIsFilled(kind: SubquestionKind, a: Partial<AnswerShape>): boolean {
+// `valueChoices` may arrive as a parsed array (client/AnswerShape) OR as the raw
+// JSON-text column (server recompute reads raw rows), so handle both.
+export function answerIsFilled(kind: SubquestionKind, a: Partial<Omit<AnswerShape, 'valueChoices'>> & { valueChoices?: string[] | string | null }): boolean {
   switch (kind) {
     case 'amount':
     case 'number':
@@ -1972,6 +1976,10 @@ export function answerIsFilled(kind: SubquestionKind, a: Partial<AnswerShape>): 
     case 'duration_months': return a.valueYears != null || a.valueMonths != null;
     case 'text': return a.valueText != null && a.valueText.trim() !== '';
     case 'choice': return a.valueChoice != null && a.valueChoice !== '';
+    case 'multichoice': {
+      const arr = Array.isArray(a.valueChoices) ? a.valueChoices : (typeof a.valueChoices === 'string' ? parseAnswerChoices(a.valueChoices) : null);
+      return !!arr && arr.length > 0;
+    }
     default: return false;
   }
 }
@@ -2111,6 +2119,18 @@ export async function updateSubquestionOption(id: string, data: { label?: string
       await db.update(subquestionConditions)
         .set({ triggerValue: data.label })
         .where(and(eq(subquestionConditions.parentSubquestionId, cur.subquestionId), eq(subquestionConditions.triggerValue, cur.label)));
+      // Multi-select (0062): value_choices holds a JSON array of labels — replace
+      // exact matches in-place (exact-match safe, unlike a raw text replace).
+      const mcRows = await db.select({ id: caseSubquestionAnswers.id, valueChoices: caseSubquestionAnswers.valueChoices })
+        .from(caseSubquestionAnswers)
+        .where(and(eq(caseSubquestionAnswers.subquestionId, cur.subquestionId), isNotNull(caseSubquestionAnswers.valueChoices)));
+      for (const r of mcRows) {
+        const arr = parseAnswerChoices(r.valueChoices);
+        if (arr && arr.includes(cur.label)) {
+          const next = arr.map((l) => (l === cur.label ? data.label! : l));
+          await db.update(caseSubquestionAnswers).set({ valueChoices: JSON.stringify(next) }).where(eq(caseSubquestionAnswers.id, r.id));
+        }
+      }
     }
   }
   await db.update(subquestionOptions).set(set).where(eq(subquestionOptions.id, id));
@@ -2179,6 +2199,18 @@ export async function getCaseSubquestionAnswers(caseId: string) {
   return db.select().from(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
 }
 
+// Multi-select (0062): the DB stores value_choices as a JSON-array text; parse it
+// to a string[] for the client. Applied at the client-facing response boundaries
+// only — the raw rows (with the text column) are still what setCaseSubquestionAnswers
+// expects as `preExisting`.
+export function parseAnswerChoices(s: string | null): string[] | null {
+  if (!s) return null;
+  try { const v = JSON.parse(s); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : null; } catch { return null; }
+}
+export function serializeCaseAnswers(rows: (typeof caseSubquestionAnswers.$inferSelect)[]) {
+  return rows.map((r) => ({ ...r, valueChoices: parseAnswerChoices(r.valueChoices) }));
+}
+
 // Upsert per-case answers. answered_at is FROZEN at first fill — editing an
 // answered subquestion never moves the completion date. An empty payload for a
 // subquestion CLEARS it (deletes the row). Returns the distinct milestoneIds
@@ -2225,6 +2257,8 @@ export async function setCaseSubquestionAnswers(
       id: generateId(), caseId, subquestionId: a.subquestionId,
       valueNumber: a.valueNumber, valueDate: a.valueDate, valueYears: a.valueYears,
       valueMonths: a.valueMonths, valueChoice: a.valueChoice, valueText: a.valueText,
+      // Multi-select (0062): stored as a JSON array of labels.
+      valueChoices: a.valueChoices && a.valueChoices.length ? JSON.stringify(a.valueChoices) : null,
       answeredAt, recordedByCollector: a.recordedByCollector ?? null,
     });
   }
@@ -2245,6 +2279,7 @@ export async function setCaseSubquestionAnswers(
             valueMonths: sql`excluded.value_months`,
             valueChoice: sql`excluded.value_choice`,
             valueText: sql`excluded.value_text`,
+            valueChoices: sql`excluded.value_choices`,
             answeredAt: sql`excluded.answered_at`,
             recordedByCollector: sql`excluded.recorded_by_collector`,
           },

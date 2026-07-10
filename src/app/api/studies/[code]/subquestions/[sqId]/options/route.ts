@@ -15,8 +15,8 @@ export async function POST(
   const subqs = await getSubquestions(study.id);
   const sq = subqs.find((s) => s.id === sqId);
   if (!sq) return NextResponse.json({ error: 'Subquestion not found' }, { status: 404 });
-  if (sq.kind !== 'choice') {
-    return NextResponse.json({ error: 'options can only be added to a choice subquestion' }, { status: 400 });
+  if (sq.kind !== 'choice' && sq.kind !== 'multichoice') {
+    return NextResponse.json({ error: 'options can only be added to a choice or multi-select subquestion' }, { status: 400 });
   }
 
   const body = await request.json();

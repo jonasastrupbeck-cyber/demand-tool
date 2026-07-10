@@ -1784,7 +1784,7 @@ export interface AskDeliveryRow {
   decisionLabel: string; // the milestone label since 0042
   whatMattersTypeId: string;
   whatMattersLabel: string;
-  kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
+  kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice';
   n: number;          // cases evaluated (ask + delivered value present)
   metCount: number;
   notCaptured: number; // ask + completed milestone, but no usable delivered value

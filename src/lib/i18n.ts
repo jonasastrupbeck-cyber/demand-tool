@@ -4276,6 +4276,13 @@ const translations = {
     sv: 'Text',
     de: 'Text',
   },
+  // Multi-select answer type (0062). da/sv/de drafted — pending Jonas's approval.
+  'settings.subquestionKindMultichoice': {
+    en: 'Multi-select',
+    da: 'Multivalg',
+    sv: 'Flerval',
+    de: 'Mehrfachauswahl',
+  },
   'settings.subquestionKindPercent': {
     en: 'Percent',
     da: 'Procent',
@@ -4441,10 +4448,16 @@ const translations = {
   // Decision-box builder UX (2026-07-04): build branching downward from the
   // parent answer instead of wiring children upward via "Show only when".
   'settings.ifValueAsk': {
-    en: 'If "{value}", ask…',
-    da: 'Hvis "{value}", spørg…',
-    sv: 'Om "{value}", fråga…',
-    de: 'Wenn „{value}", frage…',
+    en: 'Add follow-up if "{value}"',
+    da: 'Tilføj opfølgning hvis "{value}"',
+    sv: 'Lägg till uppföljning om "{value}"',
+    de: 'Folgefrage hinzufügen wenn „{value}"',
+  },
+  'settings.followUpHint': {
+    en: 'Tip: use "Add follow-up" under an answer to ask a further question only when that answer is chosen.',
+    da: 'Tip: brug "Tilføj opfølgning" under et svar for at stille et yderligere spørgsmål kun når det svar vælges.',
+    sv: 'Tips: använd "Lägg till uppföljning" under ett svar för att ställa en följdfråga bara när det svaret väljs.',
+    de: 'Tipp: Nutzen Sie „Folgefrage hinzufügen" unter einer Antwort, um nur bei dieser Antwort eine weitere Frage zu stellen.',
   },
   'settings.ifValueHeader': {
     en: 'If "{value}":',

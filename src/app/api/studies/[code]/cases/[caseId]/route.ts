@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, serializeCaseAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -48,7 +48,7 @@ export async function GET(
     getCaseDemandTypeIds(caseId),
     getCaseSubquestionAnswers(caseId),
   ]);
-  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), milestones, lifeProblemIds, demandTypeIds, subquestionAnswers });
+  return NextResponse.json({ ...caseRow, entries, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), milestones, lifeProblemIds, demandTypeIds, subquestionAnswers: serializeCaseAnswers(subquestionAnswers) });
 }
 
 export async function PATCH(

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseDemandTypeIds, getCaseMilestones, getCaseSubquestionAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
+import { getStudyByCode, getCase, getSubquestions, getMilestones, getCaseDemandTypeIds, getCaseMilestones, getCaseSubquestionAnswers, serializeCaseAnswers, setCaseSubquestionAnswers, clearHiddenCaseAnswers, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure } from '@/lib/queries';
 
 // Decision-box redesign (0042): per-case subquestion answers. POST upserts a
 // batch of answers (full objects, blanks clear), then re-derives the completion
@@ -15,7 +15,7 @@ export async function GET(
   if (!caseRow || caseRow.studyId !== study.id) {
     return NextResponse.json({ error: 'Case not found' }, { status: 404 });
   }
-  return NextResponse.json(await getCaseSubquestionAnswers(caseId));
+  return NextResponse.json(serializeCaseAnswers(await getCaseSubquestionAnswers(caseId)));
 }
 
 export async function POST(
@@ -70,6 +70,8 @@ export async function POST(
       valueMonths: int(a.valueMonths),
       valueChoice: typeof a.valueChoice === 'string' && a.valueChoice.trim() ? a.valueChoice.trim() : null,
       valueText: typeof a.valueText === 'string' && a.valueText.trim() ? a.valueText.trim() : null,
+      // Multi-select (0062): array of non-empty option labels.
+      valueChoices: Array.isArray(a.valueChoices) ? a.valueChoices.filter((x: unknown): x is string => typeof x === 'string' && x.trim() !== '').map((x: string) => x.trim()) : null,
       answeredAt: at,
       recordedByCollector,
     });
@@ -120,5 +122,5 @@ export async function POST(
     getCaseMilestones(caseId),
     getCase(caseId),
   ]);
-  return NextResponse.json({ answers, milestones, status: updatedCase?.status ?? caseRow.status }, { status: 201 });
+  return NextResponse.json({ answers: serializeCaseAnswers(answers), milestones, status: updatedCase?.status ?? caseRow.status }, { status: 201 });
 }

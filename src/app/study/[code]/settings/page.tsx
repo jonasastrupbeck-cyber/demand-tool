@@ -118,7 +118,7 @@ interface StudyData {
   contactMethods: ContactMethod[];
   pointsOfTransaction: PointOfTransaction[];
   workSources: { id: string; label: string; customerFacing: boolean; sortOrder: number }[];
-  milestones: { id: string; label: string; sortOrder: number; demandTypeExclusions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | 'concern' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
+  milestones: { id: string; label: string; sortOrder: number; demandTypeExclusions: string[]; subquestions: { id: string; milestoneId: string; label: string; kind: 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice'; required: boolean; linkedWhatMattersTypeId: string | null; currencyCode: string | null; formula: string | null; resultFormat: string | null; sortOrder: number; options: { id: string; label: string; polarity: 'positive' | 'negative' | 'concern' | null; sortOrder: number }[]; conditions: { id: string; parentSubquestionId: string; triggerValue: string }[]; demandTypeExclusions: string[]; demandTypeOptional: string[] }[] }[];
   whatMattersTypes: { id: string; label: string; operationalDefinition: string | null; timing?: 'by_date' | 'asap' | null; anchorMilestoneId?: string | null; anchorEvent?: string | null; enabled?: boolean; valueKind?: 'amount' | 'date_or_duration' | null }[];
   lifeProblems: { id: string; label: string; operationalDefinition: string | null }[];
   workTypes: WorkType[];
@@ -195,7 +195,7 @@ export default function SettingsPage() {
   // Kind must be chosen at create (immutable after), so InlineTypeAdder doesn't fit.
   const [subqAdderMsId, setSubqAdderMsId] = useState<string | null>(null);
   const [newSubqLabel, setNewSubqLabel] = useState('');
-  const [newSubqKind, setNewSubqKind] = useState<'yesno' | 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'>('yesno');
+  const [newSubqKind, setNewSubqKind] = useState<'yesno' | 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice'>('yesno');
   // Which milestone's preset menu is open (add a ready-made choice subquestion).
   const [presetMenuMsId, setPresetMenuMsId] = useState<string | null>(null);
   // Builder UX (2026-07-04): which subquestion row has its "⋯ Advanced"
@@ -1672,7 +1672,7 @@ export default function SettingsPage() {
                   </label>
                 )}
               </div>
-              {sq.kind === 'choice' && (
+              {(sq.kind === 'choice' || sq.kind === 'multichoice') && (
                 <div className="space-y-1.5 pl-1 border-l-2 border-gray-100">
                   {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => {
                     const children = node.childrenByTrigger.get(o.label) ?? [];
@@ -1703,25 +1703,29 @@ export default function SettingsPage() {
                         {o.polarity === 'negative' && (
                           <p className="text-[10px] text-red-500">{t('settings.optionSuggestCloseHint')}</p>
                         )}
-                        {/* Follow-ups revealed by this answer: indented group + inline adder. */}
-                        <div className={`${depth < 2 ? 'ml-3 pl-2 border-l-2 border-sky-200 ' : ''}space-y-1`}>
-                          {children.length > 0 && (
-                            <>
-                              <p className="text-[10px] font-medium text-sky-700">{t('settings.ifValueHeader', { value: tl(o.label) })}</p>
-                              <ul className="space-y-2">
-                                {children.map((c) => renderSubqRow(msId, c, depth + 1, undefined, children.map((cc) => cc.subq.id)))}
-                              </ul>
-                            </>
-                          )}
-                          <ChildQuestionAdder
-                            code={code}
-                            milestoneId={msId}
-                            parentSubquestionId={sq.id}
-                            triggerValue={o.label}
-                            triggerDisplay={tl(o.label)}
-                            onRefresh={loadStudy}
-                          />
-                        </div>
+                        {/* Follow-ups revealed by this answer: indented group + inline adder.
+                            Branching keys on the single 'choice' answer, so it's offered on
+                            choice questions only (not multi-select). */}
+                        {sq.kind === 'choice' && (
+                          <div className={`${depth < 2 ? 'ml-3 pl-2 border-l-2 border-sky-200 ' : ''}space-y-1`}>
+                            {children.length > 0 && (
+                              <>
+                                <p className="text-[10px] font-medium text-sky-700">{t('settings.ifValueHeader', { value: tl(o.label) })}</p>
+                                <ul className="space-y-2">
+                                  {children.map((c) => renderSubqRow(msId, c, depth + 1, undefined, children.map((cc) => cc.subq.id)))}
+                                </ul>
+                              </>
+                            )}
+                            <ChildQuestionAdder
+                              code={code}
+                              milestoneId={msId}
+                              parentSubquestionId={sq.id}
+                              triggerValue={o.label}
+                              triggerDisplay={tl(o.label)}
+                              onRefresh={loadStudy}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1734,6 +1738,10 @@ export default function SettingsPage() {
                     onCreated={() => {}}
                     onRefresh={loadStudy}
                   />
+                  {/* Discoverability: explain the per-answer follow-up control (choice only). */}
+                  {sq.kind === 'choice' && (
+                    <p className="text-[10px] text-gray-400 italic pt-0.5">{t('settings.followUpHint')}</p>
+                  )}
                 </div>
               )}
               {sq.kind === 'calculated' && (
@@ -1876,6 +1884,7 @@ export default function SettingsPage() {
                         <option value="duration">{t('settings.captureFieldKindDuration')}</option>
                         <option value="duration_months">{t('settings.subquestionKindDurationMonths')}</option>
                         <option value="text">{t('settings.subquestionKindText')}</option>
+                        <option value="multichoice">{t('settings.subquestionKindMultichoice')}</option>
                       </select>
                       <button type="button" onClick={() => addSubquestionHandler(m.id)} disabled={!newSubqLabel.trim()} className="shrink-0 px-2 py-1 rounded text-xs font-medium text-white disabled:opacity-50 bg-brand">{t('settings.add')}</button>
                       <button type="button" onClick={() => { setSubqAdderMsId(null); setNewSubqLabel(''); }} className="shrink-0 px-1 py-1 text-gray-400 hover:text-gray-600 text-sm">×</button>

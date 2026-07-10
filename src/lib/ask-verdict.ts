@@ -14,7 +14,7 @@
 
 // 0042: 'number' compares like 'amount' (at-or-under); 'text'/'choice' are not
 // comparable to a timed/amount ask.
-export type CaptureKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
+export type CaptureKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice';
 
 export interface AskShape {
   targetDate: string | Date | null;

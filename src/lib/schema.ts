@@ -410,7 +410,7 @@ export const subquestions = pgTable('subquestions', {
   id: text('id').primaryKey(),
   milestoneId: text('milestone_id').notNull().references(() => milestones.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
-  kind: text('kind').$type<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice'>().notNull(),
+  kind: text('kind').$type<'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice'>().notNull(),
   // Milestone completion = every REQUIRED subquestion answered.
   required: boolean('required').notNull().default(true),
   linkedWhatMattersTypeId: text('linked_what_matters_type_id').references(() => whatMattersTypes.id, { onDelete: 'set null' }),
@@ -517,6 +517,8 @@ export const caseSubquestionAnswers = pgTable('case_subquestion_answers', {
   valueMonths: integer('value_months'),
   valueChoice: text('value_choice'),
   valueText: text('value_text'),
+  // Multi-select (0062): JSON array of selected option labels for kind='multichoice'.
+  valueChoices: text('value_choices'),
   answeredAt: timestamp('answered_at', { withTimezone: true }).notNull(),
   recordedByCollector: text('recorded_by_collector'),
 }, (t) => ({

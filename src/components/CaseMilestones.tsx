@@ -44,6 +44,8 @@ export interface CaseSubquestionAnswer {
   valueMonths: number | null;
   valueChoice: string | null;
   valueText: string | null;
+  // Multi-select (0062): selected option labels for kind='multichoice'.
+  valueChoices?: string[] | null;
   answeredAt: string;
 }
 
@@ -91,6 +93,7 @@ const draftFromAnswer = (a?: CaseSubquestionAnswer): Draft => ({
   months: a?.valueMonths != null ? String(a.valueMonths) : '',
   choice: a?.valueChoice ?? '',
   text: a?.valueText ?? '',
+  choices: a?.valueChoices ?? [],
 });
 
 const todayISO = () => localDay();
@@ -180,6 +183,7 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
       valueMonths: (sq.kind === 'duration' || sq.kind === 'duration_months') ? parseInt10(d.months) : null,
       valueChoice: sq.kind === 'choice' && d.choice ? d.choice : null,
       valueText: sq.kind === 'text' && d.text.trim() ? d.text.trim() : null,
+      valueChoices: sq.kind === 'multichoice' && d.choices.length ? d.choices : null,
       answeredAt: `${answeredAt}T12:00:00.000Z`,
     };
   }

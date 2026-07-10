@@ -37,7 +37,7 @@ import {
 import { eq, asc, and, isNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
 
-type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
+type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice';
 
 export type StudyTemplateSnapshotV1 = {
   version: 1;

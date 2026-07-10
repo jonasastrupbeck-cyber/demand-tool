@@ -27,7 +27,7 @@ interface Props {
   onRefresh: () => Promise<void> | void;
 }
 
-type AdderKind = 'yesno' | 'choice' | 'amount' | 'number' | 'percent' | 'currency' | 'date' | 'duration' | 'duration_months' | 'text';
+type AdderKind = 'yesno' | 'choice' | 'multichoice' | 'amount' | 'number' | 'percent' | 'currency' | 'date' | 'duration' | 'duration_months' | 'text';
 
 export default function ChildQuestionAdder({ code, milestoneId, parentSubquestionId, triggerValue, triggerDisplay, onRefresh }: Props) {
   const { t } = useLocale();
@@ -40,6 +40,7 @@ export default function ChildQuestionAdder({ code, milestoneId, parentSubquestio
     { value: 'yesno', label: t('settings.addYesNoQuestion') },
     { value: 'text', label: t('settings.subquestionKindText') },
     { value: 'choice', label: t('settings.captureFieldKindChoice') },
+    { value: 'multichoice', label: t('settings.subquestionKindMultichoice') },
     { value: 'amount', label: t('settings.captureFieldKindAmount') },
     { value: 'number', label: t('settings.subquestionKindNumber') },
     { value: 'percent', label: t('settings.subquestionKindPercent') },
@@ -92,9 +93,9 @@ export default function ChildQuestionAdder({ code, milestoneId, parentSubquestio
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="px-2 py-0.5 rounded text-[11px] text-sky-600 hover:text-sky-800 border border-dashed border-sky-300 hover:border-sky-400"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 hover:border-sky-300 transition-colors"
       >
-        + {t('settings.ifValueAsk', { value: triggerDisplay })}
+        <span aria-hidden>↳</span> {t('settings.ifValueAsk', { value: triggerDisplay })}
       </button>
     );
   }

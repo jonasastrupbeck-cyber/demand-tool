@@ -15,7 +15,7 @@
 import { useLocale } from '@/lib/locale-context';
 import { formatCurrency, currencyForSubquestion, parseAmountLoose } from '@/lib/format-currency';
 
-export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice';
+export type SubquestionKind = 'amount' | 'number' | 'percent' | 'currency' | 'calculated' | 'date' | 'duration' | 'duration_months' | 'text' | 'choice' | 'multichoice';
 // 'concern' (2026-07-06) = a NEGATIVE outcome that is purely informational — it
 // colours the pill amber but never offers to close the case. 'negative' remains
 // the "suggest closing" outcome (fires onNegativePick). null = neutral.
@@ -63,9 +63,11 @@ export interface Draft {
   months: string;
   choice: string;
   text: string;
+  // Multi-select (0062): selected option labels for kind='multichoice'.
+  choices: string[];
 }
 
-export const EMPTY_DRAFT: Draft = { num: '', date: '', years: '', months: '', choice: '', text: '' };
+export const EMPTY_DRAFT: Draft = { num: '', date: '', years: '', months: '', choice: '', text: '', choices: [] };
 
 // Selected outcome = the softer customer-context tone (2026-07-05), not the
 // heavy solid -600. RESTING below stays a lighter wash; the selected pill is a
@@ -181,6 +183,27 @@ export default function SubquestionInput({ subquestion: sq, draft: d, onChange, 
                   onChange({ choice: next });
                   if (!active && o.polarity === 'negative') onNegativePick?.();
                 }}
+                className={`rounded-lg font-medium border transition-colors ${pillCls} ${active ? POLARITY_ACTIVE[tone] : POLARITY_RESTING[tone]}`}
+              >
+                {tl(o.label)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Multi-select (0062): like choice but toggles labels in/out of an array;
+          no close prompt (a multi-select never "suggests closing"). */}
+      {sq.kind === 'multichoice' && (
+        <div className="flex flex-wrap justify-center gap-1">
+          {[...sq.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => {
+            const active = d.choices.includes(o.label);
+            const tone = o.polarity ?? 'none';
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => onChange({ choices: active ? d.choices.filter((l) => l !== o.label) : [...d.choices, o.label] })}
                 className={`rounded-lg font-medium border transition-colors ${pillCls} ${active ? POLARITY_ACTIVE[tone] : POLARITY_RESTING[tone]}`}
               >
                 {tl(o.label)}
