@@ -62,6 +62,9 @@ interface CaseEntry {
   // block date, else created_at) — what the rail displays and orders by.
   sortOrder?: number | null;
   effectiveAt?: string;
+  // Captured value-creation-capability (0059), shown as a pill beside the CoR in
+  // the Capability-of-Response rail. Null = not captured / not applicable.
+  valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
 }
 
 interface Props {
@@ -95,6 +98,9 @@ interface Props {
   // Broker/Direct channel capture (migration 0061, 2026-07-10). Off hides the
   // Broker/Direct toggle + Firm/Broker fields in the flow customer box.
   brokerChannelEnabled?: boolean;
+  // Value creation capability (0059). On adds a colour-coded VCC pill beside each
+  // CoR pill in the Capability-of-Response rail (display of what was captured).
+  valueCreationCapabilityEnabled?: boolean;
   // Milestones (2026-06-18): ordered containers. Since 0042 each carries its
   // subquestions (the flattened decision box).
   milestones: MilestoneWithSubqs[];
@@ -114,6 +120,14 @@ const CLASSIFICATION_DOT: Record<CaseEntry['classification'], string> = {
   failure: 'bg-red-500',
   sequence: 'bg-amber-400',
   unknown: 'bg-gray-300',
+};
+
+// Value-creation-capability pill colours (0059) for the Capability-of-Response rail —
+// same pill shape as the CoR pill, colour-coded by judgement.
+const VCC_PILL_CLASS: Record<'created' | 'maintained' | 'missed', string> = {
+  created: 'bg-green-50 border-green-200 text-green-700',
+  maintained: 'bg-sky-50 border-sky-200 text-sky-700',
+  missed: 'bg-amber-50 border-amber-200 text-amber-700',
 };
 
 const STEP_TAG_CLASS: Record<string, string> = {
@@ -268,7 +282,7 @@ function ChannelSection({ channel, firmName, brokerName, onPatch }: {
   );
 }
 
-export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, brokerChannelEnabled, children }: Props) {
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, brokerChannelEnabled, valueCreationCapabilityEnabled, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
@@ -1251,19 +1265,28 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
                   <p className="text-xs text-gray-400 text-center py-2">—</p>
                 ) : entries.map((e, i) => {
                   const cor = handlingLabel(e.handlingTypeId);
+                  const vcc = e.valueCreationCapability;
                   return (
                     <button
                       key={e.id}
                       type="button"
                       onClick={() => onOpenEntry?.(e.id)}
-                      className="w-full flex items-center gap-2 text-left"
+                      className="w-full flex items-center gap-1.5 text-left"
                     >
                       <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-right">{i + 1}</span>
+                      {/* CoR pill — content-width (narrower) so a value-creation pill fits beside it. */}
                       {cor ? (
-                        <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs truncate">{cor}</span>
+                        <span className="min-w-0 max-w-[8rem] px-2 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-700 text-xs truncate">{cor}</span>
                       ) : (
-                        <span className="flex-1 min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
+                        <span className="min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
                       )}
+                      {/* Value creation capability (0059) — captured value, colour-coded by
+                          judgement (created=green, maintained=sky, missed=amber). Display only. */}
+                      {valueCreationCapabilityEnabled && (vcc ? (
+                        <span className={`min-w-0 max-w-[8rem] px-2 py-1 rounded-lg border text-xs truncate ${VCC_PILL_CLASS[vcc]}`}>{t(`capture.valueCreationCapability.${vcc}`)}</span>
+                      ) : (
+                        <span className="min-w-0 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-xs italic">—</span>
+                      ))}
                     </button>
                   );
                 })}

@@ -1706,6 +1706,9 @@ export async function getCaseEntries(caseId: string) {
     handlingTypeId: demandEntries.handlingTypeId,
     collectorName: demandEntries.collectorName,
     customerFelt: demandEntries.customerFelt,
+    // Captured value-creation-capability (0059) — shown as a pill beside the CoR
+    // in the flow board's Capability-of-Response rail (display-only).
+    valueCreationCapability: demandEntries.valueCreationCapability,
     systemConditionIds: sql<string | null>`(select string_agg(distinct wbsc.system_condition_id, ',') from work_block_system_conditions wbsc join work_description_blocks wdb on wdb.id = wbsc.work_block_id where wdb.demand_entry_id = demand_entries.id)`,
     // Explicit drag-reorder position (migration 0034). NULL = never reordered.
     sortOrder: demandEntries.sortOrder,

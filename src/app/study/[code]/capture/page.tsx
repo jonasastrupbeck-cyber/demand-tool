@@ -1021,6 +1021,7 @@ export default function CapturePage() {
         onAttachedLast={(caseId) => setLastEntry((le) => le ? { ...le, caseId } : le)}
         decisionPointsEnabled={study.decisionPointsEnabled}
         brokerChannelEnabled={study.brokerChannelEnabled}
+        valueCreationCapabilityEnabled={study.valueCreationCapabilityEnabled}
         milestones={study.milestones || []}
         onOpenEntry={openEntry}
       >
