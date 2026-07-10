@@ -1439,7 +1439,7 @@ export async function getP2bsValueDemandLinks(
     db.select({ id: lifeProblems.id, label: lifeProblems.label, sortOrder: lifeProblems.sortOrder })
       .from(lifeProblems).where(eq(lifeProblems.studyId, studyId)),
     db.select({ id: demandTypes.id, label: demandTypes.label, sortOrder: demandTypes.sortOrder })
-      .from(demandTypes).where(and(eq(demandTypes.studyId, studyId), eq(demandTypes.category, 'value'))),
+      .from(demandTypes).where(and(eq(demandTypes.studyId, studyId), eq(demandTypes.category, 'value'), isNull(demandTypes.archivedAt))),
   ]);
   if (caseRows.length === 0) return { links: [], cases: {} };
 

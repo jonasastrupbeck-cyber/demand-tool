@@ -1,5 +1,5 @@
 import { db } from './db';
-import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations, chartAnnotations } from './schema';
+import { studies, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, workSources, whatMattersTypes, workTypes, workStepTypes, valueSteps, demandEntries, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, workBlockSystemConditions, systemConditionMerges, taxonomyMerges, thinkings, demandEntryThinkings, demandEntryThinkingScs, lifecycleStages, lifeProblems, workDescriptionBlocks, cases, caseWhatMatters, caseLifeProblems, caseDemandTypes, milestones, caseMilestones, milestoneDemandTypeConditions, milestoneDemandTypeExclusions, subquestions, subquestionOptions, subquestionConditions, subquestionDemandTypeExclusions, subquestionDemandTypeOptional, caseSubquestionAnswers, capabilityAnnotations, chartAnnotations } from './schema';
 import { visibleSubquestionIds } from './subquestion-visibility';
 import { eq, and, or, desc, asc, sql, gt, gte, lte, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { generateId, generateAccessCode } from './utils';
@@ -397,13 +397,13 @@ export async function deleteHandlingType(id: string) {
   await db.delete(handlingTypes).where(eq(handlingTypes.id, id));
 }
 
-export async function getDemandTypes(studyId: string, category?: 'value' | 'failure') {
-  if (category) {
-    return db.select().from(demandTypes)
-      .where(and(eq(demandTypes.studyId, studyId), eq(demandTypes.category, category)))
-      .orderBy(asc(demandTypes.sortOrder));
-  }
-  return db.select().from(demandTypes).where(eq(demandTypes.studyId, studyId)).orderBy(asc(demandTypes.sortOrder));
+// Merged-away demand types are soft-archived (0063) and hidden from every live
+// listing — capture pickers, settings, dashboards. Pass includeArchived to see them.
+export async function getDemandTypes(studyId: string, category?: 'value' | 'failure', opts?: { includeArchived?: boolean }) {
+  const conds = [eq(demandTypes.studyId, studyId)];
+  if (category) conds.push(eq(demandTypes.category, category));
+  if (!opts?.includeArchived) conds.push(isNull(demandTypes.archivedAt));
+  return db.select().from(demandTypes).where(and(...conds)).orderBy(asc(demandTypes.sortOrder));
 }
 
 export async function addDemandType(studyId: string, category: 'value' | 'failure', label: string) {
@@ -1155,6 +1155,298 @@ export async function undoTaxonomyMerge(studyId: string, tax: SingleFkTaxonomy, 
   for (const mv of moved) await cfg.setLink(mv.id, mv.from);
   await db.update(tt).set({ archivedAt: null, mergedIntoId: null }).where(inArray(tt.id, sourceIds));
   if (m.priorTargetLabel != null) await db.update(tt).set({ label: m.priorTargetLabel }).where(eq(tt.id, m.targetId));
+  await db.delete(taxonomyMerges).where(eq(taxonomyMerges.id, mergeId));
+  return { undone: true };
+}
+
+// --- Demand-type synthesis (migration 0063) -------------------------------
+//
+// Value + failure demand types are a HYBRID taxonomy, unlike work types (one
+// blind FK) or system conditions (junctions only):
+//   • 4 plain FK columns  → blind re-point, no collision possible
+//   • 5 unique junctions  → per-owner dedupe, exactly like mergeSystemConditions
+// so they get their own merge/undo pair. The audit row lives in the shared
+// taxonomy_merges table with a richer `moved` blob: { fks, junctions }.
+
+export type DemandTaxonomy = 'value_demand_type' | 'failure_demand_type';
+export type SynthesisTaxonomy = SingleFkTaxonomy | DemandTaxonomy;
+
+export function resolveSynthesisTaxonomy(param: string): SynthesisTaxonomy | null {
+  const single = resolveSingleFkTaxonomy(param);
+  if (single) return single;
+  if (param === 'value-demand-types') return 'value_demand_type';
+  if (param === 'failure-demand-types') return 'failure_demand_type';
+  return null;
+}
+
+// Type-guard so the routes can narrow SynthesisTaxonomy → SingleFkTaxonomy.
+export function isDemandTaxonomy(tax: SynthesisTaxonomy): tax is DemandTaxonomy {
+  return tax === 'value_demand_type' || tax === 'failure_demand_type';
+}
+
+export function demandCategoryOf(tax: DemandTaxonomy): 'value' | 'failure' {
+  return tax === 'value_demand_type' ? 'value' : 'failure';
+}
+
+const demandTaxonomyFor = (category: 'value' | 'failure'): DemandTaxonomy =>
+  (category === 'value' ? 'value_demand_type' : 'failure_demand_type');
+
+type DtFkKind = 'entry' | 'entryOrig' | 'case' | 'block';
+type DtJunctionKind = 'caseDt' | 'msCond' | 'msExcl' | 'sqExcl' | 'sqOpt';
+type DtFkMove = { t: DtFkKind; id: string; from: string };
+type DtJunctionRow = { id: string; demandTypeId: string } & Record<string, unknown>;
+type DtJunctionMove =
+  | { j: DtJunctionKind; a: 'repoint'; id: string; from: string }
+  | { j: DtJunctionKind; a: 'restore'; row: DtJunctionRow };
+type DtMoved = { fks: DtFkMove[]; junctions: DtJunctionMove[] };
+
+// Re-point one FK column back/forward.
+async function setDtFk(t: DtFkKind, rowId: string, value: string) {
+  if (t === 'entry') return db.update(demandEntries).set({ demandTypeId: value }).where(eq(demandEntries.id, rowId));
+  if (t === 'entryOrig') return db.update(demandEntries).set({ originalValueDemandTypeId: value }).where(eq(demandEntries.id, rowId));
+  if (t === 'case') return db.update(cases).set({ demandTypeId: value }).where(eq(cases.id, rowId));
+  return db.update(workDescriptionBlocks).set({ demandTypeId: value }).where(eq(workDescriptionBlocks.id, rowId));
+}
+
+// Per-junction primitives (the 5 tables all look like {id, ownerCol, demandTypeId}).
+const DT_JUNCTIONS = {
+  caseDt: {
+    repoint: (id: string, v: string) => db.update(caseDemandTypes).set({ demandTypeId: v }).where(eq(caseDemandTypes.id, id)),
+    remove: (id: string) => db.delete(caseDemandTypes).where(eq(caseDemandTypes.id, id)),
+    insert: (row: DtJunctionRow) => db.insert(caseDemandTypes).values(row as typeof caseDemandTypes.$inferInsert).onConflictDoNothing(),
+  },
+  msCond: {
+    repoint: (id: string, v: string) => db.update(milestoneDemandTypeConditions).set({ demandTypeId: v }).where(eq(milestoneDemandTypeConditions.id, id)),
+    remove: (id: string) => db.delete(milestoneDemandTypeConditions).where(eq(milestoneDemandTypeConditions.id, id)),
+    insert: (row: DtJunctionRow) => db.insert(milestoneDemandTypeConditions).values(row as typeof milestoneDemandTypeConditions.$inferInsert).onConflictDoNothing(),
+  },
+  msExcl: {
+    repoint: (id: string, v: string) => db.update(milestoneDemandTypeExclusions).set({ demandTypeId: v }).where(eq(milestoneDemandTypeExclusions.id, id)),
+    remove: (id: string) => db.delete(milestoneDemandTypeExclusions).where(eq(milestoneDemandTypeExclusions.id, id)),
+    insert: (row: DtJunctionRow) => db.insert(milestoneDemandTypeExclusions).values(row as typeof milestoneDemandTypeExclusions.$inferInsert).onConflictDoNothing(),
+  },
+  sqExcl: {
+    repoint: (id: string, v: string) => db.update(subquestionDemandTypeExclusions).set({ demandTypeId: v }).where(eq(subquestionDemandTypeExclusions.id, id)),
+    remove: (id: string) => db.delete(subquestionDemandTypeExclusions).where(eq(subquestionDemandTypeExclusions.id, id)),
+    insert: (row: DtJunctionRow) => db.insert(subquestionDemandTypeExclusions).values(row as typeof subquestionDemandTypeExclusions.$inferInsert).onConflictDoNothing(),
+  },
+  sqOpt: {
+    repoint: (id: string, v: string) => db.update(subquestionDemandTypeOptional).set({ demandTypeId: v }).where(eq(subquestionDemandTypeOptional.id, id)),
+    remove: (id: string) => db.delete(subquestionDemandTypeOptional).where(eq(subquestionDemandTypeOptional.id, id)),
+    insert: (row: DtJunctionRow) => db.insert(subquestionDemandTypeOptional).values(row as typeof subquestionDemandTypeOptional.$inferInsert).onConflictDoNothing(),
+  },
+} as const;
+
+// Group a junction's rows by owner; if the owner already links the target the
+// source rows are duplicates (delete + record for undo), else re-point the first
+// and drop the rest. Mirrors mergeSystemConditions.
+async function dedupeDtJunction(
+  j: DtJunctionKind,
+  rows: DtJunctionRow[],
+  ownerOf: (r: DtJunctionRow) => string,
+  targetId: string,
+  sourceSet: Set<string>,
+  out: DtJunctionMove[],
+) {
+  const groups = new Map<string, DtJunctionRow[]>();
+  for (const r of rows) {
+    const k = ownerOf(r);
+    const g = groups.get(k);
+    if (g) g.push(r); else groups.set(k, [r]);
+  }
+  for (const group of groups.values()) {
+    const hasTarget = group.some((r) => r.demandTypeId === targetId);
+    const srcRows = group.filter((r) => sourceSet.has(r.demandTypeId));
+    if (srcRows.length === 0) continue;
+    if (hasTarget) {
+      for (const r of srcRows) { await DT_JUNCTIONS[j].remove(r.id); out.push({ j, a: 'restore', row: r }); }
+    } else {
+      const [keep, ...rest] = srcRows;
+      out.push({ j, a: 'repoint', id: keep.id, from: keep.demandTypeId });
+      await DT_JUNCTIONS[j].repoint(keep.id, targetId);
+      for (const r of rest) { await DT_JUNCTIONS[j].remove(r.id); out.push({ j, a: 'restore', row: r }); }
+    }
+  }
+}
+
+export async function getDemandTypeFrequencies(studyId: string, category: 'value' | 'failure') {
+  const live = await getDemandTypes(studyId, category);
+  if (live.length === 0) return [] as { id: string; label: string; count: number }[];
+  // A demand type is used by demand entries, by cases (junction), and — for
+  // failure demand — by flow work blocks. Each category only occurs where it
+  // can, so a uniform sum needs no branching.
+  const [entryRows, caseRows, blockRows] = await Promise.all([
+    db.select({ typeId: demandEntries.demandTypeId, count: sql<number>`count(*)::int` })
+      .from(demandEntries)
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.demandTypeId)))
+      .groupBy(demandEntries.demandTypeId),
+    db.select({ typeId: caseDemandTypes.demandTypeId, count: sql<number>`count(*)::int` })
+      .from(caseDemandTypes).innerJoin(cases, eq(caseDemandTypes.caseId, cases.id))
+      .where(eq(cases.studyId, studyId))
+      .groupBy(caseDemandTypes.demandTypeId),
+    db.select({ typeId: workDescriptionBlocks.demandTypeId, count: sql<number>`count(*)::int` })
+      .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(eq(demandEntries.studyId, studyId), isNotNull(workDescriptionBlocks.demandTypeId)))
+      .groupBy(workDescriptionBlocks.demandTypeId),
+  ]);
+  const tally = new Map<string, number>();
+  for (const rows of [entryRows, caseRows, blockRows]) {
+    for (const r of rows) if (r.typeId) tally.set(r.typeId, (tally.get(r.typeId) ?? 0) + r.count);
+  }
+  return live.map((t) => ({ id: t.id, label: t.label, count: tally.get(t.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function getDemandTypeMerges(studyId: string, category: 'value' | 'failure') {
+  const tax = demandTaxonomyFor(category);
+  const merges = await db.select().from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax)))
+    .orderBy(desc(taxonomyMerges.createdAt));
+  if (merges.length === 0) return [];
+  const all = await getDemandTypes(studyId, category, { includeArchived: true });
+  const labelOf = new Map(all.map((t) => [t.id, t.label]));
+  return merges.map((m) => {
+    const sourceIds: string[] = JSON.parse(m.sourceIds);
+    return {
+      id: m.id,
+      createdAt: m.createdAt,
+      targetId: m.targetId,
+      targetLabel: labelOf.get(m.targetId) ?? '(deleted)',
+      sources: sourceIds.map((id) => ({ id, label: labelOf.get(id) ?? '(unknown)' })),
+    };
+  });
+}
+
+// Renaming to a LIVE sibling's label means "these are the same" → merge instead
+// of creating a duplicate (mirrors renameTaxonomyType).
+export async function renameDemandTypeForSynthesis(studyId: string, category: 'value' | 'failure', id: string, label: string) {
+  const live = await getDemandTypes(studyId, category);
+  const dup = live.find((t) => t.id !== id && t.label === label);
+  if (dup) {
+    await mergeDemandTypes(studyId, category, { targetId: dup.id, sourceIds: [id] });
+    return;
+  }
+  await db.update(demandTypes).set({ label }).where(and(eq(demandTypes.id, id), eq(demandTypes.studyId, studyId)));
+}
+
+export async function mergeDemandTypes(
+  studyId: string,
+  category: 'value' | 'failure',
+  { targetId, sourceIds, newLabel }: { targetId: string; sourceIds: string[]; newLabel?: string },
+) {
+  const uniqueSources = [...new Set(sourceIds)].filter((id) => id !== targetId);
+  if (uniqueSources.length === 0) throw new Error('No source types to merge');
+
+  const all = await db.select({ id: demandTypes.id, label: demandTypes.label, category: demandTypes.category, archivedAt: demandTypes.archivedAt })
+    .from(demandTypes).where(and(eq(demandTypes.studyId, studyId), inArray(demandTypes.id, [targetId, ...uniqueSources])));
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const target = byId.get(targetId);
+  if (!target) throw new Error('Target type not found in study');
+  if (target.category !== category) throw new Error('Target type is the wrong demand category');
+  if (target.archivedAt) throw new Error('Target type is archived');
+  for (const sid of uniqueSources) {
+    const s = byId.get(sid);
+    if (!s) throw new Error('Source type not found in study');
+    if (s.category !== category) throw new Error('Source type is the wrong demand category');
+    if (s.archivedAt) throw new Error('Source type already archived');
+  }
+  const sourceSet = new Set(uniqueSources);
+  const scope = [targetId, ...uniqueSources];
+
+  // 1) Plain FK columns — blind re-point (no uniqueness, so no collision).
+  const fks: DtFkMove[] = [];
+  const [entryRows, entryOrigRows, caseRows, blockRows] = await Promise.all([
+    db.select({ id: demandEntries.id, from: demandEntries.demandTypeId }).from(demandEntries)
+      .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntries.demandTypeId, uniqueSources))),
+    db.select({ id: demandEntries.id, from: demandEntries.originalValueDemandTypeId }).from(demandEntries)
+      .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntries.originalValueDemandTypeId, uniqueSources))),
+    db.select({ id: cases.id, from: cases.demandTypeId }).from(cases)
+      .where(and(eq(cases.studyId, studyId), inArray(cases.demandTypeId, uniqueSources))),
+    db.select({ id: workDescriptionBlocks.id, from: workDescriptionBlocks.demandTypeId })
+      .from(workDescriptionBlocks).innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+      .where(and(eq(demandEntries.studyId, studyId), inArray(workDescriptionBlocks.demandTypeId, uniqueSources))),
+  ]);
+  for (const r of entryRows) fks.push({ t: 'entry', id: r.id, from: r.from as string });
+  for (const r of entryOrigRows) fks.push({ t: 'entryOrig', id: r.id, from: r.from as string });
+  for (const r of caseRows) fks.push({ t: 'case', id: r.id, from: r.from as string });
+  for (const r of blockRows) fks.push({ t: 'block', id: r.id, from: r.from as string });
+  for (const m of fks) await setDtFk(m.t, m.id, targetId);
+
+  // 2) Unique junctions — per-owner dedupe.
+  const junctions: DtJunctionMove[] = [];
+  const [cdt, msc, mse, sqe, sqo] = await Promise.all([
+    db.select({ j: caseDemandTypes }).from(caseDemandTypes).innerJoin(cases, eq(caseDemandTypes.caseId, cases.id))
+      .where(and(eq(cases.studyId, studyId), inArray(caseDemandTypes.demandTypeId, scope))),
+    db.select({ j: milestoneDemandTypeConditions }).from(milestoneDemandTypeConditions).innerJoin(milestones, eq(milestoneDemandTypeConditions.milestoneId, milestones.id))
+      .where(and(eq(milestones.studyId, studyId), inArray(milestoneDemandTypeConditions.demandTypeId, scope))),
+    db.select({ j: milestoneDemandTypeExclusions }).from(milestoneDemandTypeExclusions).innerJoin(milestones, eq(milestoneDemandTypeExclusions.milestoneId, milestones.id))
+      .where(and(eq(milestones.studyId, studyId), inArray(milestoneDemandTypeExclusions.demandTypeId, scope))),
+    db.select({ j: subquestionDemandTypeExclusions }).from(subquestionDemandTypeExclusions)
+      .innerJoin(subquestions, eq(subquestionDemandTypeExclusions.subquestionId, subquestions.id))
+      .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+      .where(and(eq(milestones.studyId, studyId), inArray(subquestionDemandTypeExclusions.demandTypeId, scope))),
+    db.select({ j: subquestionDemandTypeOptional }).from(subquestionDemandTypeOptional)
+      .innerJoin(subquestions, eq(subquestionDemandTypeOptional.subquestionId, subquestions.id))
+      .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+      .where(and(eq(milestones.studyId, studyId), inArray(subquestionDemandTypeOptional.demandTypeId, scope))),
+  ]);
+  await dedupeDtJunction('caseDt', cdt.map((r) => r.j as DtJunctionRow), (r) => r.caseId as string, targetId, sourceSet, junctions);
+  await dedupeDtJunction('msCond', msc.map((r) => r.j as DtJunctionRow), (r) => r.milestoneId as string, targetId, sourceSet, junctions);
+  await dedupeDtJunction('msExcl', mse.map((r) => r.j as DtJunctionRow), (r) => r.milestoneId as string, targetId, sourceSet, junctions);
+  await dedupeDtJunction('sqExcl', sqe.map((r) => r.j as DtJunctionRow), (r) => r.subquestionId as string, targetId, sourceSet, junctions);
+  await dedupeDtJunction('sqOpt', sqo.map((r) => r.j as DtJunctionRow), (r) => r.subquestionId as string, targetId, sourceSet, junctions);
+
+  // 3) Optional rename of the survivor, 4) soft-archive the losers, 5) audit row.
+  let priorTargetLabel: string | null = null;
+  const trimmed = newLabel?.trim();
+  if (trimmed && trimmed !== target.label) {
+    priorTargetLabel = target.label;
+    await db.update(demandTypes).set({ label: trimmed }).where(eq(demandTypes.id, targetId));
+  }
+  const archivedAt = new Date();
+  await db.update(demandTypes).set({ archivedAt, mergedIntoId: targetId }).where(inArray(demandTypes.id, uniqueSources));
+
+  const mergeId = generateId();
+  const moved: DtMoved = { fks, junctions };
+  await db.insert(taxonomyMerges).values({
+    id: mergeId, studyId, taxonomy: demandTaxonomyFor(category), targetId,
+    sourceIds: JSON.stringify(uniqueSources),
+    moved: JSON.stringify(moved),
+    priorTargetLabel, createdAt: archivedAt,
+  });
+  return { mergeId, archivedCount: uniqueSources.length };
+}
+
+export async function undoDemandTypeMerge(studyId: string, category: 'value' | 'failure', mergeId: string) {
+  const tax = demandTaxonomyFor(category);
+  const [m] = await db.select().from(taxonomyMerges).where(and(
+    eq(taxonomyMerges.id, mergeId), eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax),
+  ));
+  if (!m) throw new Error('Merge record not found');
+  const moved: DtMoved = JSON.parse(m.moved);
+  const rowIdsOf = (mv: DtMoved) => new Set<string>([
+    ...mv.fks.map((f) => f.id),
+    ...mv.junctions.map((j) => (j.a === 'repoint' ? j.id : j.row.id)),
+  ]);
+
+  // Chained-merge safety: block if a later merge of this taxonomy touched any of
+  // the same rows — undo the newer one first (mirrors undoTaxonomyMerge).
+  const mine = rowIdsOf(moved);
+  const later = await db.select({ moved: taxonomyMerges.moved }).from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax), gt(taxonomyMerges.createdAt, m.createdAt)));
+  for (const l of later) {
+    const ids = rowIdsOf(JSON.parse(l.moved) as DtMoved);
+    for (const id of ids) if (mine.has(id)) throw new Error('Undo more recent merges first.');
+  }
+
+  const sourceIds: string[] = JSON.parse(m.sourceIds);
+  for (const f of moved.fks) await setDtFk(f.t, f.id, f.from);
+  for (const j of moved.junctions) {
+    if (j.a === 'repoint') await DT_JUNCTIONS[j.j].repoint(j.id, j.from);
+    else await DT_JUNCTIONS[j.j].insert(j.row);
+  }
+  await db.update(demandTypes).set({ archivedAt: null, mergedIntoId: null }).where(inArray(demandTypes.id, sourceIds));
+  if (m.priorTargetLabel != null) await db.update(demandTypes).set({ label: m.priorTargetLabel }).where(eq(demandTypes.id, m.targetId));
   await db.delete(taxonomyMerges).where(eq(taxonomyMerges.id, mergeId));
   return { undone: true };
 }
@@ -3029,7 +3321,8 @@ export async function getLifecycleStageByCode(studyId: string, code: string) {
 }
 
 export async function getTypesMissingLifecycle(studyId: string) {
-  const dts = await db.select().from(demandTypes).where(and(eq(demandTypes.studyId, studyId), isNull(demandTypes.lifecycleStageId)));
+  // Skip merged-away (archived) demand types — nothing to classify (0063).
+  const dts = await db.select().from(demandTypes).where(and(eq(demandTypes.studyId, studyId), isNull(demandTypes.lifecycleStageId), isNull(demandTypes.archivedAt)));
   const wts = await db.select().from(workTypes).where(and(eq(workTypes.studyId, studyId), isNull(workTypes.lifecycleStageId)));
   return { demandTypes: dts, workTypes: wts };
 }

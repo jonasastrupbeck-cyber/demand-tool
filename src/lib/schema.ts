@@ -154,6 +154,10 @@ export const demandTypes = pgTable('demand_types', {
   lifecycleStageId: text('lifecycle_stage_id').references(() => lifecycleStages.id),
   lifecycleAiSuggestion: text('lifecycle_ai_suggestion'),
   lifecycleClassifiedAt: timestamp('lifecycle_classified_at', { withTimezone: true }),
+  // Synthesis soft-archive (migration 0063) — a merged-away demand type is kept
+  // (so historic label joins still resolve) but hidden from every live listing.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
 });
 
 export const contactMethods = pgTable('contact_methods', {
@@ -273,7 +277,9 @@ export const valueSteps = pgTable('value_steps', {
 export const taxonomyMerges = pgTable('taxonomy_merges', {
   id: text('id').primaryKey(),
   studyId: text('study_id').notNull().references(() => studies.id),
-  taxonomy: text('taxonomy').notNull().$type<'work_type' | 'work_step_type'>(),
+  // 0063: demand types (value + failure) reuse this audit table; their `moved`
+  // blob is richer ({ fks, junctions }) since they span 4 FK columns + 5 junctions.
+  taxonomy: text('taxonomy').notNull().$type<'work_type' | 'work_step_type' | 'value_demand_type' | 'failure_demand_type'>(),
   targetId: text('target_id').notNull(),
   sourceIds: text('source_ids').notNull(),
   moved: text('moved').notNull(),

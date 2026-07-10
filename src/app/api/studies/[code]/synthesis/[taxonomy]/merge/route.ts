@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getTaxonomyMerges, mergeTaxonomy, resolveSingleFkTaxonomy } from '@/lib/queries';
+import { getStudyByCode, getTaxonomyMerges, mergeTaxonomy, getDemandTypeMerges, mergeDemandTypes, resolveSynthesisTaxonomy, isDemandTaxonomy, demandCategoryOf } from '@/lib/queries';
 
 // GET: recent merges for the undo log.
 export async function GET(
@@ -7,11 +7,14 @@ export async function GET(
   { params }: { params: Promise<{ code: string; taxonomy: string }> }
 ) {
   const { code, taxonomy } = await params;
-  const tax = resolveSingleFkTaxonomy(taxonomy);
+  const tax = resolveSynthesisTaxonomy(taxonomy);
   if (!tax) return NextResponse.json({ error: 'Unknown taxonomy' }, { status: 404 });
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
+  if (isDemandTaxonomy(tax)) {
+    return NextResponse.json(await getDemandTypeMerges(study.id, demandCategoryOf(tax)));
+  }
   return NextResponse.json(await getTaxonomyMerges(study.id, tax));
 }
 
@@ -21,7 +24,7 @@ export async function POST(
   { params }: { params: Promise<{ code: string; taxonomy: string }> }
 ) {
   const { code, taxonomy } = await params;
-  const tax = resolveSingleFkTaxonomy(taxonomy);
+  const tax = resolveSynthesisTaxonomy(taxonomy);
   if (!tax) return NextResponse.json({ error: 'Unknown taxonomy' }, { status: 404 });
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
@@ -34,10 +37,11 @@ export async function POST(
   if (!Array.isArray(sourceIds) || sourceIds.length === 0 || !sourceIds.every((s) => typeof s === 'string')) {
     return NextResponse.json({ error: 'sourceIds must be a non-empty string array' }, { status: 400 });
   }
+  const label = typeof newLabel === 'string' ? newLabel : undefined;
   try {
-    const result = await mergeTaxonomy(study.id, tax, {
-      targetId, sourceIds, newLabel: typeof newLabel === 'string' ? newLabel : undefined,
-    });
+    const result = isDemandTaxonomy(tax)
+      ? await mergeDemandTypes(study.id, demandCategoryOf(tax), { targetId, sourceIds, newLabel: label })
+      : await mergeTaxonomy(study.id, tax, { targetId, sourceIds, newLabel: label });
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Merge failed' }, { status: 400 });

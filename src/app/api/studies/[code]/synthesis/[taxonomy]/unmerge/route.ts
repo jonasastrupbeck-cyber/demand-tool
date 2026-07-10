@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, undoTaxonomyMerge, resolveSingleFkTaxonomy } from '@/lib/queries';
+import { getStudyByCode, undoTaxonomyMerge, undoDemandTypeMerge, resolveSynthesisTaxonomy, isDemandTaxonomy, demandCategoryOf } from '@/lib/queries';
 
 // POST: undo a merge — re-point the recorded records back, un-archive the sources.
 export async function POST(
@@ -7,7 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ code: string; taxonomy: string }> }
 ) {
   const { code, taxonomy } = await params;
-  const tax = resolveSingleFkTaxonomy(taxonomy);
+  const tax = resolveSynthesisTaxonomy(taxonomy);
   if (!tax) return NextResponse.json({ error: 'Unknown taxonomy' }, { status: 404 });
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
@@ -18,7 +18,10 @@ export async function POST(
     return NextResponse.json({ error: 'mergeId is required' }, { status: 400 });
   }
   try {
-    return NextResponse.json(await undoTaxonomyMerge(study.id, tax, mergeId));
+    const result = isDemandTaxonomy(tax)
+      ? await undoDemandTypeMerge(study.id, demandCategoryOf(tax), mergeId)
+      : await undoTaxonomyMerge(study.id, tax, mergeId);
+    return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Undo failed' }, { status: 400 });
   }

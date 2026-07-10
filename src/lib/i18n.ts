@@ -1967,6 +1967,56 @@ const translations = {
     sv: 'Inga arbetsblock har fångats ännu.',
     de: 'Noch keine Arbeitsblöcke erfasst.',
   },
+  // Demand-type synthesis (migration 0063). Canonical DA/SV terms per CLAUDE.md —
+  // never "fejlefterspørgsel" / "felefterfrågan". da/sv/de pending Jonas's approval.
+  'synthesis.taxVd': {
+    en: 'Value demand',
+    da: 'Værdiskabende efterspørgsel',
+    sv: 'Värdeskapande efterfrågan',
+    de: 'Wert-Nachfrage',
+  },
+  'synthesis.taxFd': {
+    en: 'Failure demand',
+    da: 'Ikke-værdiskabende efterspørgsel',
+    sv: 'Icke-värdeskapande efterfrågan',
+    de: 'Fehlernachfrage',
+  },
+  'synthesis.vdHeading': {
+    en: 'Synthesise value demands',
+    da: 'Syntetisér værdiskabende efterspørgsel',
+    sv: 'Syntetisera värdeskapande efterfrågan',
+    de: 'Wert-Nachfrage zusammenführen',
+  },
+  'synthesis.vdIntro': {
+    en: 'As you study the captured value demands, you will find labels that are really the same demand said differently. Judge each against the others — Same, Similar or Different — and merge the sames and similars onto one agreed name. The change ripples back through every case and record already labelled with them.',
+    da: 'Når du studerer den opfangede værdiskabende efterspørgsel, vil du finde betegnelser, der reelt er samme efterspørgsel sagt på en anden måde. Vurdér hver enkelt mod de andre — Samme, Lignende eller Forskellige — og slå de samme og lignende sammen til ét aftalt navn. Ændringen slår igennem på alle de sager og poster, der allerede er mærket med dem.',
+    sv: 'När du studerar den fångade värdeskapande efterfrågan hittar du beteckningar som egentligen är samma efterfrågan uttryckt på ett annat sätt. Bedöm varje mot de andra — Samma, Liknande eller Olika — och slå ihop de samma och liknande till ett överenskommet namn. Ändringen slår igenom på alla ärenden och poster som redan är märkta med dem.',
+    de: 'Beim Studieren der erfassten Wert-Nachfrage finden Sie Bezeichnungen, die eigentlich dieselbe Nachfrage anders ausgedrückt sind. Beurteilen Sie jede im Vergleich zu den anderen — Gleich, Ähnlich oder Verschieden — und führen Sie die gleichen und ähnlichen unter einem vereinbarten Namen zusammen. Die Änderung wirkt sich auf alle bereits damit gekennzeichneten Fälle und Datensätze aus.',
+  },
+  'synthesis.vdEmpty': {
+    en: 'No value demands captured yet.',
+    da: 'Der er endnu ikke opfanget nogen værdiskabende efterspørgsel.',
+    sv: 'Ingen värdeskapande efterfrågan har fångats ännu.',
+    de: 'Noch keine Wert-Nachfrage erfasst.',
+  },
+  'synthesis.fdHeading': {
+    en: 'Synthesise failure demands',
+    da: 'Syntetisér ikke-værdiskabende efterspørgsel',
+    sv: 'Syntetisera icke-värdeskapande efterfrågan',
+    de: 'Fehlernachfrage zusammenführen',
+  },
+  'synthesis.fdIntro': {
+    en: 'As you study the captured failure demands, you will find labels that are really the same demand said differently. Judge each against the others — Same, Similar or Different — and merge the sames and similars onto one agreed name. The change ripples back through every case and record already labelled with them.',
+    da: 'Når du studerer den opfangede ikke-værdiskabende efterspørgsel, vil du finde betegnelser, der reelt er samme efterspørgsel sagt på en anden måde. Vurdér hver enkelt mod de andre — Samme, Lignende eller Forskellige — og slå de samme og lignende sammen til ét aftalt navn. Ændringen slår igennem på alle de sager og poster, der allerede er mærket med dem.',
+    sv: 'När du studerar den fångade icke-värdeskapande efterfrågan hittar du beteckningar som egentligen är samma efterfrågan uttryckt på ett annat sätt. Bedöm varje mot de andra — Samma, Liknande eller Olika — och slå ihop de samma och liknande till ett överenskommet namn. Ändringen slår igenom på alla ärenden och poster som redan är märkta med dem.',
+    de: 'Beim Studieren der erfassten Fehlernachfrage finden Sie Bezeichnungen, die eigentlich dieselbe Nachfrage anders ausgedrückt sind. Beurteilen Sie jede im Vergleich zu den anderen — Gleich, Ähnlich oder Verschieden — und führen Sie die gleichen und ähnlichen unter einem vereinbarten Namen zusammen. Die Änderung wirkt sich auf alle bereits damit gekennzeichneten Fälle und Datensätze aus.',
+  },
+  'synthesis.fdEmpty': {
+    en: 'No failure demands captured yet.',
+    da: 'Der er endnu ikke opfanget nogen ikke-værdiskabende efterspørgsel.',
+    sv: 'Ingen icke-värdeskapande efterfrågan har fångats ännu.',
+    de: 'Noch keine Fehlernachfrage erfasst.',
+  },
   'dashboard.capabilityLeadTime': {
     en: 'Capability — E2E time between events',
     da: 'Kapabilitet — E2E-tid mellem hændelser',

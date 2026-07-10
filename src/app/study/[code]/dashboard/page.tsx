@@ -55,6 +55,14 @@ type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
 type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis' | 'analytics';
 
+// The mergeable taxonomies offered in the Synthesise view. 'vd'/'fd' = value /
+// failure demand types (0063); they have no over-time chart.
+type SynthTax = 'sc' | 'wt' | 'wst' | 'vd' | 'fd';
+const SYNTH_SLUG = { wt: 'work-types', wst: 'work-step-types', vd: 'value-demand-types', fd: 'failure-demand-types' } as const;
+const SYNTH_HEADING = { sc: 'synthesis.heading', wt: 'synthesis.wtHeading', wst: 'synthesis.wstHeading', vd: 'synthesis.vdHeading', fd: 'synthesis.fdHeading' } as const;
+const SYNTH_INTRO = { sc: 'synthesis.intro', wt: 'synthesis.wtIntro', wst: 'synthesis.wstIntro', vd: 'synthesis.vdIntro', fd: 'synthesis.fdIntro' } as const;
+const SYNTH_EMPTY = { sc: 'synthesis.empty', wt: 'synthesis.wtEmpty', wst: 'synthesis.wstEmpty', vd: 'synthesis.vdEmpty', fd: 'synthesis.fdEmpty' } as const;
+
 // P2BS → value demand band (2026-07-09). Mirrors P2bsVdLink in
 // dashboard-aggregations.ts (kept local — the page only imports types from
 // @/types, never from server modules). null id = "Not set" on that side.
@@ -136,7 +144,7 @@ export default function DashboardPage() {
   const [synthesisEnabled, setSynthesisEnabled] = useState(false);
   const [workTypesEnabled, setWorkTypesEnabled] = useState(false);
   const [workStepTypesEnabled, setWorkStepTypesEnabled] = useState(false);
-  const [synthTax, setSynthTax] = useState<'sc' | 'wt' | 'wst'>('sc');
+  const [synthTax, setSynthTax] = useState<SynthTax>('sc');
   // Flow analytics (0029): gates the demand-style "Analytics" tab on flow dashboards.
   const [flowAnalyticsEnabled, setFlowAnalyticsEnabled] = useState(false);
   // Value-demand data-scope filter (empty = all data), multi-select. Replaces the
@@ -390,7 +398,7 @@ export default function DashboardPage() {
   // Synthesis (0028/0030): the "Synthesise" tab is available once the toggle is
   // on and there's at least one synthesisable taxonomy (system conditions, work
   // types, or work step types).
-  const synthesisAvailable = synthesisEnabled && (systemConditionsEnabled || workTypesEnabled || workStepTypesEnabled);
+  const synthesisAvailable = synthesisEnabled && (systemConditionsEnabled || workTypesEnabled || workStepTypesEnabled || demandTypesEnabled);
   // Flow analytics (0029): the demand-style "Analytics" tab, opt-in per study.
   const flowAnalyticsAvailable = isFlow && flowAnalyticsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
@@ -1728,16 +1736,18 @@ export default function DashboardPage() {
         {/* Synthesise (0028/0030): one surface, switchable across the taxonomies
             the study manages (system conditions, work types, work steps). */}
         {dashboardView === 'synthesis' && synthesisAvailable && (() => {
-          const taxes: { key: 'sc' | 'wt' | 'wst'; label: string }[] = [
-            ...((systemConditionsEnabled ? [{ key: 'sc', label: t('synthesis.taxSc') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
-            ...((workTypesEnabled ? [{ key: 'wt', label: t('synthesis.taxWt') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
-            ...((workStepTypesEnabled ? [{ key: 'wst', label: t('synthesis.taxWst') }] : []) as { key: 'sc' | 'wt' | 'wst'; label: string }[]),
+          const taxes: { key: SynthTax; label: string }[] = [
+            ...((systemConditionsEnabled ? [{ key: 'sc', label: t('synthesis.taxSc') }] : []) as { key: SynthTax; label: string }[]),
+            ...((workTypesEnabled ? [{ key: 'wt', label: t('synthesis.taxWt') }] : []) as { key: SynthTax; label: string }[]),
+            ...((workStepTypesEnabled ? [{ key: 'wst', label: t('synthesis.taxWst') }] : []) as { key: SynthTax; label: string }[]),
+            ...((demandTypesEnabled ? [{ key: 'vd', label: t('synthesis.taxVd') }] : []) as { key: SynthTax; label: string }[]),
+            ...((demandTypesEnabled ? [{ key: 'fd', label: t('synthesis.taxFd') }] : []) as { key: SynthTax; label: string }[]),
           ];
           const active = taxes.find((x) => x.key === synthTax)?.key ?? taxes[0].key;
-          const labelsFor = (kind: 'sc' | 'wt' | 'wst'): SynthesisLabels => ({
-            heading: t(kind === 'sc' ? 'synthesis.heading' : kind === 'wt' ? 'synthesis.wtHeading' : 'synthesis.wstHeading'),
-            intro: t(kind === 'sc' ? 'synthesis.intro' : kind === 'wt' ? 'synthesis.wtIntro' : 'synthesis.wstIntro'),
-            empty: t(kind === 'sc' ? 'synthesis.empty' : kind === 'wt' ? 'synthesis.wtEmpty' : 'synthesis.wstEmpty'),
+          const labelsFor = (kind: SynthTax): SynthesisLabels => ({
+            heading: t(SYNTH_HEADING[kind]),
+            intro: t(SYNTH_INTRO[kind]),
+            empty: t(SYNTH_EMPTY[kind]),
             selectHint: t('synthesis.selectHint'),
             distributionTitle: t('synthesis.distributionTitle'),
             overTimeTitle: t('synthesis.overTimeTitle'),
@@ -1756,18 +1766,26 @@ export default function DashboardPage() {
           });
           const apiBase = active === 'sc'
             ? `/api/studies/${encodeURIComponent(code)}/system-conditions`
-            : `/api/studies/${encodeURIComponent(code)}/synthesis/${active === 'wt' ? 'work-types' : 'work-step-types'}`;
+            : `/api/studies/${encodeURIComponent(code)}/synthesis/${SYNTH_SLUG[active]}`;
+          // Demand types have no over-time chart (they live on both cases and entries).
+          const isDemandTax = active === 'vd' || active === 'fd';
           return (
             <div className="space-y-4">
               {taxes.length > 1 && (
                 <PillToggle
                   ariaLabel={taxes[0].label}
                   value={active}
-                  onChange={(v) => setSynthTax(v as 'sc' | 'wt' | 'wst')}
+                  onChange={(v) => setSynthTax(v as SynthTax)}
                   options={taxes.map((x) => ({ value: x.key, label: x.label }))}
                 />
               )}
-              <TaxonomySynthesis key={active} apiBase={apiBase} labels={labelsFor(active)} valueDemands={valueDemandFilter} />
+              <TaxonomySynthesis
+                key={active}
+                apiBase={apiBase}
+                labels={labelsFor(active)}
+                hasOverTime={!isDemandTax}
+                valueDemands={valueDemandFilter}
+              />
             </div>
           );
         })()}

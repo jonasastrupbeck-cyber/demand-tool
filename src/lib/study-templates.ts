@@ -120,9 +120,9 @@ export async function snapshotStudySettings(studyId: string): Promise<StudyTempl
   const cms = await db.select().from(contactMethods).where(eq(contactMethods.studyId, studyId)).orderBy(asc(contactMethods.sortOrder));
   const pots = await db.select().from(pointsOfTransaction).where(eq(pointsOfTransaction.studyId, studyId)).orderBy(asc(pointsOfTransaction.sortOrder));
   const wss = await db.select().from(workSources).where(eq(workSources.studyId, studyId)).orderBy(asc(workSources.sortOrder));
-  const dts = await db.select().from(demandTypes).where(eq(demandTypes.studyId, studyId)).orderBy(asc(demandTypes.sortOrder));
   // Synthesis-archived rows are history, not settings — a new study starts
   // with only the live (merged/renamed) set.
+  const dts = await db.select().from(demandTypes).where(and(eq(demandTypes.studyId, studyId), isNull(demandTypes.archivedAt))).orderBy(asc(demandTypes.sortOrder));
   const wts = await db.select().from(workTypes).where(and(eq(workTypes.studyId, studyId), isNull(workTypes.archivedAt))).orderBy(asc(workTypes.sortOrder));
   const wsts = await db.select().from(workStepTypes).where(and(eq(workStepTypes.studyId, studyId), isNull(workStepTypes.archivedAt))).orderBy(asc(workStepTypes.sortOrder));
   const vsteps = await db.select().from(valueSteps).where(eq(valueSteps.studyId, studyId)).orderBy(asc(valueSteps.sortOrder));
