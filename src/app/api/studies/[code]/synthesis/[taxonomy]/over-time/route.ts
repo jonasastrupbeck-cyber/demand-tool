@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getTaxonomyOverTime, resolveSynthesisTaxonomy, isDemandTaxonomy } from '@/lib/queries';
+import { getStudyByCode, getTaxonomyOverTime, resolveSynthesisTaxonomy, isDemandTaxonomy, isHybridTaxonomy } from '@/lib/queries';
 
 // GET: per-day occurrence counts per type for the over-time line chart.
 export async function GET(
@@ -14,7 +14,7 @@ export async function GET(
 
   // Demand types have no over-time chart (they live on both cases and entries, so
   // a single date axis would mislead). The client passes hasOverTime={false}.
-  if (isDemandTaxonomy(tax)) return NextResponse.json([]);
+  if (isDemandTaxonomy(tax) || isHybridTaxonomy(tax)) return NextResponse.json([]);
 
   const valueDemands = new URL(request.url).searchParams.get('valueDemands')?.split(',').filter(Boolean);
   return NextResponse.json(await getTaxonomyOverTime(study.id, tax, valueDemands));

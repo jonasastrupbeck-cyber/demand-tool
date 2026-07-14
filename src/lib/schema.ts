@@ -212,6 +212,10 @@ export const whatMattersTypes = pgTable('what_matters_types', {
   // end date OR years+months ("I want my mortgage term to be…"). Only on
   // non-timed types — the two standard timed types keep timing semantics.
   valueKind: text('value_kind').$type<'amount' | 'date_or_duration'>(),
+  // Synthesis soft-archive (migration 0064) — a merged-away factor is kept (so
+  // historic label joins resolve) but hidden from every live listing.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
 });
 
 export const lifeProblems = pgTable('life_problems', {
@@ -220,6 +224,9 @@ export const lifeProblems = pgTable('life_problems', {
   label: text('label').notNull(),
   operationalDefinition: text('operational_definition'),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Synthesis soft-archive (migration 0064) — see whatMattersTypes.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+  mergedIntoId: text('merged_into_id'),
 });
 
 export const workTypes = pgTable('work_types', {
@@ -279,7 +286,7 @@ export const taxonomyMerges = pgTable('taxonomy_merges', {
   studyId: text('study_id').notNull().references(() => studies.id),
   // 0063: demand types (value + failure) reuse this audit table; their `moved`
   // blob is richer ({ fks, junctions }) since they span 4 FK columns + 5 junctions.
-  taxonomy: text('taxonomy').notNull().$type<'work_type' | 'work_step_type' | 'value_demand_type' | 'failure_demand_type'>(),
+  taxonomy: text('taxonomy').notNull().$type<'work_type' | 'work_step_type' | 'value_demand_type' | 'failure_demand_type' | 'life_problem' | 'what_matters_type'>(),
   targetId: text('target_id').notNull(),
   sourceIds: text('source_ids').notNull(),
   moved: text('moved').notNull(),

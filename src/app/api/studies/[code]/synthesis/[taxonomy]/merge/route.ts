@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getTaxonomyMerges, mergeTaxonomy, getDemandTypeMerges, mergeDemandTypes, resolveSynthesisTaxonomy, isDemandTaxonomy, demandCategoryOf } from '@/lib/queries';
+import { getStudyByCode, getTaxonomyMerges, mergeTaxonomy, getDemandTypeMerges, mergeDemandTypes, getHybridMerges, mergeHybridTaxonomy, resolveSynthesisTaxonomy, isDemandTaxonomy, isHybridTaxonomy, demandCategoryOf } from '@/lib/queries';
 
 // GET: recent merges for the undo log.
 export async function GET(
@@ -12,6 +12,9 @@ export async function GET(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
+  if (isHybridTaxonomy(tax)) {
+    return NextResponse.json(await getHybridMerges(study.id, tax));
+  }
   if (isDemandTaxonomy(tax)) {
     return NextResponse.json(await getDemandTypeMerges(study.id, demandCategoryOf(tax)));
   }
@@ -39,7 +42,9 @@ export async function POST(
   }
   const label = typeof newLabel === 'string' ? newLabel : undefined;
   try {
-    const result = isDemandTaxonomy(tax)
+    const result = isHybridTaxonomy(tax)
+      ? await mergeHybridTaxonomy(study.id, tax, { targetId, sourceIds, newLabel: label })
+      : isDemandTaxonomy(tax)
       ? await mergeDemandTypes(study.id, demandCategoryOf(tax), { targetId, sourceIds, newLabel: label })
       : await mergeTaxonomy(study.id, tax, { targetId, sourceIds, newLabel: label });
     return NextResponse.json(result, { status: 201 });

@@ -128,8 +128,8 @@ export async function snapshotStudySettings(studyId: string): Promise<StudyTempl
   const vsteps = await db.select().from(valueSteps).where(eq(valueSteps.studyId, studyId)).orderBy(asc(valueSteps.sortOrder));
   const scs = await db.select().from(systemConditions).where(and(eq(systemConditions.studyId, studyId), isNull(systemConditions.archivedAt))).orderBy(asc(systemConditions.sortOrder));
   const thks = await db.select().from(thinkings).where(eq(thinkings.studyId, studyId)).orderBy(asc(thinkings.sortOrder));
-  const lps = await db.select().from(lifeProblems).where(eq(lifeProblems.studyId, studyId)).orderBy(asc(lifeProblems.sortOrder));
-  const wms = await db.select().from(whatMattersTypes).where(eq(whatMattersTypes.studyId, studyId)).orderBy(asc(whatMattersTypes.sortOrder));
+  const lps = await db.select().from(lifeProblems).where(and(eq(lifeProblems.studyId, studyId), isNull(lifeProblems.archivedAt))).orderBy(asc(lifeProblems.sortOrder));
+  const wms = await db.select().from(whatMattersTypes).where(and(eq(whatMattersTypes.studyId, studyId), isNull(whatMattersTypes.archivedAt))).orderBy(asc(whatMattersTypes.sortOrder));
   const mss = await db.select().from(milestones).where(eq(milestones.studyId, studyId)).orderBy(asc(milestones.sortOrder));
   const msIds = mss.map((m) => m.id);
   const sqs = msIds.length > 0

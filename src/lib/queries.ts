@@ -453,8 +453,11 @@ export async function deleteContactMethod(id: string) {
   await db.delete(contactMethods).where(eq(contactMethods.id, id));
 }
 
-export async function getWhatMattersTypes(studyId: string) {
-  return db.select().from(whatMattersTypes).where(eq(whatMattersTypes.studyId, studyId)).orderBy(asc(whatMattersTypes.sortOrder));
+// Merged-away factors are soft-archived (0064) and hidden from every live listing.
+export async function getWhatMattersTypes(studyId: string, opts?: { includeArchived?: boolean }) {
+  const conds = [eq(whatMattersTypes.studyId, studyId)];
+  if (!opts?.includeArchived) conds.push(isNull(whatMattersTypes.archivedAt));
+  return db.select().from(whatMattersTypes).where(and(...conds)).orderBy(asc(whatMattersTypes.sortOrder));
 }
 
 export async function addWhatMattersType(studyId: string, label: string) {
@@ -521,8 +524,11 @@ export async function ensureStandardWhatMattersTypes(studyId: string) {
 
 // --- Life Problems (Phase 2 item 1: "Life Problem To Be Solved") ---
 
-export async function getLifeProblems(studyId: string) {
-  return db.select().from(lifeProblems).where(eq(lifeProblems.studyId, studyId)).orderBy(asc(lifeProblems.sortOrder));
+// Merged-away life problems are soft-archived (0064) and hidden from every live listing.
+export async function getLifeProblems(studyId: string, opts?: { includeArchived?: boolean }) {
+  const conds = [eq(lifeProblems.studyId, studyId)];
+  if (!opts?.includeArchived) conds.push(isNull(lifeProblems.archivedAt));
+  return db.select().from(lifeProblems).where(and(...conds)).orderBy(asc(lifeProblems.sortOrder));
 }
 
 export async function addLifeProblem(studyId: string, label: string) {
@@ -1169,13 +1175,15 @@ export async function undoTaxonomyMerge(studyId: string, tax: SingleFkTaxonomy, 
 // taxonomy_merges table with a richer `moved` blob: { fks, junctions }.
 
 export type DemandTaxonomy = 'value_demand_type' | 'failure_demand_type';
-export type SynthesisTaxonomy = SingleFkTaxonomy | DemandTaxonomy;
+export type SynthesisTaxonomy = SingleFkTaxonomy | DemandTaxonomy | HybridTaxonomy;
 
 export function resolveSynthesisTaxonomy(param: string): SynthesisTaxonomy | null {
   const single = resolveSingleFkTaxonomy(param);
   if (single) return single;
   if (param === 'value-demand-types') return 'value_demand_type';
   if (param === 'failure-demand-types') return 'failure_demand_type';
+  if (param === 'life-problems') return 'life_problem';
+  if (param === 'what-matters-types') return 'what_matters_type';
   return null;
 }
 
@@ -1449,6 +1457,340 @@ export async function undoDemandTypeMerge(studyId: string, category: 'value' | '
   if (m.priorTargetLabel != null) await db.update(demandTypes).set({ label: m.priorTargetLabel }).where(eq(demandTypes.id, m.targetId));
   await db.delete(taxonomyMerges).where(eq(taxonomyMerges.id, mergeId));
   return { undone: true };
+}
+
+// --- Life-problem + what-matters synthesis (migration 0064) ---------------
+//
+// Both are hybrid taxonomies like demand types (plain FKs + unique junctions),
+// so they share ONE generic engine driven by closures. The `caseWhatMatters`
+// junction is special: it carries the customer's ask (target date / amount /
+// term), so on a collision its fields are COALESCED onto the survivor (Jonas
+// 2026-07-10) rather than dropped, and undo restores them.
+
+export type HybridTaxonomy = 'life_problem' | 'what_matters_type';
+
+export function isHybridTaxonomy(tax: string): tax is HybridTaxonomy {
+  return tax === 'life_problem' || tax === 'what_matters_type';
+}
+
+type JRow = { id: string } & Record<string, unknown>;
+type FkSpec = {
+  key: string;
+  fetch: (studyId: string, sourceIds: string[]) => Promise<{ id: string; from: string }[]>;
+  set: (rowId: string, value: string) => Promise<unknown>;
+};
+type JunctionSpec = {
+  key: string;
+  fkCol: string;
+  ownerCol: string;
+  fetch: (studyId: string, scope: string[]) => Promise<JRow[]>;
+  repoint: (id: string, v: string) => Promise<unknown>;
+  remove: (id: string) => Promise<unknown>;
+  insert: (row: JRow) => Promise<unknown>;
+  update?: (id: string, patch: Record<string, unknown>) => Promise<unknown>;
+  coalesceFields?: string[]; // fill target's NULL fields from a source before deleting it
+  dateFields?: string[]; // timestamp columns to revive (string→Date) when replaying from the JSON audit blob
+};
+
+// The `moved` audit blob is JSON, so any Date column comes back as an ISO string.
+// Drizzle's timestamp columns call .toISOString() on write, so revive declared
+// date fields to Date before re-inserting/updating a row on undo.
+function reviveJunctionDates<T extends Record<string, unknown>>(row: T, dateFields?: string[]): T {
+  if (!dateFields?.length) return row;
+  const out: Record<string, unknown> = { ...row };
+  for (const f of dateFields) {
+    if (typeof out[f] === 'string') out[f] = new Date(out[f] as string);
+  }
+  return out as T;
+}
+type HybridConfig = {
+  taxonomy: HybridTaxonomy;
+  fetchTypes: (studyId: string, ids: string[]) => Promise<{ id: string; label: string; archivedAt: Date | null }[]>;
+  // Optional gate throwing for ids that must never be merged (e.g. the protected
+  // standard timed what-matters types). Runs before any mutation.
+  assertMergeable?: (studyId: string, ids: string[]) => Promise<void>;
+  rename: (id: string, label: string) => Promise<unknown>;
+  archive: (ids: string[], targetId: string, when: Date) => Promise<unknown>;
+  unarchive: (ids: string[]) => Promise<unknown>;
+  fks: FkSpec[];
+  junctions: JunctionSpec[];
+};
+type HFkMove = { key: string; id: string; from: string };
+type HJunctionMove =
+  | { key: string; a: 'repoint'; id: string; from: string }
+  | { key: string; a: 'restore'; row: JRow }
+  | { key: string; a: 'coalesce'; id: string; prior: Record<string, unknown> };
+type HMoved = { fks: HFkMove[]; junctions: HJunctionMove[] };
+
+async function dedupeHybridJunction(spec: JunctionSpec, rows: JRow[], targetId: string, sourceSet: Set<string>, out: HJunctionMove[]) {
+  const groups = new Map<string, JRow[]>();
+  for (const r of rows) {
+    const k = r[spec.ownerCol] as string;
+    const g = groups.get(k);
+    if (g) g.push(r); else groups.set(k, [r]);
+  }
+  for (const group of groups.values()) {
+    const targetRow = group.find((r) => r[spec.fkCol] === targetId);
+    const srcRows = group.filter((r) => sourceSet.has(r[spec.fkCol] as string));
+    if (srcRows.length === 0) continue;
+    if (targetRow) {
+      // Collision. Coalesce the source's ask onto the target's blank fields first.
+      if (spec.coalesceFields && spec.update) {
+        const prior: Record<string, unknown> = {};
+        const patch: Record<string, unknown> = {};
+        for (const f of spec.coalesceFields) {
+          if (targetRow[f] == null) {
+            const donor = srcRows.find((s) => s[f] != null);
+            if (donor) { prior[f] = null; patch[f] = donor[f]; }
+          }
+        }
+        if (Object.keys(patch).length) {
+          out.push({ key: spec.key, a: 'coalesce', id: targetRow.id, prior });
+          await spec.update(targetRow.id, patch);
+        }
+      }
+      for (const r of srcRows) { await spec.remove(r.id); out.push({ key: spec.key, a: 'restore', row: r }); }
+    } else {
+      const [keep, ...rest] = srcRows;
+      out.push({ key: spec.key, a: 'repoint', id: keep.id, from: keep[spec.fkCol] as string });
+      await spec.repoint(keep.id, targetId);
+      for (const r of rest) { await spec.remove(r.id); out.push({ key: spec.key, a: 'restore', row: r }); }
+    }
+  }
+}
+
+async function mergeHybrid(studyId: string, cfg: HybridConfig, { targetId, sourceIds, newLabel }: { targetId: string; sourceIds: string[]; newLabel?: string }) {
+  const uniqueSources = [...new Set(sourceIds)].filter((id) => id !== targetId);
+  if (uniqueSources.length === 0) throw new Error('No source types to merge');
+  await cfg.assertMergeable?.(studyId, [targetId, ...uniqueSources]);
+  const all = await cfg.fetchTypes(studyId, [targetId, ...uniqueSources]);
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const target = byId.get(targetId);
+  if (!target) throw new Error('Target type not found in study');
+  if (target.archivedAt) throw new Error('Target type is archived');
+  for (const sid of uniqueSources) {
+    const s = byId.get(sid);
+    if (!s) throw new Error('Source type not found in study');
+    if (s.archivedAt) throw new Error('Source type already archived');
+  }
+  const sourceSet = new Set(uniqueSources);
+  const scope = [targetId, ...uniqueSources];
+
+  const fks: HFkMove[] = [];
+  for (const spec of cfg.fks) {
+    const rows = await spec.fetch(studyId, uniqueSources);
+    for (const r of rows) fks.push({ key: spec.key, id: r.id, from: r.from });
+    for (const r of rows) await spec.set(r.id, targetId);
+  }
+  const junctions: HJunctionMove[] = [];
+  for (const spec of cfg.junctions) {
+    const rows = await spec.fetch(studyId, scope);
+    await dedupeHybridJunction(spec, rows, targetId, sourceSet, junctions);
+  }
+
+  let priorTargetLabel: string | null = null;
+  const trimmed = newLabel?.trim();
+  if (trimmed && trimmed !== target.label) {
+    priorTargetLabel = target.label;
+    await cfg.rename(targetId, trimmed);
+  }
+  const archivedAt = new Date();
+  await cfg.archive(uniqueSources, targetId, archivedAt);
+
+  const mergeId = generateId();
+  const moved: HMoved = { fks, junctions };
+  await db.insert(taxonomyMerges).values({
+    id: mergeId, studyId, taxonomy: cfg.taxonomy, targetId,
+    sourceIds: JSON.stringify(uniqueSources),
+    moved: JSON.stringify(moved),
+    priorTargetLabel, createdAt: archivedAt,
+  });
+  return { mergeId, archivedCount: uniqueSources.length };
+}
+
+async function undoHybrid(studyId: string, cfg: HybridConfig, mergeId: string) {
+  const [m] = await db.select().from(taxonomyMerges).where(and(
+    eq(taxonomyMerges.id, mergeId), eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, cfg.taxonomy),
+  ));
+  if (!m) throw new Error('Merge record not found');
+  const moved: HMoved = JSON.parse(m.moved);
+  const rowIdsOf = (mv: HMoved) => new Set<string>([
+    ...mv.fks.map((f) => f.id),
+    ...mv.junctions.map((j) => (j.a === 'restore' ? j.row.id : j.id)),
+  ]);
+  const mine = rowIdsOf(moved);
+  const later = await db.select({ moved: taxonomyMerges.moved }).from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, cfg.taxonomy), gt(taxonomyMerges.createdAt, m.createdAt)));
+  for (const l of later) {
+    const ids = rowIdsOf(JSON.parse(l.moved) as HMoved);
+    for (const id of ids) if (mine.has(id)) throw new Error('Undo more recent merges first.');
+  }
+
+  const sourceIds: string[] = JSON.parse(m.sourceIds);
+  for (const f of moved.fks) { const spec = cfg.fks.find((s) => s.key === f.key); if (spec) await spec.set(f.id, f.from); }
+  for (const j of moved.junctions) {
+    const spec = cfg.junctions.find((s) => s.key === j.key);
+    if (!spec) continue;
+    if (j.a === 'repoint') await spec.repoint(j.id, j.from);
+    else if (j.a === 'restore') await spec.insert(reviveJunctionDates(j.row, spec.dateFields));
+    else if (j.a === 'coalesce' && spec.update) await spec.update(j.id, reviveJunctionDates(j.prior, spec.dateFields));
+  }
+  await cfg.unarchive(sourceIds);
+  if (m.priorTargetLabel != null) await cfg.rename(m.targetId, m.priorTargetLabel);
+  await db.delete(taxonomyMerges).where(eq(taxonomyMerges.id, mergeId));
+  return { undone: true };
+}
+
+// ---- Life problems ----
+const LIFE_PROBLEM_CONFIG: HybridConfig = {
+  taxonomy: 'life_problem',
+  fetchTypes: (studyId, ids) => db.select({ id: lifeProblems.id, label: lifeProblems.label, archivedAt: lifeProblems.archivedAt })
+    .from(lifeProblems).where(and(eq(lifeProblems.studyId, studyId), inArray(lifeProblems.id, ids))),
+  rename: (id, label) => db.update(lifeProblems).set({ label }).where(eq(lifeProblems.id, id)),
+  archive: (ids, targetId, when) => db.update(lifeProblems).set({ archivedAt: when, mergedIntoId: targetId }).where(inArray(lifeProblems.id, ids)),
+  unarchive: (ids) => db.update(lifeProblems).set({ archivedAt: null, mergedIntoId: null }).where(inArray(lifeProblems.id, ids)),
+  fks: [
+    { key: 'case',
+      fetch: async (studyId, sids) => (await db.select({ id: cases.id, from: cases.lifeProblemId }).from(cases)
+        .where(and(eq(cases.studyId, studyId), inArray(cases.lifeProblemId, sids)))).map((r) => ({ id: r.id, from: r.from as string })),
+      set: (id, v) => db.update(cases).set({ lifeProblemId: v }).where(eq(cases.id, id)) },
+    { key: 'entry',
+      fetch: async (studyId, sids) => (await db.select({ id: demandEntries.id, from: demandEntries.lifeProblemId }).from(demandEntries)
+        .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntries.lifeProblemId, sids)))).map((r) => ({ id: r.id, from: r.from as string })),
+      set: (id, v) => db.update(demandEntries).set({ lifeProblemId: v }).where(eq(demandEntries.id, id)) },
+  ],
+  junctions: [
+    { key: 'caseLp', fkCol: 'lifeProblemId', ownerCol: 'caseId',
+      fetch: async (studyId, scope) => (await db.select({ j: caseLifeProblems }).from(caseLifeProblems).innerJoin(cases, eq(caseLifeProblems.caseId, cases.id))
+        .where(and(eq(cases.studyId, studyId), inArray(caseLifeProblems.lifeProblemId, scope)))).map((r) => r.j as JRow),
+      repoint: (id, v) => db.update(caseLifeProblems).set({ lifeProblemId: v }).where(eq(caseLifeProblems.id, id)),
+      remove: (id) => db.delete(caseLifeProblems).where(eq(caseLifeProblems.id, id)),
+      insert: (row) => db.insert(caseLifeProblems).values(row as typeof caseLifeProblems.$inferInsert).onConflictDoNothing() },
+  ],
+};
+
+// ---- What matters ----
+const CASE_WM_ASK_FIELDS = ['targetDate', 'amountSpecific', 'amountMin', 'amountMax', 'termYears', 'termMonths'];
+const WHAT_MATTERS_CONFIG: HybridConfig = {
+  taxonomy: 'what_matters_type',
+  fetchTypes: (studyId, ids) => db.select({ id: whatMattersTypes.id, label: whatMattersTypes.label, archivedAt: whatMattersTypes.archivedAt })
+    .from(whatMattersTypes).where(and(eq(whatMattersTypes.studyId, studyId), inArray(whatMattersTypes.id, ids))),
+  // The two standard timed types (When I want it / ASAP) drive timed-delivery
+  // dashboards and are delete-protected — never let them be merged/archived.
+  assertMergeable: async (studyId, ids) => {
+    const timed = await db.select({ id: whatMattersTypes.id }).from(whatMattersTypes)
+      .where(and(eq(whatMattersTypes.studyId, studyId), inArray(whatMattersTypes.id, ids), isNotNull(whatMattersTypes.timing)));
+    if (timed.length) throw new Error('The standard timed "what matters" types cannot be merged.');
+  },
+  rename: (id, label) => db.update(whatMattersTypes).set({ label }).where(eq(whatMattersTypes.id, id)),
+  archive: (ids, targetId, when) => db.update(whatMattersTypes).set({ archivedAt: when, mergedIntoId: targetId }).where(inArray(whatMattersTypes.id, ids)),
+  unarchive: (ids) => db.update(whatMattersTypes).set({ archivedAt: null, mergedIntoId: null }).where(inArray(whatMattersTypes.id, ids)),
+  fks: [
+    { key: 'entry',
+      fetch: async (studyId, sids) => (await db.select({ id: demandEntries.id, from: demandEntries.whatMattersTypeId }).from(demandEntries)
+        .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntries.whatMattersTypeId, sids)))).map((r) => ({ id: r.id, from: r.from as string })),
+      set: (id, v) => db.update(demandEntries).set({ whatMattersTypeId: v }).where(eq(demandEntries.id, id)) },
+    { key: 'subq',
+      fetch: async (studyId, sids) => (await db.select({ id: subquestions.id, from: subquestions.linkedWhatMattersTypeId }).from(subquestions)
+        .innerJoin(milestones, eq(subquestions.milestoneId, milestones.id))
+        .where(and(eq(milestones.studyId, studyId), inArray(subquestions.linkedWhatMattersTypeId, sids)))).map((r) => ({ id: r.id, from: r.from as string })),
+      set: (id, v) => db.update(subquestions).set({ linkedWhatMattersTypeId: v }).where(eq(subquestions.id, id)) },
+  ],
+  junctions: [
+    { key: 'caseWm', fkCol: 'whatMattersTypeId', ownerCol: 'caseId', coalesceFields: CASE_WM_ASK_FIELDS, dateFields: ['targetDate'],
+      fetch: async (studyId, scope) => (await db.select({ j: caseWhatMatters }).from(caseWhatMatters).innerJoin(cases, eq(caseWhatMatters.caseId, cases.id))
+        .where(and(eq(cases.studyId, studyId), inArray(caseWhatMatters.whatMattersTypeId, scope)))).map((r) => r.j as JRow),
+      repoint: (id, v) => db.update(caseWhatMatters).set({ whatMattersTypeId: v }).where(eq(caseWhatMatters.id, id)),
+      remove: (id) => db.delete(caseWhatMatters).where(eq(caseWhatMatters.id, id)),
+      insert: (row) => db.insert(caseWhatMatters).values(row as typeof caseWhatMatters.$inferInsert).onConflictDoNothing(),
+      update: (id, patch) => db.update(caseWhatMatters).set(patch).where(eq(caseWhatMatters.id, id)) },
+    { key: 'entryWm', fkCol: 'whatMattersTypeId', ownerCol: 'demandEntryId',
+      fetch: async (studyId, scope) => (await db.select({ j: demandEntryWhatMatters }).from(demandEntryWhatMatters).innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
+        .where(and(eq(demandEntries.studyId, studyId), inArray(demandEntryWhatMatters.whatMattersTypeId, scope)))).map((r) => r.j as JRow),
+      repoint: (id, v) => db.update(demandEntryWhatMatters).set({ whatMattersTypeId: v }).where(eq(demandEntryWhatMatters.id, id)),
+      remove: (id) => db.delete(demandEntryWhatMatters).where(eq(demandEntryWhatMatters.id, id)),
+      insert: (row) => db.insert(demandEntryWhatMatters).values(row as typeof demandEntryWhatMatters.$inferInsert).onConflictDoNothing() },
+  ],
+};
+
+const HYBRID_CONFIG: Record<HybridTaxonomy, HybridConfig> = {
+  life_problem: LIFE_PROBLEM_CONFIG,
+  what_matters_type: WHAT_MATTERS_CONFIG,
+};
+
+export function mergeHybridTaxonomy(studyId: string, tax: HybridTaxonomy, args: { targetId: string; sourceIds: string[]; newLabel?: string }) {
+  return mergeHybrid(studyId, HYBRID_CONFIG[tax], args);
+}
+export function undoHybridMerge(studyId: string, tax: HybridTaxonomy, mergeId: string) {
+  return undoHybrid(studyId, HYBRID_CONFIG[tax], mergeId);
+}
+
+// Renaming onto a live sibling's label ⇒ merge (mirrors renameDemandTypeForSynthesis).
+export async function renameHybridForSynthesis(studyId: string, tax: HybridTaxonomy, id: string, label: string) {
+  const live = tax === 'life_problem' ? await getLifeProblems(studyId) : await getWhatMattersTypes(studyId);
+  const dup = live.find((t) => t.id !== id && t.label === label);
+  if (dup) { await mergeHybridTaxonomy(studyId, tax, { targetId: dup.id, sourceIds: [id] }); return; }
+  const tt = tax === 'life_problem' ? lifeProblems : whatMattersTypes;
+  await db.update(tt).set({ label }).where(and(eq(tt.id, id), eq(tt.studyId, studyId)));
+}
+
+export async function getHybridMerges(studyId: string, tax: HybridTaxonomy) {
+  const merges = await db.select().from(taxonomyMerges)
+    .where(and(eq(taxonomyMerges.studyId, studyId), eq(taxonomyMerges.taxonomy, tax)))
+    .orderBy(desc(taxonomyMerges.createdAt));
+  if (merges.length === 0) return [];
+  const all = tax === 'life_problem'
+    ? await getLifeProblems(studyId, { includeArchived: true })
+    : await getWhatMattersTypes(studyId, { includeArchived: true });
+  const labelOf = new Map(all.map((t) => [t.id, t.label]));
+  return merges.map((m) => {
+    const sourceIds: string[] = JSON.parse(m.sourceIds);
+    return {
+      id: m.id, createdAt: m.createdAt, targetId: m.targetId,
+      targetLabel: labelOf.get(m.targetId) ?? '(deleted)',
+      sources: sourceIds.map((id) => ({ id, label: labelOf.get(id) ?? '(unknown)' })),
+    };
+  });
+}
+
+export async function getLifeProblemFrequencies(studyId: string) {
+  const live = await getLifeProblems(studyId);
+  if (live.length === 0) return [] as { id: string; label: string; count: number }[];
+  const [caseRows, entryRows] = await Promise.all([
+    db.select({ typeId: caseLifeProblems.lifeProblemId, count: sql<number>`count(*)::int` })
+      .from(caseLifeProblems).innerJoin(cases, eq(caseLifeProblems.caseId, cases.id))
+      .where(eq(cases.studyId, studyId)).groupBy(caseLifeProblems.lifeProblemId),
+    db.select({ typeId: demandEntries.lifeProblemId, count: sql<number>`count(*)::int` })
+      .from(demandEntries).where(and(eq(demandEntries.studyId, studyId), isNotNull(demandEntries.lifeProblemId)))
+      .groupBy(demandEntries.lifeProblemId),
+  ]);
+  const tally = new Map<string, number>();
+  for (const rows of [caseRows, entryRows]) for (const r of rows) if (r.typeId) tally.set(r.typeId, (tally.get(r.typeId) ?? 0) + r.count);
+  return live.map((t) => ({ id: t.id, label: t.label, count: tally.get(t.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function getWhatMattersTypeFrequencies(studyId: string) {
+  // Only free-form factors are synthesisable — the two standard timed types are
+  // fixed anchors (excluded here so they're never offered for merging).
+  const live = (await getWhatMattersTypes(studyId)).filter((t) => !t.timing);
+  if (live.length === 0) return [] as { id: string; label: string; count: number }[];
+  const [caseRows, entryRows] = await Promise.all([
+    db.select({ typeId: caseWhatMatters.whatMattersTypeId, count: sql<number>`count(*)::int` })
+      .from(caseWhatMatters).innerJoin(cases, eq(caseWhatMatters.caseId, cases.id))
+      .where(eq(cases.studyId, studyId)).groupBy(caseWhatMatters.whatMattersTypeId),
+    db.select({ typeId: demandEntryWhatMatters.whatMattersTypeId, count: sql<number>`count(*)::int` })
+      .from(demandEntryWhatMatters).innerJoin(demandEntries, eq(demandEntryWhatMatters.demandEntryId, demandEntries.id))
+      .where(eq(demandEntries.studyId, studyId)).groupBy(demandEntryWhatMatters.whatMattersTypeId),
+  ]);
+  const tally = new Map<string, number>();
+  for (const rows of [caseRows, entryRows]) for (const r of rows) if (r.typeId) tally.set(r.typeId, (tally.get(r.typeId) ?? 0) + r.count);
+  return live.map((t) => ({ id: t.id, label: t.label, count: tally.get(t.id) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export function getHybridFrequencies(studyId: string, tax: HybridTaxonomy) {
+  return tax === 'life_problem' ? getLifeProblemFrequencies(studyId) : getWhatMattersTypeFrequencies(studyId);
 }
 
 // --- Thinkings (mirrors System Conditions) ---

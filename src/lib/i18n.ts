@@ -2024,6 +2024,57 @@ const translations = {
     sv: 'Ingen icke-värdeskapande efterfrågan har fångats ännu.',
     de: 'Noch keine Fehlernachfrage erfasst.',
   },
+  // Life-problem + what-matters synthesis (migration 0064). Concept nouns reuse
+  // the canonical capture.lifeProblemLabel / capture.whatMattersHeader strings;
+  // intros mirror the operational phrasing of synthesis.wtIntro. da/sv/de drafts.
+  'synthesis.taxLp': {
+    en: 'Life problems',
+    da: 'Livsproblemer',
+    sv: 'Livsproblem',
+    de: 'Lebensprobleme',
+  },
+  'synthesis.taxWm': {
+    en: 'What matters',
+    da: 'Hvad betyder noget',
+    sv: 'Vad är viktigt',
+    de: 'Was wichtig ist',
+  },
+  'synthesis.lpHeading': {
+    en: 'Synthesise life problems',
+    da: 'Syntetisér livsproblemer',
+    sv: 'Syntetisera livsproblem',
+    de: 'Lebensprobleme zusammenführen',
+  },
+  'synthesis.lpIntro': {
+    en: 'As you study the captured life problems, you will find labels that are really the same life problem said differently. Judge each against the others — Same, Similar or Different — and merge the sames and similars onto one agreed name. The change ripples back through every case and record already labelled with them.',
+    da: 'Når du studerer de opfangede livsproblemer, vil du finde betegnelser, der reelt er samme livsproblem sagt på en anden måde. Vurdér hver enkelt mod de andre — Samme, Lignende eller Forskellige — og slå de samme og lignende sammen til ét aftalt navn. Ændringen slår igennem på alle de sager og poster, der allerede er mærket med dem.',
+    sv: 'När du studerar de fångade livsproblemen hittar du beteckningar som egentligen är samma livsproblem uttryckt på ett annat sätt. Bedöm varje mot de andra — Samma, Liknande eller Olika — och slå ihop de samma och liknande till ett överenskommet namn. Ändringen slår igenom på alla ärenden och poster som redan är märkta med dem.',
+    de: 'Beim Studieren der erfassten Lebensprobleme finden Sie Bezeichnungen, die eigentlich dasselbe Lebensproblem anders ausgedrückt sind. Beurteilen Sie jedes im Vergleich zu den anderen — Gleich, Ähnlich oder Verschieden — und führen Sie die gleichen und ähnlichen unter einem vereinbarten Namen zusammen. Die Änderung wirkt sich auf alle bereits damit gekennzeichneten Fälle und Datensätze aus.',
+  },
+  'synthesis.lpEmpty': {
+    en: 'No life problems captured yet.',
+    da: 'Der er endnu ikke opfanget nogen livsproblemer.',
+    sv: 'Inga livsproblem har fångats ännu.',
+    de: 'Noch keine Lebensprobleme erfasst.',
+  },
+  'synthesis.wmHeading': {
+    en: 'Synthesise what matters',
+    da: 'Syntetisér "hvad betyder noget"',
+    sv: 'Syntetisera "vad är viktigt"',
+    de: '"Was wichtig ist" zusammenführen',
+  },
+  'synthesis.wmIntro': {
+    en: 'As you study what customers said matters, you will find labels that are really the same thing said differently. Judge each against the others — Same, Similar or Different — and merge the sames and similars onto one agreed name. The change ripples back through every case and record already labelled with them.',
+    da: 'Når du studerer det, kunderne sagde betyder noget, vil du finde betegnelser, der reelt er det samme sagt på en anden måde. Vurdér hver enkelt mod de andre — Samme, Lignende eller Forskellige — og slå de samme og lignende sammen til ét aftalt navn. Ændringen slår igennem på alle de sager og poster, der allerede er mærket med dem.',
+    sv: 'När du studerar det som kunderna sa är viktigt hittar du beteckningar som egentligen är samma sak uttryckt på ett annat sätt. Bedöm varje mot de andra — Samma, Liknande eller Olika — och slå ihop de samma och liknande till ett överenskommet namn. Ändringen slår igenom på alla ärenden och poster som redan är märkta med dem.',
+    de: 'Beim Studieren dessen, was Kunden als wichtig nannten, finden Sie Bezeichnungen, die eigentlich dasselbe anders ausgedrückt sind. Beurteilen Sie jede im Vergleich zu den anderen — Gleich, Ähnlich oder Verschieden — und führen Sie die gleichen und ähnlichen unter einem vereinbarten Namen zusammen. Die Änderung wirkt sich auf alle bereits damit gekennzeichneten Fälle und Datensätze aus.',
+  },
+  'synthesis.wmEmpty': {
+    en: 'No what-matters factors captured yet.',
+    da: 'Der er endnu ikke opfanget nogen "hvad betyder noget"-faktorer.',
+    sv: 'Inga "vad är viktigt"-faktorer har fångats ännu.',
+    de: 'Noch keine "Was wichtig ist"-Faktoren erfasst.',
+  },
   'dashboard.capabilityLeadTime': {
     en: 'Capability — E2E time between events',
     da: 'Kapabilitet — E2E-tid mellem hændelser',

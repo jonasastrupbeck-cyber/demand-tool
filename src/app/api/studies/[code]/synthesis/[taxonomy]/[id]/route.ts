@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, renameTaxonomyType, renameDemandTypeForSynthesis, resolveSynthesisTaxonomy, isDemandTaxonomy, demandCategoryOf } from '@/lib/queries';
+import { getStudyByCode, renameTaxonomyType, renameDemandTypeForSynthesis, renameHybridForSynthesis, resolveSynthesisTaxonomy, isDemandTaxonomy, isHybridTaxonomy, demandCategoryOf } from '@/lib/queries';
 
 // PATCH: rename a single type (inline rename in the synthesis surface). Renaming
 // onto a live sibling's label merges into it (see renameTaxonomyType).
@@ -19,7 +19,8 @@ export async function PATCH(
   }
   const label = body.label.trim();
   try {
-    if (isDemandTaxonomy(tax)) await renameDemandTypeForSynthesis(study.id, demandCategoryOf(tax), id, label);
+    if (isHybridTaxonomy(tax)) await renameHybridForSynthesis(study.id, tax, id, label);
+    else if (isDemandTaxonomy(tax)) await renameDemandTypeForSynthesis(study.id, demandCategoryOf(tax), id, label);
     else await renameTaxonomyType(study.id, tax, id, label);
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Rename failed' }, { status: 400 });

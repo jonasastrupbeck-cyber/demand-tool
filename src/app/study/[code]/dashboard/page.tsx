@@ -56,12 +56,13 @@ type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis' | 'analytics';
 
 // The mergeable taxonomies offered in the Synthesise view. 'vd'/'fd' = value /
-// failure demand types (0063); they have no over-time chart.
-type SynthTax = 'sc' | 'wt' | 'wst' | 'vd' | 'fd';
-const SYNTH_SLUG = { wt: 'work-types', wst: 'work-step-types', vd: 'value-demand-types', fd: 'failure-demand-types' } as const;
-const SYNTH_HEADING = { sc: 'synthesis.heading', wt: 'synthesis.wtHeading', wst: 'synthesis.wstHeading', vd: 'synthesis.vdHeading', fd: 'synthesis.fdHeading' } as const;
-const SYNTH_INTRO = { sc: 'synthesis.intro', wt: 'synthesis.wtIntro', wst: 'synthesis.wstIntro', vd: 'synthesis.vdIntro', fd: 'synthesis.fdIntro' } as const;
-const SYNTH_EMPTY = { sc: 'synthesis.empty', wt: 'synthesis.wtEmpty', wst: 'synthesis.wstEmpty', vd: 'synthesis.vdEmpty', fd: 'synthesis.fdEmpty' } as const;
+// failure demand types (0063); 'lp'/'wm' = life problems / what-matters factors
+// (0064). Demand/LP/WM have no over-time chart.
+type SynthTax = 'sc' | 'wt' | 'wst' | 'vd' | 'fd' | 'lp' | 'wm';
+const SYNTH_SLUG = { wt: 'work-types', wst: 'work-step-types', vd: 'value-demand-types', fd: 'failure-demand-types', lp: 'life-problems', wm: 'what-matters-types' } as const;
+const SYNTH_HEADING = { sc: 'synthesis.heading', wt: 'synthesis.wtHeading', wst: 'synthesis.wstHeading', vd: 'synthesis.vdHeading', fd: 'synthesis.fdHeading', lp: 'synthesis.lpHeading', wm: 'synthesis.wmHeading' } as const;
+const SYNTH_INTRO = { sc: 'synthesis.intro', wt: 'synthesis.wtIntro', wst: 'synthesis.wstIntro', vd: 'synthesis.vdIntro', fd: 'synthesis.fdIntro', lp: 'synthesis.lpIntro', wm: 'synthesis.wmIntro' } as const;
+const SYNTH_EMPTY = { sc: 'synthesis.empty', wt: 'synthesis.wtEmpty', wst: 'synthesis.wstEmpty', vd: 'synthesis.vdEmpty', fd: 'synthesis.fdEmpty', lp: 'synthesis.lpEmpty', wm: 'synthesis.wmEmpty' } as const;
 
 // P2BS → value demand band (2026-07-09). Mirrors P2bsVdLink in
 // dashboard-aggregations.ts (kept local — the page only imports types from
@@ -157,6 +158,7 @@ export default function DashboardPage() {
   const [vsSort, setVsSort] = useState<'journey' | 'failureDemand' | 'failure' | 'sequence' | 'waste'>('journey');
   const [showCoverage, setShowCoverage] = useState(false);
   const [lifeProblemsEnabled, setLifeProblemsEnabled] = useState(false);
+  const [whatMattersEnabled, setWhatMattersEnabled] = useState(false);
   const [lifeProblems, setLifeProblems] = useState<{ id: string; label: string }[]>([]);
   // Case list for the Touches-over-time scope selector.
   const [cases, setCases] = useState<{ id: string; caseRef: string }[]>([]);
@@ -266,6 +268,7 @@ export default function DashboardPage() {
         setWorkStepTypesEnabled(s.workStepTypesEnabled ?? false);
         setFlowAnalyticsEnabled(s.flowAnalyticsEnabled ?? false);
         setLifeProblemsEnabled(s.lifeProblemsEnabled ?? false);
+        setWhatMattersEnabled(s.whatMattersEnabled ?? false);
         setLifeProblems(Array.isArray(s.lifeProblems) ? s.lifeProblems : []);
         setValueDemandTypes((Array.isArray(s.demandTypes) ? s.demandTypes : [])
           .filter((d: { category?: string }) => d.category === 'value')
@@ -398,7 +401,7 @@ export default function DashboardPage() {
   // Synthesis (0028/0030): the "Synthesise" tab is available once the toggle is
   // on and there's at least one synthesisable taxonomy (system conditions, work
   // types, or work step types).
-  const synthesisAvailable = synthesisEnabled && (systemConditionsEnabled || workTypesEnabled || workStepTypesEnabled || demandTypesEnabled);
+  const synthesisAvailable = synthesisEnabled && (systemConditionsEnabled || workTypesEnabled || workStepTypesEnabled || demandTypesEnabled || lifeProblemsEnabled || whatMattersEnabled);
   // Flow analytics (0029): the demand-style "Analytics" tab, opt-in per study.
   const flowAnalyticsAvailable = isFlow && flowAnalyticsEnabled;
   const eventOptions: PillSelectOption[] = useMemo(() => {
@@ -1742,6 +1745,8 @@ export default function DashboardPage() {
             ...((workStepTypesEnabled ? [{ key: 'wst', label: t('synthesis.taxWst') }] : []) as { key: SynthTax; label: string }[]),
             ...((demandTypesEnabled ? [{ key: 'vd', label: t('synthesis.taxVd') }] : []) as { key: SynthTax; label: string }[]),
             ...((demandTypesEnabled ? [{ key: 'fd', label: t('synthesis.taxFd') }] : []) as { key: SynthTax; label: string }[]),
+            ...((lifeProblemsEnabled ? [{ key: 'lp', label: t('synthesis.taxLp') }] : []) as { key: SynthTax; label: string }[]),
+            ...((whatMattersEnabled ? [{ key: 'wm', label: t('synthesis.taxWm') }] : []) as { key: SynthTax; label: string }[]),
           ];
           const active = taxes.find((x) => x.key === synthTax)?.key ?? taxes[0].key;
           const labelsFor = (kind: SynthTax): SynthesisLabels => ({
@@ -1769,7 +1774,8 @@ export default function DashboardPage() {
             ? `/api/studies/${encodeURIComponent(code)}/system-conditions`
             : `/api/studies/${encodeURIComponent(code)}/synthesis/${SYNTH_SLUG[active]}`;
           // Demand types have no over-time chart (they live on both cases and entries).
-          const isDemandTax = active === 'vd' || active === 'fd';
+          // Demand types + life problems + what-matters have no over-time chart.
+          const isDemandTax = active === 'vd' || active === 'fd' || active === 'lp' || active === 'wm';
           return (
             <div className="space-y-4">
               {taxes.length > 1 && (

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, undoTaxonomyMerge, undoDemandTypeMerge, resolveSynthesisTaxonomy, isDemandTaxonomy, demandCategoryOf } from '@/lib/queries';
+import { getStudyByCode, undoTaxonomyMerge, undoDemandTypeMerge, undoHybridMerge, resolveSynthesisTaxonomy, isDemandTaxonomy, isHybridTaxonomy, demandCategoryOf } from '@/lib/queries';
 
 // POST: undo a merge — re-point the recorded records back, un-archive the sources.
 export async function POST(
@@ -18,7 +18,9 @@ export async function POST(
     return NextResponse.json({ error: 'mergeId is required' }, { status: 400 });
   }
   try {
-    const result = isDemandTaxonomy(tax)
+    const result = isHybridTaxonomy(tax)
+      ? await undoHybridMerge(study.id, tax, mergeId)
+      : isDemandTaxonomy(tax)
       ? await undoDemandTypeMerge(study.id, demandCategoryOf(tax), mergeId)
       : await undoTaxonomyMerge(study.id, tax, mergeId);
     return NextResponse.json(result);
