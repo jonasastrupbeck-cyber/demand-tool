@@ -204,6 +204,9 @@ export default function CapturePage() {
   // collector's name (see effect below) but is editable, so you can log a touch
   // on someone else's behalf. Sent only for flow work entries when opted in.
   const [workedByName, setWorkedByName] = useState('');
+  // The name shows as settled text by default; you only get an input after
+  // clicking "Change" (avoids an always-open box inviting accidental edits).
+  const [editingWorkedBy, setEditingWorkedBy] = useState(false);
   // C7 (2026-06-17): whether the customer was affected by this touch. Inherited
   // automatically from the chosen COR's customerFacing flag (set per COR in
   // Settings, 2026-06-18) — no longer a per-touch question. null = no COR yet.
@@ -462,6 +465,7 @@ export default function CapturePage() {
     setValueCreationCapability('');
     // Cleared to '' so the default-to-collector effect re-seeds it for the next touch.
     setWorkedByName('');
+    setEditingWorkedBy(false);
     setCustomerFelt(null);
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
@@ -1930,24 +1934,38 @@ export default function CapturePage() {
                     </div>
                   </div>
                 )}
-                {/* Worked-on-by (0065): who did the work — prefilled with the
-                    collector, editable to log a touch on someone else's behalf.
-                    Datalist keeps names consistent across the study. */}
+                {/* Worked-on-by (0065): who did the work. Shows the settled default
+                    (you) as text; "Change" reveals an input to attribute the touch
+                    to someone else. Datalist keeps names consistent study-wide. */}
                 {study.workedByEnabled && (
                   <div className="flex flex-col gap-1 border-t border-gray-100 pt-1.5">
                     <span className="text-[11px] font-medium text-gray-500 text-center max-w-[16rem]">
                       {t('capture.workedByLabel')}
                     </span>
                     <div className="flex justify-center">
-                      <input
-                        type="text"
-                        aria-label={t('capture.workedByLabel')}
-                        placeholder={t('capture.workedByPlaceholder')}
-                        value={workedByName}
-                        onChange={(e) => setWorkedByName(e.target.value)}
-                        list="worked-by-names"
-                        className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
-                      />
+                      {editingWorkedBy ? (
+                        <input
+                          type="text"
+                          aria-label={t('capture.workedByLabel')}
+                          placeholder={t('capture.workedByPlaceholder')}
+                          value={workedByName}
+                          onChange={(e) => setWorkedByName(e.target.value)}
+                          onBlur={() => setEditingWorkedBy(false)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingWorkedBy(false); } }}
+                          list="worked-by-names"
+                          autoFocus
+                          className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingWorkedBy(true)}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 transition-colors"
+                        >
+                          <span className="font-medium">{workedByName.trim() || collectorName.trim() || t('capture.workedByPlaceholder')}</span>
+                          <span className="text-[10px] font-medium text-sky-600">{t('capture.change')}</span>
+                        </button>
+                      )}
                       <datalist id="worked-by-names">
                         {knownWorkedByNames.map((n) => <option key={n} value={n} />)}
                       </datalist>

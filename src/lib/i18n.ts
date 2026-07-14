@@ -317,16 +317,22 @@ const translations = {
     de: 'Wertschöpfungsfähigkeit wählen…',
   },
   'capture.workedByLabel': {
-    en: 'Who worked on this? (defaults to you)',
-    da: 'Hvem arbejdede på denne? (er som standard dig)',
-    sv: 'Vem arbetade på denna? (är som standard du)',
-    de: 'Wer hat daran gearbeitet? (standardmäßig Sie)',
+    en: 'Who worked on this?',
+    da: 'Hvem arbejdede på denne?',
+    sv: 'Vem arbetade på denna?',
+    de: 'Wer hat daran gearbeitet?',
   },
   'capture.workedByPlaceholder': {
     en: 'Name…',
     da: 'Navn…',
     sv: 'Namn…',
     de: 'Name…',
+  },
+  'capture.change': {
+    en: 'Change',
+    da: 'Skift',
+    sv: 'Ändra',
+    de: 'Ändern',
   },
   'capture.workedByShort': {
     en: 'by {name}',

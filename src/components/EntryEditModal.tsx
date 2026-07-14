@@ -111,6 +111,8 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Worked-on-by (0065): name shows as settled text; "Change" reveals the input.
+  const [editingWorkedBy, setEditingWorkedBy] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   // Attachment flags per SC — which of the 5 capture fields this SC is about.
@@ -688,20 +690,35 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Worked-on-by (0065): flow work entries only, when enabled. */}
+            {/* Worked-on-by (0065): flow work entries only, when enabled. Shows the
+                name as settled text; "Change" reveals the input. */}
             {study.systemType === 'flow' && entry.entryType === 'work' && study.workedByEnabled && (
               <div className="flex flex-col items-center gap-1">
                 <span className="text-[11px] font-medium text-gray-500 text-center max-w-[18rem]">
                   {t('capture.workedByLabel')}
                 </span>
-                <input
-                  type="text"
-                  aria-label={t('capture.workedByLabel')}
-                  placeholder={t('capture.workedByPlaceholder')}
-                  value={entry.workedByName || ''}
-                  onChange={(e) => setEntry({ ...entry, workedByName: e.target.value || null })}
-                  className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
-                />
+                {editingWorkedBy ? (
+                  <input
+                    type="text"
+                    aria-label={t('capture.workedByLabel')}
+                    placeholder={t('capture.workedByPlaceholder')}
+                    value={entry.workedByName || ''}
+                    onChange={(e) => setEntry({ ...entry, workedByName: e.target.value || null })}
+                    onBlur={() => setEditingWorkedBy(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingWorkedBy(false); } }}
+                    autoFocus
+                    className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingWorkedBy(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 transition-colors"
+                  >
+                    <span className="font-medium">{entry.workedByName?.trim() || entry.collectorName?.trim() || t('capture.workedByPlaceholder')}</span>
+                    <span className="text-[10px] font-medium text-sky-600">{t('capture.change')}</span>
+                  </button>
+                )}
               </div>
             )}
 
