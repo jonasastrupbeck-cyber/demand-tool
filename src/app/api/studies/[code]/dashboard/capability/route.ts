@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
 import { parseDateParam } from '@/lib/local-date';
-import { getCapabilityData } from '@/lib/dashboard-aggregations';
+import { getCapabilityData, type CaseStatusFilter } from '@/lib/dashboard-aggregations';
 
 // Capability / lead-time chart data: time between two chosen events across the
 // study's cases, as XmR individuals-chart points + control limits. Read-only.
@@ -26,7 +26,9 @@ export async function GET(
   const metric = metricParam === 'touches' ? 'touches' : metricParam === 'variance' ? 'variance' : 'leadTime';
   const valueDemands = sp.get('valueDemands')?.split(',').filter(Boolean);
   const wmScope = sp.get('wmScope') || undefined;
+  const statusParam = sp.get('status');
+  const status: CaseStatusFilter = statusParam === 'open' || statusParam === 'closed' ? statusParam : undefined;
 
-  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, valueDemands, wmScope);
+  const data = await getCapabilityData(study.id, fromEvent, toEvent, dateFrom, dateTo, sort, metric, valueDemands, wmScope, status);
   return NextResponse.json(data);
 }

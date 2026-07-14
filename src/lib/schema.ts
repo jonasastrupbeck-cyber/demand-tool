@@ -100,6 +100,10 @@ export const studies = pgTable('studies', {
   // Broker/Direct channel capture on cases (migration 0061, 2026-07-10): opt-in
   // Broker/Direct toggle + Firm/Broker fields in the flow customer box. Default false.
   brokerChannelEnabled: boolean('broker_channel_enabled').notNull().default(false),
+  // Worked-on-by capture (migration 0065, 2026-07-14): opt-in per-touch "who did
+  // the work" field in the flow composer (defaults to the collector, overridable).
+  // Powers the "people per value demand" XmR. Default false.
+  workedByEnabled: boolean('worked_by_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
@@ -617,6 +621,11 @@ export const demandEntries = pgTable('demand_entries', {
   // Value creation capability (migration 0059, 2026-07-09): the collector's
   // reflective judgement per flow work entry. NULL = not answered / not applicable.
   valueCreationCapability: text('value_creation_capability').$type<'created' | 'maintained' | 'missed'>(),
+  // Worked-on-by (migration 0065, 2026-07-14): who actually did the work on this
+  // touch. Defaults to the collector's name at capture but is overridable, so a
+  // collector can log a touch on someone else's behalf. NULL → falls back to
+  // collectorName for the "people per value demand" measure. Opt-in per study.
+  workedByName: text('worked_by_name'),
 }, (t) => ({
   // Perf indexes 0058: the two hottest read filters — a case's timeline and every
   // study-wide dashboard aggregation. Neither column had any index before.

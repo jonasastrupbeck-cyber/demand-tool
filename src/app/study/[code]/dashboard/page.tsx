@@ -20,6 +20,7 @@ import EntryEditModal, { type EntryEditModalStudy } from '@/components/EntryEdit
 import { type PillSelectOption } from '@/components/PillSelect';
 import CapabilityChart from '@/components/CapabilityChart';
 import TouchesPerCaseChart from '@/components/TouchesPerCaseChart';
+import PeoplePerCaseChart from '@/components/PeoplePerCaseChart';
 import StepsPerCaseChart from '@/components/StepsPerCaseChart';
 import CorDistributionChart from '@/components/CorDistributionChart';
 import OverTimeExplorerChart from '@/components/OverTimeExplorerChart';
@@ -151,6 +152,10 @@ export default function DashboardPage() {
   // Value-demand data-scope filter (empty = all data), multi-select. Replaces the
   // former P2BS (life-problem) filter on the flow dashboard. + collapsed coverage box.
   const [valueDemandFilter, setValueDemandFilter] = useState<string[]>([]);
+  // Flow case-status filter for the Capability view (2026-07-14): all / open /
+  // closed. Scopes the per-value-demand charts (touches / people / blocks /
+  // lead-time). 'all' passes no status param.
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
   const [valueDemandTypes, setValueDemandTypes] = useState<{ id: string; label: string }[]>([]);
   const [valueSteps, setValueSteps] = useState<{ id: string; label: string }[]>([]);
   // "Work by value step" ordering (Analytics): journey order (default) or ranked
@@ -1682,22 +1687,50 @@ export default function DashboardPage() {
           return (
           <CollapsibleCardsContext.Provider value={true}>
           <div className="space-y-4">
-            {/* Touches per case (XmR) — one point per case = its total touch count. */}
+            {/* Case-status scope (2026-07-14): all / open / closed. Scopes every
+                per-value-demand chart in this view. 'open' leaves the lead-time
+                charts empty (open cases have no completion) — expected. */}
+            <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.caseStatusLabel')}</p>
+              <PillToggle
+                ariaLabel={t('dashboard.caseStatusLabel')}
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v as 'all' | 'open' | 'closed')}
+                options={[
+                  { value: 'all', label: t('dashboard.scopeAll') },
+                  { value: 'open', label: t('capture.caseStatusOpen') },
+                  { value: 'closed', label: t('capture.caseStatusClosed') },
+                ]}
+              />
+            </div>
+            {/* Touches per value demand (XmR) — one point per value demand (= one
+                case) = its total touch count. */}
             <TouchesPerCaseChart
               code={code}
               dateFrom={capRange.from}
               dateTo={capRange.to}
               valueDemands={valueDemandFilter}
+              status={statusFilter}
               valueSteps={valueSteps}
             />
-            {/* Steps per case (XmR) — one point per case = its step count for the
-                chosen tag (Total / Value / Sequence / Failure / Failure demand), as
-                count or %. The work-composition companion to touches. */}
+            {/* People per value demand (XmR) — one point per value demand = the
+                number of distinct people who worked on it. Directly below touches. */}
+            <PeoplePerCaseChart
+              code={code}
+              dateFrom={capRange.from}
+              dateTo={capRange.to}
+              valueDemands={valueDemandFilter}
+              status={statusFilter}
+            />
+            {/* Blocks of work per value demand (XmR) — one point per value demand =
+                its step count for the chosen tag (Total / Value / Sequence / Failure
+                / Failure demand), as count or %. The work-composition companion. */}
             <StepsPerCaseChart
               code={code}
               dateFrom={capRange.from}
               dateTo={capRange.to}
               valueDemands={valueDemandFilter}
+              status={statusFilter}
               valueSteps={valueSteps}
             />
             {/* What-matters scope — narrows ONLY the end-to-end charts below to
@@ -1724,6 +1757,7 @@ export default function DashboardPage() {
                 dateFrom={capRange.from}
                 dateTo={capRange.to}
                 valueDemands={valueDemandFilter}
+                status={statusFilter}
                 whatMattersScopeTypeId={whatMattersScope}
                 onRemove={chartIds.length > 1 ? () => removeChart(id) : undefined}
               />

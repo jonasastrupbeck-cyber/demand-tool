@@ -2097,6 +2097,9 @@ export async function createEntry(studyId: string, data: {
   customerFelt?: boolean | null;
   // Value creation capability (0059): per-work-entry reflective judgement.
   valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
+  // Worked-on-by (0065): who did the work on this touch. Defaults to the
+  // collector at capture but is overridable. Null → falls back to collectorName.
+  workedByName?: string | null;
 }, createdAt?: Date) {
   const id = generateId();
   const entryType = data.entryType || 'demand';
@@ -2130,6 +2133,8 @@ export async function createEntry(studyId: string, data: {
     customerFelt: data.customerFelt ?? null,
     // Work-entry only (0059); demand entries never carry it.
     valueCreationCapability: !isDemand ? (data.valueCreationCapability ?? null) : null,
+    // Worked-on-by (0065): who did the work (overridable collector).
+    workedByName: data.workedByName || null,
   });
 
   // Junctions are independent of each other (thinkings uses the in-memory `scs`,
@@ -2343,6 +2348,8 @@ export async function getCaseEntries(caseId: string) {
     // Captured value-creation-capability (0059) — shown as a pill beside the CoR
     // in the flow board's Capability-of-Response rail (display-only).
     valueCreationCapability: demandEntries.valueCreationCapability,
+    // Worked-on-by (0065) — shown beside the collector on the touch row.
+    workedByName: demandEntries.workedByName,
     systemConditionIds: sql<string | null>`(select string_agg(distinct wbsc.system_condition_id, ',') from work_block_system_conditions wbsc join work_description_blocks wdb on wdb.id = wbsc.work_block_id where wdb.demand_entry_id = demand_entries.id)`,
     // Explicit drag-reorder position (migration 0034). NULL = never reordered.
     sortOrder: demandEntries.sortOrder,
@@ -3366,6 +3373,8 @@ export async function updateEntry(entryId: string, data: {
   customerFelt?: boolean | null;
   // Value creation capability (0059): per-work-entry reflective judgement.
   valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
+  // Worked-on-by (0065): who did the work (overridable collector).
+  workedByName?: string | null;
 }) {
   const { whatMattersTypeIds, systemConditions, thinkings, workBlocks } = data;
 
@@ -3386,6 +3395,7 @@ export async function updateEntry(entryId: string, data: {
   if (data.caseId !== undefined) updateFields.caseId = data.caseId;
   if (data.customerFelt !== undefined) updateFields.customerFelt = data.customerFelt;
   if (data.valueCreationCapability !== undefined) updateFields.valueCreationCapability = data.valueCreationCapability;
+  if (data.workedByName !== undefined) updateFields.workedByName = data.workedByName;
   // When workBlocks are sent, overwrite verbatim with the concatenation so legacy
   // verbatim consumers (search, export, dashboard list) keep working — Phase 2 / Item 4.
   // An empty array clears verbatim too (else the stale concatenation of the

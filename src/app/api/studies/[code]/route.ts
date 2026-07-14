@@ -147,6 +147,8 @@ export async function PUT(
   if (body.valueCreationCapabilityEnabled !== undefined) updates.valueCreationCapabilityEnabled = body.valueCreationCapabilityEnabled;
   // Broker/Direct channel capture toggle (migration 0061, 2026-07-10).
   if (body.brokerChannelEnabled !== undefined) updates.brokerChannelEnabled = body.brokerChannelEnabled;
+  // Worked-on-by per-touch capture toggle (migration 0065, 2026-07-14).
+  if (body.workedByEnabled !== undefined) updates.workedByEnabled = body.workedByEnabled;
   // System type (2026-06-11): layout regime, validated enum. Switching TO
   // 'flow' re-applies the preset ADDITIVELY (turns strands on, never off) and
   // forces caseTrackingEnabled — flow layout is meaningless without cases.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocale } from '@/lib/locale-context';
 import { useCaptureBar } from '@/lib/capture-bar-context';
@@ -112,6 +112,8 @@ interface StudyData {
   valueCreationCapabilityEnabled: boolean;
   // Broker/Direct channel capture on cases (migration 0061, 2026-07-10).
   brokerChannelEnabled: boolean;
+  // Worked-on-by per-touch capture (migration 0065, 2026-07-14).
+  workedByEnabled: boolean;
   valueSteps: { id: string; label: string; sortOrder: number }[];
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -162,6 +164,14 @@ export default function CapturePage() {
     collectorName: string | null;
   }
   const [entries, setEntries] = useState<EntryRow[]>([]);
+  // Worked-on-by (0065) datalist: distinct names already seen in the study
+  // (collectors), so attributing a touch stays spelling-consistent.
+  const knownWorkedByNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of entries) if (e.collectorName?.trim()) set.add(e.collectorName.trim());
+    if (collectorName.trim()) set.add(collectorName.trim());
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [entries, collectorName]);
   const [pendingCounts, setPendingCounts] = useState({ needsClassification: 0, needsHandling: 0, needsValueLink: 0 });
   const [filter, setFilter] = useState<'all' | 'needsClassification' | 'needsHandling' | 'needsValueLink'>('all');
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
@@ -190,6 +200,10 @@ export default function CapturePage() {
   const [handlingTypeId, setHandlingTypeId] = useState('');
   // Value creation capability (0059): per-work-entry reflective judgement. '' = unanswered.
   const [valueCreationCapability, setValueCreationCapability] = useState('');
+  // Worked-on-by (0065): who did the work on this touch. Defaults to the current
+  // collector's name (see effect below) but is editable, so you can log a touch
+  // on someone else's behalf. Sent only for flow work entries when opted in.
+  const [workedByName, setWorkedByName] = useState('');
   // C7 (2026-06-17): whether the customer was affected by this touch. Inherited
   // automatically from the chosen COR's customerFacing flag (set per COR in
   // Settings, 2026-06-18) — no longer a per-touch question. null = no COR yet.
@@ -413,6 +427,14 @@ export default function CapturePage() {
     }
   }, [loadStudy, loadTodayCount, loadSuggestions, loadPendingCounts, code]);
 
+  // Worked-on-by (0065): default the field to the current collector whenever the
+  // field is empty (initial load + after each save resets it back to '') so a
+  // touch is attributed to you by default — override it to log for someone else.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (collectorName.trim() && !workedByName) setWorkedByName(collectorName.trim());
+  }, [collectorName, workedByName]);
+
   // Debounced search
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -438,6 +460,8 @@ export default function CapturePage() {
     setDemandTypeId('');
     setHandlingTypeId('');
     setValueCreationCapability('');
+    // Cleared to '' so the default-to-collector effect re-seeds it for the next touch.
+    setWorkedByName('');
     setCustomerFelt(null);
     // Keep contactMethodId / pointOfTransactionId sticky for the session — don't reset them.
     setWhatMattersTypeIds([]);
@@ -641,6 +665,12 @@ export default function CapturePage() {
     // Value creation capability (0059): flow work entries only, when enabled.
     if (flowWorkPath && study?.valueCreationCapabilityEnabled) {
       body.valueCreationCapability = valueCreationCapability || undefined;
+    }
+
+    // Worked-on-by (0065): flow work entries only, when enabled. Falls back to the
+    // collector so a touch is always attributed to someone when the study opts in.
+    if (flowWorkPath && study?.workedByEnabled) {
+      body.workedByName = workedByName.trim() || collectorName.trim() || undefined;
     }
 
     if (entryType === 'demand') {
@@ -1900,6 +1930,30 @@ export default function CapturePage() {
                     </div>
                   </div>
                 )}
+                {/* Worked-on-by (0065): who did the work — prefilled with the
+                    collector, editable to log a touch on someone else's behalf.
+                    Datalist keeps names consistent across the study. */}
+                {study.workedByEnabled && (
+                  <div className="flex flex-col gap-1 border-t border-gray-100 pt-1.5">
+                    <span className="text-[11px] font-medium text-gray-500 text-center max-w-[16rem]">
+                      {t('capture.workedByLabel')}
+                    </span>
+                    <div className="flex justify-center">
+                      <input
+                        type="text"
+                        aria-label={t('capture.workedByLabel')}
+                        placeholder={t('capture.workedByPlaceholder')}
+                        value={workedByName}
+                        onChange={(e) => setWorkedByName(e.target.value)}
+                        list="worked-by-names"
+                        className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
+                      />
+                      <datalist id="worked-by-names">
+                        {knownWorkedByNames.map((n) => <option key={n} value={n} />)}
+                      </datalist>
+                    </div>
+                  </div>
+                )}
                 {regretButton}
               </div>
             )}
@@ -2424,6 +2478,7 @@ export default function CapturePage() {
             flowFailureDemandTypesEnabled: study.flowFailureDemandTypesEnabled,
             valueStepsEnabled: study.valueStepsEnabled,
             valueCreationCapabilityEnabled: study.valueCreationCapabilityEnabled,
+            workedByEnabled: study.workedByEnabled,
             whatMattersEnabled: study.whatMattersEnabled,
             thinkingsEnabled: study.thinkingsEnabled,
             lifeProblemsEnabled: study.lifeProblemsEnabled,

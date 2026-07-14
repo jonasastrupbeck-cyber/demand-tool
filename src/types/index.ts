@@ -119,7 +119,7 @@ export interface DemandEntry {
 // Capability / lead-time (2026-06-18): per-case duration between two chosen
 // events + XmR individuals-chart stats (control limits via the 2.66×mR method).
 export interface CapabilityData {
-  unit: 'days' | 'touches' | 'steps' | '%';
+  unit: 'days' | 'touches' | 'steps' | 'people' | '%';
   // excluded points stay on the chart (greyed) but are dropped from the limit
   // calc; note is a per-measure annotation. (2026-06-18, R4)
   points: { caseId: string; caseRef: string; leadTime: number; startedAt: string; special: boolean; excluded: boolean; note: string | null }[];

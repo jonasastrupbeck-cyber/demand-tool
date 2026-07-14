@@ -55,6 +55,8 @@ export interface EntryEditModalStudy {
   valueStepsEnabled: boolean;
   // Flow per-entry value-creation-capability dropdown (migration 0059, 2026-07-09).
   valueCreationCapabilityEnabled: boolean;
+  // Worked-on-by per-touch capture (migration 0065, 2026-07-14).
+  workedByEnabled: boolean;
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
   demandTypes: DemandType[];
@@ -89,6 +91,8 @@ interface EntryFull {
   caseId: string | null;
   // Value creation capability (0059): per-work-entry reflective judgement.
   valueCreationCapability: 'created' | 'maintained' | 'missed' | null;
+  // Worked-on-by (0065): who did the work on this touch (overridable collector).
+  workedByName: string | null;
 }
 
 interface Props {
@@ -241,6 +245,10 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
       // Value creation capability (0059): only meaningful when the study opts in.
       if (study.valueCreationCapabilityEnabled) {
         body.valueCreationCapability = entry.valueCreationCapability || null;
+      }
+      // Worked-on-by (0065): only when the study opts in.
+      if (study.workedByEnabled) {
+        body.workedByName = entry.workedByName?.trim() || null;
       }
     }
     try {
@@ -676,6 +684,23 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                     { id: 'missed', label: t('capture.valueCreationCapability.missed'), operationalDefinition: t('capture.valueCreationCapability.missedDef') },
                   ]}
                   variant="add"
+                />
+              </div>
+            )}
+
+            {/* Worked-on-by (0065): flow work entries only, when enabled. */}
+            {study.systemType === 'flow' && entry.entryType === 'work' && study.workedByEnabled && (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[11px] font-medium text-gray-500 text-center max-w-[18rem]">
+                  {t('capture.workedByLabel')}
+                </span>
+                <input
+                  type="text"
+                  aria-label={t('capture.workedByLabel')}
+                  placeholder={t('capture.workedByPlaceholder')}
+                  value={entry.workedByName || ''}
+                  onChange={(e) => setEntry({ ...entry, workedByName: e.target.value || null })}
+                  className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
                 />
               </div>
             )}

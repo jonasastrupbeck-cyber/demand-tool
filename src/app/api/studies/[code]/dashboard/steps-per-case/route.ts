@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudyByCode } from '@/lib/queries';
 import { parseDateParam } from '@/lib/local-date';
-import { getStepsPerCaseCapability } from '@/lib/dashboard-aggregations';
+import { getStepsPerCaseCapability, type CaseStatusFilter } from '@/lib/dashboard-aggregations';
 
 const TAGS = ['total', 'value', 'sequence', 'failure', 'failure_demand'] as const;
 
@@ -23,7 +23,9 @@ export async function GET(
   const tag = (TAGS as readonly string[]).includes(tagParam ?? '') ? (tagParam as typeof TAGS[number]) : 'total';
   const mode = sp.get('mode') === 'pct' ? 'pct' : 'count';
   const valueStepId = sp.get('valueStep') || undefined;
+  const statusParam = sp.get('status');
+  const status: CaseStatusFilter = statusParam === 'open' || statusParam === 'closed' ? statusParam : undefined;
 
-  const data = await getStepsPerCaseCapability(study.id, { valueDemands, from, to, tag, mode, valueStepId });
+  const data = await getStepsPerCaseCapability(study.id, { valueDemands, from, to, tag, mode, valueStepId, status });
   return NextResponse.json(data);
 }

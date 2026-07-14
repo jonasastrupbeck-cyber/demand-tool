@@ -39,7 +39,7 @@ function Card({ label, value, sub, color }: { label: string; value: string | num
 }
 
 export default function CapabilityChart({
-  code, eventOptions, studyName, dateFrom, dateTo, valueDemands, whatMattersScopeTypeId, onRemove,
+  code, eventOptions, studyName, dateFrom, dateTo, valueDemands, status, whatMattersScopeTypeId, onRemove,
 }: {
   code: string;
   eventOptions: PillSelectOption[];
@@ -47,6 +47,7 @@ export default function CapabilityChart({
   dateFrom?: string;
   dateTo?: string;
   valueDemands?: string[];
+  status?: 'all' | 'open' | 'closed';
   whatMattersScopeTypeId?: string | null;
   onRemove?: () => void;
 }) {
@@ -96,12 +97,13 @@ export default function CapabilityChart({
     if (dateFrom) qp.set('dateFrom', dateFrom);
     if (dateTo) qp.set('dateTo', dateTo);
     if (valueDemands && valueDemands.length) qp.set('valueDemands', valueDemands.join(','));
+    if (status && status !== 'all') qp.set('status', status);
     if (whatMattersScopeTypeId) qp.set('wmScope', whatMattersScopeTypeId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/capability?${qp}`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => setCapData(d))
       .finally(() => setCapLoading(false));
-  }, [capFrom, capTo, code, dateFrom, dateTo, valueDemands, whatMattersScopeTypeId, capTick, capSort, capMetric]);
+  }, [capFrom, capTo, code, dateFrom, dateTo, valueDemands, status, whatMattersScopeTypeId, capTick, capSort, capMetric]);
 
   const handleExportImage = useCallback(async () => {
     if (!capExportRef.current || capExporting) return;

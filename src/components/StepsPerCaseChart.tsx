@@ -15,12 +15,13 @@ type Tag = 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand';
 // a % of the case's total steps. The work-composition companion to touches.
 // Optionally scoped to a single value step (2026-07-08 follow-up).
 export default function StepsPerCaseChart({
-  code, dateFrom, dateTo, valueDemands, valueSteps = [], fixedTag,
+  code, dateFrom, dateTo, valueDemands, status, valueSteps = [], fixedTag,
 }: {
   code: string;
   dateFrom?: string;
   dateTo?: string;
   valueDemands?: string[];
+  status?: 'all' | 'open' | 'closed';
   valueSteps?: { id: string; label: string }[];
   /** Lock the chart to one step type (hides the measure selector). Used to show
    *  the four types as separate charts. */
@@ -46,12 +47,13 @@ export default function StepsPerCaseChart({
     if (dateFrom) qp.set('from', dateFrom);
     if (dateTo) qp.set('to', dateTo);
     if (valueDemands && valueDemands.length) qp.set('valueDemands', valueDemands.join(','));
+    if (status && status !== 'all') qp.set('status', status);
     if (valueStepId) qp.set('valueStep', valueStepId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/steps-per-case?${qp}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [code, dateFrom, dateTo, valueDemands, tag, effMode, valueStepId, tick]);
+  }, [code, dateFrom, dateTo, valueDemands, status, tag, effMode, valueStepId, tick]);
 
   // Annotations keyed per tag (a note/exclude on the failure chart doesn't bleed
   // into value); count/% + value-step scope share the tag's chartKey.
@@ -129,6 +131,7 @@ export default function StepsPerCaseChart({
       title={title}
       subtitle={subtitle}
       valueLabel={valueLabel}
+      nLabel={t('dashboard.valueDemandsN')}
       data={data}
       loading={loading}
       controls={controls}

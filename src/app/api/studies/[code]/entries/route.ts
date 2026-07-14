@@ -167,6 +167,10 @@ export async function POST(
     valueCreationCapability: ['created', 'maintained', 'missed'].includes(body.valueCreationCapability)
       ? body.valueCreationCapability
       : undefined,
+    // Worked-on-by (0065): free-text, who did the work (overridable collector).
+    workedByName: typeof body.workedByName === 'string' && body.workedByName.trim()
+      ? body.workedByName.trim()
+      : undefined,
   });
 
   // Fold the three post-save refreshes into this response so the client skips

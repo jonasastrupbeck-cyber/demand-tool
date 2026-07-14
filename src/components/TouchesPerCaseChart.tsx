@@ -12,12 +12,13 @@ import InfoPopover from '@/components/InfoPopover';
 // Picking a value step switches the measure to "touches up to completing that
 // step" (touches up to the case's last touch on that step).
 export default function TouchesPerCaseChart({
-  code, dateFrom, dateTo, valueDemands, valueSteps = [],
+  code, dateFrom, dateTo, valueDemands, status, valueSteps = [],
 }: {
   code: string;
   dateFrom?: string;
   dateTo?: string;
   valueDemands?: string[];
+  status?: 'all' | 'open' | 'closed';
   valueSteps?: { id: string; label: string }[];
 }) {
   const { t, tl } = useLocale();
@@ -34,12 +35,13 @@ export default function TouchesPerCaseChart({
     if (dateFrom) qp.set('from', dateFrom);
     if (dateTo) qp.set('to', dateTo);
     if (valueDemands && valueDemands.length) qp.set('valueDemands', valueDemands.join(','));
+    if (status && status !== 'all') qp.set('status', status);
     if (valueStepId) qp.set('valueStep', valueStepId);
     fetch(`/api/studies/${encodeURIComponent(code)}/dashboard/touches-per-case?${qp}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => setData(d))
       .finally(() => setLoading(false));
-  }, [code, dateFrom, dateTo, valueDemands, valueStepId, tick]);
+  }, [code, dateFrom, dateTo, valueDemands, status, valueStepId, tick]);
 
   // Annotations are keyed to the base measure (filter-independent), matching the
   // capability chart. count/% + value-step scope share the one chartKey.
@@ -71,6 +73,7 @@ export default function TouchesPerCaseChart({
       title={t('dashboard.touchesPerCaseTitle')}
       subtitle={subtitle}
       valueLabel={t('dashboard.touchesPerCase')}
+      nLabel={t('dashboard.valueDemandsN')}
       data={data}
       loading={loading}
       controls={controls}

@@ -111,6 +111,8 @@ interface StudyData {
   valueCreationCapabilityEnabled: boolean;
   // Broker/Direct channel capture on cases (migration 0061, 2026-07-10).
   brokerChannelEnabled: boolean;
+  // Worked-on-by per-touch capture (migration 0065, 2026-07-14).
+  workedByEnabled: boolean;
   // The PIN itself is never sent to the browser — only whether one is set.
   hasConsultantPin: boolean;
   handlingTypes: HandlingType[];
@@ -1442,6 +1444,7 @@ export default function SettingsPage() {
               { field: 'flowFailureDemandTypesEnabled' as const, label: t('capture.toggles.flowFailureDemandTypes'), value: study.flowFailureDemandTypesEnabled },
               { field: 'valueCreationCapabilityEnabled' as const, label: t('capture.toggles.valueCreationCapability'), value: study.valueCreationCapabilityEnabled },
               { field: 'brokerChannelEnabled' as const, label: t('capture.toggles.brokerChannel'), value: study.brokerChannelEnabled },
+              { field: 'workedByEnabled' as const, label: t('capture.toggles.workedBy'), value: study.workedByEnabled },
             ]).map((row) => (
               <button
                 key={row.field}

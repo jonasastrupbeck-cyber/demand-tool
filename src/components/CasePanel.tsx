@@ -65,6 +65,9 @@ interface CaseEntry {
   // Captured value-creation-capability (0059), shown as a pill beside the CoR in
   // the Capability-of-Response rail. Null = not captured / not applicable.
   valueCreationCapability?: 'created' | 'maintained' | 'missed' | null;
+  // Worked-on-by (0065): who did the work; shown beside the collector when set
+  // and different from the collector.
+  workedByName?: string | null;
 }
 
 interface Props {
@@ -201,6 +204,9 @@ const TouchCardFull = memo(function TouchCardFull({ entry: e, handlingTypes, sys
           {cor && <span className="px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700 text-[10px]">{cor}</span>}
           <span className="text-[10px] text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
           {e.collectorName && <span className="text-[10px] text-gray-500 font-medium truncate">{e.collectorName}</span>}
+          {e.workedByName && e.workedByName !== e.collectorName && (
+            <span className="text-[10px] text-emerald-700 font-medium truncate">{t('capture.workedByShort', { name: e.workedByName })}</span>
+          )}
         </div>
       </div>
     </button>
@@ -939,6 +945,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
       <span className={`shrink-0 w-2 h-2 rounded-full ${CLASSIFICATION_DOT[e.classification]}`} aria-hidden="true" />
       <span className="shrink-0 text-gray-400 tabular-nums">{new Date(e.effectiveAt ?? e.createdAt).toLocaleDateString()}</span>
       {e.collectorName && <span className="shrink-0 text-gray-600 font-medium">{e.collectorName}</span>}
+      {e.workedByName && e.workedByName !== e.collectorName && (
+        <span className="shrink-0 text-emerald-700 font-medium">{t('capture.workedByShort', { name: e.workedByName })}</span>
+      )}
       <span className="flex-1 min-w-0 truncate text-gray-700">{e.verbatim}</span>
       {handlingLabel(e.handlingTypeId) && (
         <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-sky-50 border border-sky-200 text-sky-700">

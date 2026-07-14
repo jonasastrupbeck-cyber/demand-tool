@@ -145,6 +145,7 @@ export async function PATCH(
   if (body.lifeProblemId !== undefined) updates.lifeProblemId = body.lifeProblemId;
   if (body.customerFelt !== undefined) updates.customerFelt = typeof body.customerFelt === 'boolean' ? body.customerFelt : null;
   if (body.valueCreationCapability !== undefined) updates.valueCreationCapability = ['created', 'maintained', 'missed'].includes(body.valueCreationCapability) ? body.valueCreationCapability : null;
+  if (body.workedByName !== undefined) updates.workedByName = typeof body.workedByName === 'string' && body.workedByName.trim() ? body.workedByName.trim() : null;
   if (body.workBlocks !== undefined) {
     if (!Array.isArray(body.workBlocks) || !body.workBlocks.every((b: unknown) =>
       b && typeof b === 'object'

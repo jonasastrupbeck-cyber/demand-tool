@@ -23,12 +23,23 @@ export async function valueDemandCaseIds(studyId: string, ids: string[]): Promis
 }
 
 // Case-set scope predicate for value-demand-filtered case queries. Absent filter →
-// study only; selected-but-no-match → sql`false` (zero cases).
-async function valueDemandCaseWhere(studyId: string, valueDemands?: string[]): Promise<SQL> {
-  if (!valueDemands || !valueDemands.length) return eq(cases.studyId, studyId);
+// study only; selected-but-no-match → sql`false` (zero cases). Optional `status`
+// ('open'|'closed') further narrows to that lifecycle state — the flow dashboard's
+// all/open/closed filter (2026-07-14); 'all' is expressed by passing undefined.
+async function valueDemandCaseWhere(studyId: string, valueDemands?: string[], status?: CaseStatusFilter): Promise<SQL> {
+  const statusPred = status === 'open' || status === 'closed' ? eq(cases.status, status) : undefined;
+  if (!valueDemands || !valueDemands.length) {
+    return statusPred ? and(eq(cases.studyId, studyId), statusPred)! : eq(cases.studyId, studyId);
+  }
   const caseIds = await valueDemandCaseIds(studyId, valueDemands);
-  return caseIds.length ? and(eq(cases.studyId, studyId), inArray(cases.id, caseIds))! : sql`false`;
+  if (!caseIds.length) return sql`false`;
+  return statusPred
+    ? and(eq(cases.studyId, studyId), inArray(cases.id, caseIds), statusPred)!
+    : and(eq(cases.studyId, studyId), inArray(cases.id, caseIds))!;
 }
+
+// 'open' | 'closed' narrow the flow dashboard to that lifecycle; undefined = all.
+export type CaseStatusFilter = 'open' | 'closed' | undefined;
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<DashboardData> {
   const baseConditions = [eq(demandEntries.studyId, studyId)];
@@ -988,12 +999,13 @@ export async function getCapabilityData(
   // Gives the "ASAP" measure its meaning (scope to the asap type, then read
   // case-open → completion lead time).
   whatMattersScopeTypeId?: string,
+  status?: CaseStatusFilter,
 ): Promise<CapabilityData> {
   const unit = metric === 'touches' ? 'touches' : 'days';
   const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
 
-  // Value-demand scope: capability is case-level, so filter the case set directly.
-  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
+  // Value-demand + case-status scope: capability is case-level, so filter the case set directly.
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands, status);
   let caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt, closedAt: cases.closedAt })
     .from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
@@ -1575,11 +1587,11 @@ async function getChartAnnotationMap(studyId: string, chartKey: string): Promise
 // Scoped by value demand; the date range filters touches by effective date.
 export async function getTouchesPerCaseCapability(
   studyId: string,
-  opts: { valueDemands?: string[]; from?: Date; to?: Date; valueStepId?: string } = {},
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; valueStepId?: string; status?: CaseStatusFilter } = {},
 ): Promise<CapabilityData> {
-  const { valueDemands, from, to, valueStepId } = opts;
+  const { valueDemands, from, to, valueStepId, status } = opts;
   const empty: CapabilityData = { unit: 'touches', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
-  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands, status);
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
 
@@ -1677,6 +1689,92 @@ export async function getTouchesPerCaseCapability(
   };
 }
 
+// People-per-value-demand XmR (2026-07-14): one point per case (= one value
+// demand) = the number of DISTINCT people who worked on it. "Who worked on it" is
+// COALESCE(worked_by_name, collector_name) over the case's work entries — so with
+// the worked-on-by toggle off it falls back to distinct collectors (a proxy), and
+// becomes a true hand-offs measure once touches are attributed. Mirrors the
+// touches-per-case shape (work entries, effective-date range, case-open ordering,
+// value-demand + status scope, exclude-aware limits, filter-independent chartKey).
+export async function getPeoplePerValueDemandCapability(
+  studyId: string,
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; status?: CaseStatusFilter } = {},
+): Promise<CapabilityData> {
+  const { valueDemands, from, to, status } = opts;
+  const empty: CapabilityData = { unit: 'people', points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands, status);
+  const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
+  if (caseRows.length === 0) return empty;
+
+  // One row per work entry: the person who worked it + its effective date.
+  const entryRows = await db.select({
+    caseId: demandEntries.caseId,
+    person: sql<string | null>`coalesce(nullif(${demandEntries.workedByName}, ''), ${demandEntries.collectorName})`,
+    eff: sql<string>`min(coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt}))`,
+  })
+    .from(demandEntries)
+    .innerJoin(workDescriptionBlocks, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
+    .where(and(eq(demandEntries.studyId, studyId), eq(demandEntries.entryType, 'work'), isNotNull(demandEntries.caseId)))
+    .groupBy(demandEntries.caseId, demandEntries.id, demandEntries.workedByName, demandEntries.collectorName);
+
+  const byCase = new Map<string, { person: string; ms: number }[]>();
+  for (const r of entryRows) {
+    if (!r.caseId || !r.eff) continue;
+    const person = (r.person ?? '').trim();
+    if (!person) continue; // an unnamed touch can't identify a distinct person
+    let arr = byCase.get(r.caseId);
+    if (!arr) { arr = []; byCase.set(r.caseId, arr); }
+    arr.push({ person, ms: new Date(r.eff).getTime() });
+  }
+
+  const fromMs = from ? from.getTime() : null;
+  const toMs = to ? to.getTime() : null;
+  type Row = { caseId: string; caseRef: string; people: number; startKey: number };
+  const rows: Row[] = [];
+  for (const c of caseRows) {
+    const es = byCase.get(c.id) ?? [];
+    const inRange = es.filter(({ ms }) => {
+      if (fromMs !== null && ms < fromMs) return false;
+      if (toMs !== null && ms > toMs) return false;
+      return true;
+    });
+    if (inRange.length === 0) continue; // no attributable touch in range → not on the chart
+    const people = new Set(inRange.map((x) => x.person)).size;
+    const openedMs = new Date(c.openedAt as unknown as string).getTime();
+    const earliest = es.length ? Math.min(...es.map((x) => x.ms)) : openedMs;
+    rows.push({ caseId: c.id, caseRef: c.caseRef, people, startKey: Math.min(openedMs, earliest) });
+  }
+  if (rows.length === 0) return empty;
+  rows.sort((a, b) => a.startKey - b.startKey);
+
+  const annoByCase = await getChartAnnotationMap(studyId, 'people-per-case');
+  const included = rows.filter((r) => !annoByCase.get(r.caseId)?.excluded);
+  const values = included.map((r) => r.people);
+  const { mean, median, unpl, lnpl } = xmrLimits(values, { floorZero: true });
+  const round1 = (x: number) => Math.round(x * 10) / 10;
+  const points = rows.map((r) => {
+    const anno = annoByCase.get(r.caseId);
+    const excluded = !!anno?.excluded;
+    return {
+      caseId: r.caseId,
+      caseRef: r.caseRef,
+      leadTime: r.people,
+      startedAt: new Date(r.startKey).toISOString(),
+      special: !excluded && unpl !== null && lnpl !== null && (r.people > unpl || r.people < lnpl),
+      excluded,
+      note: anno?.note ?? null,
+    };
+  });
+  return {
+    unit: 'people', points,
+    mean: mean !== null ? round1(mean) : null,
+    median: median !== null ? round1(median) : null,
+    unpl: unpl !== null ? round1(unpl) : null,
+    lnpl: lnpl !== null ? round1(lnpl) : null,
+    n: values.length, nExcluded: rows.length - included.length, nWantedByDate: 0,
+  };
+}
+
 // Steps-per-case XmR (2026-07-08): one point per case = its step count for the
 // chosen tag (total / value / sequence / failure / failure_demand), as a count or
 // as a % of that case's total steps. A step = one work_description_blocks row.
@@ -1685,14 +1783,14 @@ export async function getTouchesPerCaseCapability(
 // steps but zero of the chosen tag is a legitimate 0 point.
 export async function getStepsPerCaseCapability(
   studyId: string,
-  opts: { valueDemands?: string[]; from?: Date; to?: Date; tag?: 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand'; mode?: 'count' | 'pct'; valueStepId?: string } = {},
+  opts: { valueDemands?: string[]; from?: Date; to?: Date; tag?: 'total' | 'value' | 'sequence' | 'failure' | 'failure_demand'; mode?: 'count' | 'pct'; valueStepId?: string; status?: CaseStatusFilter } = {},
 ): Promise<CapabilityData> {
-  const { valueDemands, from, to, valueStepId } = opts;
+  const { valueDemands, from, to, valueStepId, status } = opts;
   const tag = opts.tag ?? 'total';
   const mode = opts.mode ?? 'count';
   const unit: CapabilityData['unit'] = mode === 'pct' ? '%' : 'steps';
   const empty: CapabilityData = { unit, points: [], mean: null, median: null, unpl: null, lnpl: null, n: 0, nExcluded: 0, nWantedByDate: 0 };
-  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands);
+  const caseWhere = await valueDemandCaseWhere(studyId, valueDemands, status);
   const caseRows = await db.select({ id: cases.id, caseRef: cases.caseRef, openedAt: cases.openedAt }).from(cases).where(caseWhere);
   if (caseRows.length === 0) return empty;
 
