@@ -9,7 +9,10 @@ export async function GET(
   const study = await getStudyByCode(code);
   if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
 
-  const result = await getCases(study.id);
+  // ?includeArchived=1 → include consultant-archived cases (the Settings "Manage
+  // cases" list). Default hides them (switcher, dashboard, export).
+  const includeArchived = new URL(request.url).searchParams.get('includeArchived') === '1';
+  const result = await getCases(study.id, { includeArchived });
   return NextResponse.json(result);
 }
 

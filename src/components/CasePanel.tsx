@@ -104,6 +104,9 @@ interface Props {
   // Value creation capability (0059). On adds a colour-coded VCC pill beside each
   // CoR pill in the Capability-of-Response rail (display of what was captured).
   valueCreationCapabilityEnabled?: boolean;
+  // Consultant archive (migration 0066): whether the study has a consultant PIN,
+  // so the "Archive case" confirm knows whether to prompt for it.
+  hasConsultantPin?: boolean;
   // Milestones (2026-06-18): ordered containers. Since 0042 each carries its
   // subquestions (the flattened decision box).
   milestones: MilestoneWithSubqs[];
@@ -288,12 +291,18 @@ function ChannelSection({ channel, firmName, brokerName, onPatch }: {
   );
 }
 
-export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, brokerChannelEnabled, valueCreationCapabilityEnabled, children }: Props) {
+export default function CasePanel({ code, studyName, demandTypes, handlingTypes, collectorName, onEditName, activeCaseId, onActiveCaseChange, refreshSignal, systemType, lifeProblems, whatMattersTypes, systemConditions, onTypesChanged, unattachedLastEntryId, onAttachedLast, decisionPointsEnabled, milestones, onOpenEntry, enabled, brokerChannelEnabled, valueCreationCapabilityEnabled, hasConsultantPin, children }: Props) {
   const { t, tl } = useLocale();
 
   const [refInput, setRefInput] = useState('');
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState('');
+  // Consultant "Archive case" confirm (migration 0066): a small popover with a PIN
+  // field (when the study has one). Archiving hides the case from the data.
+  const [archiving, setArchiving] = useState(false);
+  const [archivePin, setArchivePin] = useState('');
+  const [archiveErr, setArchiveErr] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
   const [caseRow, setCaseRow] = useState<CaseRow | null>(null);
   const [entries, setEntries] = useState<CaseEntry[]>([]);
   const [wmIds, setWmIds] = useState<string[]>([]);
@@ -608,6 +617,37 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     setOpening(false);
   }
 
+  // Open the archive confirm, prefilling the PIN from a prior settings unlock.
+  function openArchiveConfirm() {
+    const cached = hasConsultantPin && typeof window !== 'undefined' ? (localStorage.getItem(`consultant_pin_${code}`) ?? '') : '';
+    setArchivePin(cached);
+    setArchiveErr(false);
+    setArchiving(true);
+  }
+
+  // Archive the open case (consultant-gated). Hides it from the data, reversibly.
+  async function archiveActiveCase() {
+    if (!caseRow || archiveBusy) return;
+    setArchiveBusy(true);
+    setArchiveErr(false);
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}/cases/${encodeURIComponent(caseRow.id)}/archive`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: true, pin: archivePin }),
+      });
+      if (!res.ok) { setArchiveErr(true); setArchiveBusy(false); return; }
+      // Success: clear the board (like Set aside) + refresh the switcher list.
+      setArchiving(false);
+      setArchivePin('');
+      setArchiveBusy(false);
+      loadCaseList();
+      onActiveCaseChange(null);
+    } catch {
+      setArchiveErr(true);
+      setArchiveBusy(false);
+    }
+  }
+
   async function patchCase(body: Record<string, unknown>) {
     if (!caseRow) return;
     const caseId = caseRow.id;
@@ -864,6 +904,51 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
   const valueDemandTypes = demandTypes.filter((d) => d.category === 'value');
   const isOpen = caseRow.status === 'open';
 
+  // Consultant "Archive case" button (migration 0066) — reused in both action bars.
+  const archiveBtn = (
+    <button
+      type="button"
+      onClick={openArchiveConfirm}
+      className="text-xs px-2.5 py-1 rounded-full font-medium border border-amber-300 bg-white text-amber-700 hover:bg-amber-50 transition-colors"
+    >
+      {t('capture.caseArchive')}
+    </button>
+  );
+
+  // Confirm popover (rendered once per return, below). Shows the case + touch count,
+  // a PIN field when the study has one, then archives (hides it from the data).
+  const archiveConfirm = archiving && (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4" onClick={() => !archiveBusy && setArchiving(false)}>
+      <div className="w-full max-w-sm rounded-xl bg-white shadow-xl border border-gray-200 p-4" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-sm font-semibold text-gray-900 mb-1">{t('capture.caseArchiveTitle')}</h3>
+        <p className="text-xs text-gray-600 mb-3">{t('capture.caseArchiveBody', { ref: caseRow.caseRef, n: String(entries.length) })}</p>
+        {hasConsultantPin && (
+          <input
+            type="password"
+            inputMode="numeric"
+            autoFocus
+            value={archivePin}
+            onChange={(e) => { setArchivePin(e.target.value); setArchiveErr(false); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && archivePin.length >= 4) { e.preventDefault(); archiveActiveCase(); } }}
+            placeholder={t('consultant.enterPin')}
+            aria-label={t('consultant.enterPin')}
+            maxLength={6}
+            className="w-full px-3 py-2 mb-1 rounded-lg border border-gray-300 text-sm text-gray-900 outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        )}
+        {archiveErr && <p className="text-xs text-red-600 mb-2">{t('consultant.wrongPin')}</p>}
+        <div className="flex justify-end gap-2 mt-2">
+          <button type="button" onClick={() => setArchiving(false)} disabled={archiveBusy} className="text-xs px-3 py-1.5 rounded-full font-medium border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+            {t('capture.caseArchiveCancel')}
+          </button>
+          <button type="button" onClick={archiveActiveCase} disabled={archiveBusy || (!!hasConsultantPin && archivePin.length < 4)} className="text-xs px-3 py-1.5 rounded-full font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50">
+            {archiveBusy ? '…' : t('capture.caseArchiveConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   // Shared sub-blocks — composed differently in flow vs transactional layouts.
   const headerRow = (
     <div className="flex flex-wrap items-center justify-center gap-2">
@@ -1001,6 +1086,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         >
           {t('capture.caseSetAside')}
         </button>
+        {archiveBtn}
       </div>
     </div>
   );
@@ -1128,6 +1214,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           >
             {t('capture.caseSetAside')}
           </button>
+          {archiveBtn}
           </div>
           {/* Right cell — empty, balances the left name so the pills stay centred. */}
           <div aria-hidden="true" />
@@ -1305,6 +1392,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         </div>
       </div>
       {reorderPanel}
+      {archiveConfirm}
       </>
     );
   }
@@ -1321,6 +1409,7 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
     </div>
     {children}
     {reorderPanel}
+    {archiveConfirm}
     </>
   );
 }

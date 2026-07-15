@@ -1,7 +1,7 @@
 import { db } from './db';
 import { demandEntries, handlingTypes, demandTypes, contactMethods, pointsOfTransaction, whatMattersTypes, workTypes, workStepTypes, valueSteps, workDescriptionBlocks, workBlockSystemConditions, studies, demandEntryWhatMatters, systemConditions, demandEntrySystemConditions, lifecycleStages, lifeProblems, cases, caseLifeProblems, caseDemandTypes, caseMilestones, caseWhatMatters, capabilityAnnotations, chartAnnotations, milestones, subquestions, caseSubquestionAnswers } from './schema';
 import { askVerdict } from './ask-verdict';
-import { eq, and, or, sql, gte, lte, desc, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { eq, and, or, sql, gte, lte, desc, inArray, notInArray, isNotNull, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { DashboardData, CapabilityData, BudgetCapabilityField, BudgetCapabilityPoint } from '@/types';
 import type { SQL } from 'drizzle-orm';
@@ -18,24 +18,31 @@ export async function valueDemandCaseIds(studyId: string, ids: string[]): Promis
   const rows = await db.selectDistinct({ id: cases.id })
     .from(cases)
     .leftJoin(caseDemandTypes, eq(caseDemandTypes.caseId, cases.id))
-    .where(and(eq(cases.studyId, studyId), or(inArray(cases.demandTypeId, ids), inArray(caseDemandTypes.demandTypeId, ids))));
+    // isNull(archivedAt): a value-demand filter must never re-include archived cases.
+    .where(and(eq(cases.studyId, studyId), isNull(cases.archivedAt), or(inArray(cases.demandTypeId, ids), inArray(caseDemandTypes.demandTypeId, ids))));
   return rows.map((r) => r.id);
 }
 
-// Case-set scope predicate for value-demand-filtered case queries. Absent filter →
-// study only; selected-but-no-match → sql`false` (zero cases). Optional `status`
-// ('open'|'closed') further narrows to that lifecycle state — the flow dashboard's
-// all/open/closed filter (2026-07-14); 'all' is expressed by passing undefined.
+// Consultant-archived cases (migration 0066) are excluded from every dashboard.
+export async function archivedCaseIds(studyId: string): Promise<string[]> {
+  const rows = await db.select({ id: cases.id }).from(cases)
+    .where(and(eq(cases.studyId, studyId), isNotNull(cases.archivedAt)));
+  return rows.map((r) => r.id);
+}
+
+// Case-set scope predicate for value-demand-filtered case queries. Always excludes
+// archived cases. Absent filter → study only; selected-but-no-match → sql`false`
+// (zero cases). Optional `status` ('open'|'closed') further narrows to that lifecycle
+// state — the flow dashboard's all/open/closed filter (2026-07-14); undefined = all.
 async function valueDemandCaseWhere(studyId: string, valueDemands?: string[], status?: CaseStatusFilter): Promise<SQL> {
-  const statusPred = status === 'open' || status === 'closed' ? eq(cases.status, status) : undefined;
-  if (!valueDemands || !valueDemands.length) {
-    return statusPred ? and(eq(cases.studyId, studyId), statusPred)! : eq(cases.studyId, studyId);
+  const preds: SQL[] = [eq(cases.studyId, studyId), isNull(cases.archivedAt)];
+  if (status === 'open' || status === 'closed') preds.push(eq(cases.status, status));
+  if (valueDemands && valueDemands.length) {
+    const caseIds = await valueDemandCaseIds(studyId, valueDemands);
+    if (!caseIds.length) return sql`false`;
+    preds.push(inArray(cases.id, caseIds));
   }
-  const caseIds = await valueDemandCaseIds(studyId, valueDemands);
-  if (!caseIds.length) return sql`false`;
-  return statusPred
-    ? and(eq(cases.studyId, studyId), inArray(cases.id, caseIds), statusPred)!
-    : and(eq(cases.studyId, studyId), inArray(cases.id, caseIds))!;
+  return and(...preds)!;
 }
 
 // 'open' | 'closed' narrow the flow dashboard to that lifecycle; undefined = all.
@@ -53,6 +60,11 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
     const caseIds = await valueDemandCaseIds(studyId, valueDemands);
     baseConditions.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
   }
+
+  // Exclude entries on archived (consultant-removed) cases from every aggregation.
+  // Keep null-case entries (transactional studies have no case to archive).
+  const archived = await archivedCaseIds(studyId);
+  if (archived.length) baseConditions.push(or(isNull(demandEntries.caseId), notInArray(demandEntries.caseId, archived))!);
 
   // Demand-only conditions (filter out work entries from all existing queries)
   const demandConditions = [...baseConditions, eq(demandEntries.entryType, 'demand')];

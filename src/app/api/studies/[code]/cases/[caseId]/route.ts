@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, serializeCaseAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, serializeCaseAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, deleteCase, verifyConsultantPin, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -216,4 +216,30 @@ export async function PATCH(
     getCaseDemandTypeIds(caseId),
   ]);
   return NextResponse.json({ ...updated, whatMattersTypeIds: wmRows.map((r) => r.whatMattersTypeId), whatMattersTargetDates: targetDatesOf(wmRows), whatMattersValues: wmValuesOf(wmRows), lifeProblemIds, demandTypeIds });
+}
+
+// DELETE: permanently remove a case and all its touches (consultant-only). Gated by
+// the study's consultant PIN — the first server-enforced PIN check in the app, since
+// this is irreversible. PIN comes in the request body (the client sends the cached
+// PIN). A study with no PIN set is open, matching pin-check.
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ code: string; caseId: string }> }
+) {
+  const { code, caseId } = await params;
+  const study = await getStudyByCode(code);
+  if (!study) return NextResponse.json({ error: 'Study not found' }, { status: 404 });
+
+  const caseRow = await getCase(caseId);
+  if (!caseRow || caseRow.studyId !== study.id) {
+    return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  if (!verifyConsultantPin(study, typeof body.pin === 'string' ? body.pin : '')) {
+    return NextResponse.json({ error: 'Wrong PIN' }, { status: 403 });
+  }
+
+  await deleteCase(caseId);
+  return NextResponse.json({ success: true });
 }

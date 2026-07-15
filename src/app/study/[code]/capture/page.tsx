@@ -114,6 +114,9 @@ interface StudyData {
   brokerChannelEnabled: boolean;
   // Worked-on-by per-touch capture (migration 0065, 2026-07-14).
   workedByEnabled: boolean;
+  // Whether the study has a consultant PIN (never the PIN itself) — gates the
+  // "Archive case" confirm (migration 0066).
+  hasConsultantPin?: boolean;
   valueSteps: { id: string; label: string; sortOrder: number }[];
   oneStopHandlingType: string | null;
   handlingTypes: HandlingType[];
@@ -1059,6 +1062,7 @@ export default function CapturePage() {
         decisionPointsEnabled={study.decisionPointsEnabled}
         brokerChannelEnabled={study.brokerChannelEnabled}
         valueCreationCapabilityEnabled={study.valueCreationCapabilityEnabled}
+        hasConsultantPin={study.hasConsultantPin}
         milestones={study.milestones || []}
         onOpenEntry={openEntry}
       >

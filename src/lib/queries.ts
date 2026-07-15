@@ -2284,8 +2284,13 @@ export async function getCaseByRef(studyId: string, caseRef: string) {
   return rows[0] || null;
 }
 
-export async function getCases(studyId: string) {
+export async function getCases(studyId: string, opts: { includeArchived?: boolean } = {}) {
   // List newest-first with a per-case entry count for the settings/dashboard list.
+  // Archived (consultant-removed) cases are hidden unless includeArchived (the
+  // Settings "Manage cases" list, which needs to show + restore/purge them).
+  const where = opts.includeArchived
+    ? eq(cases.studyId, studyId)
+    : and(eq(cases.studyId, studyId), isNull(cases.archivedAt));
   return db.select({
     id: cases.id,
     caseRef: cases.caseRef,
@@ -2299,6 +2304,7 @@ export async function getCases(studyId: string) {
     demandTypeIds: sql<string | null>`(select string_agg(cdt.demand_type_id, ',' order by cdt.id) from case_demand_types cdt where cdt.case_id = cases.id)`,
     whatMattersTypeIds: sql<string | null>`(select string_agg(cwm.what_matters_type_id, ',') from case_what_matters cwm where cwm.case_id = cases.id)`,
     status: cases.status,
+    archivedAt: cases.archivedAt,
     openedAt: cases.openedAt,
     closedAt: cases.closedAt,
     note: cases.note,
@@ -2320,7 +2326,7 @@ export async function getCases(studyId: string) {
       sql`lateral (select de.created_at as at, de.verbatim as v from demand_entries de where de.case_id = ${cases.id} order by de.created_at desc limit 1) le`,
       sql`true`,
     )
-    .where(eq(cases.studyId, studyId))
+    .where(where)
     .orderBy(desc(cases.createdAt));
 }
 
@@ -3542,6 +3548,45 @@ export async function deleteEntry(entryId: string) {
   await db.delete(demandEntryThinkings).where(eq(demandEntryThinkings.demandEntryId, entryId));
   await db.delete(workDescriptionBlocks).where(eq(workDescriptionBlocks.demandEntryId, entryId));
   await db.delete(demandEntries).where(eq(demandEntries.id, entryId));
+}
+
+// Consultant "remove from the data" (migration 0066) — reversible archive.
+export async function setCaseArchived(caseId: string, archived: boolean) {
+  await db.update(cases).set({ archivedAt: archived ? new Date() : null }).where(eq(cases.id, caseId));
+}
+
+// Consultant PIN gate: no PIN set → open; else exact match (mirrors pin-check).
+export function verifyConsultantPin(study: { consultantPin: string | null }, pin: string | undefined | null): boolean {
+  return !study.consultantPin || pin === study.consultantPin;
+}
+
+// Permanently delete a case and EVERY descendant, FK-safe (children first). The DB
+// cascade isn't trusted (per scripts/delete-studies.cjs), so each child is deleted
+// explicitly — mirroring deleteEntry, extended to the case's junctions, the block→SC
+// junction it omits, and the polymorphic chart_annotations (no FK, keyed by caseId).
+export async function deleteCase(caseId: string) {
+  const entryRows = await db.select({ id: demandEntries.id }).from(demandEntries).where(eq(demandEntries.caseId, caseId));
+  const entryIds = entryRows.map((r) => r.id);
+  if (entryIds.length) {
+    const blockRows = await db.select({ id: workDescriptionBlocks.id }).from(workDescriptionBlocks).where(inArray(workDescriptionBlocks.demandEntryId, entryIds));
+    const blockIds = blockRows.map((r) => r.id);
+    if (blockIds.length) await db.delete(workBlockSystemConditions).where(inArray(workBlockSystemConditions.workBlockId, blockIds));
+    await db.delete(demandEntryThinkingScs).where(inArray(demandEntryThinkingScs.demandEntryId, entryIds));
+    await db.delete(demandEntryWhatMatters).where(inArray(demandEntryWhatMatters.demandEntryId, entryIds));
+    await db.delete(demandEntryThinkings).where(inArray(demandEntryThinkings.demandEntryId, entryIds));
+    await db.delete(demandEntrySystemConditions).where(inArray(demandEntrySystemConditions.demandEntryId, entryIds));
+    await db.delete(workDescriptionBlocks).where(inArray(workDescriptionBlocks.demandEntryId, entryIds));
+  }
+  await db.delete(caseSubquestionAnswers).where(eq(caseSubquestionAnswers.caseId, caseId));
+  await db.delete(caseWhatMatters).where(eq(caseWhatMatters.caseId, caseId));
+  await db.delete(caseMilestones).where(eq(caseMilestones.caseId, caseId));
+  await db.delete(caseLifeProblems).where(eq(caseLifeProblems.caseId, caseId));
+  await db.delete(caseDemandTypes).where(eq(caseDemandTypes.caseId, caseId));
+  await db.delete(capabilityAnnotations).where(eq(capabilityAnnotations.caseId, caseId));
+  // chart_annotations is polymorphic (pointKey may be a caseId or a date) with no FK.
+  await db.delete(chartAnnotations).where(eq(chartAnnotations.pointKey, caseId));
+  await db.delete(demandEntries).where(eq(demandEntries.caseId, caseId));
+  await db.delete(cases).where(eq(cases.id, caseId));
 }
 
 

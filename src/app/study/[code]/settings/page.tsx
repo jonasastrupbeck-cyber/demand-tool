@@ -10,6 +10,7 @@ import DemandTypeMultiSelect from '@/components/DemandTypeMultiSelect';
 import { compatibleKinds } from '@/lib/subquestion-kinds';
 import ChildQuestionAdder from '@/components/ChildQuestionAdder';
 import CollapsibleCard from '@/components/CollapsibleCard';
+import ManageCasesSection from '@/components/ManageCasesSection';
 import { buildSubquestionTree, type SubqTreeNode, type RootNote } from '@/lib/subquestion-tree';
 import CaptureTogglesPanel from '@/components/CaptureTogglesPanel';
 import SegmentedToggle from '@/components/SegmentedToggle';
@@ -1469,6 +1470,13 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </CollapsibleCard>}
+
+        {/* Manage cases (migration 0066): archive/restore/permanently-delete
+            learning & practice cases so they don't fudge the data. Consultant-only
+            — this whole page is behind the PIN gate. Shown when the study tracks cases. */}
+        {study.caseTrackingEnabled && <CollapsibleCard title={t('settings.manageCasesTitle')} description={t('settings.manageCasesDesc')}>
+          <ManageCasesSection code={code} />
         </CollapsibleCard>}
 
         {/* Handling types — visible whenever handling is enabled */}

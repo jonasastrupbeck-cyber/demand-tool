@@ -337,6 +337,11 @@ export const cases = pgTable('cases', {
   // duplication mirroring demandEntries.whatMatters vs demandEntryWhatMatters
   // (categories + a nuance note are different data; don't "clean up").
   whatMatters: text('what_matters'),
+  // Consultant-archived (migration 0066, 2026-07-15): a reversible "remove from
+  // the data" flag for learning/practice cases. When set, the case is hidden from
+  // every dashboard/count and the normal case list, but recoverable in Settings
+  // (or permanently deleted from there). NULL = live. Consultant-PIN gated.
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
 }, (t) => ({
   uniqStudyCaseRef: unique().on(t.studyId, t.caseRef),
 }));
