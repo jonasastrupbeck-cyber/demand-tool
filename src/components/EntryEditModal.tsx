@@ -99,20 +99,20 @@ interface Props {
   code: string;
   entryId: string;
   study: EntryEditModalStudy;
+  /** Names with collected data in the study, for the worked-on-by picker. */
+  knownWorkedByNames?: string[];
   onClose: () => void;
   onSaved?: () => void;
   onStudyRefresh?: () => Promise<void> | void;
 }
 
-export default function EntryEditModal({ code, entryId, study, onClose, onSaved, onStudyRefresh }: Props) {
+export default function EntryEditModal({ code, entryId, study, knownWorkedByNames = [], onClose, onSaved, onStudyRefresh }: Props) {
   const { t, tl } = useLocale();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  // Worked-on-by (0065): name shows as settled text; "Change" reveals the input.
-  const [editingWorkedBy, setEditingWorkedBy] = useState(false);
   const [entry, setEntry] = useState<EntryFull | null>(null);
   const [whatMattersTypeIds, setWhatMattersTypeIds] = useState<string[]>([]);
   // Attachment flags per SC — which of the 5 capture fields this SC is about.
@@ -690,37 +690,35 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
               </div>
             )}
 
-            {/* Worked-on-by (0065): flow work entries only, when enabled. Shows the
-                name as settled text; "Change" reveals the input. */}
-            {study.systemType === 'flow' && entry.entryType === 'work' && study.workedByEnabled && (
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[11px] font-medium text-gray-500 text-center max-w-[18rem]">
-                  {t('capture.workedByLabel')}
-                </span>
-                {editingWorkedBy ? (
-                  <input
-                    type="text"
-                    aria-label={t('capture.workedByLabel')}
+            {/* Worked-on-by (0065): flow work entries only, when enabled. Click the
+                pill to pick a name with collected data, or "+ Add a name" to type a
+                new person. */}
+            {study.systemType === 'flow' && entry.entryType === 'work' && study.workedByEnabled && (() => {
+              const current = entry.workedByName?.trim() || '';
+              const names = new Set(knownWorkedByNames);
+              if (current) names.add(current);
+              if (entry.collectorName?.trim()) names.add(entry.collectorName.trim());
+              const options = [...names].sort((a, b) => a.localeCompare(b)).map((n) => ({ id: n, label: n }));
+              return (
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-[11px] font-medium text-gray-500 text-center max-w-[18rem]">
+                    {t('capture.workedByLabel')}
+                  </span>
+                  <PillSelect
+                    ariaLabel={t('capture.workedByLabel')}
                     placeholder={t('capture.workedByPlaceholder')}
-                    value={entry.workedByName || ''}
-                    onChange={(e) => setEntry({ ...entry, workedByName: e.target.value || null })}
-                    onBlur={() => setEditingWorkedBy(false)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setEditingWorkedBy(false); } }}
-                    autoFocus
-                    className="px-2.5 py-1 text-xs border border-gray-300 rounded-full bg-white text-gray-700 text-center min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-green-400/40"
+                    value={current}
+                    onChange={(id) => setEntry({ ...entry, workedByName: id || null })}
+                    onCreate={async (label) => label.trim() || null}
+                    addNewLabel={t('capture.workedByAddNew')}
+                    options={options}
+                    variant="add"
+                    compact
+                    compactMenu
                   />
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => { setEntry({ ...entry, workedByName: null }); setEditingWorkedBy(true); }}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 transition-colors"
-                  >
-                    <span className="font-medium">{entry.workedByName?.trim() || entry.collectorName?.trim() || t('capture.workedByPlaceholder')}</span>
-                    <span className="text-[10px] font-medium text-sky-600">{t('capture.change')}</span>
-                  </button>
-                )}
-              </div>
-            )}
+                </div>
+              );
+            })()}
 
             {/* Flow — opt-in per entry-type via flowDemandEnabled / flowWorkEnabled
                 (migration 0014). Horizontal sequence of Value/Failure steps

@@ -328,11 +328,11 @@ const translations = {
     sv: 'Namn…',
     de: 'Name…',
   },
-  'capture.change': {
-    en: 'Change',
-    da: 'Skift',
-    sv: 'Ändra',
-    de: 'Ändern',
+  'capture.workedByAddNew': {
+    en: 'Add a name',
+    da: 'Tilføj et navn',
+    sv: 'Lägg till ett namn',
+    de: 'Namen hinzufügen',
   },
   'capture.workedByShort': {
     en: 'by {name}',
