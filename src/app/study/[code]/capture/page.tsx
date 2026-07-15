@@ -162,13 +162,18 @@ export default function CapturePage() {
     originalValueDemandTypeId: string | null;
     createdAt: string;
     collectorName: string | null;
+    workedByName: string | null;
   }
   const [entries, setEntries] = useState<EntryRow[]>([]);
-  // Worked-on-by (0065) datalist: distinct names already seen in the study
-  // (collectors), so attributing a touch stays spelling-consistent.
+  // Worked-on-by (0065) datalist: every name that has collected data in the study
+  // — both collectors and anyone previously attributed a touch — so you can pick
+  // from the list and keep spelling consistent.
   const knownWorkedByNames = useMemo(() => {
     const set = new Set<string>();
-    for (const e of entries) if (e.collectorName?.trim()) set.add(e.collectorName.trim());
+    for (const e of entries) {
+      if (e.collectorName?.trim()) set.add(e.collectorName.trim());
+      if (e.workedByName?.trim()) set.add(e.workedByName.trim());
+    }
     if (collectorName.trim()) set.add(collectorName.trim());
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [entries, collectorName]);
@@ -433,10 +438,12 @@ export default function CapturePage() {
   // Worked-on-by (0065): default the field to the current collector whenever the
   // field is empty (initial load + after each save resets it back to '') so a
   // touch is attributed to you by default — override it to log for someone else.
+  // Skip while actively editing, else clearing the input to type a new name would
+  // instantly re-fill with the collector.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (collectorName.trim() && !workedByName) setWorkedByName(collectorName.trim());
-  }, [collectorName, workedByName]);
+    if (!editingWorkedBy && collectorName.trim() && !workedByName) setWorkedByName(collectorName.trim());
+  }, [collectorName, workedByName, editingWorkedBy]);
 
   // Debounced search
   useEffect(() => {
@@ -1959,7 +1966,7 @@ export default function CapturePage() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => setEditingWorkedBy(true)}
+                          onClick={() => { setWorkedByName(''); setEditingWorkedBy(true); }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 transition-colors"
                         >
                           <span className="font-medium">{workedByName.trim() || collectorName.trim() || t('capture.workedByPlaceholder')}</span>

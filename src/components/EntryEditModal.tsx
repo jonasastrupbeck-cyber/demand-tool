@@ -712,7 +712,7 @@ export default function EntryEditModal({ code, entryId, study, onClose, onSaved,
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setEditingWorkedBy(true)}
+                    onClick={() => { setEntry({ ...entry, workedByName: null }); setEditingWorkedBy(true); }}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 transition-colors"
                   >
                     <span className="font-medium">{entry.workedByName?.trim() || entry.collectorName?.trim() || t('capture.workedByPlaceholder')}</span>
