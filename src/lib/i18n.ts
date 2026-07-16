@@ -648,6 +648,14 @@ const translations = {
     sv: 'Kunde inte spara post. F\u00f6rs\u00f6k igen.',
     de: 'Eintrag konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
   },
+  // Guards the silent drop of a blank block that still carries a value step /
+  // system conditions (2026-07-16) \u2014 use Remove to delete a block on purpose.
+  'capture.blockNeedsText': {
+    en: 'A block of work is empty but still has details on it. Describe it, or remove it with \u2715.',
+    da: 'En arbejdsblok er tom, men har stadig detaljer p\u00e5 sig. Beskriv den, eller fjern den med \u2715.',
+    sv: 'Ett arbetsblock \u00e4r tomt men har fortfarande detaljer p\u00e5 sig. Beskriv det, eller ta bort det med \u2715.',
+    de: 'Ein Arbeitsblock ist leer, tr\u00e4gt aber noch Angaben. Beschreiben Sie ihn oder entfernen Sie ihn mit \u2715.',
+  },
   'capture.loading': {
     en: 'Loading...',
     da: 'Indl\u00e6ser...',

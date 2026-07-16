@@ -284,6 +284,9 @@ export default function DashboardPage() {
     if (range.from) queryParams.push(`from=${range.from}`);
     if (range.to) queryParams.push(`to=${range.to}`);
     if (valueDemandFilter.length) queryParams.push(`valueDemands=${encodeURIComponent(valueDemandFilter.join(','))}`);
+    // Case status (2026-07-16): scope the payload the same way the per-case
+    // capability charts are scoped, so every flow view agrees. 'all' sends nothing.
+    if (statusFilter !== 'all') queryParams.push(`status=${statusFilter}`);
     if (queryParams.length) url += '?' + queryParams.join('&');
 
     try {
@@ -293,7 +296,7 @@ export default function DashboardPage() {
     } finally {
       if (dashReqRef.current === reqId) setLoading(false);
     }
-  }, [code, getDateRangeParams, valueDemandFilter]);
+  }, [code, getDateRangeParams, valueDemandFilter, statusFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -905,9 +908,8 @@ export default function DashboardPage() {
 
         {/* Value-demand data scope — applies to EVERY flow view (touches/blocks,
             capability, analytics, synthesis), so it stays in the shared header.
-            Full-width now it's the only box here; the what-matters scope only
-            touches the E2E charts, so it lives inside the Capability view
-            instead (relocated 2026-07-09). */}
+            The what-matters scope only touches the E2E charts, so it lives inside
+            the Capability view instead (relocated 2026-07-09). */}
         {isFlow && valueDemandTypes.length > 0 && (
           <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.valueDemand')}</p>
@@ -917,6 +919,29 @@ export default function DashboardPage() {
               onChange={setValueDemandFilter}
               allLabel={t('dashboard.scopeAll')}
               options={valueDemandTypes.map((d) => ({ value: d.id, label: tl(d.label) }))}
+            />
+          </div>
+        )}
+
+        {/* Case-status scope — all / open / closed. Moved out of the Capability
+            view into the shared header (2026-07-16) now that it scopes the whole
+            flow payload, not just the per-case charts: Analytics used to ignore it
+            while the capability charts obeyed it, so the two disagreed. A filter
+            that scopes everything has to be visible everywhere it applies.
+            'open' leaves the lead-time charts empty (open cases have no
+            completion) — expected. */}
+        {isFlow && caseTrackingEnabled && (
+          <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
+            <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.caseStatusLabel')}</p>
+            <PillToggle
+              ariaLabel={t('dashboard.caseStatusLabel')}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v as 'all' | 'open' | 'closed')}
+              options={[
+                { value: 'all', label: t('dashboard.scopeAll') },
+                { value: 'open', label: t('capture.caseStatusOpen') },
+                { value: 'closed', label: t('capture.caseStatusClosed') },
+              ]}
             />
           </div>
         )}
@@ -1811,22 +1836,8 @@ export default function DashboardPage() {
           return (
           <CollapsibleCardsContext.Provider value={true}>
           <div className="space-y-4">
-            {/* Case-status scope (2026-07-14): all / open / closed. Scopes every
-                per-value-demand chart in this view. 'open' leaves the lead-time
-                charts empty (open cases have no completion) — expected. */}
-            <div className="rounded-lg border border-gray-300 bg-gray-50 p-2">
-              <p className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 px-0.5">{t('dashboard.caseStatusLabel')}</p>
-              <PillToggle
-                ariaLabel={t('dashboard.caseStatusLabel')}
-                value={statusFilter}
-                onChange={(v) => setStatusFilter(v as 'all' | 'open' | 'closed')}
-                options={[
-                  { value: 'all', label: t('dashboard.scopeAll') },
-                  { value: 'open', label: t('capture.caseStatusOpen') },
-                  { value: 'closed', label: t('capture.caseStatusClosed') },
-                ]}
-              />
-            </div>
+            {/* The case-status scope used to live here; it moved to the shared
+                header (2026-07-16) when it started scoping the whole flow payload. */}
             {(() => {
               const cards: CardDescriptor[] = [];
               // Touches per value demand (XmR) — one point per value demand (= one

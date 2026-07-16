@@ -48,10 +48,10 @@ async function valueDemandCaseWhere(studyId: string, valueDemands?: string[], st
 // 'open' | 'closed' narrow the flow dashboard to that lifecycle; undefined = all.
 export type CaseStatusFilter = 'open' | 'closed' | undefined;
 
-export async function getDashboardData(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<DashboardData> {
+export async function getDashboardData(studyId: string, from?: Date, to?: Date, valueDemands?: string[], status?: CaseStatusFilter): Promise<DashboardData> {
   // Non-date scope shared by BOTH the entry-level and block-level condition sets
-  // below (study + value demand + archived cases). Only the DATE predicate differs
-  // between them — see baseConditions / blockScopeConditions.
+  // below (study + value demand + case status + archived cases). Only the DATE
+  // predicate differs between them — see baseConditions / blockScopeConditions.
   const scopeConditions = [eq(demandEntries.studyId, studyId)];
 
   // Value-demand scope (flow: value demand lives on the case; entries carry
@@ -60,6 +60,17 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   if (valueDemands && valueDemands.length) {
     const caseIds = await valueDemandCaseIds(studyId, valueDemands);
     scopeConditions.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
+  }
+
+  // Case-status scope (2026-07-16): all / open / closed, matching the per-case
+  // capability charts, which have honoured it since 2026-07-14. Without this the
+  // Analytics cards (value steps, work types, …) silently ignored the CASES filter
+  // while the capability charts obeyed it, so the two disagreed. undefined = all,
+  // so transactional studies (which never send it) are unaffected.
+  if (status === 'open' || status === 'closed') {
+    const rows = await db.select({ id: cases.id }).from(cases)
+      .where(and(eq(cases.studyId, studyId), eq(cases.status, status), isNull(cases.archivedAt)));
+    scopeConditions.push(rows.length ? inArray(demandEntries.caseId, rows.map((r) => r.id)) : sql`false`);
   }
 
   // Exclude entries on archived (consultant-removed) cases from every aggregation.

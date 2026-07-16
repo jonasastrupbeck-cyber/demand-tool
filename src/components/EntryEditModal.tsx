@@ -240,6 +240,20 @@ export default function EntryEditModal({ code, entryId, study, knownWorkedByName
       thinkings,
     };
     if (entry.entryType === 'work') {
+      // Guard the text-less drop below. Clearing a block's step (the "change step"
+      // button) blanks its text but KEEPS its value step / system conditions / tag —
+      // saving then silently deleted the whole block and everything captured on it.
+      // Blocks are removed deliberately with the Remove button, so a blank block
+      // that still carries content is a mistake, not a deletion: refuse the save and
+      // say so rather than destroying the work. A wholly empty block still drops
+      // silently (nothing to lose), matching capture's rule.
+      const wouldLoseContent = workBlocks.some((b) =>
+        !b.text.trim() && (b.workStepTypeId || b.valueStepId || b.demandTypeId || b.systemConditionIds.length > 0));
+      if (wouldLoseContent) {
+        setSaveError(t('capture.blockNeedsText'));
+        setSaving(false);
+        return;
+      }
       // Strip the UI-only freeText flag before PATCH.
       body.workBlocks = workBlocks
         .filter((b) => b.text.trim().length > 0)
