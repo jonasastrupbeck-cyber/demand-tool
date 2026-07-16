@@ -49,22 +49,40 @@ async function valueDemandCaseWhere(studyId: string, valueDemands?: string[], st
 export type CaseStatusFilter = 'open' | 'closed' | undefined;
 
 export async function getDashboardData(studyId: string, from?: Date, to?: Date, valueDemands?: string[]): Promise<DashboardData> {
-  const baseConditions = [eq(demandEntries.studyId, studyId)];
-  if (from) baseConditions.push(gte(demandEntries.createdAt, from));
-  if (to) baseConditions.push(lte(demandEntries.createdAt, to));
+  // Non-date scope shared by BOTH the entry-level and block-level condition sets
+  // below (study + value demand + archived cases). Only the DATE predicate differs
+  // between them — see baseConditions / blockScopeConditions.
+  const scopeConditions = [eq(demandEntries.studyId, studyId)];
 
   // Value-demand scope (flow: value demand lives on the case; entries carry
   // caseId). Cascades into demandWhere + workWhere below, so every aggregation is
   // scoped. Selected-but-no-match → sql`false` (show zero, never "all").
   if (valueDemands && valueDemands.length) {
     const caseIds = await valueDemandCaseIds(studyId, valueDemands);
-    baseConditions.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
+    scopeConditions.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
   }
 
   // Exclude entries on archived (consultant-removed) cases from every aggregation.
   // Keep null-case entries (transactional studies have no case to archive).
   const archived = await archivedCaseIds(studyId);
-  if (archived.length) baseConditions.push(or(isNull(demandEntries.caseId), notInArray(demandEntries.caseId, archived))!);
+  if (archived.length) scopeConditions.push(or(isNull(demandEntries.caseId), notInArray(demandEntries.caseId, archived))!);
+
+  // ENTRY-level date scope: aggregations that count demand/work ENTRIES bucket by
+  // the entry's own createdAt.
+  const baseConditions = [...scopeConditions];
+  if (from) baseConditions.push(gte(demandEntries.createdAt, from));
+  if (to) baseConditions.push(lte(demandEntries.createdAt, to));
+
+  // BLOCK-level date scope: a work block carries its own date (migration 0031) and
+  // is routinely backdated relative to its parent entry (retrospective capture), so
+  // anything counting BLOCKS must bucket by coalesce(block_date, created_at) — the
+  // same effective-date rule as getOverTimeSeries and the capability charts.
+  // Filtering blocks by the parent entry's createdAt put backdated work in the
+  // wrong period and made the value-step cards disagree with the over-time chart.
+  // Requires workDescriptionBlocks to be in the query's FROM/JOIN set.
+  const blockScopeConditions = [...scopeConditions];
+  if (from) blockScopeConditions.push(gte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, from));
+  if (to) blockScopeConditions.push(lte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, to));
 
   // Demand-only conditions (filter out work entries from all existing queries)
   const demandConditions = [...baseConditions, eq(demandEntries.entryType, 'demand')];
@@ -616,7 +634,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
         .from(workDescriptionBlocks)
         .innerJoin(workStepTypes, eq(workDescriptionBlocks.workStepTypeId, workStepTypes.id))
         .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-        .where(and(...baseConditions))
+        .where(and(...blockScopeConditions))
         .groupBy(workStepTypes.label, workStepTypes.tag)
         .orderBy(desc(sql`count(*)`)),
       // 4) Capability by work type (block-level value vs failure tags)
@@ -710,7 +728,7 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
       .from(workDescriptionBlocks)
       .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
       .innerJoin(demandTypes, eq(workDescriptionBlocks.demandTypeId, demandTypes.id))
-      .where(and(...baseConditions, eq(workDescriptionBlocks.tag, 'failure_demand')))
+      .where(and(...blockScopeConditions, eq(workDescriptionBlocks.tag, 'failure_demand')))
       .groupBy(demandTypes.id, demandTypes.label)
       .orderBy(desc(sql`count(*)`));
     flowFailureDemandTypeCounts = rows.map(r => ({ label: r.label, count: r.count }));
@@ -758,30 +776,41 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
   // ── WORK BY VALUE STEP (migration 0047) ──
   // Where does failure/sequence (and value) work land across the customer value
   // journey? Count flow work blocks per value step, split by tag. P2BS-scoped
-  // via baseConditions; ordered by the value step's own order. Feature-gated.
-  let workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }> = [];
-  let valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }> = [];
+  // via blockScopeConditions (effective block date); ordered by the value step's
+  // own order. Feature-gated.
+  //
+  // Returns EVERY value step the study defines (zero-filled when it has no work)
+  // plus an `id: null` "untagged" bucket for blocks that carry no value step, so
+  // the totals reconcile to the study's block count and "not tagged yet" is
+  // distinguishable from "no work here". Previously an inner join off the block
+  // side returned only steps that already had work — a study whose work predates
+  // its value steps rendered as a single lonely row and read as broken.
+  const UNTAGGED_SORT = Number.MAX_SAFE_INTEGER; // pins the untagged bucket last in journey order
+  let workByValueStep: Array<{ id: string | null; label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }> = [];
+  let valueStepSystemConditions: Array<{ stepId: string; stepLabel: string; stepSortOrder: number; scLabel: string; count: number }> = [];
   const valueStepDone = (async () => {
   if (valueStepsEnabled) {
-    const [rows, scRows] = await Promise.all([
+    const [rows, scRows, allSteps] = await Promise.all([
+      // LEFT join + group by the BLOCK's valueStepId so untagged blocks survive
+      // as a null-id row instead of being silently dropped.
       db.select({
-        label: valueSteps.label,
-        sortOrder: valueSteps.sortOrder,
+        id: workDescriptionBlocks.valueStepId,
         tag: workDescriptionBlocks.tag,
         count: sql<number>`count(*)::int`,
       })
         .from(workDescriptionBlocks)
         .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
-        .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
-        .where(and(...baseConditions))
-        .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, workDescriptionBlocks.tag),
+        .where(and(...blockScopeConditions))
+        .groupBy(workDescriptionBlocks.valueStepId, workDescriptionBlocks.tag),
       // Per (value step × system condition) block counts — the CAUSES behind
       // the waste at each step, for the per-step overview cards. Junction rows
       // are re-pointed to the surviving SC at merge time, so excluding archived
       // conditions here reproduces getSystemConditionFrequencies' behaviour.
-      // Same base scoping (study + P2BS + dates) as workByValueStep.
+      // Same block scoping as workByValueStep. Inner join on value steps is right
+      // here: an SC on an untagged block isn't attributable to any step.
       systemConditionsEnabled
         ? db.select({
+            stepId: valueSteps.id,
             stepLabel: valueSteps.label,
             stepSortOrder: valueSteps.sortOrder,
             scLabel: systemConditions.label,
@@ -792,21 +821,41 @@ export async function getDashboardData(studyId: string, from?: Date, to?: Date, 
             .innerJoin(demandEntries, eq(workDescriptionBlocks.demandEntryId, demandEntries.id))
             .innerJoin(valueSteps, eq(workDescriptionBlocks.valueStepId, valueSteps.id))
             .innerJoin(systemConditions, eq(workBlockSystemConditions.systemConditionId, systemConditions.id))
-            .where(and(...baseConditions, isNull(systemConditions.archivedAt)))
+            .where(and(...blockScopeConditions, isNull(systemConditions.archivedAt)))
             .groupBy(valueSteps.id, valueSteps.label, valueSteps.sortOrder, systemConditions.id, systemConditions.label)
             .orderBy(desc(sql`count(*)`))
         : Promise.resolve([]),
+      // The study's full journey — drives the output so empty steps still appear.
+      db.select({ id: valueSteps.id, label: valueSteps.label, sortOrder: valueSteps.sortOrder })
+        .from(valueSteps)
+        .where(eq(valueSteps.studyId, studyId)),
     ]);
     valueStepSystemConditions = scRows;
-    const byStep = new Map<string, { label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>();
+
+    // Tally the block counts per step id (null = untagged). Keyed on the id, not
+    // label+sortOrder — two steps sharing both used to collapse into one row.
+    type Tally = { id: string | null; label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number };
+    const blank = (id: string | null, label: string, sortOrder: number): Tally =>
+      ({ id, label, sortOrder, value: 0, sequence: 0, failure: 0, failureDemand: 0 });
+    const byStep = new Map<string, Tally>();
+    for (const s of allSteps) byStep.set(s.id, blank(s.id, s.label, s.sortOrder));
     for (const r of rows) {
-      const key = `${r.sortOrder}::${r.label}`;
-      const e = byStep.get(key) ?? { label: r.label, sortOrder: r.sortOrder, value: 0, sequence: 0, failure: 0, failureDemand: 0 };
+      // Fold anything we can't place on this study's journey into untagged — a
+      // null step id, or (never expected, since the FK nulls on delete) an id the
+      // study doesn't define. Better surfaced as untagged than silently dropped.
+      const key = r.id && byStep.has(r.id) ? r.id : '__untagged__';
+      const e = byStep.get(key) ?? blank(null, '', UNTAGGED_SORT);
       if (r.tag === 'value') e.value += r.count;
       else if (r.tag === 'sequence') e.sequence += r.count;
       else if (r.tag === 'failure') e.failure += r.count;
       else if (r.tag === 'failure_demand') e.failureDemand += r.count;
       byStep.set(key, e);
+    }
+    // The untagged bucket only earns a row when it actually holds work; the
+    // client renders its label (i18n) off `id === null`.
+    const untagged = byStep.get('__untagged__');
+    if (untagged && (untagged.value + untagged.sequence + untagged.failure + untagged.failureDemand) === 0) {
+      byStep.delete('__untagged__');
     }
     workByValueStep = [...byStep.values()].sort((a, b) => a.sortOrder - b.sortOrder);
   }
@@ -1552,6 +1601,12 @@ export async function getOverTimeSeries(
     const caseIds = await valueDemandCaseIds(studyId, valueDemands);
     scopeConds.push(caseIds.length ? inArray(demandEntries.caseId, caseIds) : sql`false`);
   }
+  // Exclude archived (consultant-removed) cases, as every other aggregation does.
+  // Without this the series only *looked* right when a value demand was selected
+  // (valueDemandCaseIds filters archived out transitively) and silently included
+  // archived work on "All" — so it disagreed with the value-step cards.
+  const archived = await archivedCaseIds(studyId);
+  if (archived.length) scopeConds.push(or(isNull(demandEntries.caseId), notInArray(demandEntries.caseId, archived))!);
   if (valueStepIds && valueStepIds.length) scopeConds.push(inArray(workDescriptionBlocks.valueStepId, valueStepIds));
   if (from) scopeConds.push(gte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, from));
   if (to) scopeConds.push(lte(sql`coalesce(${workDescriptionBlocks.blockDate}, ${demandEntries.createdAt})`, to));

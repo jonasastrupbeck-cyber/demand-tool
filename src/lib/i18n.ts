@@ -1846,6 +1846,27 @@ const translations = {
     sv: 'Inga systemvillkor registrerade på arbetet i detta steg ännu.',
     de: 'Noch keine Systembedingungen an der Arbeit dieses Schritts erfasst.',
   },
+  // The "untagged" bucket (2026-07-16): blocks of work carrying no value step.
+  // Shown so the journey's totals reconcile and untagged work is visible instead
+  // of silently dropped.
+  'dashboard.vsUntagged': {
+    en: 'Not tagged to a value step',
+    da: 'Ikke knyttet til et værditrin',
+    sv: 'Inte kopplat till ett värdesteg',
+    de: 'Keinem Wertschritt zugeordnet',
+  },
+  'dashboard.vsUntaggedHint': {
+    en: 'These blocks of work were registered without a value step.',
+    da: 'Disse arbejdsblokke blev registreret uden et værditrin.',
+    sv: 'Dessa arbetsblock registrerades utan ett värdesteg.',
+    de: 'Diese Arbeitsblöcke wurden ohne Wertschritt erfasst.',
+  },
+  'dashboard.vsNoWorkYet': {
+    en: 'No work recorded at this step yet.',
+    da: 'Intet arbejde registreret i dette trin endnu.',
+    sv: 'Inget arbete registrerat i detta steg ännu.',
+    de: 'Noch keine Arbeit in diesem Schritt erfasst.',
+  },
   'dashboard.synthesisTabHelp': {
     en: 'Study what you have captured and merge the labels that are really the same onto one agreed name.',
     da: 'Studér det, du har opfanget, og slå de betegnelser sammen, der reelt er det samme, til ét aftalt navn.',

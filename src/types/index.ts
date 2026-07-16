@@ -215,13 +215,20 @@ export interface DashboardData {
   // Value steps (migration 0047): work-block counts per value step, split by
   // tag, so we can see where failure/sequence work lands across the value
   // journey. Ordered by value-step order. P2BS-scoped. Empty unless enabled.
+  //
+  // Includes EVERY step the study defines (zero-filled when it has no work) plus,
+  // when non-empty, an `id: null` "untagged" bucket for blocks carrying no value
+  // step — pinned last. So the counts reconcile to the study's total block count,
+  // and "not tagged yet" reads differently from "no work here". The client renders
+  // the untagged row's label from i18n off `id === null` (its `label` is '').
   valueStepsEnabled: boolean;
-  workByValueStep: Array<{ label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>;
+  workByValueStep: Array<{ id: string | null; label: string; sortOrder: number; value: number; sequence: number; failure: number; failureDemand: number }>;
   // Per (value step × system condition) flow-block counts — the causes behind
   // the waste at each step. Flat rows ordered by count desc; the client groups
-  // per step (match on stepLabel + stepSortOrder, mirroring workByValueStep's
-  // key). Empty unless valueStepsEnabled AND systemConditionsEnabled.
-  valueStepSystemConditions: Array<{ stepLabel: string; stepSortOrder: number; scLabel: string; count: number }>;
+  // per step by `stepId` (matching workByValueStep's `id`). Never carries the
+  // untagged bucket — an SC on an untagged block isn't attributable to a step.
+  // Empty unless valueStepsEnabled AND systemConditionsEnabled.
+  valueStepSystemConditions: Array<{ stepId: string; stepLabel: string; stepSortOrder: number; scLabel: string; count: number }>;
   // Value creation capability (migration 0059): per-work-entry reflective
   // judgement (Value Created / Value Maintained / Missed Opportunity), counted
   // over answered flow work entries. P2BS + date scoped. Empty unless enabled.

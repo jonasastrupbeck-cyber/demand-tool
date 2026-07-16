@@ -2242,7 +2242,10 @@ export default function DashboardPage() {
                       : vsSort === 'sequence' ? b.sequence - a.sequence
                       : vsSort === 'waste' ? (b.sequence + b.failure + b.failureDemand) - (a.sequence + a.failure + a.failureDemand)
                       : a.sortOrder - b.sortOrder
-                    ).map(d => ({ ...d, label: tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
+                    // id === null = the "not tagged to a value step" bucket; its
+                    // label lives in i18n, not the DB. Journey order pins it last
+                    // (MAX_SAFE_INTEGER sortOrder); the waste sorts rank it by count.
+                    ).map(d => ({ ...d, label: d.id === null ? t('dashboard.vsUntagged') : tl(d.label) }))} layout="vertical" margin={{ left: 10, right: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
                       <XAxis type="number" allowDecimals={false} tick={tickStyle} />
                       <YAxis type="category" dataKey="label" width={160} tick={{ fontSize: 10, fill: THEME.textSecondary }} interval={0} tickFormatter={(v: string) => v.length > 25 ? v.slice(0, 23) + '…' : v} />
@@ -2270,8 +2273,12 @@ export default function DashboardPage() {
                       const total = step.value + step.sequence + step.failure + step.failureDemand;
                       const waste = step.sequence + step.failure + step.failureDemand;
                       const wastePct = total > 0 ? Math.round((waste / total) * 100) : 0;
-                      const scs = data.valueStepSystemConditions
-                        .filter((r) => r.stepLabel === step.label && r.stepSortOrder === step.sortOrder)
+                      // id === null → the "not tagged to a value step" bucket: work
+                      // that carries no step (e.g. captured before the study defined
+                      // its journey). Not a step, so no SCs and its own styling.
+                      const isUntagged = step.id === null;
+                      const scs = isUntagged ? [] : data.valueStepSystemConditions
+                        .filter((r) => r.stepId === step.id)
                         .slice(0, 5); // already count-desc from the query
                       const scMax = scs[0]?.count ?? 0;
                       const mix = [
@@ -2281,24 +2288,39 @@ export default function DashboardPage() {
                         { key: 'failureDemand', n: step.failureDemand, color: '#e11d48', name: t('capture.workBlockTagFailureDemand') },
                       ].filter((m) => m.n > 0);
                       return (
-                        <div key={`${step.sortOrder}::${step.label}`} className="rounded-lg border border-gray-100 bg-gray-50/60 px-3 py-2.5">
+                        <div key={step.id ?? '__untagged__'} className={`rounded-lg border px-3 py-2.5 ${isUntagged ? 'border-amber-200 bg-amber-50/60' : 'border-gray-100 bg-gray-50/60'}`}>
                           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                            <p className="text-sm font-medium text-gray-800 break-words">{tl(step.label)}</p>
+                            <p className={`text-sm font-medium break-words ${isUntagged ? 'text-amber-800' : total === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
+                              {isUntagged ? t('dashboard.vsUntagged') : tl(step.label)}
+                            </p>
                             <p className="text-[11px] text-gray-500 shrink-0">
-                              {total} {t('dashboard.vsWorkSteps')} ·{' '}
-                              <span className={`font-medium ${wastePct > 0 ? 'text-red-600' : 'text-green-700'}`}>{wastePct}% {t('dashboard.vsNonValueShare')}</span>
+                              {total} {t('dashboard.vsWorkSteps')}
+                              {/* A step with no work has no meaningful waste share —
+                                  "0% non-value" would read as a clean step. */}
+                              {total > 0 && (<>
+                                {' · '}
+                                <span className={`font-medium ${wastePct > 0 ? 'text-red-600' : 'text-green-700'}`}>{wastePct}% {t('dashboard.vsNonValueShare')}</span>
+                              </>)}
                             </p>
                           </div>
-                          {/* Work-mix strip: 100%-stacked, same palette as the chart above. */}
+                          {/* Work-mix strip: 100%-stacked, same palette as the chart
+                              above. `mix` is empty when total === 0, so the divide
+                              never runs and the strip renders as an empty grey rail. */}
                           <div className="mt-1.5 flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
                             {mix.map((m) => (<div key={m.key} style={{ width: `${(m.n / total) * 100}%`, backgroundColor: m.color }} />))}
                           </div>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            {mix.map((m, i) => (
-                              <span key={m.key}>{i > 0 && ' · '}<span style={{ color: m.color }}>●</span> {m.name} {m.n}</span>
-                            ))}
-                          </p>
-                          {scs.length > 0 ? (
+                          {total > 0 && (
+                            <p className="mt-1 text-[11px] text-gray-500">
+                              {mix.map((m, i) => (
+                                <span key={m.key}>{i > 0 && ' · '}<span style={{ color: m.color }}>●</span> {m.name} {m.n}</span>
+                              ))}
+                            </p>
+                          )}
+                          {isUntagged ? (
+                            <p className="mt-1.5 text-[11px] text-amber-700">{t('dashboard.vsUntaggedHint')}</p>
+                          ) : total === 0 ? (
+                            <p className="mt-1.5 text-[11px] italic text-gray-400">{t('dashboard.vsNoWorkYet')}</p>
+                          ) : scs.length > 0 ? (
                             <div className="mt-2 space-y-1">
                               <p className="text-[11px] font-medium text-gray-600">{t('dashboard.vsTopSystemConditions')}</p>
                               {scs.map((sc) => (
