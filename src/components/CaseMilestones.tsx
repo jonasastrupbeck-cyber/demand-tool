@@ -16,7 +16,7 @@
  * (no reseed effect → no clobber of in-progress typing).
  */
 
-import { useState, useMemo, type ReactElement } from 'react';
+import { useState, useMemo, useEffect, useRef, type ReactElement } from 'react';
 import { useLocale } from '@/lib/locale-context';
 import { askVerdict, type CaptureKind } from '@/lib/ask-verdict';
 import SubquestionInput, { type Subquestion, type Draft, EMPTY_DRAFT } from '@/components/SubquestionInput';
@@ -110,6 +110,18 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [completedOn, setCompletedOn] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  // Save feedback (2026-07-16). The save is a ~1-2s round-trip (write + full
+  // recompute + re-read) and used to give NO signal until the green landed, so
+  // collectors read "nothing happened" and only noticed the green later. `savedId`
+  // flashes a short "Saved ✓" — needed because re-saving an already-green decision
+  // changes nothing visually, so an edit+save otherwise has zero feedback.
+  // `saveErrorId` surfaces failures, which used to be swallowed silently.
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saveErrorId, setSaveErrorId] = useState<string | null>(null);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The component remounts per case (key={caseRow.id}), so the flash timer must
+  // never outlive it and fire setState on an unmounted tree.
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
   // Close prompt after picking a negative-polarity option (never auto-closes).
   const [closePrompt, setClosePrompt] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -191,6 +203,9 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
   async function saveMilestone(m: MilestoneWithSubqs) {
     if (savingId) return;
     setSavingId(m.id);
+    setSaveErrorId(null);
+    setSavedId(null);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
     const on = completedOn[m.id] ?? todayISO();
     const answersPayload = m.subquestions.filter((sq) => visibleIds.has(sq.id)).map((sq) => toAnswer(sq, drafts[sq.id] ?? EMPTY_DRAFT, on));
     try {
@@ -208,9 +223,20 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
         } else {
           await onChanged();
         }
+        // Keep the just-saved decision open. Completing it shifts
+        // firstIncompleteIdx to the next milestone, which would otherwise
+        // auto-collapse this box the moment it went green — pulling the result
+        // out from under the collector instead of showing it to them.
+        setOverrides((o) => ({ ...o, [m.id]: true }));
+        setSavedId(m.id);
+        savedTimer.current = setTimeout(() => setSavedId(null), 1500);
+      } else {
+        setSaveErrorId(m.id);
       }
     } catch {
-      // Network failure — leave drafts intact so the collector can retry.
+      // Network failure — leave drafts intact so the collector can retry, and say
+      // so: a silent failure was indistinguishable from a successful save.
+      setSaveErrorId(m.id);
     } finally {
       setSavingId(null);
     }
@@ -361,12 +387,16 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
           );
         }
 
+        // Completed styling matches the collapsed pill's weight (green-50/70 +
+        // green heading). It used to be green-50 at 40% with a tiny tick, so a
+        // decision that stayed open barely read as green and collectors thought
+        // Save hadn't worked until collapsing revealed the strong pill.
         return (
-          <div key={m.id} className={`rounded-xl border-2 p-2 space-y-1.5 ${complete ? 'border-green-300 bg-green-50/40' : 'border-sky-200 bg-white'}`}>
+          <div key={m.id} className={`rounded-xl border-2 p-2 space-y-1.5 ${complete ? 'border-green-300 bg-green-50/70' : 'border-sky-200 bg-white'}`}>
             <div className="flex items-center gap-1.5">
               <span className="shrink-0 w-4 text-[10px] text-gray-400 tabular-nums text-center">{idx + 1}</span>
-              <p className="flex-1 text-xs font-semibold text-gray-800 truncate">{tl(m.label)}</p>
-              {complete && rec && <span className="shrink-0 text-[10px] text-green-600">✓ {new Date(rec.reachedAt).toLocaleDateString()}</span>}
+              <p className={`flex-1 text-xs font-semibold truncate ${complete ? 'text-green-800' : 'text-gray-800'}`}>{tl(m.label)}</p>
+              {complete && rec && <span className="shrink-0 text-[10px] font-medium text-green-700 tabular-nums">✓ {new Date(rec.reachedAt).toLocaleDateString()}</span>}
               <button type="button" onClick={() => toggleOpen(false)} aria-label={t('capture.milestoneCollapse')} className="shrink-0 text-[10px] text-gray-400 hover:text-gray-700 px-1 leading-none">▾</button>
             </div>
 
@@ -388,9 +418,25 @@ export default function CaseMilestones({ code, caseId, milestones, answers, case
                     />
                   </label>
                 </div>
+                {/* The save is a ~1-2s round-trip. Say "Saving…" during it, then
+                    flash "Saved ✓" — re-saving an already-green decision changes
+                    nothing visually, so without the flash an edit+save gives no
+                    feedback at all. Every save button disables while any save is in
+                    flight: saveMilestone() no-ops on a second concurrent call, so
+                    leaving the others live meant a click that did nothing. */}
                 <div className="flex items-center justify-center gap-1.5">
-                  <button type="button" onClick={() => saveMilestone(m)} disabled={savingId === m.id} className="px-2 py-0.5 rounded-lg text-[11px] font-medium text-white bg-brand hover:bg-brand-hover disabled:opacity-50 transition-colors">{t('settings.save')}</button>
+                  <button
+                    type="button"
+                    onClick={() => saveMilestone(m)}
+                    disabled={!!savingId}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-medium text-white transition-colors disabled:opacity-50 ${savedId === m.id ? 'bg-green-600' : 'bg-brand hover:bg-brand-hover'}`}
+                  >
+                    {savingId === m.id ? t('capture.decisionSaving') : savedId === m.id ? `✓ ${t('capture.decisionSaved')}` : t('settings.save')}
+                  </button>
                 </div>
+                {saveErrorId === m.id && (
+                  <p className="text-[10px] text-red-600 text-center">{t('capture.decisionSaveFailed')}</p>
+                )}
               </div>
             )}
           </div>

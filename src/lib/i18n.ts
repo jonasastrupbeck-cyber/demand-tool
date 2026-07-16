@@ -648,6 +648,26 @@ const translations = {
     sv: 'Kunde inte spara post. F\u00f6rs\u00f6k igen.',
     de: 'Eintrag konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.',
   },
+  // Decision-box save feedback (2026-07-16): the save is a ~1-2s round-trip and
+  // used to give no signal until the green landed.
+  'capture.decisionSaving': {
+    en: 'Saving\u2026',
+    da: 'Gemmer\u2026',
+    sv: 'Sparar\u2026',
+    de: 'Speichern\u2026',
+  },
+  'capture.decisionSaved': {
+    en: 'Saved',
+    da: 'Gemt',
+    sv: 'Sparat',
+    de: 'Gespeichert',
+  },
+  'capture.decisionSaveFailed': {
+    en: 'Could not save. Please try again.',
+    da: 'Kunne ikke gemme. Pr\u00f8v igen.',
+    sv: 'Kunde inte spara. F\u00f6rs\u00f6k igen.',
+    de: 'Konnte nicht gespeichert werden. Bitte erneut versuchen.',
+  },
   // Guards the silent drop of a blank block that still carries a value step /
   // system conditions (2026-07-16) \u2014 use Remove to delete a block on purpose.
   'capture.blockNeedsText': {
