@@ -105,6 +105,11 @@ export const studies = pgTable('studies', {
   // Powers the "people per value demand" XmR. Default false.
   workedByEnabled: boolean('worked_by_enabled').notNull().default(false),
   consultantPin: text('consultant_pin'),
+  // Per-study dashboard card layout (migration 0067, 2026-07-16). JSON blob:
+  // { [view]: { order: string[], hidden: string[] } } letting a study drag-reorder
+  // and show/hide its dashboard chart cards. Null = default order, all visible.
+  // Additive; existing studies behave identically.
+  dashboardCardConfig: text('dashboard_card_config'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
 });

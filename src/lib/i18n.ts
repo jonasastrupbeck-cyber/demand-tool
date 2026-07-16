@@ -1622,6 +1622,44 @@ const translations = {
     sv: 'Exportera',
     de: 'Exportieren',
   },
+  // Per-study dashboard card layout (2026-07-16): rearrange-mode toolbar + card
+  // show/hide affordances. UI chrome — not Vanguard concept copy.
+  'dashboard.rearrange': {
+    en: 'Rearrange',
+    da: 'Omarranger',
+    sv: 'Ändra ordning',
+    de: 'Anordnen',
+  },
+  'dashboard.rearrangeSave': {
+    en: 'Save layout',
+    da: 'Gem layout',
+    sv: 'Spara layout',
+    de: 'Layout speichern',
+  },
+  'dashboard.rearrangeCancel': {
+    en: 'Cancel',
+    da: 'Annuller',
+    sv: 'Avbryt',
+    de: 'Abbrechen',
+  },
+  'dashboard.rearrangeReset': {
+    en: 'Reset',
+    da: 'Nulstil',
+    sv: 'Återställ',
+    de: 'Zurücksetzen',
+  },
+  'dashboard.showCard': {
+    en: 'Show card',
+    da: 'Vis kort',
+    sv: 'Visa kort',
+    de: 'Karte anzeigen',
+  },
+  'dashboard.hideCard': {
+    en: 'Hide card',
+    da: 'Skjul kort',
+    sv: 'Dölj kort',
+    de: 'Karte ausblenden',
+  },
   'dashboard.viewLabel': {
     en: 'View',
     da: 'Visning',

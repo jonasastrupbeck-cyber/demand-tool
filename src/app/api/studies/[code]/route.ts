@@ -163,6 +163,20 @@ export async function PUT(
     }
   }
   if (body.consultantPin !== undefined) updates.consultantPin = body.consultantPin;
+  // Per-study dashboard card layout (migration 0067, 2026-07-16). Stored as a
+  // JSON string ({ [view]: { order, hidden } }); null clears it. Guard the size
+  // so a malformed client can't bloat the row. Accepts either a pre-stringified
+  // value or an object we serialise here.
+  if (body.dashboardCardConfig !== undefined) {
+    if (body.dashboardCardConfig === null) {
+      updates.dashboardCardConfig = null;
+    } else {
+      const raw = typeof body.dashboardCardConfig === 'string'
+        ? body.dashboardCardConfig
+        : JSON.stringify(body.dashboardCardConfig);
+      if (raw.length <= 8000) updates.dashboardCardConfig = raw;
+    }
+  }
 
   // Only call the DB update when we actually have something to set — Drizzle's
   // .set({}) rejects empty objects with "No values to set". A PUT containing

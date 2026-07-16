@@ -27,6 +27,7 @@ import OverTimeExplorerChart from '@/components/OverTimeExplorerChart';
 import TaxonomySynthesis, { type SynthesisLabels } from '@/components/TaxonomySynthesis';
 import { nodeToPngDataUrl } from '@/lib/chart-image';
 import { CollapsibleCardsContext, useCollapsibleCards } from '@/components/collapsible-cards-context';
+import { CardStack, type CardDescriptor } from '@/components/DashboardCard';
 
 const THEME = {
   text: '#1f2937',
@@ -55,6 +56,11 @@ const tooltipStyle = {
 type DateRange = 'all' | 'today' | '7d' | '30d' | 'custom';
 
 type DashboardView = 'demand' | 'work' | 'overview' | 'capability' | 'synthesis' | 'analytics';
+
+// Per-study dashboard card layout (migration 0067, 2026-07-16): per-view drag
+// order + hidden-set for the chart cards, persisted as the study's
+// `dashboardCardConfig` JSON blob keyed by view.
+type ViewCardCfg = { order: string[]; hidden: string[] };
 
 // The mergeable taxonomies offered in the Synthesise view. 'vd'/'fd' = value /
 // failure demand types (0063); 'lp'/'wm' = life problems / what-matters factors
@@ -178,6 +184,44 @@ export default function DashboardPage() {
   const [chartIds, setChartIds] = useState<string[]>(['cap-1']);
   const [capPptxExporting, setCapPptxExporting] = useState(false);
 
+  // Per-study dashboard card layout (migration 0067, 2026-07-16). `cardConfig` is
+  // the committed per-view order + hidden-set (from dashboardCardConfig JSON).
+  // "Rearrange" mode edits DRAFT copies scoped to the active view so Cancel needs
+  // no revert; Save persists them back to the study.
+  const [cardConfig, setCardConfig] = useState<Record<string, ViewCardCfg>>({});
+  const [rearranging, setRearranging] = useState(false);
+  const [draftOrder, setDraftOrder] = useState<string[]>([]);
+  const [draftHidden, setDraftHidden] = useState<string[]>([]);
+  const [savingLayout, setSavingLayout] = useState(false);
+
+  const startRearrange = useCallback(() => {
+    setDraftOrder(cardConfig[dashboardView]?.order ?? []);
+    setDraftHidden(cardConfig[dashboardView]?.hidden ?? []);
+    setRearranging(true);
+  }, [cardConfig, dashboardView]);
+  const cancelRearrange = useCallback(() => setRearranging(false), []);
+  // Reset stays in rearrange mode (draft cleared → default order, all visible);
+  // the user then Saves to persist the cleared config.
+  const resetLayout = useCallback(() => { setDraftOrder([]); setDraftHidden([]); }, []);
+  const applyDraftOrder = useCallback((next: string[]) => setDraftOrder(next), []);
+  const toggleDraftHidden = useCallback((id: string) => {
+    setDraftHidden((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id]));
+  }, []);
+  const saveLayout = useCallback(async () => {
+    setSavingLayout(true);
+    const next = { ...cardConfig, [dashboardView]: { order: draftOrder, hidden: draftHidden } };
+    try {
+      const res = await fetch(`/api/studies/${encodeURIComponent(code)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboardCardConfig: JSON.stringify(next) }),
+      });
+      if (res.ok) { setCardConfig(next); setRearranging(false); }
+    } finally {
+      setSavingLayout(false);
+    }
+  }, [cardConfig, dashboardView, draftOrder, draftHidden, code]);
+
   const getDateRangeParams = useCallback((): { from?: string; to?: string } => {
     if (dateRange === 'today') {
       const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -292,6 +336,10 @@ export default function DashboardPage() {
         if (s.valueLinkingEnabled) effective = Math.max(effective, 4);
         if ((s.whatMattersTypes?.length || 0) > 0) effective = Math.max(effective, 5);
         setActiveLayer(effective);
+        // Per-study dashboard card layout (migration 0067). Tolerate legacy/empty
+        // or malformed JSON — fall back to defaults (nothing ordered/hidden).
+        try { setCardConfig(s.dashboardCardConfig ? JSON.parse(s.dashboardCardConfig) : {}); }
+        catch { setCardConfig({}); }
         setFullStudy(s as EntryEditModalStudy);
       });
   }, [code]);
@@ -403,6 +451,15 @@ export default function DashboardPage() {
   const capabilityAvailable = caseTrackingEnabled && milestones.length > 0;
   // R7: flow studies get a capability-only dashboard (demand widgets stripped).
   const isFlow = systemType === 'flow';
+  // Per-study card layout (2026-07-16): the "Rearrange" toolbar shows only on the
+  // card views (flow → capability; non-flow → demand/work/overview). The
+  // capability view's reorder set is the fixed XmR charts; the dynamic
+  // CapabilityChart stack keeps its own add/remove.
+  const cardViewActive =
+    (isFlow && dashboardView === 'capability') ||
+    (!isFlow && (dashboardView === 'demand' || dashboardView === 'work' || dashboardView === 'overview'));
+  const layoutOrder = (view: string) => (rearranging && view === dashboardView ? draftOrder : (cardConfig[view]?.order ?? []));
+  const layoutHidden = (view: string) => new Set<string>(rearranging && view === dashboardView ? draftHidden : (cardConfig[view]?.hidden ?? []));
   // Synthesis (0028/0030): the "Synthesise" tab is available once the toggle is
   // on and there's at least one synthesisable taxonomy (system conditions, work
   // types, or work step types).
@@ -723,6 +780,27 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex gap-2">
+            {rearranging ? (
+              /* Rearrange mode (2026-07-16): swap the export cluster for Save /
+                 Cancel / Reset. Drag handles + eye toggles live on the cards. */
+              <>
+                <button onClick={cancelRearrange} disabled={savingLayout} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                  {t('dashboard.rearrangeCancel')}
+                </button>
+                <button onClick={resetLayout} disabled={savingLayout} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                  {t('dashboard.rearrangeReset')}
+                </button>
+                <button onClick={saveLayout} disabled={savingLayout} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-brand text-white hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed">
+                  {savingLayout ? '...' : t('dashboard.rearrangeSave')}
+                </button>
+              </>
+            ) : (
+            <>
+            {cardViewActive && (
+              <button onClick={startRearrange} className="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+                {t('dashboard.rearrange')}
+              </button>
+            )}
             {isFlow ? (
               /* R11: flow exports — branded PowerPoint of the charts + a full-study
                  spreadsheet, consolidated into one sky "Export" dropdown (2026-07-05).
@@ -781,6 +859,8 @@ export default function DashboardPage() {
                   {exportingPptx ? '...' : t('dashboard.exportPptx')}
                 </button>
               </>
+            )}
+            </>
             )}
           </div>
         </div>
@@ -861,10 +941,10 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-500">{t('dashboard.noEntriesHint')}</p>
           </div>
         )}
-        {!isFlow && dashboardView === 'demand' && data.totalEntries > 0 && (
-          <>
-            {/* Value/Failure pie (Layer 2+) */}
-            {activeLayer >= 2 && <ChartCard title={t('dashboard.valueVsFailure')}>
+        {!isFlow && dashboardView === 'demand' && data.totalEntries > 0 && (() => {
+          const cards: CardDescriptor[] = [];
+            // Value/Failure pie (Layer 2+)
+            if (activeLayer >= 2) cards.push({ id: 'valueVsFailure', node: (<ChartCard title={t('dashboard.valueVsFailure')}>
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" outerRadius={75} innerRadius={30} dataKey="value"
@@ -877,10 +957,10 @@ export default function DashboardPage() {
                   <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
                 </PieChart>
               </ResponsiveContainer>
-            </ChartCard>}
+            </ChartCard>) });
 
-            {/* Top 10 Demand Types (when demand types enabled) */}
-            {demandTypesEnabled && <ChartCard title={t('dashboard.top10')}>
+            // Top 10 Demand Types (when demand types enabled)
+            if (demandTypesEnabled) cards.push({ id: 'top10', node: (<ChartCard title={t('dashboard.top10')}>
               <ResponsiveContainer width="100%" height={Math.max(300, translatedDemandTypeCounts.length * 40 + 40)}>
                 <BarChart data={translatedDemandTypeCounts} layout="vertical" margin={{ left: 10, right: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} />
@@ -895,10 +975,10 @@ export default function DashboardPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-            </ChartCard>}
+            </ChartCard>) });
 
-            {/* Demand over time */}
-            {data.demandOverTime.length > 1 && (
+            // Demand over time
+            if (data.demandOverTime.length > 1) cards.push({ id: 'overTime', node: (
               <ChartCard title={t('dashboard.overTime')}>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={data.demandOverTime}>
@@ -912,10 +992,10 @@ export default function DashboardPage() {
                   </LineChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
+            ) });
 
-            {/* Handling pie + Handling by classification (Layer 3+) */}
-            {activeLayer >= 3 && <div className="grid md:grid-cols-2 gap-4">
+            // Handling pie + Handling by classification (Layer 3+)
+            if (activeLayer >= 3) cards.push({ id: 'handlingGroup', node: (<div className="grid md:grid-cols-2 gap-4">
               <ChartCard title={t('dashboard.handlingTitle')}>
                 <ResponsiveContainer width="100%" height={250}>
                   <PieChart>
@@ -948,10 +1028,10 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            </div>}
+            </div>) });
 
-            {/* Failures by original value demand type */}
-            {activeLayer >= 2 && data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0 && (
+            // Failures by original value demand type
+            if (activeLayer >= 2 && data.failuresByOriginalValueDemand && data.failuresByOriginalValueDemand.length > 0) cards.push({ id: 'failureByValueDemand', node: (
               <ChartCard title={t('dashboard.failureByValueTitle')}>
                 <ResponsiveContainer width="100%" height={Math.max(200, data.failuresByOriginalValueDemand.length * 45)}>
                   <BarChart data={data.failuresByOriginalValueDemand} layout="vertical" margin={{ left: 10, right: 60 }}>
@@ -969,10 +1049,10 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
+            ) });
 
-            {/* Failure Flow Sankey */}
-            {activeLayer >= 2 && (() => {
+            // Failure Flow Sankey
+            if (activeLayer >= 2) { const _node = (() => {
               const flowLinks = data.failureFlowLinks || [];
               if (flowLinks.length === 0) return null;
               const sankeyData = buildSankeyData(flowLinks, tl);
@@ -1000,10 +1080,10 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'failureFlow', node: _node }); }
 
-            {/* Lifecycle Sankey + failure-by-stage */}
-            {data.lifecycleEnabled && (data.lifecycleByStageAndDemandType?.length ?? 0) > 0 && (() => {
+            // Lifecycle Sankey + failure-by-stage
+            if (data.lifecycleEnabled && (data.lifecycleByStageAndDemandType?.length ?? 0) > 0) { const _node = (() => {
               const rows = data.lifecycleByStageAndDemandType;
               const stageOrder: string[] = [];
               const stageSeen = new Set<string>();
@@ -1076,9 +1156,9 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'lifecycleSankey', node: _node }); }
 
-            {data.lifecycleEnabled && (data.lifecycleFailureByStage?.length ?? 0) > 0 && (
+            if (data.lifecycleEnabled && (data.lifecycleFailureByStage?.length ?? 0) > 0) cards.push({ id: 'lifecycleByStage', node: (
               <ChartCard title={t('dashboard.lifecycleByStage')}>
                 <ResponsiveContainer width="100%" height={Math.max(220, data.lifecycleFailureByStage.length * 38 + 40)}>
                   <BarChart data={data.lifecycleFailureByStage} layout="vertical" margin={{ left: 10, right: 40 }}>
@@ -1092,9 +1172,10 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
+            ) });
 
-            {/* Contact methods + What Matters */}
+            // Contact methods + What Matters
+            if (data.contactMethodCounts.length > 0 || data.whatMattersCounts.length > 0) cards.push({ id: 'contactWhatMattersGroup', node: (
             <div className="grid md:grid-cols-2 gap-4">
               {data.contactMethodCounts.length > 0 && (
                 <ChartCard title={t('dashboard.contactMethods')}>
@@ -1129,9 +1210,10 @@ export default function DashboardPage() {
                 </ChartCard>
               )}
             </div>
+            ) });
 
-            {/* Life Problems Being Solved (Phase 3) — demand-only, layer 2+ */}
-            {activeLayer >= 2 && data.lifeProblemCounts.length > 0 && (() => {
+            // Life Problems Being Solved (Phase 3) — demand-only, layer 2+
+            if (activeLayer >= 2 && data.lifeProblemCounts.length > 0) { const _node = (() => {
               const translated = data.lifeProblemCounts.map(d => ({ ...d, label: tl(d.label) }));
               const total = translated.reduce((s, r) => s + r.count, 0);
               const withPct = translated.map(r => ({
@@ -1153,10 +1235,10 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'lifeProblems', node: _node }); }
 
-            {/* What matters by classification (Layer 5+) */}
-            {activeLayer >= 5 && translatedWmByClassification.length > 0 && (
+            // What matters by classification (Layer 5+)
+            if (activeLayer >= 5 && translatedWmByClassification.length > 0) cards.push({ id: 'whatMattersByClass', node: (
               <ChartCard title={t('dashboard.whatMattersByClass')}>
                 <ResponsiveContainer width="100%" height={Math.max(250, translatedWmByClassification.length * 50 + 40)}>
                   <BarChart data={translatedWmByClassification} margin={{ left: 10, right: 10, bottom: 20 }}>
@@ -1174,10 +1256,10 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
+            ) });
 
-            {/* Point of transaction by classification */}
-            {translatedPotByClassification.length > 0 && (
+            // Point of transaction by classification
+            if (translatedPotByClassification.length > 0) cards.push({ id: 'pointOfTransaction', node: (
               <ChartCard title={t('dashboard.pointOfTransaction')}>
                 <ResponsiveContainer width="100%" height={Math.max(200, translatedPotByClassification.length * 50 + 40)}>
                   <BarChart data={translatedPotByClassification} layout="vertical" margin={{ left: 10, right: 80 }}>
@@ -1201,10 +1283,10 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartCard>
-            )}
+            ) });
 
-            {/* Failure causes bar chart (Layer 2+) */}
-            {activeLayer >= 2 && data.failureCauses.length > 0 && (() => {
+            // Failure causes bar chart (Layer 2+)
+            if (activeLayer >= 2 && data.failureCauses.length > 0) { const _node = (() => {
               const top10Causes = data.failureCauses.slice(0, 10);
               const totalCauses = top10Causes.reduce((s, fc) => s + fc.count, 0);
               const causesWithPct = top10Causes.map(fc => ({
@@ -1226,10 +1308,10 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'failureCauses', node: _node }); }
 
-            {/* Helping conditions bar chart (Layer 2+) — mirror of Failure Causes filtered to dimension = 'helps' */}
-            {activeLayer >= 2 && data.helpingConditions.length > 0 && (() => {
+            // Helping conditions bar chart (Layer 2+) — mirror of Failure Causes filtered to dimension = 'helps'
+            if (activeLayer >= 2 && data.helpingConditions.length > 0) { const _node = (() => {
               const top10 = data.helpingConditions.slice(0, 10);
               const total = top10.reduce((s, fc) => s + fc.count, 0);
               const withPct = top10.map(fc => ({
@@ -1251,10 +1333,10 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'helpingConditions', node: _node }); }
 
-            {/* What matters - word cloud */}
-            {notesByDate.size > 0 && (() => {
+            // What matters - word cloud
+            if (notesByDate.size > 0) { const _node = (() => {
               const themes = whatMattersThemes;
               if (themes.length === 0) return null;
               const maxCount = themes[0].count;
@@ -1287,10 +1369,10 @@ export default function DashboardPage() {
                   </div>
                 </ChartCard>
               );
-            })()}
+            })(); if (_node) cards.push({ id: 'whatMattersThemes', node: _node }); }
 
-            {/* What matters - free text notes */}
-            {notesByDate.size > 0 && (
+            // What matters - free text notes
+            if (notesByDate.size > 0) cards.push({ id: 'whatMattersNotes', node: (
               <ChartCard title={`${t('dashboard.whatMattersNotes')} (${data.whatMattersNotes.length})`}>
                 {/* Grouping toggle */}
                 {demandTypesEnabled && notesByDemandType.size > 1 && (
@@ -1348,10 +1430,21 @@ export default function DashboardPage() {
                   )}
                 </div>
               </ChartCard>
-            )}
+            ) });
 
-          </>
-        )}
+          return (
+            <CardStack
+              cards={cards}
+              order={layoutOrder('demand')}
+              hidden={layoutHidden('demand')}
+              rearranging={rearranging}
+              showLabel={t('dashboard.showCard')}
+              hideLabel={t('dashboard.hideCard')}
+              onReorder={applyDraftOrder}
+              onToggleHide={toggleDraftHidden}
+            />
+          );
+        })()}
 
         {/* ── WORK VIEW ── */}
         {!isFlow && dashboardView === 'work' && (
@@ -1373,10 +1466,10 @@ export default function DashboardPage() {
               <div className="rounded-xl p-8 text-center bg-white border border-gray-200 text-gray-600">
                 {t('dashboard.noEntries')}
               </div>
-            ) : (
-              <>
-                {/* Work value/failure/sequence pie */}
-                <ChartCard title={t('dashboard.workAnalysis')}>
+            ) : (() => {
+                const cards: CardDescriptor[] = [];
+                // Work value/failure/sequence pie
+                cards.push({ id: 'workAnalysis', node: (<ChartCard title={t('dashboard.workAnalysis')}>
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
@@ -1397,10 +1490,10 @@ export default function DashboardPage() {
                       <Legend wrapperStyle={{ fontSize: 12, color: THEME.textSecondary }} />
                     </PieChart>
                   </ResponsiveContainer>
-                </ChartCard>
+                </ChartCard>) });
 
-                {/* Work types by classification — stacked bar */}
-                {data.workTypesByClassification && data.workTypesByClassification.length > 0 && (() => {
+                // Work types by classification — stacked bar
+                if (data.workTypesByClassification && data.workTypesByClassification.length > 0) { const _node = (() => {
                   const hasSequence = data.workTypesByClassification.some(d => d.sequenceCount > 0);
                   const translated = data.workTypesByClassification.map(d => ({
                     label: tl(d.label),
@@ -1427,10 +1520,10 @@ export default function DashboardPage() {
                       </ResponsiveContainer>
                     </ChartCard>
                   );
-                })()}
+                })(); if (_node) cards.push({ id: 'workTypesByClass', node: _node }); }
 
-                {/* Work types total bar chart */}
-                {data.workTypeCounts.length > 0 && (
+                // Work types total bar chart
+                if (data.workTypeCounts.length > 0) cards.push({ id: 'workTypes', node: (
                   <ChartCard title={t('dashboard.workTypes')}>
                     <ResponsiveContainer width="100%" height={Math.max(200, data.workTypeCounts.length * 40 + 40)}>
                       <BarChart data={(() => {
@@ -1451,14 +1544,15 @@ export default function DashboardPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </ChartCard>
-                )}
+                ) });
 
-                {/* Work over time */}
-                {data.workOverTime.length > 1 && <WorkOverTimeCard rows={data.workOverTime} />}
+                // Work over time
+                if (data.workOverTime.length > 1) cards.push({ id: 'workOverTime', node: (<WorkOverTimeCard rows={data.workOverTime} />) });
 
-                {/* Phase 4C (2026-04-16) — Work Step analysis. Only visible when
-                    workStepTypesEnabled AND real step-tagged data exists. */}
-                {data.workStepTypesEnabled && data.workStepFrequency.length > 0 && (
+                // Phase 4C (2026-04-16) — Work Step analysis. Only visible when
+                // workStepTypesEnabled AND real step-tagged data exists. The whole
+                // section (heading + its charts) reorders as one tile.
+                if (data.workStepTypesEnabled && data.workStepFrequency.length > 0) cards.push({ id: 'workStepGroup', node: (
                   <>
                     <h3 className="text-base font-semibold text-gray-900 mt-4">{t('dashboard.workStepAnalysis')}</h3>
 
@@ -1543,9 +1637,21 @@ export default function DashboardPage() {
                       </ChartCard>
                     )}
                   </>
-                )}
-              </>
-            )}
+                ) });
+
+                return (
+                  <CardStack
+                    cards={cards}
+                    order={layoutOrder('work')}
+                    hidden={layoutHidden('work')}
+                    rearranging={rearranging}
+                    showLabel={t('dashboard.showCard')}
+                    hideLabel={t('dashboard.hideCard')}
+                    onReorder={applyDraftOrder}
+                    onToggleHide={toggleDraftHidden}
+                  />
+                );
+              })()}
           </>
         )}
 
@@ -1570,7 +1676,10 @@ export default function DashboardPage() {
                 <Card label={t('dashboard.demandWorkRatio')} value={`${demandRatio}% : ${workRatio}%`} />
               </div>
 
-              {/* Side-by-side demand vs work split */}
+              {(() => {
+              const cards: CardDescriptor[] = [];
+              // Side-by-side demand vs work split
+              cards.push({ id: 'demandWorkSplit', node: (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {/* Demand split mini pie */}
                 <ChartCard title={t('dashboard.demandSplit')}>
@@ -1620,9 +1729,10 @@ export default function DashboardPage() {
                   </ResponsiveContainer>
                 </ChartCard>
               </div>
+              ) });
 
-              {/* Top 3 system conditions */}
-              {data.failureCauses.length > 0 && (
+              // Top 3 system conditions
+              if (data.failureCauses.length > 0) cards.push({ id: 'topFailureCauses', node: (
                 <ChartCard title={t('dashboard.topFailureCauses')}>
                   <div className="space-y-2">
                     {data.failureCauses.slice(0, 3).map((fc, i) => (
@@ -1636,7 +1746,21 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 </ChartCard>
-              )}
+              ) });
+
+              return (
+                <CardStack
+                  cards={cards}
+                  order={layoutOrder('overview')}
+                  hidden={layoutHidden('overview')}
+                  rearranging={rearranging}
+                  showLabel={t('dashboard.showCard')}
+                  hideLabel={t('dashboard.hideCard')}
+                  onReorder={applyDraftOrder}
+                  onToggleHide={toggleDraftHidden}
+                />
+              );
+              })()}
             </>
           );
         })()}
@@ -1703,36 +1827,57 @@ export default function DashboardPage() {
                 ]}
               />
             </div>
-            {/* Touches per value demand (XmR) — one point per value demand (= one
-                case) = its total touch count. */}
-            <TouchesPerCaseChart
-              code={code}
-              dateFrom={capRange.from}
-              dateTo={capRange.to}
-              valueDemands={valueDemandFilter}
-              status={statusFilter}
-              valueSteps={valueSteps}
-            />
-            {/* People per value demand (XmR) — one point per value demand = the
-                number of distinct people who worked on it. Directly below touches. */}
-            <PeoplePerCaseChart
-              code={code}
-              dateFrom={capRange.from}
-              dateTo={capRange.to}
-              valueDemands={valueDemandFilter}
-              status={statusFilter}
-            />
-            {/* Blocks of work per value demand (XmR) — one point per value demand =
-                its step count for the chosen tag (Total / Value / Sequence / Failure
-                / Failure demand), as count or %. The work-composition companion. */}
-            <StepsPerCaseChart
-              code={code}
-              dateFrom={capRange.from}
-              dateTo={capRange.to}
-              valueDemands={valueDemandFilter}
-              status={statusFilter}
-              valueSteps={valueSteps}
-            />
+            {(() => {
+              const cards: CardDescriptor[] = [];
+              // Touches per value demand (XmR) — one point per value demand (= one
+              // case) = its total touch count.
+              cards.push({ id: 'touchesPerCase', node: (
+                <TouchesPerCaseChart
+                  code={code}
+                  dateFrom={capRange.from}
+                  dateTo={capRange.to}
+                  valueDemands={valueDemandFilter}
+                  status={statusFilter}
+                  valueSteps={valueSteps}
+                />
+              ) });
+              // People per value demand (XmR) — one point per value demand = the
+              // number of distinct people who worked on it. Directly below touches.
+              cards.push({ id: 'peoplePerCase', node: (
+                <PeoplePerCaseChart
+                  code={code}
+                  dateFrom={capRange.from}
+                  dateTo={capRange.to}
+                  valueDemands={valueDemandFilter}
+                  status={statusFilter}
+                />
+              ) });
+              // Blocks of work per value demand (XmR) — one point per value demand =
+              // its step count for the chosen tag (Total / Value / Sequence / Failure
+              // / Failure demand), as count or %. The work-composition companion.
+              cards.push({ id: 'stepsPerCase', node: (
+                <StepsPerCaseChart
+                  code={code}
+                  dateFrom={capRange.from}
+                  dateTo={capRange.to}
+                  valueDemands={valueDemandFilter}
+                  status={statusFilter}
+                  valueSteps={valueSteps}
+                />
+              ) });
+              return (
+                <CardStack
+                  cards={cards}
+                  order={layoutOrder('capability')}
+                  hidden={layoutHidden('capability')}
+                  rearranging={rearranging}
+                  showLabel={t('dashboard.showCard')}
+                  hideLabel={t('dashboard.hideCard')}
+                  onReorder={applyDraftOrder}
+                  onToggleHide={toggleDraftHidden}
+                />
+              );
+            })()}
             {/* What-matters scope — narrows ONLY the end-to-end charts below to
                 cases that chose a timed factor (relocated here 2026-07-09 so it
                 no longer looks like it scopes the whole dashboard). */}
