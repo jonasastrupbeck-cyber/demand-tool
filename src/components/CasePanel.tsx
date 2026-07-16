@@ -1086,6 +1086,9 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
         >
           {t('capture.caseSetAside')}
         </button>
+        {/* Divider + gap (2026-07-16): keeps Archive clear of Set aside so it
+            isn't pressed by accident. */}
+        <span className="w-px h-4 bg-gray-200 mx-1.5" aria-hidden="true" />
         {archiveBtn}
       </div>
     </div>
@@ -1214,10 +1217,12 @@ export default function CasePanel({ code, studyName, demandTypes, handlingTypes,
           >
             {t('capture.caseSetAside')}
           </button>
-          {archiveBtn}
           </div>
-          {/* Right cell — empty, balances the left name so the pills stay centred. */}
-          <div aria-hidden="true" />
+          {/* Right cell — the Archive action, pushed to the FAR RIGHT (2026-07-16)
+              so it's well away from the Close/Set-aside pills and can't be hit by
+              accident. The 1fr side cells still balance, so the centre pills stay
+              centred exactly as before. */}
+          <div className="flex justify-end">{archiveBtn}</div>
       </div>
       {/* Responsive (2026-06-17): wide screens (lg+) keep the three frozen-pane
           columns (customer left · touch rail + composer middle · decisions right).
