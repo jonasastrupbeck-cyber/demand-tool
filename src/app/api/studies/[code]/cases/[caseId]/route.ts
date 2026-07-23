@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getStudyByCode, getCase, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, serializeCaseAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, deleteCase, verifyConsultantPin, type CaseWhatMattersValue } from '@/lib/queries';
+import { getStudyByCode, getCase, getCaseByRef, getCaseEntries, updateCase, getCaseWhatMatters, setCaseWhatMattersDate, setCaseWhatMattersValue, getCaseMilestones, getCaseLifeProblemIds, getCaseDemandTypeIds, getCaseSubquestionAnswers, serializeCaseAnswers, getMilestones, getCaseVisibleSubquestionIds, getApplicableMilestoneIds, recomputeCaseMilestone, recomputeCaseClosure, validateStudyRefs, deleteCase, verifyConsultantPin, type CaseWhatMattersValue } from '@/lib/queries';
 
 // Build the { whatMattersTypeId → ISO target date } map from junction rows.
 function targetDatesOf(wmRows: { whatMattersTypeId: string; targetDate: Date | null }[]) {
@@ -66,6 +66,28 @@ export async function PATCH(
 
   const body = await request.json();
   const data: Parameters<typeof updateCase>[1] = {};
+
+  // Case reference edit (2026-07-16) — from the consultant "Manage cases" list.
+  // Gate ONLY when caseRef is present so the un-PIN'd capture-side PATCH callers
+  // (status/date/channel/etc.) are unaffected. Reuses the same PIN + validation +
+  // uniqueness rules as archive/delete and case creation.
+  if (body.caseRef !== undefined) {
+    if (!verifyConsultantPin(study, typeof body.pin === 'string' ? body.pin : '')) {
+      return NextResponse.json({ error: 'Wrong PIN' }, { status: 403 });
+    }
+    const ref = typeof body.caseRef === 'string' ? body.caseRef.trim() : '';
+    if (!ref || ref.length > 64) {
+      return NextResponse.json({ error: 'caseRef must be 1–64 characters' }, { status: 400 });
+    }
+    // Per-study uniqueness (uniqStudyCaseRef): renaming onto another case's ref
+    // would hit the DB constraint. Reject with a stable code the client maps to a
+    // friendly message (a no-op rename to the same ref is allowed — same id).
+    const clash = await getCaseByRef(study.id, ref);
+    if (clash && clash.id !== caseId) {
+      return NextResponse.json({ error: 'duplicate-case-ref' }, { status: 409 });
+    }
+    data.caseRef = ref;
+  }
 
   if (body.demandTypeId !== undefined) data.demandTypeId = body.demandTypeId || null;
   if (body.status !== undefined) {

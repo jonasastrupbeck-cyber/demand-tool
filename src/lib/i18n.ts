@@ -4360,6 +4360,25 @@ const translations = {
     sv: 'Återställ',
     de: 'Wiederherstellen',
   },
+  // Case reference edit (2026-07-16): fix a mistyped case number in Manage cases.
+  'settings.caseEditAria': {
+    en: 'Edit case reference',
+    da: 'Rediger sagsnummer',
+    sv: 'Redigera ärendenummer',
+    de: 'Fallnummer bearbeiten',
+  },
+  'settings.caseRefExists': {
+    en: 'A case with that reference already exists.',
+    da: 'En sag med det nummer findes allerede.',
+    sv: 'Ett ärende med det numret finns redan.',
+    de: 'Ein Fall mit dieser Nummer existiert bereits.',
+  },
+  'settings.cancel': {
+    en: 'Cancel',
+    da: 'Annuller',
+    sv: 'Avbryt',
+    de: 'Abbrechen',
+  },
   'settings.caseDeletePermanent': {
     en: 'Delete permanently',
     da: 'Slet permanent',

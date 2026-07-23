@@ -2397,6 +2397,10 @@ export async function reorderCaseEntries(
 }
 
 export async function updateCase(caseId: string, data: {
+  // Case reference edit (2026-07-16). Plain rename — no side effects. The caller
+  // MUST have validated non-empty/≤64 and checked the per-study uniqueness
+  // (uniqStudyCaseRef) via getCaseByRef first; a raw collision here throws.
+  caseRef?: string;
   demandTypeId?: string | null;
   status?: 'open' | 'closed';
   openedAt?: Date;
@@ -2420,6 +2424,7 @@ export async function updateCase(caseId: string, data: {
   demandTypeIds?: string[];
 }) {
   const updateFields: Record<string, unknown> = {};
+  if (data.caseRef !== undefined) updateFields.caseRef = data.caseRef;
   if (data.demandTypeId !== undefined) updateFields.demandTypeId = data.demandTypeId;
   if (data.status !== undefined) {
     updateFields.status = data.status;
